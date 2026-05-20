@@ -59,6 +59,18 @@ externalPort = 3001
 localPort = 5000
 externalPort = 5000
 
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 22757
+externalPort = 3000
+
+[[ports]]
+localPort = 25937
+externalPort = 80
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
