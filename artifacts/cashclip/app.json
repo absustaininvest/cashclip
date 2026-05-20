@@ -439,7 +439,12 @@
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
+      "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
     }
   }
 }

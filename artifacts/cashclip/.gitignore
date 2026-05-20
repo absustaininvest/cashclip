@@ -45,7 +45,10 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
+
+# OTA signing — private key only (certificate is intentionally tracked)
+keys/
+*.key.pem
 
 # local env files
 .env*.local

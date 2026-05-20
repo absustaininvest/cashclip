@@ -184,6 +184,15 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 }
 
 export async function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  const consoleToken = process.env.INVECE;
+  if (consoleToken) {
+    const provided = req.headers["x-console-token"];
+    if (typeof provided !== "string" || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(consoleToken))) {
+      res.status(401).json({ error: "No token provided" });
+      return;
+    }
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "No token provided" });
