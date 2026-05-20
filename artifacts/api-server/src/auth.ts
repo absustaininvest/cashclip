@@ -22,6 +22,24 @@ function getJwtSecret(): string {
   if (s.length < 64) throw new Error("JWT_TRIDENTE is too short — must be at least 64 characters.");
   return s;
 }
+
+// ── Secret rotation support ───────────────────────────────────────────────────
+// During a key rotation:
+//   1. Set JWT_TRIDENTE_PREV = current JWT_TRIDENTE value
+//   2. Set JWT_TRIDENTE     = new 64-byte secret
+//   3. Restart the server — new tokens are signed with the new secret,
+//      but tokens signed with the old secret remain valid for their full 7d TTL.
+//   4. After 7 days all old tokens have expired — clear JWT_TRIDENTE_PREV.
+function getPrevJwtSecret(): string | null {
+  const s = process.env.JWT_TRIDENTE_PREV;
+  if (!s) return null;
+  if (s.length < 64) {
+    logger.warn("JWT_TRIDENTE_PREV is set but too short (<64 chars) — ignoring it");
+    return null;
+  }
+  return s;
+}
+
 const TOKEN_EXPIRY = "7d";
 
 // ── RIPRENDERE — refresh token layer ─────────────────────────────────────────
@@ -80,21 +98,27 @@ function generateToken(userId: string, role: string, tokenVersion: number): stri
 }
 
 function verifyToken(token: string): { userId: string; role: string; tokenVersion: number } | null {
-  try {
-    const decoded = jwt.verify(token, getJwtSecret());
-    if (
-      typeof decoded === "object" &&
-      decoded !== null &&
-      "userId" in decoded &&
-      "role" in decoded &&
-      "tokenVersion" in decoded
-    ) {
-      return decoded as { userId: string; role: string; tokenVersion: number };
+  const secrets: string[] = [getJwtSecret()];
+  const prev = getPrevJwtSecret();
+  if (prev) secrets.push(prev);
+
+  for (const secret of secrets) {
+    try {
+      const decoded = jwt.verify(token, secret);
+      if (
+        typeof decoded === "object" &&
+        decoded !== null &&
+        "userId" in decoded &&
+        "role" in decoded &&
+        "tokenVersion" in decoded
+      ) {
+        return decoded as { userId: string; role: string; tokenVersion: number };
+      }
+    } catch {
+      // try next secret
     }
-    return null;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 const SID_COOKIE = "sid";
