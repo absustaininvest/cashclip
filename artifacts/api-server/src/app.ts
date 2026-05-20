@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import path from "node:path";
@@ -30,6 +31,39 @@ if (!INVECE_SECRET) {
 
 const app: Express = express();
 app.set("trust proxy", 1);
+
+// ── SECURITY HEADERS (helmet) ─────────────────────────────────────────────────
+// Sets X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, HSTS,
+// Referrer-Policy, Permissions-Policy, and more on every response.
+app.use(
+  helmet({
+    // HSTS: tell browsers to only use HTTPS for 1 year (including subdomains).
+    // Only enforce in production to avoid breaking local dev over plain HTTP.
+    hsts: process.env.NODE_ENV === "production"
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+    // Content-Security-Policy: API only serves JSON + a handful of HTML pages.
+    // Inline scripts/styles are only needed on the few HTML landing pages;
+    // the mobile app talks directly to the JSON endpoints.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // needed for inline HTML pages
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameSrc: ["'self'", "https:"], // interstitial iframe needs https: targets
+        frameAncestors: ["'none'"], // prevents clickjacking
+        upgradeInsecureRequests: process.env.NODE_ENV === "production" ? [] : null,
+      },
+    },
+    crossOriginEmbedderPolicy: false, // avoid breaking iframe-based ad pages
+    referrerPolicy: { policy: "no-referrer" },
+  }),
+);
+
 app.use(cookieParser(INVECE_SECRET || undefined));
 
 // ── MAINTENANCE MODE ─────────────────────────────────────────────────────────
