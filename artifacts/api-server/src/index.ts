@@ -1,0 +1,61 @@
+import app from "./app";
+import { logger } from "./lib/logger";
+import { storage } from "./storage";
+import { RESERVED_ADMIN_USERNAMES } from "./auth";
+import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
+import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
+import bcrypt from "bcryptjs";
+
+loadPersistedIntegrationKeys();
+
+async function seedAdmins() {
+  const seedPassword = process.env["SEED_ADMIN_PASSWORD"];
+  if (!seedPassword) {
+    logger.info("SEED_ADMIN_PASSWORD not set — skipping admin account provisioning");
+    return;
+  }
+
+  const forceReset = process.env["SEED_ADMIN_FORCE_RESET"] === "true";
+
+  for (const username of RESERVED_ADMIN_USERNAMES) {
+    const existing = await storage.getUserByUsername(username);
+    if (!existing) {
+      const hashed = await bcrypt.hash(seedPassword, 12);
+      await storage.createUser({ username, password: hashed, role: "admin" });
+      logger.info({ username }, "Created admin account via seed — rotate this password immediately after first login");
+    } else if (existing.role !== "admin") {
+      logger.warn({ username }, "Reserved admin username exists but was NOT promoted — this account was publicly registered and is untrusted. Delete or rename it in the database, then set SEED_ADMIN_PASSWORD and restart to provision a trusted admin account.");
+    } else if (forceReset) {
+      const hashed = await bcrypt.hash(seedPassword, 12);
+      await storage.updateUserPassword(existing.id, hashed);
+      logger.warn({ username }, "Admin password RESET via SEED_ADMIN_FORCE_RESET — remove that env var immediately and rotate password after login");
+    } else {
+      logger.info({ username }, "Admin account already exists, skipping seed");
+    }
+  }
+}
+
+const rawPort = process.env["PORT"];
+
+if (!rawPort) {
+  throw new Error(
+    "PORT environment variable is required but was not provided.",
+  );
+}
+
+const port = Number(rawPort);
+
+if (Number.isNaN(port) || port <= 0) {
+  throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+app.listen(port, (err) => {
+  if (err) {
+    logger.error({ err }, "Error listening on port");
+    process.exit(1);
+  }
+
+  logger.info({ port }, "Server listening");
+  seedAdmins().catch((e) => logger.error({ err: e }, "Admin seed failed"));
+  startWebhookAuditCleanupJob();
+});

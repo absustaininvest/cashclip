@@ -1,0 +1,32 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hello": "tsx ./src/hello.ts",
+    "generate-pitch": "tsx ./src/generate-pitch.ts",
+    "generate-appstore-prep": "tsx ./src/generate-appstore-prep.ts",
+    "generate-launch-script": "tsx ./src/generate-launch-script.ts",
+    "generate-todo": "tsx ./src/generate-todo.ts",
+    "test-email": "tsx ./src/test-email.ts",
+    "bump-version": "tsx ./src/bump-version.ts",
+    "bump-build-number": "tsx ./src/bump-build-number.ts",
+    "check-build-number": "tsx ./src/check-build-number.ts",
+    "check-version": "tsx ./src/check-version.ts",
+    "reset-build-number": "tsx ./src/reset-build-number.ts",
+    "check-public-archives": "tsx ./src/check-public-archives.ts",
+    "check-signing-md-sync": "tsx ./src/check-signing-md-sync.ts",
+    "test": "node --import tsx/esm --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  },
+  "dependencies": {
+    "@types/pdfkit": "^0.17.6",
+    "nodemailer": "^8.0.7",
+    "pdfkit": "^0.18.0"
+  }
+}

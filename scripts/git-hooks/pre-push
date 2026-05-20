@@ -1,0 +1,61 @@
+#!/bin/sh
+# Buffer stdin once so multiple hooks can consume it.
+PUSH_INPUT=$(cat)
+
+# --- Git LFS check ---
+command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\n%s\n\n" "This repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'pre-push' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks')."; exit 2; }
+printf '%s\n' "$PUSH_INPUT" | git lfs pre-push "$@"
+LFS_EXIT=$?
+if [ "$LFS_EXIT" -ne 0 ]; then
+  exit "$LFS_EXIT"
+fi
+
+# --- Version-sync check ---
+# Runs check-signing-md-sync when any pushed commit touches app.json or
+# SIGNING.md.  The check exits 0 immediately when SIGNING.md is absent, so
+# contributors without that file are unaffected (opt-in via SIGNING.md).
+#
+# To opt in: create artifacts/cashclip/SIGNING.md (see SIGNING.md.template).
+# To skip once: git push --no-verify
+
+Z40=0000000000000000000000000000000000000000
+NEEDS_CHECK=0
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip branch deletions.
+  if [ "$local_sha" = "$Z40" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "$Z40" ]; then
+    # New branch: enumerate filenames from every commit not yet on any remote
+    # tracking branch.  `git log --name-only --format=""` emits one filename
+    # per line across all matching commits — no xargs, no per-commit loop.
+    changed=$(git log --name-only --format="" "$local_sha" --not --remotes \
+      2>/dev/null \
+      | grep -cE '^(artifacts/cashclip/app\.json|artifacts/cashclip/SIGNING\.md)$')
+  else
+    # Existing branch: aggregate diff between the remote tip and local tip.
+    changed=$(git diff --name-only "$remote_sha..$local_sha" 2>/dev/null \
+      | grep -cE '^(artifacts/cashclip/app\.json|artifacts/cashclip/SIGNING\.md)$')
+  fi
+
+  if [ "${changed:-0}" -gt 0 ]; then
+    NEEDS_CHECK=1
+    break
+  fi
+done <<INPUT
+$PUSH_INPUT
+INPUT
+
+if [ "$NEEDS_CHECK" -eq 1 ]; then
+  printf '\n[pre-push] app.json or SIGNING.md changed — running version-sync check...\n'
+  pnpm --filter @workspace/scripts run check-signing-md-sync
+  CHECK_EXIT=$?
+  if [ "$CHECK_EXIT" -ne 0 ]; then
+    printf '\n[pre-push] Version-sync check failed. Fix the mismatch or use --no-verify to skip.\n'
+    exit "$CHECK_EXIT"
+  fi
+fi
+
+exit 0

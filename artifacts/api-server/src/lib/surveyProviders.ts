@@ -1,0 +1,428 @@
+import crypto from "node:crypto";
+
+function md5hex(input: string): string {
+  return crypto.createHash("md5").update(input).digest("hex");
+}
+
+export type SurveyProviderKey = "pollfish" | "cint" | "lucid" | "cpx" | "bitlabs" | "internal";
+
+export interface ExternalSurvey {
+  id: string;
+  provider: SurveyProviderKey;
+  providerName: string;
+  title: string;
+  description: string;
+  reward: number;
+  estimatedMinutes: number;
+  category: string;
+  difficulty: "easy" | "medium" | "hard";
+  surveyUrl: string;
+  completionVerificationUrl?: string;
+}
+
+export interface ProviderConfig {
+  key: SurveyProviderKey;
+  name: string;
+  apiKey: string | undefined;
+  baseUrl: string;
+  isConfigured: boolean;
+}
+
+export interface SurveyListResponse {
+  surveys: ExternalSurvey[];
+  provider: SurveyProviderKey;
+  error?: string;
+}
+
+export interface CompletionVerifyRequest {
+  surveyId: string;
+  provider: SurveyProviderKey;
+  userId: string;
+  transactionId: string;
+}
+
+export interface CompletionVerifyResponse {
+  verified: boolean;
+  reward: number;
+  error?: string;
+}
+
+function getProviderConfigs(): ProviderConfig[] {
+  return [
+    {
+      key: "pollfish",
+      name: "Pollfish",
+      apiKey: process.env.POLLFISH_API_KEY,
+      baseUrl: "https://api.pollfish.com/v2",
+      isConfigured: !!process.env.POLLFISH_API_KEY,
+    },
+    {
+      key: "cint",
+      name: "Cint",
+      apiKey: process.env.CINT_API_KEY,
+      baseUrl: "https://api.cint.com/v1",
+      isConfigured: !!process.env.CINT_API_KEY,
+    },
+    {
+      key: "lucid",
+      name: "Lucid (Cint)",
+      apiKey: process.env.LUCID_API_KEY,
+      baseUrl: "https://api.samplicio.us/supply/v1",
+      isConfigured: !!process.env.LUCID_API_KEY,
+    },
+    {
+      key: "cpx",
+      name: "CPX Research",
+      apiKey: process.env.CPX_API_KEY,
+      baseUrl: "https://live.cpx-research.com/api",
+      isConfigured: !!process.env.CPX_API_KEY && !!process.env.CPX_APP_ID,
+    },
+    {
+      key: "bitlabs",
+      name: "BitLabs",
+      apiKey: process.env.BITLABS_API_KEY,
+      baseUrl: "https://api.bitlabs.ai/v1",
+      isConfigured: !!process.env.BITLABS_API_KEY,
+    },
+  ];
+}
+
+function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined): string {
+  if (!url) return "";
+  if (!apiKey || !url.includes(apiKey)) return url;
+  try {
+    const parsed = new URL(url);
+    const toRemove: string[] = [];
+    parsed.searchParams.forEach((value, key) => {
+      if (value === apiKey) toRemove.push(key);
+    });
+    if (toRemove.length === 0) {
+      const pathSegments = parsed.pathname.split("/");
+      const cleaned = pathSegments.filter((seg) => seg !== apiKey).join("/");
+      parsed.pathname = cleaned;
+    } else {
+      toRemove.forEach((key) => parsed.searchParams.delete(key));
+    }
+    return parsed.toString();
+  } catch {
+    return url.split("?")[0] || "";
+  }
+}
+
+async function fetchPollfishSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/surveys/available`, {
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) throw new Error(`Pollfish API error: ${res.status}`);
+    const data = await res.json() as any;
+    const surveys: ExternalSurvey[] = (data.surveys || []).map((s: any) => ({
+      id: `pollfish_${s.survey_id || s.id}`,
+      provider: "pollfish" as SurveyProviderKey,
+      providerName: "Pollfish",
+      title: s.survey_name || s.title || "Pollfish Survey",
+      description: s.description || "Complete this survey to earn a reward.",
+      reward: typeof s.reward_value === "number" ? s.reward_value : parseFloat(s.reward_value || "0.50"),
+      estimatedMinutes: s.loi || s.estimated_minutes || 5,
+      category: s.category || "General",
+      difficulty: (s.loi && s.loi <= 5 ? "easy" : s.loi <= 10 ? "medium" : "hard") as "easy" | "medium" | "hard",
+      surveyUrl: sanitizeSurveyUrl(s.survey_url || `https://wss.pollfish.com/link/survey?survey_id=${s.survey_id || s.id}`, config.apiKey),
+    }));
+    return surveys;
+  } catch (err) {
+    return [];
+  }
+}
+
+async function fetchCintSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/surveys/available`, {
+      headers: {
+        "X-Api-Key": config.apiKey!,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) throw new Error(`Cint API error: ${res.status}`);
+    const data = await res.json() as any;
+    const surveys: ExternalSurvey[] = (data.surveys || data.items || []).map((s: any) => ({
+      id: `cint_${s.id || s.surveyId}`,
+      provider: "cint" as SurveyProviderKey,
+      providerName: "Cint",
+      title: s.name || s.title || "Cint Research Survey",
+      description: s.description || "Market research survey from Cint.",
+      reward: typeof s.cpi === "number" ? s.cpi : parseFloat(s.cpi || "1.00"),
+      estimatedMinutes: s.loi || s.length_of_interview || 8,
+      category: s.category || "Market Research",
+      difficulty: (s.loi && s.loi <= 6 ? "easy" : s.loi <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
+      surveyUrl: sanitizeSurveyUrl(s.link || s.survey_url || `https://survey.cint.com/${s.id || s.surveyId}`, config.apiKey),
+    }));
+    return surveys;
+  } catch (err) {
+    return [];
+  }
+}
+
+async function fetchLucidSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/surveys/available`, {
+      headers: {
+        Authorization: config.apiKey!,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) throw new Error(`Lucid API error: ${res.status}`);
+    const data = await res.json() as any;
+    const surveys: ExternalSurvey[] = (data.AllSurveys || data.surveys || []).map((s: any) => ({
+      id: `lucid_${s.SurveyNumber || s.id}`,
+      provider: "lucid" as SurveyProviderKey,
+      providerName: "Lucid (Cint)",
+      title: s.SurveyName || s.title || "Lucid Research Survey",
+      description: s.SurveyBrief || s.description || "Research survey from Lucid marketplace.",
+      reward: typeof s.CPI === "number" ? s.CPI : parseFloat(s.CPI || "1.20"),
+      estimatedMinutes: s.LOI || s.loi || 10,
+      category: s.SurveyGroup || s.category || "Research",
+      difficulty: (s.LOI && s.LOI <= 6 ? "easy" : s.LOI <= 15 ? "medium" : "hard") as "easy" | "medium" | "hard",
+      surveyUrl: sanitizeSurveyUrl(s.SurveyURL || s.survey_url || `https://www.samplicio.us/s/${s.SurveyNumber || s.id}`, config.apiKey),
+    }));
+    return surveys;
+  } catch (err) {
+    return [];
+  }
+}
+
+export function buildCpxWallUrl(userId: string, appId: string, apiKey: string): string {
+  const secureHash = md5hex(`${userId}-${apiKey}`);
+  return `https://offers.cpx-research.com/index.php?app_id=${encodeURIComponent(appId)}&ext_user_id=${encodeURIComponent(userId)}&secure_hash=${encodeURIComponent(secureHash)}`;
+}
+
+async function fetchCpxSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {
+  const appId = process.env.CPX_APP_ID;
+  if (!appId || !config.apiKey || !userId) return [];
+  return [
+    {
+      id: "cpx_wall",
+      provider: "cpx" as SurveyProviderKey,
+      providerName: "CPX Research",
+      title: "CPX Research Surveys",
+      description: "Earn cash completing paid surveys from CPX Research. Multiple surveys available — payouts credited automatically.",
+      reward: 0.50,
+      estimatedMinutes: 5,
+      category: "Multiple Topics",
+      difficulty: "easy" as "easy" | "medium" | "hard",
+      surveyUrl: buildCpxWallUrl(userId, appId, config.apiKey),
+    },
+  ];
+}
+
+async function fetchBitlabsSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/client/surveys`, {
+      headers: {
+        "X-Api-Token": config.apiKey!,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) throw new Error(`BitLabs API error: ${res.status}`);
+    const data = await res.json() as any;
+    const list = data.data?.surveys || data.surveys || [];
+    const surveys: ExternalSurvey[] = list.map((s: any) => ({
+      id: `bitlabs_${s.id || s.network_id}`,
+      provider: "bitlabs" as SurveyProviderKey,
+      providerName: "BitLabs",
+      title: s.title || `BitLabs Survey (${s.category?.name || "General"})`,
+      description: s.description || "Quick paid survey from BitLabs.",
+      reward: typeof s.value === "number" ? s.value : parseFloat(s.value || s.cpi || "0.50"),
+      estimatedMinutes: parseInt(s.loi || s.length || "6", 10),
+      category: s.category?.name || "General",
+      difficulty: (parseInt(s.loi || "6", 10) <= 5 ? "easy" : parseInt(s.loi || "10", 10) <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
+      surveyUrl: sanitizeSurveyUrl(s.link || s.click_url, config.apiKey),
+    }));
+    return surveys;
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function fetchExternalSurveys(userId: string): Promise<SurveyListResponse[]> {
+  const configs = getProviderConfigs();
+  const configured = configs.filter((c) => c.isConfigured);
+
+  if (configured.length === 0) {
+    return [];
+  }
+
+  const results = await Promise.allSettled(
+    configured.map(async (config): Promise<SurveyListResponse> => {
+      let surveys: ExternalSurvey[] = [];
+      if (config.key === "pollfish") surveys = await fetchPollfishSurveys(config);
+      else if (config.key === "cint") surveys = await fetchCintSurveys(config);
+      else if (config.key === "lucid") surveys = await fetchLucidSurveys(config);
+      else if (config.key === "cpx") surveys = await fetchCpxSurveys(config, userId);
+      else if (config.key === "bitlabs") surveys = await fetchBitlabsSurveys(config);
+      return { surveys, provider: config.key };
+    })
+  );
+
+  return results
+    .filter((r): r is PromiseFulfilledResult<SurveyListResponse> => r.status === "fulfilled")
+    .map((r) => r.value);
+}
+
+interface ProviderCompletionPayload {
+  status?: string;
+  state?: string;
+  completed?: boolean;
+  verified?: boolean;
+  transaction_id?: string;
+  transactionId?: string;
+  user_id?: string;
+  userId?: string;
+  respondent_id?: string;
+  respondentId?: string;
+}
+
+function isCompletionPayloadValid(payload: ProviderCompletionPayload | null, transactionId: string, userId?: string): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const status = (payload.status || payload.state || "").toString().toLowerCase();
+  const completed = payload.completed === true || payload.verified === true;
+  const txn = (payload.transaction_id || payload.transactionId || "").toString();
+  const statusOk = ["completed", "complete", "success", "verified", "approved"].includes(status);
+  if (!statusOk && !completed) return false;
+  if (txn && txn !== transactionId) return false;
+  if (userId) {
+    const payloadUser = (payload.user_id || payload.userId || payload.respondent_id || payload.respondentId || "").toString();
+    if (payloadUser && payloadUser !== userId) return false;
+  }
+  return true;
+}
+
+async function safeJson(res: Response): Promise<ProviderCompletionPayload | null> {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text) as ProviderCompletionPayload;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyPollfishCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
+  try {
+    const rawId = surveyId.replace("pollfish_", "");
+    const res = await fetch(`https://api.pollfish.com/v2/surveys/${rawId}/completions/${transactionId}?user_id=${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyCintCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
+  try {
+    const rawId = surveyId.replace("cint_", "");
+    const res = await fetch(`https://api.cint.com/v1/surveys/${rawId}/completions/${transactionId}?respondent_id=${encodeURIComponent(userId)}`, {
+      headers: { "X-Api-Key": apiKey },
+    });
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyLucidCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
+  try {
+    const rawId = surveyId.replace("lucid_", "");
+    const res = await fetch(`https://api.samplicio.us/supply/v1/surveys/${rawId}/completions/${transactionId}?respondent_id=${encodeURIComponent(userId)}`, {
+      headers: { Authorization: apiKey },
+    });
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+  } catch {
+    return false;
+  }
+}
+
+function isStrictCompletionPayloadValid(payload: ProviderCompletionPayload | null, transactionId: string, userId: string): boolean {
+  if (!isCompletionPayloadValid(payload, transactionId, userId)) return false;
+  if (!payload) return false;
+  const txn = (payload.transaction_id || payload.transactionId || "").toString();
+  const payloadUser = (payload.user_id || payload.userId || payload.respondent_id || payload.respondentId || "").toString();
+  return txn === transactionId && payloadUser === userId;
+}
+
+async function verifyCpxCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
+  try {
+    const appId = process.env.CPX_APP_ID;
+    if (!appId) return false;
+    const rawId = surveyId.replace("cpx_", "");
+    // CPX transaction verification hash = MD5(ext_user_id + "-" + hash_key)
+    const secureHash = md5hex(`${userId}-${apiKey}`);
+    const res = await fetch(`https://live.cpx-research.com/api/get-transactions.php?app_id=${encodeURIComponent(appId)}&secure_hash=${encodeURIComponent(secureHash)}&ext_user_id=${encodeURIComponent(userId)}&trans_id=${encodeURIComponent(transactionId)}&survey_id=${encodeURIComponent(rawId)}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return false;
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyBitlabsCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
+  try {
+    const rawId = surveyId.replace("bitlabs_", "");
+    const res = await fetch(`https://api.bitlabs.ai/v1/client/transactions?survey_id=${encodeURIComponent(rawId)}&transaction_id=${encodeURIComponent(transactionId)}&user_id=${encodeURIComponent(userId)}`, {
+      headers: { "X-Api-Token": apiKey },
+    });
+    if (!res.ok) return false;
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
+  } catch {
+    return false;
+  }
+}
+
+export async function verifyProviderCompletion(req: CompletionVerifyRequest): Promise<CompletionVerifyResponse> {
+  const transactionId = (req.transactionId || "").trim();
+  if (transactionId.length === 0) {
+    return { verified: false, reward: 0, error: "transactionId is required for survey verification" };
+  }
+
+  const configs = getProviderConfigs();
+  const config = configs.find((c) => c.key === req.provider);
+
+  if (!config || !config.isConfigured) {
+    return { verified: false, reward: 0, error: `Provider ${req.provider} not configured` };
+  }
+
+  let verified = false;
+  if (req.provider === "pollfish") {
+    verified = await verifyPollfishCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+  } else if (req.provider === "cint") {
+    verified = await verifyCintCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+  } else if (req.provider === "lucid") {
+    verified = await verifyLucidCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+  } else if (req.provider === "cpx") {
+    verified = await verifyCpxCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+  } else if (req.provider === "bitlabs") {
+    verified = await verifyBitlabsCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+  }
+
+  return { verified, reward: 0, error: verified ? undefined : "Provider did not confirm completion" };
+}
+
+export function getConfiguredProviders(): ProviderConfig[] {
+  return getProviderConfigs().filter((c) => c.isConfigured);
+}
+
+export function getProviderStatus(): { provider: string; name: string; configured: boolean }[] {
+  return getProviderConfigs().map((c) => ({
+    provider: c.key,
+    name: c.name,
+    configured: c.isConfigured,
+  }));
+}

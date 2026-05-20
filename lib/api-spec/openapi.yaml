@@ -1,0 +1,863 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: CashClip API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: balance
+    description: Balance and transactions
+  - name: withdrawals
+    description: Withdrawal operations
+  - name: surveys
+    description: Survey operations
+  - name: offerwalls
+    description: Offerwall operations
+  - name: revenue
+    description: Revenue information
+  - name: integrations
+    description: Integration status
+  - name: admin
+    description: Admin operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /balance:
+    get:
+      operationId: getBalance
+      tags: [balance]
+      summary: Get user balance
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [balance]
+      summary: Get transaction history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionsResponse"
+
+  /withdrawals:
+    post:
+      operationId: createWithdrawal
+      tags: [withdrawals]
+      summary: Request a withdrawal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalRequest"
+      responses:
+        "201":
+          description: Withdrawal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalCreatedResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: getWithdrawals
+      tags: [withdrawals]
+      summary: Get user withdrawals
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Withdrawal list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalsResponse"
+
+  /surveys/providers:
+    get:
+      operationId: getSurveyProviders
+      tags: [surveys]
+      summary: Get survey providers
+      responses:
+        "200":
+          description: Survey providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvidersResponse"
+
+  /surveys/available:
+    get:
+      operationId: getAvailableSurveys
+      tags: [surveys]
+      summary: Get available surveys
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Available surveys
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SurveysResponse"
+
+  /surveys/start:
+    post:
+      operationId: startSurvey
+      tags: [surveys]
+      summary: Start a survey session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSurveyRequest"
+      responses:
+        "200":
+          description: Survey session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+
+  /surveys/complete:
+    post:
+      operationId: completeSurvey
+      tags: [surveys]
+      summary: Complete a survey and claim reward
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteSessionRequest"
+      responses:
+        "200":
+          description: Survey completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCompleteResponse"
+
+  /offerwalls/providers:
+    get:
+      operationId: getOfferwallProviders
+      tags: [offerwalls]
+      summary: Get offerwall providers
+      responses:
+        "200":
+          description: Offerwall providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvidersResponse"
+
+  /offerwalls/available:
+    get:
+      operationId: getAvailableOffers
+      tags: [offerwalls]
+      summary: Get available offers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Available offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OffersResponse"
+
+  /offerwalls/start:
+    post:
+      operationId: startOffer
+      tags: [offerwalls]
+      summary: Start an offer session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartOfferRequest"
+      responses:
+        "200":
+          description: Offer session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+
+  /offerwalls/complete:
+    post:
+      operationId: completeOffer
+      tags: [offerwalls]
+      summary: Complete an offer and claim reward
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteSessionRequest"
+      responses:
+        "200":
+          description: Offer completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCompleteResponse"
+
+  /revenue/sources:
+    get:
+      operationId: getRevenueSources
+      tags: [revenue]
+      summary: Get revenue sources
+      responses:
+        "200":
+          description: Revenue sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      type: object
+
+  /revenue/allocation:
+    get:
+      operationId: getRevenueAllocation
+      tags: [revenue]
+      summary: Get revenue allocation
+      responses:
+        "200":
+          description: Revenue allocation
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /revenue/metrics:
+    get:
+      operationId: getRevenueMetrics
+      tags: [revenue]
+      summary: Get revenue metrics
+      responses:
+        "200":
+          description: Revenue metrics
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /revenue/transparency:
+    get:
+      operationId: getRevenueTransparency
+      tags: [revenue]
+      summary: Get revenue transparency info
+      responses:
+        "200":
+          description: Revenue transparency
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /revenue/margin:
+    get:
+      operationId: getRevenueMargin
+      tags: [revenue]
+      summary: Get revenue margin breakdown
+      responses:
+        "200":
+          description: Revenue margin
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /integrations/status:
+    get:
+      operationId: getIntegrationsStatus
+      tags: [integrations]
+      summary: Get integration statuses
+      responses:
+        "200":
+          description: Integration statuses
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /integrations/{id}:
+    get:
+      operationId: getIntegration
+      tags: [integrations]
+      summary: Get a specific integration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Integration details
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/withdrawals:
+    get:
+      operationId: adminGetWithdrawals
+      tags: [admin]
+      summary: Get all withdrawals (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All withdrawals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalsResponse"
+
+  /admin/withdrawals/{id}:
+    patch:
+      operationId: adminUpdateWithdrawal
+      tags: [admin]
+      summary: Update withdrawal status (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                adminNote:
+                  type: string
+      responses:
+        "200":
+          description: Withdrawal updated
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /admin/withdrawals/{id}/payout:
+    post:
+      operationId: adminPayoutWithdrawal
+      tags: [admin]
+      summary: Process PayPal payout (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payout processed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /admin/paypal-status:
+    get:
+      operationId: adminGetPaypalStatus
+      tags: [admin]
+      summary: Get PayPal configuration status (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: PayPal status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  mode:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    AuthCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, username, role]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    UserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    WithdrawalTier:
+      type: object
+      properties:
+        amount:
+          type: number
+        bonusPercent:
+          type: number
+        bonusAmount:
+          type: number
+        totalPayout:
+          type: number
+        label:
+          type: string
+        tag:
+          type: string
+
+    BalanceResponse:
+      type: object
+      required: [balance, totalEarned]
+      properties:
+        balance:
+          type: number
+        totalEarned:
+          type: number
+        tiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/WithdrawalTier"
+        allTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/WithdrawalTier"
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        amount:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        refId:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+
+    TransactionsResponse:
+      type: object
+      required: [transactions]
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+
+    WithdrawalRequest:
+      type: object
+      required: [amount, paypalEmail]
+      properties:
+        amount:
+          type: number
+        paypalEmail:
+          type: string
+
+    Withdrawal:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        username:
+          type: string
+        amount:
+          type: string
+        bonusPercent:
+          type: string
+        bonusAmount:
+          type: string
+        totalPayout:
+          type: string
+        paypalEmail:
+          type: string
+        status:
+          type: string
+        adminNote:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        processedAt:
+          type: string
+          nullable: true
+
+    WithdrawalCreatedResponse:
+      type: object
+      properties:
+        withdrawal:
+          $ref: "#/components/schemas/Withdrawal"
+        balance:
+          type: number
+
+    WithdrawalsResponse:
+      type: object
+      required: [withdrawals]
+      properties:
+        withdrawals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Withdrawal"
+
+    Provider:
+      type: object
+      properties:
+        provider:
+          type: string
+        name:
+          type: string
+        configured:
+          type: boolean
+
+    ProvidersResponse:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Provider"
+        anyConfigured:
+          type: boolean
+
+    Survey:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        providerName:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        reward:
+          type: number
+        estimatedMinutes:
+          type: integer
+        category:
+          type: string
+        difficulty:
+          type: string
+        surveyUrl:
+          type: string
+
+    SurveysResponse:
+      type: object
+      properties:
+        surveys:
+          type: array
+          items:
+            $ref: "#/components/schemas/Survey"
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Provider"
+        count:
+          type: integer
+        message:
+          type: string
+
+    Offer:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        reward:
+          type: number
+        category:
+          type: string
+        offerUrl:
+          type: string
+
+    OffersResponse:
+      type: object
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Offer"
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Provider"
+        count:
+          type: integer
+        message:
+          type: string
+
+    StartSurveyRequest:
+      type: object
+      required: [surveyId, provider]
+      properties:
+        surveyId:
+          type: string
+        provider:
+          type: string
+        estimatedReward:
+          type: number
+
+    StartOfferRequest:
+      type: object
+      required: [offerId, provider]
+      properties:
+        offerId:
+          type: string
+        provider:
+          type: string
+        estimatedReward:
+          type: number
+
+    SessionStartResponse:
+      type: object
+      properties:
+        sessionToken:
+          type: string
+        estimatedReward:
+          type: number
+        expiresAt:
+          type: string
+        message:
+          type: string
+
+    CompleteSessionRequest:
+      type: object
+      required: [sessionToken, transactionId]
+      properties:
+        sessionToken:
+          type: string
+        transactionId:
+          type: string
+
+    SessionCompleteResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        reward:
+          type: number
+        balance:
+          type: number
+        totalEarned:
+          type: number
+        message:
+          type: string

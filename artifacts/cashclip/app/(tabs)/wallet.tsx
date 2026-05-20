@@ -1,0 +1,796 @@
+import React, { useState, useCallback, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Pressable,
+  Platform,
+  Alert,
+  RefreshControl,
+  Modal,
+  ScrollView,
+  TextInput,
+  ActivityIndicator,
+  Linking,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
+import Colors from "@/constants/colors";
+import {
+  getUserStats,
+  getTransactions,
+  getWithdrawalTiers,
+  type UserStats,
+  type Transaction,
+  type WithdrawalTier,
+} from "@/lib/storage";
+import { useLanguage } from "@/lib/LanguageContext";
+import { useAuth } from "@/lib/AuthContext";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { t as tFn, type Translations } from "@/lib/i18n";
+
+function extractApiErrorMessage(rawMsg: string, fallback: string): string {
+  const colonIdx = rawMsg.indexOf(":");
+  if (colonIdx === -1) return rawMsg || fallback;
+  const tail = rawMsg.slice(colonIdx + 1).trim();
+  if (!tail.startsWith("{")) return rawMsg;
+  try {
+    const parsed = JSON.parse(tail) as { error?: unknown };
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+  } catch (parseErr) {
+    console.warn("[wallet] failed to parse API error payload:", parseErr);
+  }
+  return rawMsg;
+}
+
+function TransactionItem({ item, t }: { item: Transaction; t: Translations }) {
+  const isPositive = item.amount > 0;
+  const iconName =
+    item.type === "withdrawn" ? "arrow-up-right" :
+    item.type === "bonus" ? "gift" :
+    item.type === "referral" ? "user-plus" :
+    item.type === "checkin" ? "check-circle" :
+    item.type === "spin" ? "rotate-cw" :
+    item.type === "mission" ? "target" :
+    "dollar-sign";
+  const iconColor = item.type === "withdrawn" ? Colors.error : item.type === "bonus" ? Colors.accent : Colors.primary;
+
+  const date = new Date(item.timestamp);
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric" });
+
+  return (
+    <View style={styles.txItem}>
+      <View style={[styles.txIcon, { backgroundColor: `${iconColor}15` }]}>
+        <Feather name={iconName as any} size={18} color={iconColor} />
+      </View>
+      <View style={styles.txInfo}>
+        <Text style={styles.txDesc}>{item.description}</Text>
+        <Text style={styles.txDate}>{dateStr} {t.wallet.at} {timeStr}</Text>
+      </View>
+      <Text style={[styles.txAmount, { color: isPositive ? Colors.primary : Colors.error }]}>
+        {isPositive ? "+" : ""}${Math.abs(item.amount).toFixed(2)}
+      </Text>
+    </View>
+  );
+}
+
+const TIER_TAG_KEYS: Record<string, keyof Translations["wallet"]> = {
+  Minimum: "tierMinimum",
+  Smart: "tierSmart",
+  Popular: "tierPopular",
+  "Best Value": "tierBestValue",
+  VIP: "tierVIP",
+  Elite: "tierElite",
+};
+
+function TierCard({
+  tier,
+  selected,
+  onSelect,
+  t,
+}: {
+  tier: WithdrawalTier;
+  selected: boolean;
+  onSelect: () => void;
+  t: Translations;
+}) {
+  const isPopular = tier.tag === "Popular" || tier.tag === "Best Value";
+  const translatedTag = t.wallet[TIER_TAG_KEYS[tier.tag] || "tierMinimum"] as string;
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onSelect();
+      }}
+      style={({ pressed }) => [
+        styles.tierCard,
+        selected && styles.tierCardSelected,
+        { opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+      ]}
+    >
+      {isPopular && (
+        <View style={styles.tierPopularBadge}>
+          <Ionicons name="star" size={10} color="#000" />
+          <Text style={styles.tierPopularText}>{translatedTag}</Text>
+        </View>
+      )}
+      {!isPopular && tier.tag !== "Minimum" && (
+        <View style={[styles.tierPopularBadge, { backgroundColor: "rgba(0,230,118,0.15)" }]}>
+          <Text style={[styles.tierPopularText, { color: Colors.primary }]}>{translatedTag}</Text>
+        </View>
+      )}
+
+      <Text style={[styles.tierAmount, selected && styles.tierAmountSelected]}>
+        ${tier.amount.toFixed(2)}
+      </Text>
+
+      {tier.bonusPercent > 0 ? (
+        <View style={styles.tierBonusRow}>
+          <Feather name="trending-up" size={12} color={Colors.accent} />
+          <Text style={styles.tierBonusText}>+{tier.bonusPercent}% {t.wallet.bonus}</Text>
+        </View>
+      ) : (
+        <Text style={styles.tierNoBonusText}>{t.wallet.noBonusLabel}</Text>
+      )}
+
+      {tier.bonusPercent > 0 && (
+        <Text style={styles.tierPayoutText}>
+          {t.wallet.youGet} ${tier.totalPayout.toFixed(2)}
+        </Text>
+      )}
+
+      <View style={[styles.tierRadio, selected && styles.tierRadioSelected]}>
+        {selected && <View style={styles.tierRadioDot} />}
+      </View>
+    </Pressable>
+  );
+}
+
+export default function WalletScreen() {
+  const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+  const { token } = useAuth();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [serverBalance, setServerBalance] = useState<number>(0);
+  const [serverTotalEarned, setServerTotalEarned] = useState<number>(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showInvestModal, setShowInvestModal] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<WithdrawalTier | null>(null);
+  const [tiers, setTiers] = useState<WithdrawalTier[]>([]);
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
+
+  const fetchServerBalance = useCallback(async (): Promise<{ balance: number; totalEarned: number } | null> => {
+    try {
+      const authToken = await AsyncStorage.getItem("cashclip_auth_token");
+      if (!authToken) return null;
+      const url = new URL("/api/balance", getApiUrl());
+      const res = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return { balance: Number(data.balance) || 0, totalEarned: Number(data.totalEarned) || 0 };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    const [s, t, srv] = await Promise.all([getUserStats(), getTransactions(), fetchServerBalance()]);
+    setStats(s);
+    setTransactions(t);
+    if (srv) {
+      setServerBalance(srv.balance);
+      setServerTotalEarned(srv.totalEarned);
+      setTiers(getWithdrawalTiers(srv.balance));
+    } else {
+      setTiers(getWithdrawalTiers(s.balance));
+    }
+  }, [fetchServerBalance]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, []);
+
+  const openWithdrawModal = useCallback(async () => {
+    const srv = await fetchServerBalance();
+    const effective = srv?.balance ?? 0;
+    if (srv) {
+      setServerBalance(srv.balance);
+      setServerTotalEarned(srv.totalEarned);
+    }
+    if (effective < 5) {
+      Alert.alert(
+        t.wallet.minimumNotReached,
+        srv
+          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $5 minimum.`
+          : t.wallet.needAtLeast
+      );
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTiers(getWithdrawalTiers(effective));
+    setSelectedTier(null);
+    setPaypalEmail("");
+    setShowWithdrawModal(true);
+  }, [fetchServerBalance, t]);
+
+  const handleWithdraw = useCallback(async () => {
+    if (!selectedTier || !paypalEmail.trim()) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(paypalEmail.trim())) {
+      Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
+      return;
+    }
+    setSubmitting(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    try {
+      await apiRequest("POST", "/api/withdrawals", {
+        amount: selectedTier.amount,
+        paypalEmail: paypalEmail.trim(),
+      });
+
+      setShowWithdrawModal(false);
+      Alert.alert(
+        t.wallet.withdrawalSuccessful,
+        `$${selectedTier.totalPayout.toFixed(2)} will be sent to ${paypalEmail.trim()} via PayPal. Please allow 3-5 business days for processing.`
+      );
+      await loadData();
+    } catch (err: unknown) {
+      const fallback = "Failed to submit withdrawal request";
+      const rawMsg = err instanceof Error ? err.message : fallback;
+      Alert.alert("Error", extractApiErrorMessage(rawMsg, fallback));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedTier, paypalEmail, t, loadData]);
+
+  if (!fontsLoaded || !stats) return null;
+
+  const webTopPad = Platform.OS === "web" ? 67 : 0;
+  const displayBalance = serverBalance;
+  const progressToNext = displayBalance < 5
+    ? (displayBalance / 5) * 100
+    : 100;
+  const nextTierAmount = displayBalance < 5 ? 5 : displayBalance < 10 ? 10 : displayBalance < 25 ? 25 : displayBalance < 50 ? 50 : displayBalance < 100 ? 100 : displayBalance < 250 ? 250 : null;
+  const nextTierBonus = nextTierAmount === 10 ? 3 : nextTierAmount === 25 ? 5 : nextTierAmount === 50 ? 8 : nextTierAmount === 100 ? 12 : nextTierAmount === 250 ? 15 : 0;
+
+  return (
+    <View style={[styles.container, { paddingTop: webTopPad }]}>
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : 16, paddingHorizontal: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <LinearGradient
+              colors={["#0D2818", "#0A1F14"]}
+              style={styles.balanceCard}
+            >
+              <View style={styles.balanceRow}>
+                <View>
+                  <Text style={styles.balanceLabel}>{t.wallet.totalBalance}</Text>
+                  <Text style={styles.balanceAmount}>${(serverBalance > 0 ? serverBalance : stats.balance).toFixed(2)}</Text>
+                </View>
+                <View style={styles.coinIcon}>
+                  <MaterialCommunityIcons name="wallet" size={28} color={Colors.primary} />
+                </View>
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>${(serverTotalEarned > 0 ? serverTotalEarned : stats.totalEarned).toFixed(2)}</Text>
+                  <Text style={styles.statLabel}>{t.wallet.totalEarned}</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.adsWatched}</Text>
+                  <Text style={styles.statLabel}>{t.wallet.adsWatched}</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.streak}</Text>
+                  <Text style={styles.statLabel}>{t.wallet.dayStreak}</Text>
+                </View>
+              </View>
+            </LinearGradient>
+
+            {nextTierAmount && (
+              <View style={styles.nextTierCard}>
+                <View style={styles.nextTierHeader}>
+                  <Feather name="trending-up" size={14} color={Colors.accent} />
+                  <Text style={styles.nextTierTitle}>
+                    {displayBalance < 5 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
+                  </Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${Math.min(((displayBalance / (nextTierAmount || 5)) * 100), 100)}%` as any }]} />
+                </View>
+                <Text style={styles.nextTierProgress}>
+                  ${displayBalance.toFixed(2)} / ${(nextTierAmount || 5).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.verifiedBalanceCard}>
+              <View style={styles.verifiedBalanceRow}>
+                <Feather name="shield" size={14} color={Colors.primary} />
+                <Text style={styles.verifiedBalanceLabel}>Verified withdrawable balance</Text>
+              </View>
+              <Text style={styles.verifiedBalanceAmount}>${serverBalance.toFixed(2)}</Text>
+              <Text style={styles.verifiedBalanceHint}>
+                Only earnings verified by survey and offer providers can be withdrawn.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={openWithdrawModal}
+              style={({ pressed }) => [
+                styles.withdrawButton,
+                serverBalance < 5 && styles.withdrawButtonDisabled,
+                { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+              ]}
+            >
+              <LinearGradient
+                colors={serverBalance >= 5 ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
+                style={styles.withdrawGradient}
+              >
+                <Feather name="send" size={18} color={serverBalance >= 5 ? Colors.background : Colors.textMuted} />
+                <Text style={[styles.withdrawText, serverBalance < 5 && { color: Colors.textMuted }]}>
+                  {serverBalance >= 5 ? t.wallet.withdrawFunds : tFn(t, "wallet.moreToWithdraw", { amount: (5 - serverBalance).toFixed(2) })}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable
+              disabled
+              style={[styles.investButton, { opacity: 0.5 }]}
+            >
+              <LinearGradient
+                colors={["#3a3a4a", "#2e2e3e"]}
+                style={styles.investGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Feather name="clock" size={18} color="#aaa" />
+                <Text style={[styles.investText, { color: "#aaa" }]}>Invest My Earnings</Text>
+                <View style={[styles.investBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
+                  <Text style={[styles.investBadgeText, { color: "#aaa" }]}>SOON</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+
+            <View style={styles.tierPreview}>
+              <Text style={styles.tierPreviewTitle}>Payout Limits</Text>
+              <View style={styles.tierMiniGrid}>
+                {[
+                  { label: "Minimum", value: "$5.00" },
+                  { label: "Daily Max", value: "$7.00" },
+                  { label: "Processing", value: "3–5 days" },
+                ].map((item) => (
+                  <View key={item.label} style={[styles.tierMiniItem, { minWidth: "30%" }]}>
+                    <Text style={styles.tierMiniAmt}>{item.value}</Text>
+                    <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>{t.wallet.transactionHistory}</Text>
+          </View>
+        }
+        renderItem={({ item }) => <TransactionItem item={item} t={t} />}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Feather name="inbox" size={40} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>{t.wallet.noTransactions}</Text>
+            <Text style={styles.emptySubtitle}>{t.wallet.watchAdsToStart}</Text>
+          </View>
+        }
+      />
+
+      {/* Invest Modal */}
+      <Modal visible={showInvestModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Power of the Penny 🪙</Text>
+              <Pressable onPress={() => setShowInvestModal(false)} hitSlop={12}>
+                <Feather name="x" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={styles.philosophyCard}>
+              <Text style={styles.philosophyQuoteMark}>"</Text>
+              <Text style={styles.philosophyText}>Don't you ever underestimate the power of the penny.</Text>
+              <Text style={styles.philosophyAuthor}>— Jorge Ballen, Founder & CEO</Text>
+            </View>
+
+            <View style={styles.investModalCard}>
+              <View style={styles.investModalCardHeader}>
+                <View style={[styles.investModalIcon, { backgroundColor: "#1B4332" }]}>
+                  <Text style={{ fontSize: 22 }}>🌱</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.investModalName}>Acorns</Text>
+                  <Text style={styles.investModalTagline}>Micro-investing, automatically</Text>
+                </View>
+                <View style={styles.investModalBadge}>
+                  <Text style={styles.investModalBadgeText}>$5–$10/referral</Text>
+                </View>
+              </View>
+              <Text style={styles.investModalDesc}>
+                Round-ups and recurring investments in diversified portfolios. Perfect for beginners turning small earnings into long-term wealth.
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Linking.openURL("https://acorns.com");
+                }}
+                style={({ pressed }) => [styles.investModalBtn, { opacity: pressed ? 0.85 : 1 }]}
+              >
+                <LinearGradient colors={["#3D9970", "#2ECC71"]} style={styles.investModalBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Feather name="external-link" size={15} color="#fff" />
+                  <Text style={styles.investModalBtnText}>Invest with Acorns</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            <View style={[styles.investModalCard, { marginBottom: 0 }]}>
+              <View style={styles.investModalCardHeader}>
+                <View style={[styles.investModalIcon, { backgroundColor: "#1E1B4B" }]}>
+                  <Text style={{ fontSize: 22 }}>📈</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.investModalName}>Stash</Text>
+                  <Text style={styles.investModalTagline}>Invest in what you believe in</Text>
+                </View>
+                <View style={[styles.investModalBadge, { backgroundColor: "rgba(124,58,237,0.15)" }]}>
+                  <Text style={[styles.investModalBadgeText, { color: "#7C3AED" }]}>$5–$15/referral</Text>
+                </View>
+              </View>
+              <Text style={styles.investModalDesc}>
+                Choose your own stocks and ETFs. Stash makes investing approachable with fractional shares starting at $1.
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Linking.openURL("https://stash.com");
+                }}
+                style={({ pressed }) => [styles.investModalBtn, { opacity: pressed ? 0.85 : 1 }]}
+              >
+                <LinearGradient colors={["#4F46E5", "#7C3AED"]} style={styles.investModalBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Feather name="external-link" size={15} color="#fff" />
+                  <Text style={styles.investModalBtnText}>Invest with Stash</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            <Text style={styles.investModalDisclaimer}>
+              Investing involves risk. CashClip may earn a referral commission when you open an account.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWithdrawModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t.wallet.chooseWithdrawalAmount}</Text>
+              <Pressable onPress={() => setShowWithdrawModal(false)} hitSlop={12}>
+                <Feather name="x" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              {t.wallet.higherAmountsBiggerBonuses}
+            </Text>
+            <Text style={styles.modalBalance}>
+              {t.wallet.available}: ${serverBalance.toFixed(2)}
+            </Text>
+
+            <ScrollView
+              style={styles.tiersScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              {tiers.map((tier) => (
+                <TierCard
+                  key={tier.amount}
+                  tier={tier}
+                  selected={selectedTier?.amount === tier.amount}
+                  onSelect={() => setSelectedTier(tier)}
+                  t={t}
+                />
+              ))}
+            </ScrollView>
+
+            {selectedTier && (
+              <>
+                <View style={styles.paypalSection}>
+                  <View style={styles.paypalHeader}>
+                    <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.paypalLabel}>PayPal Email</Text>
+                  </View>
+                  <View style={styles.paypalInputWrapper}>
+                    <TextInput
+                      style={styles.paypalInput}
+                      placeholder="your@email.com"
+                      placeholderTextColor={Colors.textMuted}
+                      value={paypalEmail}
+                      onChangeText={setPaypalEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      testID="withdraw-paypal-email"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>{t.wallet.withdrawal}</Text>
+                    <Text style={styles.summaryValue}>${selectedTier.amount.toFixed(2)}</Text>
+                  </View>
+                  {selectedTier.bonusPercent > 0 && (
+                    <View style={styles.summaryRow}>
+                      <Text style={[styles.summaryLabel, { color: Colors.accent }]}>{t.wallet.bonus} (+{selectedTier.bonusPercent}%)</Text>
+                      <Text style={[styles.summaryValue, { color: Colors.accent }]}>+${selectedTier.bonusAmount.toFixed(2)}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.summaryRow, styles.summaryTotal]}>
+                    <Text style={styles.summaryTotalLabel}>{t.wallet.youReceive}</Text>
+                    <Text style={styles.summaryTotalValue}>${selectedTier.totalPayout.toFixed(2)}</Text>
+                  </View>
+                  {paypalEmail.trim() ? (
+                    <View style={styles.paypalConfirmRow}>
+                      <Feather name="send" size={12} color={Colors.textSecondary} />
+                      <Text style={styles.paypalConfirmText}>via PayPal to {paypalEmail.trim()}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </>
+            )}
+
+            <Pressable
+              onPress={handleWithdraw}
+              disabled={!selectedTier || !paypalEmail.trim() || submitting}
+              style={({ pressed }) => [
+                styles.confirmButton,
+                (!selectedTier || !paypalEmail.trim()) && styles.confirmButtonDisabled,
+                { opacity: pressed ? 0.9 : 1 },
+              ]}
+              testID="withdraw-confirm"
+            >
+              <LinearGradient
+                colors={selectedTier && paypalEmail.trim() ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
+                style={styles.confirmGradient}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={Colors.background} />
+                ) : (
+                  <>
+                    <Feather name="check-circle" size={18} color={selectedTier && paypalEmail.trim() ? Colors.background : Colors.textMuted} />
+                    <Text style={[styles.confirmText, (!selectedTier || !paypalEmail.trim()) && { color: Colors.textMuted }]}>
+                      {selectedTier ? `${t.wallet.withdraw} $${selectedTier.totalPayout.toFixed(2)}` : t.wallet.selectAnAmount}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: { paddingTop: 12, paddingBottom: 8 },
+  balanceCard: {
+    borderRadius: 20, padding: 24, marginBottom: 12,
+    borderWidth: 1, borderColor: "rgba(0, 230, 118, 0.15)",
+  },
+  balanceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  balanceLabel: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textSecondary, marginBottom: 4 },
+  balanceAmount: { fontFamily: "Outfit_700Bold", fontSize: 40, color: Colors.text, letterSpacing: -1 },
+  coinIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(0, 230, 118, 0.1)", alignItems: "center", justifyContent: "center" },
+  statsRow: { flexDirection: "row", alignItems: "center" },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text, marginBottom: 2 },
+  statLabel: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted },
+  statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
+  nextTierCard: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: "rgba(255, 214, 0, 0.15)",
+  },
+  nextTierHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  nextTierTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.accent },
+  progressBar: { height: 6, backgroundColor: Colors.surfaceHighlight, borderRadius: 3, overflow: "hidden", marginBottom: 6 },
+  progressFill: { height: "100%", backgroundColor: Colors.accent, borderRadius: 3 },
+  nextTierProgress: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "right" },
+  verifiedBalanceCard: {
+    backgroundColor: "rgba(0,230,118,0.08)",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0,230,118,0.25)",
+  },
+  verifiedBalanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  verifiedBalanceLabel: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  verifiedBalanceAmount: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 26,
+    color: Colors.primary,
+    marginTop: 2,
+  },
+  verifiedBalanceHint: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  withdrawButton: { marginBottom: 10 },
+  withdrawButtonDisabled: { opacity: 0.7 },
+  withdrawGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14 },
+  withdrawText: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.background },
+  investButton: { marginBottom: 16 },
+  investGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
+  investText: { fontFamily: "Outfit_700Bold", fontSize: 15, color: "#fff" },
+  investBadge: { backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  investBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 9, color: "#fff", letterSpacing: 0.5 },
+  investModalCard: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  investModalCardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
+  investModalIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  investModalName: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.text, marginBottom: 2 },
+  investModalTagline: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted },
+  investModalBadge: { backgroundColor: "rgba(0,230,118,0.12)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  investModalBadgeText: { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: Colors.primary },
+  investModalDesc: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 19, marginBottom: 12 },
+  investModalBtn: { borderRadius: 12, overflow: "hidden" },
+  investModalBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12 },
+  investModalBtnText: { fontFamily: "Outfit_700Bold", fontSize: 14, color: "#fff" },
+  investModalDisclaimer: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center", marginTop: 12, lineHeight: 16 },
+  philosophyCard: {
+    backgroundColor: "rgba(79,70,229,0.1)", borderRadius: 14, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: "rgba(124,58,237,0.3)", alignItems: "center",
+  },
+  philosophyQuoteMark: { fontFamily: "Outfit_700Bold", fontSize: 48, color: "#7C3AED", lineHeight: 44, alignSelf: "flex-start", marginBottom: -8 },
+  philosophyText: { fontFamily: "Outfit_700Bold", fontSize: 15, color: "#fff", textAlign: "center", lineHeight: 22, fontStyle: "italic", marginBottom: 10 },
+  philosophyAuthor: { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: "#7C3AED", letterSpacing: 0.5 },
+  tierPreview: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 20,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  tierPreviewTitle: { fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text, marginBottom: 2 },
+  tierPreviewSubtitle: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginBottom: 12 },
+  tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tierMiniItem: {
+    width: "30%" as any, flexGrow: 1, backgroundColor: Colors.surfaceHighlight,
+    borderRadius: 10, paddingVertical: 10, alignItems: "center",
+  },
+  tierMiniAmt: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.text, marginBottom: 2 },
+  tierMiniPct: { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary },
+  sectionTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text, marginBottom: 12 },
+  txItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  txIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  txInfo: { flex: 1, marginLeft: 12, gap: 2 },
+  txDesc: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.text },
+  txDate: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted },
+  txAmount: { fontFamily: "Outfit_700Bold", fontSize: 15 },
+  separator: { height: 1, backgroundColor: Colors.border },
+  emptyState: { alignItems: "center", paddingVertical: 48, gap: 8 },
+  emptyTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 16, color: Colors.textSecondary },
+  emptySubtitle: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted },
+  modalOverlay: {
+    flex: 1, backgroundColor: Colors.overlay,
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: Platform.OS === "web" ? 34 : 32,
+    maxHeight: "85%",
+  },
+  modalHandle: {
+    width: 36, height: 4, backgroundColor: Colors.border, borderRadius: 2,
+    alignSelf: "center", marginTop: 12, marginBottom: 16,
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  modalTitle: { fontFamily: "Outfit_700Bold", fontSize: 20, color: Colors.text },
+  modalSubtitle: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, marginBottom: 4 },
+  modalBalance: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.primary, marginBottom: 16 },
+  tiersScroll: { maxHeight: 320 },
+  tierCard: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 10,
+    borderWidth: 1.5, borderColor: Colors.border, alignItems: "center", position: "relative",
+  },
+  tierCardSelected: { borderColor: Colors.primary, backgroundColor: "rgba(0, 230, 118, 0.05)" },
+  tierPopularBadge: {
+    position: "absolute", top: -8, right: 12,
+    backgroundColor: Colors.accent, borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 2,
+    flexDirection: "row", alignItems: "center", gap: 3,
+  },
+  tierPopularText: { fontFamily: "Outfit_700Bold", fontSize: 10, color: "#000" },
+  tierAmount: { fontFamily: "Outfit_700Bold", fontSize: 26, color: Colors.text, marginBottom: 4 },
+  tierAmountSelected: { color: Colors.primary },
+  tierBonusRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
+  tierBonusText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.accent },
+  tierNoBonusText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, marginBottom: 2 },
+  tierPayoutText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary },
+  tierRadio: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2,
+    borderColor: Colors.border, alignItems: "center", justifyContent: "center",
+    marginTop: 8,
+  },
+  tierRadioSelected: { borderColor: Colors.primary },
+  tierRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  summaryCard: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  summaryLabel: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textSecondary },
+  summaryValue: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.text },
+  summaryTotal: {
+    borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10, marginBottom: 0,
+  },
+  summaryTotalLabel: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.text },
+  summaryTotalValue: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.primary },
+  paypalSection: { marginBottom: 12 },
+  paypalHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  paypalLabel: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.text },
+  paypalInputWrapper: {
+    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, height: 48, justifyContent: "center",
+  },
+  paypalInput: { fontFamily: "Outfit_400Regular", fontSize: 15, color: Colors.text },
+  paypalConfirmRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
+  paypalConfirmText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary },
+  confirmButton: { marginBottom: 8 },
+  confirmButtonDisabled: { opacity: 0.6 },
+  confirmGradient: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 16, borderRadius: 14,
+  },
+  confirmText: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.background },
+});
