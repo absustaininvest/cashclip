@@ -89,7 +89,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/app/version", (_req, res) => {
     const minVersion = process.env.MIN_APP_VERSION ?? "1.1.0";
     const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.1.0";
-    res.json({ minVersion, currentVersion });
+    const maintenance = process.env.MAINTENANCE_MODE === "true";
+    const maintenanceMessage = process.env.MAINTENANCE_MESSAGE ?? "We're upgrading our systems to serve you better. We'll be back shortly — thank you for your patience!";
+    res.json({ minVersion, currentVersion, maintenance, maintenanceMessage });
   });
 
   const revenueSources: RevenueSource[] = [

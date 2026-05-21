@@ -83,6 +83,11 @@ if (MAINTENANCE_MODE) {
     ) {
       return next();
     }
+    // Always allow the version endpoint so the app can read the maintenance
+    // flag and show a proper in-app maintenance screen instead of a raw 503.
+    if (req.path === "/api/app/version" || req.path.startsWith("/api/app/version")) {
+      return next();
+    }
     res.status(503);
     res.setHeader("Retry-After", "3600");
     if (req.accepts(["html", "json"]) === "html") {

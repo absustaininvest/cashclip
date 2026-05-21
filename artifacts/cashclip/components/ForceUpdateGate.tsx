@@ -11,10 +11,13 @@ import { getApiUrl } from "@/lib/query-client";
 import { APP_VERSION } from "@/constants/app";
 import Colors from "@/constants/colors";
 
-type GateState = "checking" | "ok" | "blocked";
+type GateState = "checking" | "ok" | "blocked" | "maintenance";
 
 export function ForceUpdateGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>("checking");
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string>(
+    "We're upgrading our systems to serve you better. We'll be back shortly — thank you for your patience!"
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -28,11 +31,16 @@ export function ForceUpdateGate({ children }: { children: React.ReactNode }) {
           if (res.status === 426) {
             setState("blocked");
           } else {
-            setState("ok");
+            const data = await res.json();
+            if (data?.maintenance === true) {
+              if (data?.maintenanceMessage) setMaintenanceMessage(data.maintenanceMessage);
+              setState("maintenance");
+            } else {
+              setState("ok");
+            }
           }
         }
       } catch {
-        // Network error — let the app through; the main screens handle errors.
         if (!cancelled) setState("ok");
       }
     })();
@@ -71,6 +79,17 @@ export function ForceUpdateGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (state === "maintenance") {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.icon}>🔧</Text>
+        <Text style={styles.title}>System Upgrade</Text>
+        <Text style={styles.body}>{maintenanceMessage}</Text>
+        <Text style={styles.sub}>Your balance and earnings are safe.</Text>
+      </View>
+    );
+  }
+
   return <>{children}</>;
 }
 
@@ -81,6 +100,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 32,
+  },
+  icon: {
+    fontSize: 48,
+    marginBottom: 20,
   },
   title: {
     fontSize: 26,
@@ -94,8 +117,14 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
     color: "#AAAAAA",
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 16,
     lineHeight: 24,
+  },
+  sub: {
+    fontSize: 14,
+    fontFamily: "Outfit_400Regular",
+    color: Colors.primary,
+    textAlign: "center",
   },
   btn: {
     backgroundColor: Colors.primary,
