@@ -109,10 +109,10 @@ export function registerEarningsRoutes(app: Express): void {
     message: { error: "Too many requests — slow down" },
   });
 
-  // 10 claim requests per hour per user (prevents claim-hammering)
+  // 5 claim requests per hour per user (prevents claim-hammering)
   const claimLimit = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: 10,
+    max: 5,
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => (req as AuthRequest).userId ?? "anon",
