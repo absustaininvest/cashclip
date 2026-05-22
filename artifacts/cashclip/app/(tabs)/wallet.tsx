@@ -12,7 +12,6 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -162,7 +161,6 @@ export default function WalletScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [showInvestModal, setShowInvestModal] = useState(false);
   const [selectedTier, setSelectedTier] = useState<WithdrawalTier | null>(null);
   const [tiers, setTiers] = useState<WithdrawalTier[]>([]);
   const [paypalEmail, setPaypalEmail] = useState("");
@@ -365,23 +363,6 @@ export default function WalletScreen() {
               </LinearGradient>
             </Pressable>
 
-            <Pressable
-              disabled
-              style={[styles.investButton, { opacity: 0.5 }]}
-            >
-              <LinearGradient
-                colors={["#3a3a4a", "#2e2e3e"]}
-                style={styles.investGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Feather name="clock" size={18} color="#aaa" />
-                <Text style={[styles.investText, { color: "#aaa" }]}>Invest My Earnings</Text>
-                <View style={[styles.investBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
-                  <Text style={[styles.investBadgeText, { color: "#aaa" }]}>SOON</Text>
-                </View>
-              </LinearGradient>
-            </Pressable>
 
             <View style={styles.tierPreview}>
               <Text style={styles.tierPreviewTitle}>Payout Limits</Text>
@@ -413,89 +394,6 @@ export default function WalletScreen() {
         }
       />
 
-      {/* Invest Modal */}
-      <Modal visible={showInvestModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Power of the Penny 🪙</Text>
-              <Pressable onPress={() => setShowInvestModal(false)} hitSlop={12}>
-                <Feather name="x" size={24} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            <View style={styles.philosophyCard}>
-              <Text style={styles.philosophyQuoteMark}>"</Text>
-              <Text style={styles.philosophyText}>Don't you ever underestimate the power of the penny.</Text>
-              <Text style={styles.philosophyAuthor}>— Jorge Ballen, Founder & CEO</Text>
-            </View>
-
-            <View style={styles.investModalCard}>
-              <View style={styles.investModalCardHeader}>
-                <View style={[styles.investModalIcon, { backgroundColor: "#1B4332" }]}>
-                  <Text style={{ fontSize: 22 }}>🌱</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.investModalName}>Acorns</Text>
-                  <Text style={styles.investModalTagline}>Micro-investing, automatically</Text>
-                </View>
-                <View style={styles.investModalBadge}>
-                  <Text style={styles.investModalBadgeText}>$5–$10/referral</Text>
-                </View>
-              </View>
-              <Text style={styles.investModalDesc}>
-                Round-ups and recurring investments in diversified portfolios. Perfect for beginners turning small earnings into long-term wealth.
-              </Text>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  Linking.openURL("https://acorns.com");
-                }}
-                style={({ pressed }) => [styles.investModalBtn, { opacity: pressed ? 0.85 : 1 }]}
-              >
-                <LinearGradient colors={["#3D9970", "#2ECC71"]} style={styles.investModalBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Feather name="external-link" size={15} color="#fff" />
-                  <Text style={styles.investModalBtnText}>Invest with Acorns</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-
-            <View style={[styles.investModalCard, { marginBottom: 0 }]}>
-              <View style={styles.investModalCardHeader}>
-                <View style={[styles.investModalIcon, { backgroundColor: "#1E1B4B" }]}>
-                  <Text style={{ fontSize: 22 }}>📈</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.investModalName}>Stash</Text>
-                  <Text style={styles.investModalTagline}>Invest in what you believe in</Text>
-                </View>
-                <View style={[styles.investModalBadge, { backgroundColor: "rgba(124,58,237,0.15)" }]}>
-                  <Text style={[styles.investModalBadgeText, { color: "#7C3AED" }]}>$5–$15/referral</Text>
-                </View>
-              </View>
-              <Text style={styles.investModalDesc}>
-                Choose your own stocks and ETFs. Stash makes investing approachable with fractional shares starting at $1.
-              </Text>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  Linking.openURL("https://stash.com");
-                }}
-                style={({ pressed }) => [styles.investModalBtn, { opacity: pressed ? 0.85 : 1 }]}
-              >
-                <LinearGradient colors={["#4F46E5", "#7C3AED"]} style={styles.investModalBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Feather name="external-link" size={15} color="#fff" />
-                  <Text style={styles.investModalBtnText}>Invest with Stash</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-
-            <Text style={styles.investModalDisclaimer}>
-              Investing involves risk. CashClip may earn a referral commission when you open an account.
-            </Text>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={showWithdrawModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -670,33 +568,6 @@ const styles = StyleSheet.create({
   withdrawButtonDisabled: { opacity: 0.7 },
   withdrawGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14 },
   withdrawText: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.background },
-  investButton: { marginBottom: 16 },
-  investGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
-  investText: { fontFamily: "Outfit_700Bold", fontSize: 15, color: "#fff" },
-  investBadge: { backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  investBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 9, color: "#fff", letterSpacing: 0.5 },
-  investModalCard: {
-    backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  investModalCardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
-  investModalIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  investModalName: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.text, marginBottom: 2 },
-  investModalTagline: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted },
-  investModalBadge: { backgroundColor: "rgba(0,230,118,0.12)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  investModalBadgeText: { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: Colors.primary },
-  investModalDesc: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 19, marginBottom: 12 },
-  investModalBtn: { borderRadius: 12, overflow: "hidden" },
-  investModalBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12 },
-  investModalBtnText: { fontFamily: "Outfit_700Bold", fontSize: 14, color: "#fff" },
-  investModalDisclaimer: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center", marginTop: 12, lineHeight: 16 },
-  philosophyCard: {
-    backgroundColor: "rgba(79,70,229,0.1)", borderRadius: 14, padding: 16, marginBottom: 16,
-    borderWidth: 1, borderColor: "rgba(124,58,237,0.3)", alignItems: "center",
-  },
-  philosophyQuoteMark: { fontFamily: "Outfit_700Bold", fontSize: 48, color: "#7C3AED", lineHeight: 44, alignSelf: "flex-start", marginBottom: -8 },
-  philosophyText: { fontFamily: "Outfit_700Bold", fontSize: 15, color: "#fff", textAlign: "center", lineHeight: 22, fontStyle: "italic", marginBottom: 10 },
-  philosophyAuthor: { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: "#7C3AED", letterSpacing: 0.5 },
   tierPreview: {
     backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 20,
     borderWidth: 1, borderColor: Colors.border,
