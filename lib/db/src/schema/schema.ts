@@ -341,10 +341,14 @@ export const earnTokens = pgTable("earn_tokens", {
   claimableAt: timestamp("claimable_at", { withTimezone: true }).notNull(),
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
   status: text("status").notNull().default("pending"),
+  // Populated only for AdMob SSV tokens — used to prevent replay attacks.
+  // PostgreSQL UNIQUE allows multiple NULLs, so non-SSV tokens are unaffected.
+  transactionId: varchar("transaction_id"),
 }, (t) => ({
   userIdx: index("earn_tokens_user_idx").on(t.userId),
   userStatusIdx: index("earn_tokens_user_status_idx").on(t.userId, t.status),
   claimableIdx: index("earn_tokens_claimable_idx").on(t.status, t.claimableAt),
+  txnIdx: uniqueIndex("earn_tokens_txn_id_idx").on(t.transactionId),
 }));
 
 export type EarnToken = typeof earnTokens.$inferSelect;
