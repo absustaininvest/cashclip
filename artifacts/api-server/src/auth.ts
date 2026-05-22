@@ -560,6 +560,23 @@ export function registerAuthRoutes(app: Express) {
   // Only works for accounts that already have role=admin in the database.
   app.post("/api/auth/operator-recovery", async (req: Request, res: Response): Promise<void> => {
     try {
+      // Require X-Console-Token (INVECE layer) — same guard used on all admin routes.
+      // This means an attacker must possess BOTH JWT_TRIDENTE and INVECE to recover.
+      const consoleToken = process.env.INVECE;
+      if (consoleToken) {
+        const provided = req.headers["x-console-token"];
+        let tokenMatch = false;
+        try {
+          tokenMatch = typeof provided === "string" &&
+            provided.length === consoleToken.length &&
+            crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(consoleToken));
+        } catch { tokenMatch = false; }
+        if (!tokenMatch) {
+          logger.warn({ ip: req.ip }, "operator-recovery blocked: missing/invalid X-Console-Token");
+          res.status(401).json({ error: "Unauthorized" }); return;
+        }
+      }
+
       const { operatorKey, username } = req.body;
       if (!operatorKey || !username) {
         res.status(400).json({ error: "operatorKey and username are required" }); return;

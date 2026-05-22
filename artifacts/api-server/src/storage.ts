@@ -625,6 +625,14 @@ export class DatabaseStorage implements IStorage {
     try {
       return await db.transaction(async (tx) => {
         const now = new Date();
+
+        // Row-level lock: serialize concurrent claims on the same session token.
+        // Prevents a race where two simultaneous requests for the same session
+        // both see status='pending' before either commits.
+        await tx.execute(
+          sql`SELECT id FROM reward_sessions WHERE session_token = ${sessionToken} AND user_id = ${userId} FOR UPDATE`,
+        );
+
         const updateSet: Record<string, unknown> = { status: "completed", completedAt: now };
         if (providerTransactionId) {
           updateSet.providerTransactionId = providerTransactionId;
