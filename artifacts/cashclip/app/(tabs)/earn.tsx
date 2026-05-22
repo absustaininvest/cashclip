@@ -48,8 +48,6 @@ import {
   getUserStats,
   performDailyCheckin,
   getDailyCheckinInfo,
-  canSpinToday,
-  recordSpin,
   getDailyMissions,
   getWeeklyMissions,
   claimMissionReward,
@@ -57,22 +55,36 @@ import {
   type DailyMission,
   type WeeklyMission,
 } from "@/lib/storage";
+import {
+  recordEarnAction,
+  claimAllReady,
+  refreshPendingFromServer,
+  canSpinNow,
+  recordSpinTimestamp,
+  getNextSpinTime,
+  formatPoints,
+  formatCountdown,
+  pointsToUsd,
+  type PendingState,
+} from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DAILY_GOAL = 20;
 
+// Visual-only wheel segments — actual reward is server-issued after spin
 const WHEEL_SEGMENTS = [
-  { value: 0.01, label: "$0.01", color: "#E53935" },
-  { value: 0.03, label: "$0.03", color: "#FB8C00" },
-  { value: 0.05, label: "$0.05", color: "#FDD835" },
-  { value: 0.10, label: "$0.10", color: "#43A047" },
-  { value: 0.15, label: "$0.15", color: "#00ACC1" },
-  { value: 0.20, label: "$0.20", color: "#1E88E5" },
-  { value: 0.25, label: "$0.25", color: "#8E24AA" },
-  { value: 0.50, label: "$0.50", color: "#D81B60" },
+  { value: 50,  label: "50 pts",  color: "#E53935" },
+  { value: 80,  label: "80 pts",  color: "#FB8C00" },
+  { value: 100, label: "100 pts", color: "#FDD835" },
+  { value: 150, label: "150 pts", color: "#43A047" },
+  { value: 200, label: "200 pts", color: "#00ACC1" },
+  { value: 300, label: "300 pts", color: "#1E88E5" },
+  { value: 400, label: "400 pts", color: "#8E24AA" },
+  { value: 500, label: "500 pts", color: "#D81B60" },
 ];
 
-const DAY_REWARDS = [0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.24];
+// Check-in streak visual rewards (pts) — server awards 100 pts per check-in
+const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
 
 function AdCard({
   ad,
@@ -308,9 +320,9 @@ function SpinRewardModal({
               color={Colors.accent}
             />
             <Text style={styles.spinRewardTitle}>{t.earn.congratulations}</Text>
-            <Text style={styles.spinRewardAmount}>+${reward.toFixed(2)}</Text>
+            <Text style={styles.spinRewardAmount}>+{reward} pts</Text>
             <Text style={styles.spinRewardSubtext}>
-              {t.earn.addedToBalance}
+              Added to pending earnings — claim after 3 hours
             </Text>
             <Pressable onPress={onClose} style={styles.claimButton}>
               <LinearGradient
@@ -567,10 +579,13 @@ export default function EarnScreen() {
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [spinAvailable, setSpinAvailable] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [spinReward, setSpinReward] = useState(0);
+  const [spinReward, setSpinReward] = useState(0); // pts from server
   const [showSpinReward, setShowSpinReward] = useState(false);
   const [dailyMissions, setDailyMissions] = useState<DailyMission[]>([]);
   const [weeklyMissions, setWeeklyMissions] = useState<WeeklyMission[]>([]);
+  const [pendingState, setPendingState] = useState<PendingState | null>(null);
+  const [nextSpinTime, setNextSpinTime] = useState<number | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const balancePulse = useSharedValue(1);
   const wheelRotation = useSharedValue(0);
@@ -584,19 +599,23 @@ export default function EarnScreen() {
   const wheelSize = Math.min(SCREEN_WIDTH - 64, 280);
 
   const loadAll = useCallback(async () => {
-    const [s, checkinInfo, canSpin, dm, wm] = await Promise.all([
+    const [s, checkinInfo, spinReady, dm, wm, pending, spinNext] = await Promise.all([
       getUserStats(),
       getDailyCheckinInfo(),
-      canSpinToday(),
+      canSpinNow(),
       getDailyMissions(),
       getWeeklyMissions(),
+      refreshPendingFromServer(),
+      getNextSpinTime(),
     ]);
     setStats(s);
     setCheckedInToday(checkinInfo.checkedInToday);
     setCheckinStreak(checkinInfo.checkinStreak);
-    setSpinAvailable(canSpin);
+    setSpinAvailable(spinReady);
     setDailyMissions(dm);
     setWeeklyMissions(wm);
+    if (pending) setPendingState(pending);
+    setNextSpinTime(spinNext);
   }, []);
 
   useEffect(() => {
@@ -611,6 +630,8 @@ export default function EarnScreen() {
     const result = await performDailyCheckin();
     setCheckedInToday(true);
     setCheckinStreak(result.streak);
+    // Issue server earn token — non-blocking, UI optimistic
+    recordEarnAction("checkin", "Daily check-in");
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),
       withSpring(1, { damping: 8 })
@@ -623,26 +644,26 @@ export default function EarnScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsSpinning(true);
 
-    const segmentIndex = Math.floor(Math.random() * 8);
-    const reward = WHEEL_SEGMENTS[segmentIndex].value;
-    const segmentAngle = (segmentIndex * 360) / 8;
+    // Spin animation — visual only, reward is server-determined
+    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
+    const segmentAngle = (segmentIndex * 360) / WHEEL_SEGMENTS.length;
     const targetRotation = 360 * 5 + (360 - segmentAngle);
 
     wheelRotation.value = withTiming(
       wheelRotation.value + targetRotation,
       { duration: 4000, easing: Easing.out(Easing.cubic) },
-      (finished) => {
-        if (finished) {
-          // handled below via timeout
-        }
-      }
     );
 
     setTimeout(async () => {
-      await recordSpin(reward);
-      setSpinReward(reward);
-      setIsSpinning(false);
+      // Lock spin timer client-side immediately
+      await recordSpinTimestamp();
       setSpinAvailable(false);
+      setNextSpinTime(Date.now() + 2 * 60 * 60 * 1000);
+      // Get server-authoritative points
+      const token = await recordEarnAction("spin", "Spin wheel");
+      const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
+      setSpinReward(pts);
+      setIsSpinning(false);
       setShowSpinReward(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await loadAll();
@@ -673,6 +694,8 @@ export default function EarnScreen() {
         setAdPreloaded(isRewardedAdPreloaded());
         if (result.rewarded) {
           await recordAdWatch();
+          // Issue server earn token for watching a rewarded ad
+          recordEarnAction("rewarded_ad", "Watched rewarded ad");
           await loadAll();
           balancePulse.value = withSequence(
             withSpring(1.1, { damping: 4 }),
@@ -708,6 +731,8 @@ export default function EarnScreen() {
     trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
+    // Issue server earn token for the simulated ad completion
+    recordEarnAction("rewarded_ad", "Watched rewarded ad");
     await loadAll();
     setShowModal(false);
     setWatchingAd(null);
@@ -721,6 +746,8 @@ export default function EarnScreen() {
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await claimMissionReward(id, false);
+      // Issue server earn token for completing a daily mission
+      recordEarnAction("mission_daily", "Daily mission completed");
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),
@@ -734,6 +761,8 @@ export default function EarnScreen() {
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await claimMissionReward(id, true);
+      // Issue server earn token for completing a weekly mission
+      recordEarnAction("mission_weekly", "Weekly mission completed");
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),
@@ -742,6 +771,31 @@ export default function EarnScreen() {
     },
     []
   );
+
+  const handleClaimAll = useCallback(async () => {
+    if (isClaiming) return;
+    setIsClaiming(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const result = await claimAllReady();
+      if (!result || result.claimed === 0) {
+        Alert.alert("Nothing to claim", "Your earnings are still in the 3-hour pending window. Check back later.");
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        "Earnings Claimed!",
+        `$${result.creditedUsd.toFixed(2)} has been added to your verified balance.`
+      );
+      await loadAll();
+      balancePulse.value = withSequence(
+        withSpring(1.15, { damping: 4 }),
+        withSpring(1, { damping: 8 })
+      );
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [isClaiming, loadAll]);
 
   const balanceStyle = useAnimatedStyle(() => ({
     transform: [{ scale: balancePulse.value }],
@@ -772,12 +826,32 @@ export default function EarnScreen() {
             colors={[Colors.surfaceLight, Colors.surface]}
             style={styles.earningsCard}
           >
-            <Text style={styles.earningsLabel}>{t.earn.todaysEarnings}</Text>
+            <Text style={styles.earningsLabel}>Pending Earnings</Text>
             <Animated.View style={balanceStyle}>
               <Text style={styles.earningsAmount}>
-                ${stats.balance.toFixed(2)}
+                {formatPoints((pendingState?.pendingPoints ?? 0) + (pendingState?.claimablePoints ?? 0))}
               </Text>
             </Animated.View>
+            {(pendingState?.claimablePoints ?? 0) > 0 && (
+              <Pressable
+                onPress={handleClaimAll}
+                disabled={isClaiming}
+                style={styles.claimReadyBadge}
+              >
+                <Feather name="download" size={12} color={Colors.background} />
+                <Text style={styles.claimReadyText}>
+                  {isClaiming
+                    ? "Claiming..."
+                    : `${formatPoints(pendingState!.claimablePoints)} ready — tap to claim`}
+                </Text>
+              </Pressable>
+            )}
+            {(pendingState?.pendingPoints ?? 0) > 0 && (pendingState?.claimablePoints ?? 0) === 0 && (
+              <View style={styles.streakRow}>
+                <Feather name="clock" size={14} color={Colors.textMuted} />
+                <Text style={[styles.streakText, { color: Colors.textMuted }]}>Claimable after 3-hour window</Text>
+              </View>
+            )}
             <View style={styles.streakRow}>
               <Ionicons name="flame" size={16} color={Colors.accent} />
               <Text style={styles.streakText}>{stats.streak} {t.earn.dayStreak}</Text>
@@ -844,7 +918,7 @@ export default function EarnScreen() {
                       isCurrent && { color: Colors.primary },
                     ]}
                   >
-                    ${reward.toFixed(2)}
+                    {reward} pts
                   </Text>
                 </View>
               );
@@ -993,7 +1067,9 @@ export default function EarnScreen() {
                   ? t.earn.spinning
                   : spinAvailable
                   ? t.earn.spin
-                  : t.earn.comeBackTomorrow}
+                  : nextSpinTime
+                    ? `Next spin in ${formatCountdown(nextSpinTime)}`
+                    : "Spin again in 2h"}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -1536,6 +1612,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     marginBottom: 8,
+  },
+  claimReadyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  claimReadyText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 13,
+    color: Colors.background,
   },
 
   dailyGoal: {

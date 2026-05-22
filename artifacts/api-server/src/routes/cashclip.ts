@@ -24,6 +24,7 @@ import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured } from "../paypal";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
+import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
@@ -80,6 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
   registerSurveyRoutes(app);
   registerOfferwallRoutes(app);
+  registerEarningsRoutes(app);
 
   // ── App version check ───────────────────────────────────────────────────
   // Public endpoint — exempt from version gate (see app.ts appVersionMiddleware).

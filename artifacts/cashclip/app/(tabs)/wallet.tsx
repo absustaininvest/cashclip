@@ -214,11 +214,11 @@ export default function WalletScreen() {
       setServerBalance(srv.balance);
       setServerTotalEarned(srv.totalEarned);
     }
-    if (effective < 5) {
+    if (effective < 1) {
       Alert.alert(
         t.wallet.minimumNotReached,
         srv
-          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $5 minimum.`
+          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $1.00 minimum.`
           : t.wallet.needAtLeast
       );
       return;
@@ -265,11 +265,11 @@ export default function WalletScreen() {
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const displayBalance = serverBalance;
-  const progressToNext = displayBalance < 5
-    ? (displayBalance / 5) * 100
+  const progressToNext = displayBalance < 1
+    ? (displayBalance / 1) * 100
     : 100;
-  const nextTierAmount = displayBalance < 5 ? 5 : displayBalance < 10 ? 10 : displayBalance < 25 ? 25 : displayBalance < 50 ? 50 : displayBalance < 100 ? 100 : displayBalance < 250 ? 250 : null;
-  const nextTierBonus = nextTierAmount === 10 ? 3 : nextTierAmount === 25 ? 5 : nextTierAmount === 50 ? 8 : nextTierAmount === 100 ? 12 : nextTierAmount === 250 ? 15 : 0;
+  const nextTierAmount = displayBalance < 1 ? 1 : displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : displayBalance < 7 ? 7 : null;
+  const nextTierBonus = 0;
 
   return (
     <View style={[styles.container, { paddingTop: webTopPad }]}>
@@ -321,14 +321,14 @@ export default function WalletScreen() {
                 <View style={styles.nextTierHeader}>
                   <Feather name="trending-up" size={14} color={Colors.accent} />
                   <Text style={styles.nextTierTitle}>
-                    {displayBalance < 5 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
+                    {displayBalance < 1 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${Math.min(((displayBalance / (nextTierAmount || 5)) * 100), 100)}%` as any }]} />
+                  <View style={[styles.progressFill, { width: `${Math.min(((displayBalance / (nextTierAmount || 1)) * 100), 100)}%` as any }]} />
                 </View>
                 <Text style={styles.nextTierProgress}>
-                  ${displayBalance.toFixed(2)} / ${(nextTierAmount || 5).toFixed(2)}
+                  ${displayBalance.toFixed(2)} / ${(nextTierAmount || 1).toFixed(2)}
                 </Text>
               </View>
             )}
@@ -348,17 +348,17 @@ export default function WalletScreen() {
               onPress={openWithdrawModal}
               style={({ pressed }) => [
                 styles.withdrawButton,
-                serverBalance < 5 && styles.withdrawButtonDisabled,
+                serverBalance < 1 && styles.withdrawButtonDisabled,
                 { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
               ]}
             >
               <LinearGradient
-                colors={serverBalance >= 5 ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
+                colors={serverBalance >= 1 ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
                 style={styles.withdrawGradient}
               >
-                <Feather name="send" size={18} color={serverBalance >= 5 ? Colors.background : Colors.textMuted} />
-                <Text style={[styles.withdrawText, serverBalance < 5 && { color: Colors.textMuted }]}>
-                  {serverBalance >= 5 ? t.wallet.withdrawFunds : tFn(t, "wallet.moreToWithdraw", { amount: (5 - serverBalance).toFixed(2) })}
+                <Feather name="send" size={18} color={serverBalance >= 1 ? Colors.background : Colors.textMuted} />
+                <Text style={[styles.withdrawText, serverBalance < 1 && { color: Colors.textMuted }]}>
+                  {serverBalance >= 1 ? t.wallet.withdrawFunds : tFn(t, "wallet.moreToWithdraw", { amount: (1 - serverBalance).toFixed(2) })}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -368,7 +368,7 @@ export default function WalletScreen() {
               <Text style={styles.tierPreviewTitle}>Payout Limits</Text>
               <View style={styles.tierMiniGrid}>
                 {[
-                  { label: "Minimum", value: "$5.00" },
+                  { label: "Minimum", value: "$1.00" },
                   { label: "Daily Max", value: "$7.00" },
                   { label: "Processing", value: "3–5 days" },
                 ].map((item) => (

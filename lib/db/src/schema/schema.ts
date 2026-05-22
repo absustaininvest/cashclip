@@ -325,3 +325,26 @@ export type User = typeof users.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type EarningsLedgerEntry = typeof earningsLedger.$inferSelect;
 export type RewardSession = typeof rewardSessions.$inferSelect;
+
+// ── EARN TOKENS ───────────────────────────────────────────────────────────────
+// Server-issued pending earn tokens. Each action (ad watch, check-in, spin,
+// mission, game) creates a token here. Tokens are claimable after 3 hours.
+// The 3-hour window is enforced server-side at claim time — the client can
+// never self-report or forge points.
+export const earnTokens = pgTable("earn_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  points: integer("points").notNull(),
+  actionType: text("action_type").notNull(),
+  description: text("description").notNull().default(""),
+  earnedAt: timestamp("earned_at", { withTimezone: true }).notNull().defaultNow(),
+  claimableAt: timestamp("claimable_at", { withTimezone: true }).notNull(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  status: text("status").notNull().default("pending"),
+}, (t) => ({
+  userIdx: index("earn_tokens_user_idx").on(t.userId),
+  userStatusIdx: index("earn_tokens_user_status_idx").on(t.userId, t.status),
+  claimableIdx: index("earn_tokens_claimable_idx").on(t.status, t.claimableAt),
+}));
+
+export type EarnToken = typeof earnTokens.$inferSelect;
