@@ -763,7 +763,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/withdrawals", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
-      const { amount, paypalEmail } = req.body;
+      const { amount, paypalEmail, deviceCompromised } = req.body;
+      if (deviceCompromised === true) {
+        res.status(403).json({ error: "Withdrawals are not available on modified or rooted devices. Contact support if you believe this is an error." }); return;
+      }
       const numericAmount = typeof amount === "number" ? amount : parseFloat(String(amount));
       if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         res.status(400).json({ error: "Invalid withdrawal amount" }); return;

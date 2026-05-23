@@ -30,6 +30,7 @@ import {
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { t as tFn, type Translations } from "@/lib/i18n";
 
@@ -208,7 +209,19 @@ export default function WalletScreen() {
   }, []);
 
   const openWithdrawModal = useCallback(async () => {
-    const srv = await fetchServerBalance();
+    const [integrity, srv] = await Promise.all([
+      checkDeviceIntegrity(),
+      fetchServerBalance(),
+    ]);
+
+    if (!integrity.clean) {
+      Alert.alert(
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+      );
+      return;
+    }
+
     const effective = srv?.balance ?? 0;
     if (srv) {
       setServerBalance(srv.balance);
@@ -237,6 +250,16 @@ export default function WalletScreen() {
       Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
       return;
     }
+
+    const integrity = await checkDeviceIntegrity();
+    if (!integrity.clean) {
+      Alert.alert(
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+      );
+      return;
+    }
+
     setSubmitting(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -244,6 +267,7 @@ export default function WalletScreen() {
       await apiRequest("POST", "/api/withdrawals", {
         amount: selectedTier.amount,
         paypalEmail: paypalEmail.trim(),
+        deviceCompromised: !integrity.clean,
       });
 
       setShowWithdrawModal(false);
