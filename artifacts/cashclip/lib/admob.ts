@@ -14,6 +14,7 @@ export const AD_UNITS = {
   rewarded: "ca-app-pub-8679658921848348/7282036986",
   interstitial: "ca-app-pub-8679658921848348/8403546965",
   banner: "ca-app-pub-8679658921848348/3883360799",
+  native: "ca-app-pub-8679658921848348/4968536047",
 };
 
 export const TEST_AD_UNITS = {
@@ -32,11 +33,16 @@ export const TEST_AD_UNITS = {
     android: "ca-app-pub-3940256099942544/6300978111",
     default: "",
   }),
+  native: Platform.select({
+    ios: "ca-app-pub-3940256099942544/3986624511",
+    android: "ca-app-pub-3940256099942544/2247696110",
+    default: "",
+  }),
 };
 
 const isDev = __DEV__;
 
-export function getAdUnitId(type: "rewarded" | "interstitial" | "banner"): string {
+export function getAdUnitId(type: "rewarded" | "interstitial" | "banner" | "native"): string {
   if (isDev) return TEST_AD_UNITS[type] || "";
   return AD_UNITS[type] || TEST_AD_UNITS[type] || "";
 }
