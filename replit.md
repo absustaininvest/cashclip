@@ -44,6 +44,8 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 - **Framework**: Express 5 + TypeScript
 - **Auth**: JWT via `JWT_TRIDENTE` secret
 - **Database**: PostgreSQL via Drizzle ORM (`@workspace/db`)
+- **Production URL**: `https://cash-clip.replit.app` (Replit deployment)
+- **Production API domain (baked into EAS builds)**: `api.cash-clip.app` — add as custom domain in Replit deployment panel, then set CNAME `api.cash-clip.app` → `cash-clip.replit.app` at DNS registrar
 
 ## AB Sustainability Investments (artifacts/absustain/)
 

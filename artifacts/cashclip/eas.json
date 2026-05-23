@@ -43,7 +43,7 @@
       "autoIncrement": false,
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
+        "EXPO_PUBLIC_DOMAIN": "api.cash-clip.app"
       },
       "ios": {
         "resourceClass": "m-medium",
