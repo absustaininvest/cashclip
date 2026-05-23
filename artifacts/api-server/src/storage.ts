@@ -19,6 +19,8 @@ import {
 import { db } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
 
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export type LedgerType =
   | "survey"
   | "offerwall"
@@ -274,7 +276,7 @@ export class DatabaseStorage implements IStorage {
     }
     const amountStr = amount.toFixed(2);
 
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTx) => {
       const isEarning = type === "survey" || type === "offerwall" || type === "bonus";
       const updateSet = isEarning
         ? {
@@ -323,7 +325,7 @@ export class DatabaseStorage implements IStorage {
     }
     const amountStr = amount.toFixed(2);
 
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTx) => {
       const [updated] = await tx
         .update(users)
         .set({
@@ -391,7 +393,7 @@ export class DatabaseStorage implements IStorage {
     const { userId, username, amount, bonusPercent, bonusAmount, totalPayout, paypalEmail, dailyCapMax, dayStart } = args;
     const amountStr = amount.toFixed(2);
 
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTx) => {
       // Acquire a row-level lock on the user row for the duration of this
       // transaction. Concurrent withdrawal requests for the same user will
       // block here until the first one commits or rolls back, which
@@ -623,7 +625,7 @@ export class DatabaseStorage implements IStorage {
   } | { conflict: "duplicate" } | { conflict: "not_claimable" }> {
     const { sessionToken, userId, type, description, providerTransactionId, finalReward } = args;
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: DbTx) => {
         const now = new Date();
 
         // Row-level lock: serialize concurrent claims on the same session token.
@@ -802,7 +804,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`coalesce(sum(case when ${adEvents.event} = 'reward_earned' then least(cast(${adEvents.rewardAmount} as numeric), 1.0) else 0 end), 0) desc`)
       .limit(limit);
 
-    return rows.map((r) => ({
+    return rows.map((r: (typeof rows)[number]) => ({
       userId: r.userId!,
       username: r.username,
       impressions: Number(r.impressions),
@@ -843,7 +845,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`date(${adEvents.createdAt}) desc`)
       .limit(90);
 
-    return rows.map((r) => ({
+    return rows.map((r: (typeof rows)[number]) => ({
       date: String(r.date),
       impressions: Number(r.impressions),
       completions: Number(r.completions),
@@ -1124,7 +1126,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(webhookAudit.ip, webhookAudit.provider)
       .orderBy(desc(count()))
       .limit(limit);
-    return rows.map((r) => ({
+    return rows.map((r: (typeof rows)[number]) => ({
       ip: r.ip,
       provider: r.provider,
       count: Number(r.count),
@@ -1144,7 +1146,7 @@ export class DatabaseStorage implements IStorage {
     const rows = await db
       .selectDistinct({ provider: webhookAudit.provider })
       .from(webhookAudit);
-    return rows.map((r) => r.provider).sort();
+    return rows.map((r: (typeof rows)[number]) => r.provider).sort();
   }
 }
 

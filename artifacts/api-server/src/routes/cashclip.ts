@@ -1670,21 +1670,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /** Publisher: create campaign */
   app.post("/api/publisher/campaigns", authMiddleware, async (req: AuthRequest, res) => {
     try {
-      const { z } = await import("zod/v4");
-      const schema = z.object({
-        title: z.string().min(3).max(80),
-        description: z.string().min(10).max(300),
-        targetUrl: z.url(),
-        rewardPerVisit: z.number().min(0.01).max(0.50),
-        totalBudget: z.number().min(0.50).max(500),
-      });
-      const parsed = schema.safeParse(req.body);
-      if (!parsed.success) { res.status(400).json({ error: "Invalid campaign data" }); return; }
+      const { title, description, targetUrl, rewardPerVisit, totalBudget } = req.body ?? {};
+      if (
+        typeof title !== "string" || title.length < 3 || title.length > 80 ||
+        typeof description !== "string" || description.length < 10 || description.length > 300 ||
+        typeof targetUrl !== "string" || (() => { try { new URL(targetUrl); return false; } catch { return true; } })() ||
+        typeof rewardPerVisit !== "number" || rewardPerVisit < 0.01 || rewardPerVisit > 0.50 ||
+        typeof totalBudget !== "number" || totalBudget < 0.50 || totalBudget > 500
+      ) { res.status(400).json({ error: "Invalid campaign data" }); return; }
 
       const user = await storage.getUser(req.userId!);
       if (!user?.isPublisher) { res.status(403).json({ error: "Publisher access required" }); return; }
-
-      const { totalBudget } = parsed.data;
 
       const { db: dbClient, campaigns: campaignsTable, users: usersTable } = await import("@workspace/db");
       const { sql: drizzleSql, and: drizzleAndCreate, eq: drizzleEqCreate } = await import("drizzle-orm");
@@ -1715,9 +1711,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const [row] = await tx.insert(campaignsTable).values({
             userId: req.userId!,
-            ...parsed.data,
+            title,
+            description,
+            targetUrl,
             totalBudget: String(totalBudget),
-            rewardPerVisit: String(parsed.data.rewardPerVisit),
+            rewardPerVisit: String(rewardPerVisit),
             status: "pending",
           }).returning();
 
@@ -2549,7 +2547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dailyCapEnabled = Number.isFinite(dailyCap) && dailyCap > 0;
 
       try {
-        await dbClient.transaction(async (tx) => {
+        await dbClient.transaction(async (tx: Parameters<Parameters<typeof dbClient.transaction>[0]>[0]) => {
           // 0a. Per-user advisory lock so concurrent /visit settlements by
           // the same user serialize through the cap check below. Without
           // this, two parallel requests against different campaigns can

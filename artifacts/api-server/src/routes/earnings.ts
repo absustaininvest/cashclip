@@ -233,7 +233,7 @@ export function registerEarningsRoutes(app: Express): void {
         dayStart.setUTCHours(0, 0, 0, 0);
         const expiryThreshold = new Date(now.getTime() - TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-        const result = await db.transaction(async (tx: typeof db) => {
+        const result = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
           // Row-level lock — prevents concurrent double-claim
           await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
 
@@ -373,11 +373,12 @@ export function registerEarningsRoutes(app: Express): void {
             eq(earnTokens.status, "pending"),
           ));
 
-        const pending   = tokens.filter(t => t.claimableAt > now);
-        const claimable = tokens.filter(t => t.claimableAt <= now);
+        type EarnTokenRow = (typeof tokens)[number];
+        const pending   = tokens.filter((t: EarnTokenRow) => t.claimableAt > now);
+        const claimable = tokens.filter((t: EarnTokenRow) => t.claimableAt <= now);
 
         res.json({
-          pending: pending.map(t => ({
+          pending: pending.map((t: EarnTokenRow) => ({
             id:          t.id,
             points:      t.points,
             actionType:  t.actionType,
@@ -385,15 +386,15 @@ export function registerEarningsRoutes(app: Express): void {
             earnedAt:    t.earnedAt,
             claimableAt: t.claimableAt,
           })),
-          claimable: claimable.map(t => ({
+          claimable: claimable.map((t: EarnTokenRow) => ({
             id:          t.id,
             points:      t.points,
             actionType:  t.actionType,
             description: t.description,
             claimableAt: t.claimableAt,
           })),
-          pendingPoints:   pending.reduce((s, t) => s + t.points, 0),
-          claimablePoints: claimable.reduce((s, t) => s + t.points, 0),
+          pendingPoints:   pending.reduce((s: number, t: EarnTokenRow) => s + t.points, 0),
+          claimablePoints: claimable.reduce((s: number, t: EarnTokenRow) => s + t.points, 0),
         });
       } catch (err) {
         logger.error({ err }, "earnings/pending error");

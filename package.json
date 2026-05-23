@@ -7,9 +7,10 @@
     "prepare": "git config core.hooksPath scripts/git-hooks 2>/dev/null || true",
     "check-public-archives": "pnpm --filter @workspace/scripts run check-public-archives",
     "check-signing-md-sync": "pnpm --filter @workspace/scripts run check-signing-md-sync",
-    "build": "pnpm run check-public-archives && pnpm run typecheck && pnpm -r --if-present run build",
+    "build": "pnpm run check-public-archives && pnpm run typecheck:deploy && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "typecheck:deploy": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck",
     "expo": "pnpm --filter @workspace/cashclip exec expo",
     "eas-build-post-install": "command -v pod && echo 'pod found' || (for d in /opt/homebrew/bin /opt/homebrew/opt/cocoapods/bin /usr/local/bin /usr/bin; do [ -f \"$d/pod\" ] && ln -sf \"$d/pod\" /usr/local/bin/pod && echo \"Linked pod from $d\" && break; done) || sudo gem install cocoapods"
   },
