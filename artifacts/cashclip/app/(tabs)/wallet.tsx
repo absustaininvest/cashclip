@@ -267,7 +267,6 @@ export default function WalletScreen() {
       await apiRequest("POST", "/api/withdrawals", {
         amount: selectedTier.amount,
         paypalEmail: paypalEmail.trim(),
-        deviceCompromised: !integrity.clean,
       });
 
       setShowWithdrawModal(false);
