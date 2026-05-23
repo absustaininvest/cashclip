@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet, secureSet, secureDelete } from "./secure-store";
 
 const KEYS = {
   BALANCE: "cashclip_balance",
@@ -41,7 +42,7 @@ const KEYS = {
   ACCOUNT_CREATED: "cashclip_account_created",
   DAILY_EARNINGS: "cashclip_daily_earnings",
   DAILY_EARNINGS_DATE: "cashclip_daily_earnings_date",
-  FRAUD_FLAGS: "cashclip_fraud_flags",
+
   WITHDRAWAL_COUNT: "cashclip_withdrawal_count",
   LAST_WITHDRAWAL_DATE: "cashclip_last_withdrawal_date",
   APP_PIN: "cashclip_app_pin",
@@ -900,29 +901,13 @@ export interface FraudFlag {
 }
 
 export async function getFraudFlags(): Promise<FraudFlag[]> {
-  const data = await AsyncStorage.getItem(KEYS.FRAUD_FLAGS);
-  if (!data) return [];
-  return JSON.parse(data);
+  return [];
 }
 
-export async function addFraudFlag(type: FraudFlag["type"], description: string): Promise<void> {
-  const flags = await getFraudFlags();
-  flags.push({
-    id: Date.now().toString() + Math.random().toString(36).slice(2, 5),
-    type,
-    description,
-    timestamp: Date.now(),
-  });
-  await AsyncStorage.setItem(KEYS.FRAUD_FLAGS, JSON.stringify(flags));
+export async function addFraudFlag(_type: FraudFlag["type"], _description: string): Promise<void> {
 }
 
 export async function checkForSuspiciousActivity(): Promise<boolean> {
-  const dailyEarnings = await getDailyEarnings();
-  const hoursSinceStart = await getHoursActiveToday();
-  if (hoursSinceStart > 0 && dailyEarnings / hoursSinceStart > SUSPICIOUS_EARNING_RATE) {
-    await addFraudFlag("rapid_earning", `Earning rate $${(dailyEarnings / hoursSinceStart).toFixed(2)}/hr detected`);
-    return true;
-  }
   return false;
 }
 
@@ -933,29 +918,29 @@ async function getHoursActiveToday(): Promise<number> {
 }
 
 export async function getSecuritySettings(): Promise<{ pinEnabled: boolean; biometricEnabled: boolean; hasPin: boolean }> {
-  const pinEnabled = (await AsyncStorage.getItem(KEYS.PIN_ENABLED)) === "true";
-  const biometricEnabled = (await AsyncStorage.getItem(KEYS.BIOMETRIC_ENABLED)) === "true";
-  const hasPin = !!(await AsyncStorage.getItem(KEYS.APP_PIN));
+  const pinEnabled = (await secureGet(KEYS.PIN_ENABLED)) === "true";
+  const biometricEnabled = (await secureGet(KEYS.BIOMETRIC_ENABLED)) === "true";
+  const hasPin = !!(await secureGet(KEYS.APP_PIN));
   return { pinEnabled, biometricEnabled, hasPin };
 }
 
 export async function setAppPin(pin: string): Promise<void> {
-  await AsyncStorage.setItem(KEYS.APP_PIN, pin);
-  await AsyncStorage.setItem(KEYS.PIN_ENABLED, "true");
+  await secureSet(KEYS.APP_PIN, pin);
+  await secureSet(KEYS.PIN_ENABLED, "true");
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {
-  const savedPin = await AsyncStorage.getItem(KEYS.APP_PIN);
+  const savedPin = await secureGet(KEYS.APP_PIN);
   return savedPin === pin;
 }
 
 export async function removeAppPin(): Promise<void> {
-  await AsyncStorage.removeItem(KEYS.APP_PIN);
-  await AsyncStorage.setItem(KEYS.PIN_ENABLED, "false");
+  await secureDelete(KEYS.APP_PIN);
+  await secureSet(KEYS.PIN_ENABLED, "false");
 }
 
 export async function setBiometricEnabled(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(KEYS.BIOMETRIC_ENABLED, enabled ? "true" : "false");
+  await secureSet(KEYS.BIOMETRIC_ENABLED, enabled ? "true" : "false");
 }
 
 export function getFraudProtectionConfig() {

@@ -28,8 +28,8 @@ function getJwtSecret(): string {
 //   1. Set JWT_TRIDENTE_PREV = current JWT_TRIDENTE value
 //   2. Set JWT_TRIDENTE     = new 64-byte secret
 //   3. Restart the server — new tokens are signed with the new secret,
-//      but tokens signed with the old secret remain valid for their full 7d TTL.
-//   4. After 7 days all old tokens have expired — clear JWT_TRIDENTE_PREV.
+//      but tokens signed with the old secret remain valid for their full 2h TTL.
+//   4. After 2 hours all old tokens have expired — clear JWT_TRIDENTE_PREV.
 function getPrevJwtSecret(): string | null {
   const s = process.env.JWT_TRIDENTE_PREV;
   if (!s) return null;
@@ -40,11 +40,11 @@ function getPrevJwtSecret(): string | null {
   return s;
 }
 
-const TOKEN_EXPIRY = "7d";
+const TOKEN_EXPIRY = "2h";
 
 // ── RIPRENDERE — refresh token layer ─────────────────────────────────────────
 // Signs long-lived refresh tokens (30d) stored in the rid httpOnly cookie.
-// When the short-lived JWT (TRIDENTE, 7d) expires, POST /api/auth/refresh
+// When the short-lived JWT (TRIDENTE, 2h) expires, POST /api/auth/refresh
 // exchanges a valid rid cookie for a fresh JWT + sid cookie without re-login.
 const RIPRENDERE_SECRET = process.env.RIPRENDERE;
 const REFRESH_TOKEN_EXPIRY = "30d";

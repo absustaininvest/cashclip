@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "./query-client";
+import { secureGet, secureSet, secureMultiDelete } from "./secure-store";
 
 const AUTH_TOKEN_KEY = "cashclip_auth_token";
 const REFRESH_TOKEN_KEY = "cashclip_refresh_token";
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
     try {
-      const storedRefreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      const storedRefreshToken = await secureGet(REFRESH_TOKEN_KEY);
       if (!storedRefreshToken) return false;
       const baseUrl = getApiUrl();
       const res = await fetch(new URL("/api/auth/refresh", baseUrl).toString(), {
@@ -55,12 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ refreshToken: storedRefreshToken }),
       });
       if (!res.ok) {
-        await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+        await secureMultiDelete([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
         return false;
       }
       const data = await res.json();
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
-      if (data.refreshToken) await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      await secureSet(AUTH_TOKEN_KEY, data.token);
+      if (data.refreshToken) await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
       setToken(data.token);
       setUser(data.user);
       return true;
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function restoreSession() {
     try {
-      const savedToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      const savedToken = await secureGet(AUTH_TOKEN_KEY);
       if (savedToken) {
         const baseUrl = getApiUrl();
         const res = await fetch(new URL("/api/auth/me", baseUrl).toString(), {
@@ -85,14 +85,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
-      // JWT missing or expired — try silent refresh via RIPRENDERE
       const refreshed = await refreshSession();
       if (!refreshed) {
-        await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+        await secureMultiDelete([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
       }
     } catch (err: any) {
       console.error("Session restore error:", err?.message || String(err));
-      await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+      await secureMultiDelete([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
     } finally {
       setIsLoading(false);
     }
@@ -110,8 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) {
         return { success: false, error: data.error || "Login failed" };
       }
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
-      if (data.refreshToken) await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      await secureSet(AUTH_TOKEN_KEY, data.token);
+      if (data.refreshToken) await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
       setToken(data.token);
       setUser(data.user);
       return { success: true };
@@ -141,8 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!loginRes.ok) {
         return { success: false, error: loginData.error || "Login after registration failed" };
       }
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, loginData.token);
-      if (loginData.refreshToken) await AsyncStorage.setItem(REFRESH_TOKEN_KEY, loginData.refreshToken);
+      await secureSet(AUTH_TOKEN_KEY, loginData.token);
+      if (loginData.refreshToken) await secureSet(REFRESH_TOKEN_KEY, loginData.refreshToken);
       setToken(loginData.token);
       setUser(loginData.user);
       return { success: true };
@@ -152,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+    await secureMultiDelete([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
     setToken(null);
     setUser(null);
   }, []);

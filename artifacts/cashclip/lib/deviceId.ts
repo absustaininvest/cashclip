@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet, secureSet } from "./secure-store";
 
 const KEY = "cashclip_device_id_v1";
 
@@ -18,14 +18,14 @@ export async function getDeviceId(): Promise<string> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const existing = await AsyncStorage.getItem(KEY);
+      const existing = await secureGet(KEY);
       if (existing && /^[0-9a-f-]{36}$/i.test(existing)) {
         cached = existing;
         return existing;
       }
     } catch {}
     const fresh = newId();
-    try { await AsyncStorage.setItem(KEY, fresh); } catch {}
+    try { await secureSet(KEY, fresh); } catch {}
     cached = fresh;
     return fresh;
   })();
