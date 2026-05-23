@@ -426,7 +426,8 @@
         }
       ],
       "./plugins/withAndroidManifestFix",
-      "./plugins/withAndroidUnityAdapter"
+      "./plugins/withAndroidUnityAdapter",
+      "./plugins/withSslPinning"
     ],
     "experiments": {
       "typedRoutes": true,
