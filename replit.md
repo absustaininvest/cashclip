@@ -37,6 +37,7 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 - **Build number**: iOS 35, Android versionCode 2, version 1.1.0
 - **Bundle ID**: `app.replit.cashclip`
 - **EAS Build**: `scripts/eas-build-ios.sh` — reads `EXPO_TOKLAST` secret
+- **Expo account**: username `absustainabilityinvestments`, login email `support@absustainabilityinvestments.com`. If EAS builds fail auth, regenerate a token from expo.dev while logged in with that email and update `EXPO_TOKLAST`
 
 ### Backend (artifacts/api-server/)
 
