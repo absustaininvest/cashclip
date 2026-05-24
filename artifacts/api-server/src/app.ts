@@ -235,6 +235,13 @@ if (surveyDoneHtml) {
   });
 }
 
+// app-ads.txt — authorizes ad networks to sell inventory for this app
+app.get("/app-ads.txt", (_req, res) => {
+  res.type("text/plain").send(
+    "google.com, pub-8679658921848348, DIRECT, f08c47fec0942fa0\n"
+  );
+});
+
 app.use("/api", router);
 registerRoutes(app);
 
