@@ -23,14 +23,15 @@
     },
     "preview": {
       "extends": "base",
-      "distribution": "internal",
+      "distribution": "store",
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_ENV": "preview",
-        "EXPO_PUBLIC_DOMAIN": "cashclip-staging.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
       },
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "credentialsSource": "remote"
       },
       "android": {
         "buildType": "apk"
