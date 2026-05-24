@@ -59,8 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       const data = await res.json();
+      if (typeof data.token !== "string" || !data.token) return false;
       await secureSet(AUTH_TOKEN_KEY, data.token);
-      if (data.refreshToken) await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+      if (typeof data.refreshToken === "string" && data.refreshToken) {
+        await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+      }
       setToken(data.token);
       setUser(data.user);
       return true;
@@ -109,8 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) {
         return { success: false, error: data.error || "Login failed" };
       }
+      if (typeof data.token !== "string" || !data.token) {
+        return { success: false, error: "Server did not return a session token. Please try again." };
+      }
       await secureSet(AUTH_TOKEN_KEY, data.token);
-      if (data.refreshToken) await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+      if (typeof data.refreshToken === "string" && data.refreshToken) {
+        await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+      }
       setToken(data.token);
       setUser(data.user);
       return { success: true };
@@ -140,8 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!loginRes.ok) {
         return { success: false, error: loginData.error || "Login after registration failed" };
       }
+      if (typeof loginData.token !== "string" || !loginData.token) {
+        return { success: false, error: "Server did not return a session token. Please try again." };
+      }
       await secureSet(AUTH_TOKEN_KEY, loginData.token);
-      if (loginData.refreshToken) await secureSet(REFRESH_TOKEN_KEY, loginData.refreshToken);
+      if (typeof loginData.refreshToken === "string" && loginData.refreshToken) {
+        await secureSet(REFRESH_TOKEN_KEY, loginData.refreshToken);
+      }
       setToken(loginData.token);
       setUser(loginData.user);
       return { success: true };

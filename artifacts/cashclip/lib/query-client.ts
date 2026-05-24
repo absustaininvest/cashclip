@@ -45,8 +45,11 @@ async function tryRefreshToken(): Promise<boolean> {
       return false;
     }
     const data = await res.json();
+    if (typeof data.token !== "string" || !data.token) return false;
     await secureSet(AUTH_TOKEN_KEY, data.token);
-    if (data.refreshToken) await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+    if (typeof data.refreshToken === "string" && data.refreshToken) {
+      await secureSet(REFRESH_TOKEN_KEY, data.refreshToken);
+    }
     return true;
   } catch {
     return false;
