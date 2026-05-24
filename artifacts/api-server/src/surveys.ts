@@ -321,16 +321,19 @@ export function registerSurveyRoutes(app: Express): void {
     }
     const params = { ...req.query, ...req.body };
     // uid = BitLabs default param name; user_id = custom mapped name
-    const { survey_id, user_id, uid, val, reason, tx } = params;
+    const { survey_id, user_id, uid, val, reason, tx, cashback_state } = params;
     const resolvedUserId = (user_id || uid) as string | undefined;
     // survey_id for surveys; tx for cashback and magic receipts
     const resolvedRefId = (survey_id || tx) as string | undefined;
 
     const reasonStr = typeof reason === "string" ? reason.toUpperCase() : "";
+    const cashbackStateStr = typeof cashback_state === "string" ? cashback_state.toUpperCase() : "";
     const isSurveyComplete = !reasonStr || reasonStr === "COMPLETE" || reasonStr === "COMPLETED";
-    const isCashbackComplete = reasonStr === "CASHBACK_COMPLETED" ||
+    // Credit cashback only on COMPLETED state — CREATED/PENDING/ADJUSTED must be ignored
+    const isCashbackComplete = cashbackStateStr === "COMPLETED" ||
+      reasonStr === "CASHBACK_COMPLETED" ||
       (reasonStr === "CASHBACK_ADJUSTMENT" && parseFloat(String(val)) > 0);
-    const isReceiptComplete = reasonStr === "RECEIPT_COMPLETE";
+    const isReceiptComplete = reasonStr === "RECEIPT_COMPLETE" || cashbackStateStr === "RECEIPT_COMPLETE";
 
     if ((isSurveyComplete || isCashbackComplete || isReceiptComplete) && resolvedUserId && resolvedRefId) {
       const reward = typeof val === "number" ? val : typeof val === "string" ? parseFloat(val) : undefined;
