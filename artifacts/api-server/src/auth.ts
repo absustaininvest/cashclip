@@ -9,8 +9,9 @@ import { recordLoginAttempt, pruneExpiredLoginAttempts } from "./lib/dbRateLimit
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
 import type { InsertUser } from "@workspace/db";
-import { db, passwordResetTokens } from "@workspace/db";
+import { db, passwordResetTokens, users } from "@workspace/db";
 import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as drizzleGte } from "drizzle-orm";
+import { generateTotpSecret, verifyTotp } from "./lib/totp";
 
 // Resolved lazily so the server can start and pass the health check even when
 // JWT_TRIDENTE / JWT_SECRET hasn't been linked to the production environment yet.
@@ -366,6 +367,18 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
+      // If TOTP is enabled, issue a short-lived pending token instead of the
+      // full JWT. The client must complete login via POST /api/auth/totp/verify.
+      if (user.totpEnabled && user.totpSecret) {
+        const totpSessionToken = jwt.sign(
+          { userId: user.id, type: "totp-pending", tokenVersion: user.tokenVersion },
+          getJwtSecret(),
+          { expiresIn: "5m" },
+        );
+        res.json({ requiresTotp: true, totpSessionToken });
+        return;
+      }
+
       const token = generateToken(user.id, user.role, user.tokenVersion);
       const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
       setSessionCookie(res, token);
@@ -378,6 +391,116 @@ export function registerAuthRoutes(app: Express) {
     } catch (err: unknown) {
       logger.error({ err }, "Login error");
       res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // ── TOTP 2FA routes ───────────────────────────────────────────────────────
+
+  app.post("/api/auth/totp/verify", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { totpSessionToken, code } = req.body;
+      if (!totpSessionToken || !code) {
+        res.status(400).json({ error: "totpSessionToken and code are required" });
+        return;
+      }
+      let payload: { userId: string; type: string; tokenVersion: number } | null = null;
+      try {
+        const decoded = jwt.verify(totpSessionToken, getJwtSecret());
+        if (
+          typeof decoded === "object" && decoded !== null &&
+          "userId" in decoded && "type" in decoded &&
+          (decoded as Record<string, unknown>).type === "totp-pending"
+        ) {
+          payload = decoded as { userId: string; type: string; tokenVersion: number };
+        }
+      } catch { /* invalid token */ }
+      if (!payload) {
+        res.status(401).json({ error: "Invalid or expired session. Please log in again." });
+        return;
+      }
+      const user = await storage.getUser(payload.userId);
+      if (!user || !user.totpEnabled || !user.totpSecret) {
+        res.status(401).json({ error: "Invalid session." });
+        return;
+      }
+      if (user.tokenVersion !== payload.tokenVersion) {
+        res.status(401).json({ error: "Invalid or expired session. Please log in again." });
+        return;
+      }
+      if (!verifyTotp(user.totpSecret, String(code))) {
+        res.status(400).json({ error: "Invalid code. Please check your authenticator app." });
+        return;
+      }
+      const token = generateToken(user.id, user.role, user.tokenVersion);
+      const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
+      setSessionCookie(res, token);
+      setRefreshCookie(res, user.id, user.tokenVersion);
+      res.json({
+        token,
+        ...(refreshToken ? { refreshToken } : {}),
+        user: { id: user.id, username: user.username, role: user.role },
+      });
+    } catch (err: unknown) {
+      logger.error({ err }, "TOTP verify error");
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.get("/api/auth/totp/status", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    const user = await storage.getUser(req.userId!);
+    if (!user) { res.status(401).json({ error: "User not found" }); return; }
+    if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+    res.json({ enabled: user.totpEnabled ?? false });
+  });
+
+  app.post("/api/auth/totp/setup", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    const user = await storage.getUser(req.userId!);
+    if (!user) { res.status(401).json({ error: "User not found" }); return; }
+    if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+    const { secret, uri } = generateTotpSecret();
+    res.json({ secret, uri });
+  });
+
+  app.post("/api/auth/totp/enable", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+      if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+      const { secret, code } = req.body;
+      if (!secret || !code) { res.status(400).json({ error: "secret and code are required" }); return; }
+      if (!verifyTotp(String(secret), String(code))) {
+        res.status(400).json({ error: "Invalid code. Please try again." });
+        return;
+      }
+      await db.update(users).set({ totpSecret: secret, totpEnabled: true }).where(drizzleEq(users.id, req.userId!));
+      logger.info({ userId: req.userId }, "Admin enabled TOTP 2FA");
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      logger.error({ err }, "TOTP enable error");
+      res.status(500).json({ error: "Failed to enable 2FA" });
+    }
+  });
+
+  app.post("/api/auth/totp/disable", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+      if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+      if (!user.totpEnabled || !user.totpSecret) {
+        res.status(400).json({ error: "2FA is not enabled" }); return;
+      }
+      const { code } = req.body;
+      if (!code) { res.status(400).json({ error: "code is required" }); return; }
+      if (!verifyTotp(user.totpSecret, String(code))) {
+        res.status(400).json({ error: "Invalid code. Please try again." });
+        return;
+      }
+      await db.update(users).set({ totpSecret: null, totpEnabled: false }).where(drizzleEq(users.id, req.userId!));
+      logger.info({ userId: req.userId }, "Admin disabled TOTP 2FA");
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      logger.error({ err }, "TOTP disable error");
+      res.status(500).json({ error: "Failed to disable 2FA" });
     }
   });
 

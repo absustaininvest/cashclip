@@ -6,7 +6,7 @@ import {
   Upload, FileText, Download, X, BookOpen, Calculator, Layers, AlertCircle,
   Linkedin, Instagram, Facebook, Youtube, ShoppingCart, Copy, Music2,
   Globe, Smartphone, Palette, Share2, Package, BarChart3, KeyRound, Eye, EyeOff,
-  Inbox, AtSign, Building2, Megaphone, Headphones,
+  Inbox, AtSign, Building2, Megaphone, Headphones, Shield, ShieldCheck,
 } from "lucide-react";
 
 interface Lead {
@@ -69,18 +69,27 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"password" | "otp">("password");
+  const [totpSessionToken, setTotpSessionToken] = useState("");
+  const [otp, setOtp] = useState("");
 
-  async function doLogin(user: string, pass: string) {
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password: pass }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
+      if (data.requiresTotp) {
+        setTotpSessionToken(data.totpSessionToken);
+        setStep("otp");
+        return;
+      }
       if (data.user.role !== "admin") throw new Error("Admin access required");
       localStorage.setItem("admin_token", data.token);
       onLogin(data.token);
@@ -91,9 +100,26 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleOtpSubmit(e: React.FormEvent) {
     e.preventDefault();
-    doLogin(username, password);
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/totp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totpSessionToken, code: otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      if (data.user.role !== "admin") throw new Error("Admin access required");
+      localStorage.setItem("admin_token", data.token);
+      onLogin(data.token);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -102,35 +128,283 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
         <div className="text-center mb-8">
           <img src={`${import.meta.env.BASE_URL}logo-full.png`} alt="AB Sustainability" className="h-12 rounded mx-auto mb-4" />
           <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-white">Admin Dashboard</h1>
-          <p className="text-white/40 text-sm mt-2">Sign in to manage your business</p>
+          {step === "password" ? (
+            <p className="text-white/40 text-sm mt-2">Sign in to manage your business</p>
+          ) : (
+            <p className="text-white/40 text-sm mt-2">Enter the code from your authenticator app</p>
+          )}
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
-            required
-            className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
-          />
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
+
+        {step === "password" ? (
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              required
+              autoComplete="username"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              required
+              autoComplete="current-password"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+            />
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleOtpSubmit} className="space-y-4">
+            <div className="flex items-center gap-2 bg-[#00E676]/5 border border-[#00E676]/20 rounded-xl px-4 py-3">
+              <ShieldCheck className="w-4 h-4 text-[#00E676] flex-shrink-0" />
+              <p className="text-white/60 text-sm">Two-factor authentication required</p>
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              required
+              autoFocus
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.4em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+            />
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || otp.length !== 6}
+              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Verifying..." : "Verify"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep("password"); setError(""); setOtp(""); }}
+              className="w-full text-white/30 hover:text-white/60 text-sm transition-colors py-1"
+            >
+              ← Back to sign in
+            </button>
+          </form>
+        )}
       </div>
+    </div>
+  );
+}
+
+function TwoFactorPanel({ token }: { token: string }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [setupData, setSetupData] = useState<{ secret: string; uri: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/totp/status", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setEnabled(d.enabled ?? false))
+      .catch(() => setEnabled(false));
+  }, [token]);
+
+  async function handleSetup() {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch("/api/auth/totp/setup", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setSetupData(data);
+      setCode("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEnable() {
+    if (!setupData) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/totp/enable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ secret: setupData.secret, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to enable"); return; }
+      setEnabled(true);
+      setSetupData(null);
+      setCode("");
+      setSuccess("Two-factor authentication is now enabled. You'll need your authenticator app on every login.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDisable() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/totp/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to disable"); return; }
+      setEnabled(false);
+      setCode("");
+      setSuccess("Two-factor authentication has been disabled.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="max-w-md space-y-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2.5 rounded-xl bg-[#00E676]/10">
+          <Shield className="w-5 h-5 text-[#00E676]" />
+        </div>
+        <div>
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Two-Factor Authentication</h2>
+          <p className="text-white/40 text-sm">Add an extra layer of security to your admin account</p>
+        </div>
+      </div>
+
+      {success && (
+        <div className="flex items-center gap-2 text-[#00E676] text-sm bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl px-4 py-3">
+          <Check className="w-4 h-4 flex-shrink-0" />
+          {success}
+        </div>
+      )}
+
+      {enabled === null && (
+        <p className="text-white/30 text-sm">Loading...</p>
+      )}
+
+      {enabled === true && !setupData && (
+        <div className="space-y-4">
+          <div className="bg-[#00E676]/5 border border-[#00E676]/20 rounded-2xl p-5 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[#00E676]/10">
+              <ShieldCheck className="w-5 h-5 text-[#00E676]" />
+            </div>
+            <div>
+              <p className="text-white font-medium text-sm">2FA is active</p>
+              <p className="text-white/40 text-xs mt-0.5">Your account requires an authenticator code on every login</p>
+            </div>
+          </div>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+            <p className="text-white/60 text-sm">To disable 2FA, enter a valid code from your authenticator app:</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-red-500/50 transition-colors"
+            />
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            <button
+              onClick={handleDisable}
+              disabled={code.length !== 6 || loading}
+              className="w-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold py-2.5 rounded-xl hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+            >
+              {loading ? "Disabling..." : "Disable 2FA"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {enabled === false && !setupData && (
+        <div className="space-y-4">
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-white font-medium text-sm">2FA is not enabled</p>
+              <p className="text-white/40 text-xs mt-1">Your account is protected by password only. Enabling 2FA significantly reduces the risk of unauthorized access.</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSetup}
+            disabled={loading}
+            className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50 text-sm"
+          >
+            {loading ? "Generating..." : "Set Up Two-Factor Authentication"}
+          </button>
+        </div>
+      )}
+
+      {setupData && (
+        <div className="space-y-4">
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-white font-medium text-sm mb-1">1. Scan this QR code with your authenticator app</p>
+              <p className="text-white/40 text-xs">Use Google Authenticator, Authy, or any TOTP-compatible app</p>
+            </div>
+            <div className="flex justify-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(setupData.uri)}&size=200x200&margin=2`}
+                alt="Scan this QR code with your authenticator app"
+                className="rounded-xl border border-white/10"
+                width={200}
+                height={200}
+              />
+            </div>
+            <div>
+              <p className="text-white/40 text-xs mb-1.5">Can't scan? Enter this key manually in your app:</p>
+              <div className="bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2.5 font-mono text-xs text-white/70 break-all select-all tracking-wider">
+                {setupData.secret}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+            <p className="text-white font-medium text-sm">2. Enter the 6-digit code from your app to confirm setup</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              autoFocus
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+            />
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setSetupData(null); setCode(""); setError(""); }}
+                className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEnable}
+                disabled={code.length !== 6 || loading}
+                className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+              >
+                {loading ? "Enabling..." : "Enable 2FA"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1948,7 +2222,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
   );
 }
 
-type Tab = "submissions" | "ventures" | "accounting" | "integrations" | "inbox" | "account" | "cashclip";
+type Tab = "submissions" | "ventures" | "accounting" | "integrations" | "inbox" | "account" | "cashclip" | "security";
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("submissions");
@@ -2011,6 +2285,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     { id: "integrations", label: "Integrations", icon: Share2 },
     { id: "inbox", label: "Inbox", icon: Inbox },
     { id: "account", label: "Account", icon: User },
+    { id: "security", label: "Security", icon: Shield },
   ];
 
   return (
@@ -2175,6 +2450,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
             <ChangePasswordPanel token={token} />
           </div>
         )}
+        {tab === "security" && <TwoFactorPanel token={token} />}
       </main>
     </div>
   );

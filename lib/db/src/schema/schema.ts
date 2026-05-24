@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   isPublisher: boolean("is_publisher").notNull().default(false),
   publisherGrantedAt: timestamp("publisher_granted_at"),
   adCredits: numeric("ad_credits", { precision: 12, scale: 2 }).notNull().default("0"),
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
 },
 (t) => ({
   balanceNonNegative: check("users_balance_non_negative", sql`${t.balance} >= 0`),
