@@ -9,9 +9,9 @@ import bcrypt from "bcryptjs";
 loadPersistedIntegrationKeys();
 
 async function seedAdmins() {
-  const seedPassword = process.env["WORKAROUND"];
+  const seedPassword = process.env["WORKAROUND_HINT"];
   if (!seedPassword) {
-    logger.info("WORKAROUND not set — skipping admin account provisioning");
+    logger.info("WORKAROUND_HINT not set — skipping admin account provisioning");
     return;
   }
 
@@ -24,7 +24,7 @@ async function seedAdmins() {
       await storage.createUser({ username, password: hashed, role: "admin" });
       logger.info({ username }, "Created admin account via seed — rotate this password immediately after first login");
     } else if (existing.role !== "admin") {
-      logger.warn({ username }, "Reserved admin username exists but was NOT promoted — this account was publicly registered and is untrusted. Delete or rename it in the database, then set WORKAROUND and restart to provision a trusted admin account.");
+      logger.warn({ username }, "Reserved admin username exists but was NOT promoted — this account was publicly registered and is untrusted. Delete or rename it in the database, then set WORKAROUND_HINT and restart to provision a trusted admin account.");
     } else if (forceReset) {
       const hashed = await bcrypt.hash(seedPassword, 12);
       await storage.updateUserPassword(existing.id, hashed);
