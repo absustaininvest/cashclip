@@ -1,0 +1,63 @@
+❗️
+We’ve migrated to a new, more advanced callback system. Updated documentation will be available soon. In the meantime, the UI may look slightly different, but all underlying principles and behaviors remain the same.
+What is a Cashback callback for?
+
+To receive only Cashback callbacks, or to set a separate endpoint specifically for Cashback, you can use the Cashback Callback field instead of the standard Reward Callback field.
+
+How to set up Cashback callbacks
+
+To set up the cashback callbacks, visit the Publisher Dashboard -> Apps -> Your App -> Integration -> Cashback Callback:
+
+
+IMPORTANT: Compared to other callback implementations, cashback callbacks are always stateful. This means that all cashback states will be sent, not only the COMPLETED ones.
+
+To configure a new URL, press the cog wheel to open the callback URL configurator:
+
+
+Multiple fields have to be filled out:
+
+Callback URL Host: Enter the callback endpoint URL you have set up.
+Protocol: In most cases, you want to leave it as is.
+Callback Parameter: Here you can add all the parameters you need to process the callbacks correctly. We highly recommend that you have the following parameters in there: UID, TX, VAL, and RAW.
+For cashback, we also recommend to add the cashback_state parameter. cashback_state will return the state of a receipt: CREATED, PENDING, ADJUSTED, COMPLETED. Learn more about the magic receipt states here.
+Custom Parameter: In case you want to attach a parameter yourself, you can add it here. However, it does only support static parameters.
+Example URL: This shows you an example callback URL that you would receive. Keep in mind the hash in the example is not a valid one!
+Here is an example of how a callback URL could be configured:
+
+
+Press the Save button and then the Save Changes button in the top right.
+
+Cashback states
+
+Each offer callback will have a different state. The following states are available:
+
+COMPLETED: The COMPLETED callback will be sent when a cashback reward is given. This is a final state and can not change.
+
+CREATED: A CREATED callback will be sent when a user clicks on a tracking link. After a purchase, a PENDING callback will follow.
+
+PENDING: A PENDING callback will be sent when a reward for cashback is pending. After a PENDING callback was sent, a COMPLETED or ADJUSTED can follow.
+
+ADJUSTED: A ADJUSTEDCallback will be sent when the user returns the purchased item, fraud is detected, or items are partially returned. In those cases, we adjust the reward value or set it to 0. The adjusted reason is not always available to us and is dictated by the merchants.
+
+🚧
+Make sure to only reward users for cashback_state=COMPLETED callbacks!
+Cashback parameters
+
+For cashback we do provide additional parameters for additional information:
+
+Parameter	Type	Description
+[%CASHBACK:STATE%]	String	One of: COMPLETED, CREATED, ADJUSTED, PENDING
+[%CASHBACK:MERCHANT:REF%]	String	Returns the merchant ref ID
+[%CASHBACK:MERCHANT:NAME%]	String	Returns the merchant name
+[%CASHBACK:EVENT:NAME%]	String	Returns the name of the tracked event
+[%CASHBACK:ORDER:ID%]	String	Returns the order ID of a purchase
+[%CASHBACK:REASON%]	String	Reason for adjustments
+[%CASHBACK:LINE_ID%]	String	The offer line ID
+[%CASHBACK:REWARD_DELAY_DAYS%]	Integer	Delay in days
+For a full list of all parameters across all demands, click here.
+
+How to test cashback callbacks
+
+We offer a callback tester on the dashboard to test your configured callback endpoints. Learn more about it here.
+
+
