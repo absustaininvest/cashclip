@@ -58,3 +58,4 @@ keys/
 .vercel
 
 .env
+certs/private-key.pem
