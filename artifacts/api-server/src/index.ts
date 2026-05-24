@@ -16,10 +16,17 @@ async function seedAdmins() {
   }
 
   const forceReset = process.env["SEED_ADMIN_FORCE_RESET"] === "true";
+  const nukeRecreate = process.env["SEED_ADMIN_NUKE_RECREATE"] === "true";
 
   for (const username of RESERVED_ADMIN_USERNAMES) {
     const existing = await storage.getUserByUsername(username);
-    if (!existing) {
+    if (existing && nukeRecreate) {
+      await storage.deleteUser(existing.id);
+      logger.warn({ username }, "Admin account DELETED via SEED_ADMIN_NUKE_RECREATE — recreating fresh");
+      const hashed = await bcrypt.hash(seedPassword, 12);
+      await storage.createUser({ username, password: hashed, role: "admin" });
+      logger.warn({ username }, "Admin account recreated fresh — remove SEED_ADMIN_NUKE_RECREATE and rotate password after login");
+    } else if (!existing) {
       const hashed = await bcrypt.hash(seedPassword, 12);
       await storage.createUser({ username, password: hashed, role: "admin" });
       logger.info({ username }, "Created admin account via seed — rotate this password immediately after first login");
