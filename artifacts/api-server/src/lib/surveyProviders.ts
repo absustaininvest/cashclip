@@ -217,9 +217,11 @@ async function fetchCpxSurveys(config: ProviderConfig, userId: string): Promise<
   ];
 }
 
-async function fetchBitlabsSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
+async function fetchBitlabsSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {
   try {
-    const res = await fetch(`${config.baseUrl}/client/surveys`, {
+    const url = new URL(`${config.baseUrl}/client/surveys`);
+    if (userId) url.searchParams.set("uid", userId);
+    const res = await fetch(url.toString(), {
       headers: {
         "X-Api-Token": config.apiKey!,
         "Content-Type": "application/json",
@@ -261,7 +263,7 @@ export async function fetchExternalSurveys(userId: string): Promise<SurveyListRe
       else if (config.key === "cint") surveys = await fetchCintSurveys(config);
       else if (config.key === "lucid") surveys = await fetchLucidSurveys(config);
       else if (config.key === "cpx") surveys = await fetchCpxSurveys(config, userId);
-      else if (config.key === "bitlabs") surveys = await fetchBitlabsSurveys(config);
+      else if (config.key === "bitlabs") surveys = await fetchBitlabsSurveys(config, userId);
       return { surveys, provider: config.key };
     })
   );
