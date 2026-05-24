@@ -2295,6 +2295,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // ─────────────────────────────────────────────────────────────────────
 
+      // ── IP/UA binding enforcement ─────────────────────────────────────────
+      // /r/:token stored the redirecting client's IP and UA hashes. Enforce
+      // that this request comes from the same client — prevents a scripted
+      // attacker from fetching /r/:token to extract the completion sig and
+      // then replaying /c/:token from a different process/host.
+      if (attempt.redirectIpHash || attempt.redirectUaHash) {
+        const { createHash: _ch } = await import("crypto");
+        const { getClientIp: _gcip } = await import("../lib/clientIp");
+        const currentIp = _gcip(req);
+        const currentUa = String(req.headers["user-agent"] ?? "");
+        const currentIpHash = _ch("sha256").update(currentIp).digest("hex");
+        const currentUaHash = _ch("sha256").update(currentUa).digest("hex");
+
+        const ipMismatch = attempt.redirectIpHash && attempt.redirectIpHash !== currentIpHash;
+        const uaMismatch = attempt.redirectUaHash && attempt.redirectUaHash !== currentUaHash;
+
+        if (ipMismatch || uaMismatch) {
+          req.log?.warn?.({ token: token.slice(0, 8) + "…", ipMismatch, uaMismatch }, "Sponsored visit client binding mismatch — rejected");
+          res.status(403).send("Visit must be completed from the same device that opened the link"); return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       if (!attempt.settledAt && !attempt.witnessedAt) {
         // Server-observed completion: record witnessedAt atomically.
         // COALESCE guard ensures concurrent /c calls for the same token

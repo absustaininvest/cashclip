@@ -198,11 +198,23 @@ export function registerSurveyRoutes(app: Express): void {
         });
         if (!verifyResult.verified) {
           providerVerified = false;
-          verifyResult = { verified: true, reward: parseFloat(session.expectedReward) };
+          // Do not fail-open: if the configured provider rejected the transaction
+          // ID the survey was not actually completed. Crediting anyway would let
+          // attackers mint survey payouts with arbitrary transaction IDs.
+          res.status(402).json({
+            error: "Survey completion could not be verified with the provider. Complete the survey fully before claiming.",
+            providerVerified: false,
+          }); return;
         }
       } catch (e) {
         providerVerified = false;
-        verifyResult = { verified: true, reward: parseFloat(session.expectedReward) };
+        // Transient provider error — fail closed rather than crediting
+        // an unverified completion. The user can retry once the provider
+        // is reachable again.
+        res.status(503).json({
+          error: "Could not reach the survey provider to verify completion. Please try again in a moment.",
+          providerVerified: false,
+        }); return;
       }
 
       const providerBounds = PROVIDER_REWARD_RANGES[session.provider] ?? { min: 0.10, max: 5.00 };
