@@ -59,7 +59,26 @@ const SERVER_ONLY_ACTIONS = new Set([
   "mission_weekly",
   "game",
   "video",
+  // spin — must be initiated via POST /api/earn/spin/begin (server-issued
+  // challenge token required at /api/earn/spin/complete). This closes the
+  // direct-minting bypass; the spin wheel calls the begin/complete flow.
+  "spin",
 ]);
+
+// ── SPIN CHALLENGE STORE ──────────────────────────────────────────────────────
+// Server-issued single-use challenge tokens for the spin wheel.
+// /begin issues a token; /complete requires it before crediting the earn token.
+// This ensures the client called /begin (server-observed) before earning points.
+const SPIN_CHALLENGE_TTL_MS  = 60_000;  // challenge valid for 60 s
+const SPIN_CHALLENGE_MIN_MS  = 3_000;   // must wait ≥3 s between begin→complete
+interface SpinChallenge { userId: string; issuedAt: number; }
+const spinChallenges = new Map<string, SpinChallenge>();
+setInterval(() => {
+  const cutoff = Date.now() - SPIN_CHALLENGE_TTL_MS;
+  for (const [k, v] of spinChallenges) {
+    if (v.issuedAt < cutoff) spinChallenges.delete(k);
+  }
+}, 30_000);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
 interface GooglePublicKey { keyId: number; pem: string; base64: string; }
@@ -241,6 +260,128 @@ export function registerEarningsRoutes(app: Express): void {
       } catch (err) {
         logger.error({ err }, "earnings/record error");
         res.status(500).json({ error: "Failed to record earn action" });
+      }
+    },
+  );
+
+  // ── POST /api/earn/spin/begin ────────────────────────────────────────────────
+  // Issues a server-side spin challenge token. The client must present this
+  // token to /api/earn/spin/complete before an earn token is issued.
+  // This enforces a server-observed "begin" step — /complete is rejected
+  // without a valid, unexpired, same-user challenge.
+  app.post(
+    "/api/earn/spin/begin",
+    authMiddleware,
+    earnLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { randomBytes } = await import("node:crypto");
+        const challengeToken = randomBytes(32).toString("hex");
+        spinChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
+        logger.info({ userId: req.userId }, "spin challenge issued");
+        res.status(201).json({ challengeToken });
+      } catch (err) {
+        logger.error({ err }, "earn/spin/begin error");
+        res.status(500).json({ error: "Failed to begin spin" });
+      }
+    },
+  );
+
+  // ── POST /api/earn/spin/complete ─────────────────────────────────────────────
+  // Validates the server-issued spin challenge and issues an earn token.
+  // Enforced: challenge must exist, belong to this user, not be expired,
+  // and have been issued at least SPIN_CHALLENGE_MIN_MS ago (anti-instant-replay).
+  // Then applies the standard 2h server-side cooldown + daily cap.
+  app.post(
+    "/api/earn/spin/complete",
+    authMiddleware,
+    earnLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { challengeToken } = req.body as { challengeToken?: unknown };
+        if (!challengeToken || typeof challengeToken !== "string") {
+          res.status(400).json({ error: "challengeToken is required" }); return;
+        }
+
+        const challenge = spinChallenges.get(challengeToken);
+        if (!challenge) {
+          res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
+        }
+        if (challenge.userId !== req.userId) {
+          res.status(403).json({ error: "Spin challenge does not belong to this user" }); return;
+        }
+        const age = Date.now() - challenge.issuedAt;
+        if (age > SPIN_CHALLENGE_TTL_MS) {
+          spinChallenges.delete(challengeToken);
+          res.status(403).json({ error: "Spin challenge expired — please spin again" }); return;
+        }
+        if (age < SPIN_CHALLENGE_MIN_MS) {
+          res.status(425).json({
+            error: "Spin completed too quickly",
+            retryAfterMs: SPIN_CHALLENGE_MIN_MS - age,
+          }); return;
+        }
+
+        // Consume challenge — single use
+        spinChallenges.delete(challengeToken);
+
+        const config = ACTION_CONFIG.spin;
+        const now      = new Date();
+        const dayStart = new Date(now);
+        dayStart.setUTCHours(0, 0, 0, 0);
+
+        // Daily cap
+        const [{ todayCount }] = await db
+          .select({ todayCount: count() })
+          .from(earnTokens)
+          .where(and(
+            eq(earnTokens.userId, req.userId!),
+            eq(earnTokens.actionType, "spin"),
+            gte(earnTokens.earnedAt, dayStart),
+          ));
+        if (Number(todayCount) >= config.dailyCap) {
+          res.status(429).json({ error: "Daily spin limit reached", cap: config.dailyCap }); return;
+        }
+
+        // 2h cooldown
+        const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
+        const [recentSpin] = await db
+          .select({ earnedAt: earnTokens.earnedAt })
+          .from(earnTokens)
+          .where(and(
+            eq(earnTokens.userId, req.userId!),
+            eq(earnTokens.actionType, "spin"),
+            gte(earnTokens.earnedAt, cooldownSince),
+          ))
+          .limit(1);
+        if (recentSpin) {
+          const nextAt = new Date(recentSpin.earnedAt.getTime() + SPIN_COOLDOWN_MS);
+          res.status(429).json({ error: "Spin cooldown active", nextAvailableAt: nextAt.toISOString() }); return;
+        }
+
+        const pts = pickRandom(SPIN_POOL);
+        const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+        const [token] = await db.insert(earnTokens).values({
+          userId:      req.userId!,
+          points:      pts,
+          actionType:  "spin",
+          description: "Spin wheel",
+          earnedAt:    now,
+          claimableAt,
+          status:      "pending",
+        }).returning();
+
+        logger.info({ userId: req.userId, pts }, "spin earn token issued via challenge");
+        res.status(201).json({
+          tokenId:     token.id,
+          points:      pts,
+          claimableAt: claimableAt.toISOString(),
+          dailyUsed:   Number(todayCount) + 1,
+          dailyCap:    config.dailyCap,
+        });
+      } catch (err) {
+        logger.error({ err }, "earn/spin/complete error");
+        res.status(500).json({ error: "Failed to complete spin" });
       }
     },
   );

@@ -2021,17 +2021,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Completion sig: HMAC-SHA256(JWT_SECRET, "completion:" + token).
-      // Used by /c/:token to verify the request originated from this
-      // interstitial flow. The sig alone is not sufficient to claim a reward —
-      // /c/:token also enforces a server-side minimum dwell time (elapsed since
-      // redirectedAt), so a script that parses the sig from the HTML and
-      // immediately calls /c will be rejected with 425 Too Early.
-      const { createHmac } = await import("crypto");
-      const completionSig = createHmac("sha256", (process.env.JWT_TRIDENTE ?? process.env.JWT_SECRET)!)
-        .update("completion:" + token)
-        .digest("hex");
-      const completionPath = "/api/earn/sponsored/c/" + token + "?q=" + completionSig;
+      // Completion path — no secret embedded in the URL or HTML.
+      // /c/:token enforces: redirectedAt set (proving /r was fetched),
+      // IP/UA hash match (same client that fetched /r), and a server-side
+      // minimum dwell time. A script that fetches /r and then calls /c
+      // must do so from the same IP/UA and wait the dwell — no replayable
+      // secret in the page means there is nothing to extract and replay.
+      const completionPath = "/api/earn/sponsored/c/" + token;
 
       // Minimum time (ms) the interstitial must remain open before /c/:token
       // accepts the witnessedAt stamp. Enforced both client-side (countdown)
@@ -2068,11 +2064,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const escapeHtml = (s: string) => s
         .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag — safeForScript uses JSON.stringify + script-break neutralization; escapedTitle/escapedCompletionPath use escapeHtml()
+      // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag — safeForScript uses JSON.stringify + script-break neutralization; escapedTitle uses escapeHtml()
       const safeForScript = (s: string) => JSON.stringify(s)
         .replace(/<\/script/gi, "<\\/script")
         .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-      const escapedCompletionPath = escapeHtml(completionPath);
       const escapedTitle = escapeHtml(String(campaign.title ?? "Sponsor"));
       // Validate targetUrl is http(s) before embedding in iframe src / JS.
       const targetUrl = String(campaign.targetUrl ?? "");
@@ -2226,28 +2221,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   app.get("/api/earn/sponsored/c/:token", async (req, res) => {
     const token = String(req.params.token);
-    const qSig = String(req.query.q ?? "");
     let targetUrl: string | undefined;
 
     try {
       if (!/^[a-f0-9]{64}$/.test(token)) {
         res.status(404).send("Not found"); return;
       }
-
-      // ── Signature verification (before any DB access) ─────────────────────
-      if (!qSig) {
-        res.status(403).send("Missing completion signature"); return;
-      }
-      const { createHmac, timingSafeEqual } = await import("crypto");
-      const expectedSig = createHmac("sha256", (process.env.JWT_TRIDENTE ?? process.env.JWT_SECRET)!)
-        .update("completion:" + token)
-        .digest("hex");
-      const sigOk = qSig.length === expectedSig.length &&
-        timingSafeEqual(Buffer.from(qSig), Buffer.from(expectedSig));
-      if (!sigOk) {
-        res.status(403).send("Invalid completion signature"); return;
-      }
-      // ──────────────────────────────────────────────────────────────────────
 
       const {
         db: dbClient,

@@ -51,6 +51,42 @@ export async function recordEarnAction(
   }
 }
 
+// ── SPIN CHALLENGE / COMPLETE ─────────────────────────────────────────────────
+// Two-step spin flow: /begin issues a server challenge, /complete consumes it.
+// The server rejects /complete without a valid challenge from /begin, ensuring
+// the client went through a server-observed initiation step before earning.
+
+export async function beginSpin(): Promise<string | null> {
+  try {
+    const res = await apiRequest("POST", "/api/earn/spin/begin", {});
+    if (!res.ok) return null;
+    const data = await res.json() as { challengeToken?: string };
+    return data.challengeToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function completeSpin(challengeToken: string): Promise<EarnToken | null> {
+  try {
+    const res = await apiRequest("POST", "/api/earn/spin/complete", { challengeToken });
+    if (!res.ok) return null;
+    const data = await res.json() as { tokenId: string; points: number; claimableAt: string };
+    const token: EarnToken = {
+      id:          data.tokenId,
+      points:      data.points,
+      actionType:  "spin",
+      description: "Spin wheel",
+      earnedAt:    Date.now(),
+      claimableAt: new Date(data.claimableAt).getTime(),
+    };
+    await storeTokenLocally(token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 // ── CLAIM ALL READY TOKENS ────────────────────────────────────────────────────
 // Calls server — only tokens past the 3-hour window are credited.
 export async function claimAllReady(): Promise<{

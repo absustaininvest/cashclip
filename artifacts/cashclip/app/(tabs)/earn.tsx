@@ -57,6 +57,8 @@ import {
 } from "@/lib/storage";
 import {
   recordEarnAction,
+  beginSpin,
+  completeSpin,
   claimAllReady,
   refreshPendingFromServer,
   canSpinNow,
@@ -644,6 +646,9 @@ export default function EarnScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsSpinning(true);
 
+    // Begin spin challenge BEFORE animation — challenge has 60s TTL
+    const challengeToken = await beginSpin();
+
     // Spin animation — visual only, reward is server-determined
     const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
     const segmentAngle = (segmentIndex * 360) / WHEEL_SEGMENTS.length;
@@ -659,8 +664,8 @@ export default function EarnScreen() {
       await recordSpinTimestamp();
       setSpinAvailable(false);
       setNextSpinTime(Date.now() + 2 * 60 * 60 * 1000);
-      // Get server-authoritative points
-      const token = await recordEarnAction("spin", "Spin wheel");
+      // Complete spin with the server-issued challenge token
+      const token = challengeToken ? await completeSpin(challengeToken) : null;
       const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
       setSpinReward(pts);
       setIsSpinning(false);
