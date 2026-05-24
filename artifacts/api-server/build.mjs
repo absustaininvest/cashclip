@@ -14,13 +14,6 @@ async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  // Copy HTML templates into dist so they're available at runtime in production
-  await cp(
-    path.resolve(artifactDir, "src/templates"),
-    path.resolve(distDir, "templates"),
-    { recursive: true }
-  );
-
   await esbuild({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
@@ -125,6 +118,13 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // Copy HTML templates into dist after esbuild has created the dist directory
+  await cp(
+    path.resolve(artifactDir, "src/templates"),
+    path.resolve(distDir, "templates"),
+    { recursive: true, force: true }
+  );
 }
 
 buildAll().catch((err) => {
