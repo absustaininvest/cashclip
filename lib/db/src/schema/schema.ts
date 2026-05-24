@@ -208,6 +208,9 @@ export const campaignVisitAttempts = pgTable(
     // raises the per-account attack cost from "one HTTP call" to "run a JS
     // engine that fires the beacon AND matches the redirect IP/UA".
     witnessedAt: timestamp("witnessed_at"),
+    // Single-use nonce set by /r, verified and cleared by /c. Also issued as
+    // an HttpOnly cookie so clients without cookie support fail at /c.
+    witnessNonce: varchar("witness_nonce", { length: 64 }),
     settledAt: timestamp("settled_at"),
     expiresAt: timestamp("expires_at").notNull(),
   },
