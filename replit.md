@@ -9,7 +9,10 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | Secret Name | Purpose |
 |-------------|---------|
 | `EXPO_TOKLAST` | Expo/EAS authentication token (used by EAS build scripts as EXPO_TOKEN) |
-| `JWT_TRIDENTE` | JWT signing secret for API auth (code reads this as JWT_SECRET via alias) |
+| `JWT_TRIDENTE` | JWT signing secret for access tokens (HS256) |
+| `RIPRENDERE` | JWT signing secret for refresh tokens (30-day session renewal) |
+| `INVECE` | Admin console token |
+| `WORKAROUND_HINT` | Seeds admin account passwords on startup (used with SEED_ADMIN_FORCE_RESET) |
 | `SEED_ADMIN_PASSWORD` | Seeds reserved admin accounts on API startup |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `CPX_API_KEY` | CPX Research survey integration |
