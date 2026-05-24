@@ -11,12 +11,7 @@ export function getApiUrl(): string {
     return window.location.origin + "/";
   }
 
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
-
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
-  }
-
+  const host = process.env.EXPO_PUBLIC_DOMAIN || "cash-clip.app";
   return new URL(`https://${host}`).href;
 }
 

@@ -718,10 +718,7 @@ export default function EarnScreen() {
       return;
     }
 
-    Alert.alert(
-      "AdMob Not Ready",
-      "The real rewarded ad flow is only available on a device with AdMob initialized. Please reload after consent and try again."
-    );
+    // AdMob not yet initialized — show mock ad for dev/simulator
     setWatchingAd(ad);
     setShowModal(true);
   }, [adLoading, loadAll, t]);

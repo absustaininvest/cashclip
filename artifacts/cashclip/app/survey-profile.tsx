@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
   ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-  : "";
+  : "https://cash-clip.app";
 
 interface ProfileData {
   dateOfBirth: string;

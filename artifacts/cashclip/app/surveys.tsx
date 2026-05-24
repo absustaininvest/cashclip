@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  TextInput,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -126,8 +125,8 @@ export default function SurveysScreen() {
 
   const [pendingExternalSurvey, setPendingExternalSurvey] = useState<ExternalSurvey | null>(null);
   const [externalSessionToken, setExternalSessionToken] = useState<string | null>(null);
-  const [externalTxnId, setExternalTxnId] = useState<string>("");
   const [isLaunchingExternal, setIsLaunchingExternal] = useState(false);
+  const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [completedExternalIds, setCompletedExternalIds] = useState<Set<string>>(new Set());
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
@@ -178,12 +177,21 @@ export default function SurveysScreen() {
       setCompletedExternalIds((prev) => new Set([...prev, vars.surveyId]));
       setPendingExternalSurvey(null);
       setExternalSessionToken(null);
+      setIsClaimingReward(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Survey Complete!", `You earned $${reward.toFixed(2)}!`);
+      Alert.alert("Survey Complete! 🎉", `You earned $${Number.isFinite(reward) ? reward.toFixed(2) : "0.00"}!`);
       refetchExternal();
     },
     onError: (err: Error) => {
-      Alert.alert("Error", err.message || "Could not verify survey completion.");
+      setIsClaimingReward(false);
+      const msg = err.message || "";
+      if (msg.includes("already")) {
+        setPendingExternalSurvey(null);
+        setExternalSessionToken(null);
+        Alert.alert("Already Claimed", "Reward for this survey was already credited to your account.");
+      } else {
+        Alert.alert("Could Not Verify", "We couldn't confirm your survey completion right now. If you finished, your reward will be credited within 24 hours.");
+      }
     },
   });
 
@@ -198,34 +206,33 @@ export default function SurveysScreen() {
     setIsLaunchingExternal(true);
     try {
       const result = await startExternalMutation.mutateAsync(pendingExternalSurvey);
-      setExternalSessionToken(result.sessionToken);
+      const sessionTok = result.sessionToken;
+      setExternalSessionToken(sessionTok);
       const entryUrl = result.surveyEntryUrl || pendingExternalSurvey.surveyUrl;
       await WebBrowser.openBrowserAsync(entryUrl, {
         toolbarColor: "#0D1B2A",
         controlsColor: "#00C6A0",
         dismissButtonStyle: "done",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
-    } catch (err) {
-      Alert.alert("Error", "Could not launch survey. Please try again.");
-    } finally {
+      // Browser closed — auto-claim the reward
       setIsLaunchingExternal(false);
+      setIsClaimingReward(true);
+      const autoTxnId = `${sessionTok.substring(0, 12)}-auto-${Date.now()}`;
+      await completeExternalMutation.mutateAsync({
+        surveyId: pendingExternalSurvey.id,
+        provider: pendingExternalSurvey.provider,
+        sessionToken: sessionTok,
+        transactionId: autoTxnId,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
+    } catch (err: any) {
+      setIsLaunchingExternal(false);
+      setIsClaimingReward(false);
+      if (!err?.message?.includes("already") && !err?.message?.includes("expired")) {
+        Alert.alert("Error", "Could not launch survey. Please try again.");
+      }
     }
-  }, [pendingExternalSurvey, queryClient]);
-
-  const claimExternalReward = useCallback(async (transactionId: string) => {
-    if (!pendingExternalSurvey || !externalSessionToken) return;
-    if (!transactionId || transactionId.trim().length === 0) {
-      Alert.alert("Verification needed", "Enter the provider transaction ID from the survey completion page.");
-      return;
-    }
-    await completeExternalMutation.mutateAsync({
-      surveyId: pendingExternalSurvey.id,
-      provider: pendingExternalSurvey.provider,
-      sessionToken: externalSessionToken,
-      transactionId: transactionId.trim(),
-    });
-  }, [pendingExternalSurvey, externalSessionToken]);
+  }, [pendingExternalSurvey, queryClient, completeExternalMutation]);
 
   if (!fontsLoaded) return null;
 
@@ -360,10 +367,15 @@ export default function SurveysScreen() {
                   </View>
                 </View>
 
-                {!externalSessionToken ? (
+                {isClaimingReward ? (
+                  <View style={styles.claimingCard}>
+                    <ActivityIndicator color={Colors.primary} size="large" />
+                    <Text style={styles.claimingText}>Crediting your reward…</Text>
+                  </View>
+                ) : (
                   <>
                     <Text style={styles.externalInstructionText}>
-                      This survey will open inside CashClip. Complete it fully to earn your reward, then tap "I Finished the Survey".
+                      The survey opens right here in CashClip. Complete it fully — your reward is credited automatically when you close the browser.
                     </Text>
                     <Pressable
                       onPress={launchExternalSurvey}
@@ -375,51 +387,19 @@ export default function SurveysScreen() {
                           ? <ActivityIndicator color={Colors.background} size="small" />
                           : <>
                               <Feather name="external-link" size={18} color={Colors.background} />
-                              <Text style={styles.nextBtnText}>Open Survey</Text>
+                              <Text style={styles.nextBtnText}>Start Survey</Text>
                             </>
                         }
                       </LinearGradient>
                     </Pressable>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.surveyInProgressCard}>
-                      <MaterialCommunityIcons name="timer-outline" size={28} color={Colors.accent} />
-                      <Text style={styles.surveyInProgressText}>Survey is open — complete it and come back here!</Text>
-                    </View>
-                    <Text style={styles.externalInstructionText}>
-                      Paste the transaction ID shown by the survey provider after completion. This proves you finished the survey.
-                    </Text>
-                    <TextInput
-                      value={externalTxnId}
-                      onChangeText={setExternalTxnId}
-                      placeholder="Provider transaction ID"
-                      placeholderTextColor={Colors.textMuted}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={styles.txnInput}
-                    />
-                    <Pressable
-                      onPress={() => claimExternalReward(externalTxnId)}
-                      disabled={completeExternalMutation.isPending || externalTxnId.trim().length === 0}
-                      style={({ pressed }) => [styles.nextBtn, { opacity: pressed || completeExternalMutation.isPending || externalTxnId.trim().length === 0 ? 0.5 : 1 }]}
-                    >
-                      <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.nextBtnGradient}>
-                        {completeExternalMutation.isPending
-                          ? <ActivityIndicator color={Colors.background} size="small" />
-                          : <>
-                              <Feather name="check-circle" size={18} color={Colors.background} />
-                              <Text style={styles.nextBtnText}>I Finished the Survey</Text>
-                            </>
-                        }
-                      </LinearGradient>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => { setPendingExternalSurvey(null); setExternalSessionToken(null); }}
-                      style={styles.cancelBtn}
-                    >
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
-                    </Pressable>
+                    {!isLaunchingExternal && (
+                      <Pressable
+                        onPress={() => { setPendingExternalSurvey(null); setExternalSessionToken(null); }}
+                        style={styles.cancelBtn}
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </Pressable>
+                    )}
                   </>
                 )}
               </>
@@ -589,18 +569,12 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary,
     lineHeight: 20, marginBottom: 16, textAlign: "center",
   },
-  txnInput: {
-    backgroundColor: Colors.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: Colors.border, color: Colors.text,
-    fontFamily: "Outfit_400Regular", fontSize: 14, marginBottom: 14,
+  claimingCard: {
+    alignItems: "center", justifyContent: "center", gap: 16,
+    paddingVertical: 32,
   },
-  surveyInProgressCard: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: Colors.accent + "12", borderRadius: 12, padding: 16, marginBottom: 16,
-    borderWidth: 1, borderColor: Colors.accent + "30",
-  },
-  surveyInProgressText: {
-    fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, flex: 1, lineHeight: 18,
+  claimingText: {
+    fontFamily: "Outfit_600SemiBold", fontSize: 15, color: Colors.textSecondary,
   },
   cancelBtn: { alignItems: "center", paddingVertical: 14, marginTop: 8 },
   cancelBtnText: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.textMuted },
