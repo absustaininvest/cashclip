@@ -200,6 +200,7 @@ const landingHtml = loadTemplate("landing-page.html");
 const corporateHtml = loadTemplate("corporate-page.html");
 const privacyHtml = loadTemplate("privacy-page.html");
 const supportHtml = loadTemplate("support-page.html");
+const surveyDoneHtml = loadTemplate("survey-done.html");
 
 if (landingHtml) {
   app.get("/api", (_req, res) => {
@@ -228,6 +229,11 @@ if (supportHtml) {
   });
 }
 
+if (surveyDoneHtml) {
+  app.get("/survey-done", (_req, res) => {
+    res.type("html").send(surveyDoneHtml);
+  });
+}
 
 app.use("/api", router);
 registerRoutes(app);
