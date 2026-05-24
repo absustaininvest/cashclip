@@ -2457,11 +2457,35 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 }
 
 export default function Admin() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("admin_token"));
+  const [token, setToken] = useState<string | null>(null);
+  const [validating, setValidating] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("admin_token");
+    if (!stored) {
+      setValidating(false);
+      return;
+    }
+    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${stored}` } })
+      .then((r) => {
+        if (r.ok) setToken(stored);
+        else localStorage.removeItem("admin_token");
+      })
+      .catch(() => localStorage.removeItem("admin_token"))
+      .finally(() => setValidating(false));
+  }, []);
 
   function handleLogout() {
     localStorage.removeItem("admin_token");
     setToken(null);
+  }
+
+  if (validating) {
+    return (
+      <div className="min-h-screen bg-[#06060E] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-[#00E676] rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (!token) return <LoginForm onLogin={setToken} />;
