@@ -47,21 +47,6 @@ interface RevenueSource {
   monthlyEstimate: number;
 }
 
-// ── SPONSORED-VISIT WITNESS NONCES ────────────────────────────────────────────
-// Single-use nonces bound to each sponsored-visit attempt.
-// /r/:token stores a nonce here AND sets it as an HttpOnly cookie.
-// /c/:token requires both the ?w= query param (from the JS-embedded path)
-// and the cc_w cookie to match the stored nonce — clients without cookie
-// support (plain curl) fail because they don't automatically replay cookies.
-const WITNESS_NONCE_TTL_MS = 10 * 60 * 1000; // 10 min max between /r and /c
-interface WitnessEntry { nonce: string; expiresAt: number; }
-const witnessNonces = new Map<string, WitnessEntry>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of witnessNonces) {
-    if (v.expiresAt < now) witnessNonces.delete(k);
-  }
-}, 60_000);
 
 interface RevenueAllocation {
   userPayouts: number;
@@ -2037,14 +2022,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Generate a single-use witness nonce, stored server-side and ALSO set
-      // as an HttpOnly cookie. /c/:token requires both the cookie (auto-sent
-      // by a real browser/WebView, ignored by plain curl without -c/-b) and
-      // the ?w= query param embedded in the JS completionPath. A client that
-      // fetches /r but doesn't process Set-Cookie cannot satisfy /c.
+      // Generate a single-use witness nonce. Stored in the DB attempt row
+      // (DB-persisted, works across multi-instance deployments, single-use).
+      // ALSO set as an HttpOnly cookie so that clients without cookie support
+      // (plain curl without -c/-b) fail at /c even if they parse the ?w= nonce
+      // from the HTML — the cookie must arrive automatically with the request.
       const { randomBytes: _rnd } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
-      witnessNonces.set(token, { nonce: witnessNonce, expiresAt: Date.now() + WITNESS_NONCE_TTL_MS });
       res.setHeader("Set-Cookie",
         `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Lax`);
       const completionPath = "/api/earn/sponsored/c/" + token + "?w=" + witnessNonce;
@@ -2059,11 +2043,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Hard NULL guard so a second /r fetch cannot rebind even if the
       // COALESCE plan ever changes — the UPDATE simply matches zero rows.
+      // witnessNonce is stored in the DB (DB-persisted, not in-memory) so
+      // it survives restarts and works correctly in multi-instance deployments.
       await dbClient.update(attemptsTable)
         .set({
           redirectedAt: drizzleSql`NOW()`,
           redirectIpHash: ipHash,
           redirectUaHash: uaHash,
+          witnessNonce: witnessNonce,
         })
         .where(drizzleAndLocal(
           drizzleEqLocal(attemptsTable.token, token),
@@ -2248,24 +2235,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).send("Not found"); return;
       }
 
-      // ── Witness nonce verification ─────────────────────────────────────────
-      // Both the HttpOnly cc_w cookie (set by /r) and the ?w= query param
-      // (embedded in the JS completionPath) must match the stored nonce.
-      // Rejects clients that lack cookie support even if they parsed the nonce
-      // from the HTML — the cookie must arrive automatically with the request.
-      const ccwCookie = (req.headers.cookie ?? "").split(";")
-        .map(s => s.trim()).find(s => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
-      const queryNonce = String(req.query.w ?? "");
-      const witnessEntry = witnessNonces.get(token);
-      if (!witnessEntry || Date.now() > witnessEntry.expiresAt) {
-        res.status(403).send("Visit witness expired — please reopen the link"); return;
-      }
-      if (!ccwCookie || ccwCookie !== witnessEntry.nonce || queryNonce !== witnessEntry.nonce) {
-        res.status(403).send("Visit witness mismatch — please reopen the link"); return;
-      }
-      witnessNonces.delete(token); // single-use: consume immediately
-      // ──────────────────────────────────────────────────────────────────────
-
       const {
         db: dbClient,
         campaigns: campaignsTable,
@@ -2279,6 +2248,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (attempt.expiresAt.getTime() < Date.now()) {
         res.status(410).send("Visit link expired"); return;
       }
+
+      // ── Witness nonce verification (DB-persisted, single-use) ─────────────
+      // /r/:token stored a random nonce in the DB AND set it as an HttpOnly
+      // cookie (cc_w). Here we require:
+      //   1. The cc_w cookie is present (auto-sent by browser; plain curl
+      //      without -c/-b never receives it, so it's absent on replay).
+      //   2. The ?w= query param matches (embedded in the JS completionPath).
+      //   3. Both match the server-stored nonce in the DB attempt row.
+      // The nonce is cleared from the DB on the witnessedAt update below
+      // (single-use semantics, prevents replay of the same /c call).
+      if (!attempt.settledAt && !attempt.witnessedAt) {
+        const ccwCookie = (req.headers.cookie ?? "").split(";")
+          .map(s => s.trim()).find(s => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
+        const queryNonce = String(req.query.w ?? "");
+        const storedNonce = attempt.witnessNonce;
+        if (!storedNonce) {
+          // /r was never completed or nonce already consumed — reject.
+          res.status(403).send("Visit witness missing — please reopen the link"); return;
+        }
+        if (!ccwCookie || ccwCookie !== storedNonce || queryNonce !== storedNonce) {
+          req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored visit witness nonce mismatch — rejected");
+          res.status(403).send("Visit witness mismatch — please reopen the link"); return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Load target URL before updating so we can redirect even if update
       // fails (e.g. idempotent second call where attempt is already settled).
@@ -2336,11 +2330,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ─────────────────────────────────────────────────────────────────────
 
       if (!attempt.settledAt && !attempt.witnessedAt) {
-        // Server-observed completion: record witnessedAt atomically.
-        // COALESCE guard ensures concurrent /c calls for the same token
-        // are idempotent — only the first one sets the timestamp.
+        // Server-observed completion: record witnessedAt atomically and
+        // clear witnessNonce (single-use — prevents /c replay for same token).
+        // COALESCE guard ensures concurrent /c calls are idempotent.
         await dbClient.update(attemptsTable)
-          .set({ witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())` })
+          .set({
+            witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
+            witnessNonce: null,
+          })
           .where(drizzleAndLocal(
             drizzleEqLocal(attemptsTable.token, token),
             drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
