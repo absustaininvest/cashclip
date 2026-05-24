@@ -743,8 +743,10 @@ export default function EarnScreen() {
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await claimMissionReward(id, false);
-      // Issue server earn token for completing a daily mission
-      recordEarnAction("mission_daily", "Daily mission completed");
+      // Mission server credit is pending a proper /api/missions/claim endpoint
+      // that validates server-side mission completion state before crediting.
+      // recordEarnAction("mission_daily") is intentionally removed — the server
+      // now rejects it (no verifiable proof) to prevent fraudulent minting.
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),
@@ -758,8 +760,10 @@ export default function EarnScreen() {
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await claimMissionReward(id, true);
-      // Issue server earn token for completing a weekly mission
-      recordEarnAction("mission_weekly", "Weekly mission completed");
+      // Mission server credit is pending a proper /api/missions/claim endpoint
+      // that validates server-side mission completion state before crediting.
+      // recordEarnAction("mission_weekly") is intentionally removed — the server
+      // now rejects it (no verifiable proof) to prevent fraudulent minting.
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),

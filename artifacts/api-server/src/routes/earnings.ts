@@ -43,11 +43,23 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
 };
 
 // Actions that may ONLY be credited by trusted server-to-server callbacks
-// (e.g. AdMob SSV, provider webhooks). Clients submitting these via
-// POST /api/earnings/record are rejected with 403 regardless of auth status.
-// Adding rewarded_ad here closes the bypass around GET /api/admob/ssv, which
-// performs ECDSA-SHA256 signature verification before crediting the reward.
-const SERVER_ONLY_ACTIONS = new Set(["rewarded_ad"]);
+// (e.g. AdMob SSV, provider webhooks, server-side mission completion records).
+// Clients submitting these via POST /api/earnings/record are rejected with 403.
+//
+// rewarded_ad  — only via GET /api/admob/ssv (ECDSA-SHA256 verified by Google)
+// mission_daily/mission_weekly — no server-side mission state exists yet; block
+//   until a proper /api/missions/claim endpoint with server-tracked mission
+//   completion is implemented. Clients currently call claimMissionReward() which
+//   only updates AsyncStorage, providing no server-verifiable proof.
+// game/video — no server-verifiable proof exists for these action types.
+//   Neither action type is currently issued by any mobile app code path.
+const SERVER_ONLY_ACTIONS = new Set([
+  "rewarded_ad",
+  "mission_daily",
+  "mission_weekly",
+  "game",
+  "video",
+]);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
 interface GooglePublicKey { keyId: number; pem: string; base64: string; }

@@ -2181,7 +2181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setTimeout(navigate,minMs+10000);
 })();
 </script>
-<noscript><meta http-equiv="refresh" content="${countdownSecs};url=${escapedCompletionPath}"></noscript>
+<noscript><p style="color:#fff;padding:24px;text-align:center">Please enable JavaScript to complete this sponsored visit.</p></noscript>
 </body></html>`);
     } catch (err: any) {
       req.log?.error?.({ err }, "Sponsored redirect failed");
