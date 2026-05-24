@@ -47,6 +47,22 @@ interface RevenueSource {
   monthlyEstimate: number;
 }
 
+// ── SPONSORED-VISIT WITNESS NONCES ────────────────────────────────────────────
+// Single-use nonces bound to each sponsored-visit attempt.
+// /r/:token stores a nonce here AND sets it as an HttpOnly cookie.
+// /c/:token requires both the ?w= query param (from the JS-embedded path)
+// and the cc_w cookie to match the stored nonce — clients without cookie
+// support (plain curl) fail because they don't automatically replay cookies.
+const WITNESS_NONCE_TTL_MS = 10 * 60 * 1000; // 10 min max between /r and /c
+interface WitnessEntry { nonce: string; expiresAt: number; }
+const witnessNonces = new Map<string, WitnessEntry>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of witnessNonces) {
+    if (v.expiresAt < now) witnessNonces.delete(k);
+  }
+}, 60_000);
+
 interface RevenueAllocation {
   userPayouts: number;
   operations: number;
@@ -2021,13 +2037,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Completion path — no secret embedded in the URL or HTML.
-      // /c/:token enforces: redirectedAt set (proving /r was fetched),
-      // IP/UA hash match (same client that fetched /r), and a server-side
-      // minimum dwell time. A script that fetches /r and then calls /c
-      // must do so from the same IP/UA and wait the dwell — no replayable
-      // secret in the page means there is nothing to extract and replay.
-      const completionPath = "/api/earn/sponsored/c/" + token;
+      // Generate a single-use witness nonce, stored server-side and ALSO set
+      // as an HttpOnly cookie. /c/:token requires both the cookie (auto-sent
+      // by a real browser/WebView, ignored by plain curl without -c/-b) and
+      // the ?w= query param embedded in the JS completionPath. A client that
+      // fetches /r but doesn't process Set-Cookie cannot satisfy /c.
+      const { randomBytes: _rnd } = await import("node:crypto");
+      const witnessNonce = _rnd(24).toString("hex");
+      witnessNonces.set(token, { nonce: witnessNonce, expiresAt: Date.now() + WITNESS_NONCE_TTL_MS });
+      res.setHeader("Set-Cookie",
+        `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Lax`);
+      const completionPath = "/api/earn/sponsored/c/" + token + "?w=" + witnessNonce;
 
       // Minimum time (ms) the interstitial must remain open before /c/:token
       // accepts the witnessedAt stamp. Enforced both client-side (countdown)
@@ -2227,6 +2247,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!/^[a-f0-9]{64}$/.test(token)) {
         res.status(404).send("Not found"); return;
       }
+
+      // ── Witness nonce verification ─────────────────────────────────────────
+      // Both the HttpOnly cc_w cookie (set by /r) and the ?w= query param
+      // (embedded in the JS completionPath) must match the stored nonce.
+      // Rejects clients that lack cookie support even if they parsed the nonce
+      // from the HTML — the cookie must arrive automatically with the request.
+      const ccwCookie = (req.headers.cookie ?? "").split(";")
+        .map(s => s.trim()).find(s => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
+      const queryNonce = String(req.query.w ?? "");
+      const witnessEntry = witnessNonces.get(token);
+      if (!witnessEntry || Date.now() > witnessEntry.expiresAt) {
+        res.status(403).send("Visit witness expired — please reopen the link"); return;
+      }
+      if (!ccwCookie || ccwCookie !== witnessEntry.nonce || queryNonce !== witnessEntry.nonce) {
+        res.status(403).send("Visit witness mismatch — please reopen the link"); return;
+      }
+      witnessNonces.delete(token); // single-use: consume immediately
+      // ──────────────────────────────────────────────────────────────────────
 
       const {
         db: dbClient,
