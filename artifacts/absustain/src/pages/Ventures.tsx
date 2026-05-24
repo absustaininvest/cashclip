@@ -231,7 +231,6 @@ export default function Ventures() {
             { name: "Lucid", type: "Surveys", status: "Integrated" },
             { name: "Cint", type: "Surveys", status: "Integrated" },
             { name: "InBrain", type: "Surveys", status: "In Contact" },
-            { name: "Dynata", type: "Surveys", status: "In Contact" },
             { name: "AdGate Media", type: "Offerwall", status: "Integrated" },
             { name: "OfferToro", type: "Offerwall", status: "Integrated" },
             { name: "Tapjoy", type: "Offerwall", status: "Integrated" },
@@ -250,15 +249,22 @@ export default function Ventures() {
               </div>
             </div>
           ))}
+          <Link href="/sc-portal">
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-colors cursor-pointer">
+              <div className="flex items-center gap-2 mb-2">
+                <Link2 className="w-3.5 h-3.5 text-[#00E676] flex-shrink-0" />
+                <span className="text-white text-sm font-semibold leading-tight">Dynata</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/30 text-xs">Surveys</span>
+                <span className="text-xs font-medium text-yellow-500">In Contact</span>
+              </div>
+            </div>
+          </Link>
         </div>
         <p className="text-center text-white/30 text-xs mt-6">
           For partnership inquiries: <a href="mailto:supportpr@absustaininvest.com" className="text-[#00E676] hover:underline">supportpr@absustaininvest.com</a>
         </p>
-        <div className="flex justify-end mt-4">
-          <Link href="/sc-portal">
-            <img src={`${import.meta.env.BASE_URL}logo-alt.png`} alt="" className="h-7 rounded opacity-15 hover:opacity-35 transition-opacity cursor-default" />
-          </Link>
-        </div>
       </div>
     </div>
   );
