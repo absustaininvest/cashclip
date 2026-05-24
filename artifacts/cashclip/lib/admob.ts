@@ -360,7 +360,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
 }
 
 export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
-  if (!isAdMobAvailable) {
+  if (!isAdMobReady()) {
     return { rewarded: false };
   }
 
@@ -384,7 +384,7 @@ export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boo
 }
 
 export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
-  if (!isAdMobAvailable) return false;
+  if (!isAdMobReady()) return false;
 
   try {
     const { InterstitialAd, AdEventType, TestIds } = require("react-native-google-mobile-ads");
