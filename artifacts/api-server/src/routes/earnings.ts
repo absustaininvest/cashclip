@@ -42,6 +42,13 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
   video:          { points: 5,    dailyCap: 50 },
 };
 
+// Actions that may ONLY be credited by trusted server-to-server callbacks
+// (e.g. AdMob SSV, provider webhooks). Clients submitting these via
+// POST /api/earnings/record are rejected with 403 regardless of auth status.
+// Adding rewarded_ad here closes the bypass around GET /api/admob/ssv, which
+// performs ECDSA-SHA256 signature verification before crediting the reward.
+const SERVER_ONLY_ACTIONS = new Set(["rewarded_ad"]);
+
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
 interface GooglePublicKey { keyId: number; pem: string; base64: string; }
 
@@ -133,6 +140,16 @@ export function registerEarningsRoutes(app: Express): void {
 
         if (!actionType || typeof actionType !== "string" || !(actionType in ACTION_CONFIG)) {
           res.status(400).json({ error: "Invalid action type" }); return;
+        }
+
+        // Server-only actions (e.g. rewarded_ad) must be credited exclusively
+        // via trusted server-to-server callbacks (AdMob SSV, provider webhooks).
+        // Accepting them from authenticated clients would bypass the ECDSA/HMAC
+        // proof those callbacks perform, allowing fraudulent balance minting.
+        if (SERVER_ONLY_ACTIONS.has(actionType)) {
+          res.status(403).json({
+            error: `${actionType} rewards are issued automatically by the ad network — no manual claim needed`,
+          }); return;
         }
 
         const config = ACTION_CONFIG[actionType];
