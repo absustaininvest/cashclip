@@ -5,7 +5,6 @@ import Home from "./pages/Home";
 import Ventures from "./pages/Ventures";
 import About from "./pages/About";
 import Investors from "./pages/Investors";
-import Team from "./pages/Team";
 import Contact from "./pages/Contact";
 import Admin from "./pages/Admin";
 import PressKit from "./pages/PressKit";
@@ -26,7 +25,6 @@ function Router() {
             <Route path="/ventures/solera" component={Solera} />
             <Route path="/about" component={About} />
             <Route path="/investors" component={Investors} />
-            <Route path="/team" component={Team} />
             <Route path="/contact" component={Contact} />
             <Route path="/press" component={PressKit} />
             <Route path="/cashclip/privacy" component={CashClipPrivacy} />

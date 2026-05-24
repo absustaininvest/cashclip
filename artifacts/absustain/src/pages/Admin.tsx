@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import QRCode from "qrcode";
 import type { LucideIcon } from "lucide-react";
 import {
   LogOut, Filter, RefreshCw, Mail, User, Calendar, Tag, Plus, Trash2, Check, Clock,
@@ -207,6 +208,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
 function TwoFactorPanel({ token }: { token: string }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [setupData, setSetupData] = useState<{ secret: string; uri: string } | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -218,6 +220,13 @@ function TwoFactorPanel({ token }: { token: string }) {
       .then((d) => setEnabled(d.enabled ?? false))
       .catch(() => setEnabled(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!setupData?.uri) { setQrDataUrl(null); return; }
+    QRCode.toDataURL(setupData.uri, { margin: 2, width: 200, errorCorrectionLevel: "M" })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(null));
+  }, [setupData?.uri]);
 
   async function handleSetup() {
     setLoading(true);
@@ -359,13 +368,19 @@ function TwoFactorPanel({ token }: { token: string }) {
               <p className="text-white/40 text-xs">Use Google Authenticator, Authy, or any TOTP-compatible app</p>
             </div>
             <div className="flex justify-center">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(setupData.uri)}&size=200x200&margin=2`}
-                alt="Scan this QR code with your authenticator app"
-                className="rounded-xl border border-white/10"
-                width={200}
-                height={200}
-              />
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="Scan this QR code with your authenticator app"
+                  className="rounded-xl border border-white/10"
+                  width={200}
+                  height={200}
+                />
+              ) : (
+                <div className="w-[200px] h-[200px] rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center">
+                  <span className="text-white/30 text-xs">Generating…</span>
+                </div>
+              )}
             </div>
             <div>
               <p className="text-white/40 text-xs mb-1.5">Can't scan? Enter this key manually in your app:</p>

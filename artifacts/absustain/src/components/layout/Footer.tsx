@@ -14,7 +14,6 @@ export function Footer() {
           <Link href="/about" data-testid="footer-link-about">{f.about}</Link>
           <Link href="/ventures" data-testid="footer-link-ventures">{f.ventures}</Link>
           <Link href="/investors" data-testid="footer-link-investors">{f.investors}</Link>
-          <Link href="/team" data-testid="footer-link-team">{f.team}</Link>
           <Link href="/contact" data-testid="footer-link-contact">{f.contact}</Link>
           <Link href="/press" data-testid="footer-link-press">{f.press}</Link>
           <a href="https://cash-clip.app" target="_blank" rel="noopener noreferrer" data-testid="footer-link-cashclip">{f.cashclip}</a>

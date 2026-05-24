@@ -32,7 +32,6 @@ export function Navbar() {
           <Link href="/about" className={location === "/about" ? "active" : ""} data-testid="link-about">{t.nav.about}</Link>
           <Link href="/ventures" className={location === "/ventures" ? "active" : ""} data-testid="link-ventures">{t.nav.ventures}</Link>
           <Link href="/investors" className={location === "/investors" ? "active" : ""} data-testid="link-investors">{t.nav.investors}</Link>
-          <Link href="/team" className={location === "/team" ? "active" : ""} data-testid="link-team">{t.nav.team}</Link>
           <Link href="/press" className={location === "/press" ? "active" : ""} data-testid="link-press">{t.nav.press}</Link>
 
           {/* Language switcher */}
