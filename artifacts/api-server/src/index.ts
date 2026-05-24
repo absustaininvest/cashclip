@@ -8,17 +8,26 @@ import bcrypt from "bcryptjs";
 
 loadPersistedIntegrationKeys();
 
-async function seedAdmins() {
-  const seedPassword = process.env["WORKAROUND_HINT"];
-  if (!seedPassword) {
-    logger.info("WORKAROUND_HINT not set — skipping admin account provisioning");
-    return;
-  }
+// Per-account seed secrets — each admin account has its own independent secret
+// so resetting one never affects the other.
+const ADMIN_SEED_SECRETS: Record<string, string> = {
+  "jorge.ballen@cash-clip.app": "WORKAROUND_HINT",
+  "support@absustaininvest.com": "WORKAROUND_SUPPORT",
+};
 
+async function seedAdmins() {
   const forceReset = process.env["SEED_ADMIN_FORCE_RESET"] === "true";
   const nukeRecreate = process.env["SEED_ADMIN_NUKE_RECREATE"] === "true";
 
   for (const username of RESERVED_ADMIN_USERNAMES) {
+    const secretKey = ADMIN_SEED_SECRETS[username];
+    const seedPassword = secretKey ? process.env[secretKey] : undefined;
+
+    if (!seedPassword) {
+      logger.info({ username, secretKey }, "Seed secret not set — skipping account provisioning");
+      continue;
+    }
+
     const existing = await storage.getUserByUsername(username);
     if (existing && nukeRecreate) {
       await storage.deleteUser(existing.id);
@@ -31,7 +40,7 @@ async function seedAdmins() {
       await storage.createUser({ username, password: hashed, role: "admin" });
       logger.info({ username }, "Created admin account via seed — rotate this password immediately after first login");
     } else if (existing.role !== "admin") {
-      logger.warn({ username }, "Reserved admin username exists but was NOT promoted — this account was publicly registered and is untrusted. Delete or rename it in the database, then set WORKAROUND_HINT and restart to provision a trusted admin account.");
+      logger.warn({ username }, "Reserved admin username exists but was NOT promoted — this account was publicly registered and is untrusted.");
     } else if (forceReset) {
       const hashed = await bcrypt.hash(seedPassword, 12);
       await storage.updateUserPassword(existing.id, hashed);

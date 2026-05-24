@@ -12,7 +12,8 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `JWT_TRIDENTE` | JWT signing secret for access tokens (HS256) |
 | `RIPRENDERE` | JWT signing secret for refresh tokens (30-day session renewal) |
 | `INVECE` | Admin console token |
-| `WORKAROUND_HINT` | Seeds admin account passwords on startup (used with SEED_ADMIN_FORCE_RESET) |
+| `WORKAROUND_HINT` | Seeds `jorge.ballen@cash-clip.app` password on startup (independent per-account) |
+| `WORKAROUND_SUPPORT` | Seeds `support@absustaininvest.com` password on startup (independent per-account) |
 | `SEED_ADMIN_PASSWORD` | Seeds reserved admin accounts on API startup |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `CPX_API_KEY` | CPX Research survey integration |
