@@ -1,4 +1,4 @@
-import { Mail, Linkedin } from "lucide-react";
+import { Mail } from "lucide-react";
 import { useLang } from "../lib/i18n";
 
 const team = [
@@ -8,7 +8,7 @@ const team = [
     title: "Founder & CEO",
     color: "#00E676",
     email: "support@absustaininvest.com",
-    linkedin: "https://www.linkedin.com/company/ab-sustainability-investments",
+    linkedin: null,
     bio: "Entrepreneur, technology builder, and visionary behind AB Sustainability Investments LLC and its flagship product CashClip. Jorge leads the company's product development, technology infrastructure, and strategic direction — turning an idea into a real, growing business.",
     highlights: ["Product & Technology", "Venture Strategy", "Capital Operations"],
   },
@@ -39,7 +39,7 @@ export default function Team() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
-        {team.map(({ initials, name, title, color, email, linkedin, highlights }, i) => (
+        {team.map(({ initials, name, title, color, email, highlights }, i) => (
           <div key={name} className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 flex flex-col">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center mb-6 flex-shrink-0"
@@ -69,18 +69,6 @@ export default function Team() {
                 <Mail className="w-4 h-4" style={{ color }} />
                 {email}
               </a>
-              {linkedin && (
-                <a
-                  href={linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all hover:opacity-90 w-fit"
-                  style={{ borderColor: `${color}44`, color, background: `${color}11` }}
-                >
-                  <Linkedin className="w-4 h-4" />
-                  {t.team.connect}
-                </a>
-              )}
             </div>
           </div>
         ))}

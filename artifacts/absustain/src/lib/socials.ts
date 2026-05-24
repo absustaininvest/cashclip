@@ -1,4 +1,4 @@
-import { Linkedin, Instagram, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export interface SocialLink {
   name: string;
@@ -7,19 +7,6 @@ export interface SocialLink {
   Icon: LucideIcon;
 }
 
-export const SOCIALS: SocialLink[] = [
-  {
-    name: "LinkedIn",
-    url: "https://www.linkedin.com/company/ab-sustainability-investments",
-    handle: "AB Sustainability Investments",
-    Icon: Linkedin,
-  },
-  {
-    name: "Instagram",
-    url: "https://www.instagram.com/absustaininvest",
-    handle: "@absustaininvest",
-    Icon: Instagram,
-  },
-];
+export const SOCIALS: SocialLink[] = [];
 
 export const CASHCLIP_SOCIALS: SocialLink[] = [];

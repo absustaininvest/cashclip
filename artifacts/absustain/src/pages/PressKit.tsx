@@ -194,39 +194,6 @@ export default function PressKit() {
         </div>
       </section>
 
-      {/* Social Media Bios */}
-      <section className="mb-16">
-        <div className="section-label">{t.press.brandVoice}</div>
-        <p className="text-white/40 text-sm mt-2 mb-6">{t.press.brandVoiceSub}</p>
-        <div className="space-y-4">
-          {[
-            {
-              platform: "LinkedIn (Company Page)",
-              handle: "AB Sustainability Investments",
-              charLimit: "No strict limit",
-              bio: "AB Sustainability Investments LLC is a diversified holding company building sustainable enterprises across technology, retail, and food service. Our flagship product, CashClip, is a mobile rewards app that pays users real cash for completing surveys, watching videos, playing games, and engaging with offers. Withdrawals via PayPal. D-U-N-S Registered · Georgia, USA · absustaininvest.com",
-            },
-            {
-              platform: "Instagram",
-              handle: "@absustaininvest",
-              charLimit: "150 chars",
-              bio: "Building tomorrow's enduring enterprises 🌱\nFlagship: CashClip — get paid for surveys & offers 💵\nD-U-N-S Registered LLC · Georgia, USA\n🔗 absustaininvest.com",
-            },
-          ].map(({ platform, handle, charLimit, bio }) => (
-            <div key={platform} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div>
-                  <span className="text-white font-semibold text-sm">{platform}</span>
-                  <span className="ml-3 text-[#00E676] text-xs font-medium">{handle}</span>
-                </div>
-                <span className="text-white/30 text-xs">{charLimit}</span>
-              </div>
-              <p className="text-white/60 text-sm leading-relaxed whitespace-pre-line font-mono bg-white/[0.02] rounded-xl p-4 border border-white/[0.04]">{bio}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Key Facts */}
       <section>
         <div className="section-label">{t.press.keyFacts}</div>

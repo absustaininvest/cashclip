@@ -1,4 +1,5 @@
 import { ArrowUpRight, Smartphone, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor } from "lucide-react";
+import { Link } from "wouter";
 import { useLang } from "../lib/i18n";
 
 export default function Ventures() {
@@ -253,6 +254,11 @@ export default function Ventures() {
         <p className="text-center text-white/30 text-xs mt-6">
           For partnership inquiries: <a href="mailto:supportpr@absustaininvest.com" className="text-[#00E676] hover:underline">supportpr@absustaininvest.com</a>
         </p>
+        <div className="flex justify-end mt-4">
+          <Link href="/sc-portal">
+            <img src={`${import.meta.env.BASE_URL}logo-alt.png`} alt="" className="h-7 rounded opacity-15 hover:opacity-35 transition-opacity cursor-default" />
+          </Link>
+        </div>
       </div>
     </div>
   );

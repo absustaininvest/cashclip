@@ -41,9 +41,7 @@ export function Footer() {
           ))}
         </div>
         <div className="mt-8 flex flex-col items-center gap-4">
-          <Link href="/sc-portal">
-            <img src={`${import.meta.env.BASE_URL}logo-alt.png`} alt="AB Sustainability Investments" className="h-16 rounded cursor-default" />
-          </Link>
+          <img src={`${import.meta.env.BASE_URL}logo-alt.png`} alt="AB Sustainability Investments" className="h-16 rounded" />
           <p className="text-white/20 text-xs">{f.rights}</p>
         </div>
       </div>
