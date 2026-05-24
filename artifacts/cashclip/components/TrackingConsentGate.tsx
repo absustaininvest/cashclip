@@ -108,6 +108,7 @@ function LearnMoreSection() {
 export function TrackingConsentGate({ children, onConsentDone }: Props) {
   const [consentState, setConsentState] = useState<ConsentState>("checking");
   const handledRef = useRef(false);
+  const consentDoneFiredRef = useRef(false);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -123,25 +124,41 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
     }
 
     async function check() {
-      const [dismissed, status] = await Promise.all([
-        AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null),
-        getTrackingStatus(),
-      ]);
+      const status = await getTrackingStatus();
 
       if (status === "authorized" || status === "unavailable") {
         setConsentState("done");
-        onConsentDone?.();
+        if (!consentDoneFiredRef.current) {
+          consentDoneFiredRef.current = true;
+          onConsentDone?.();
+        }
         return;
       }
 
+      // "undetermined" means iOS hasn't recorded a decision yet (or reset it
+      // after a Settings toggle). Always show the prompt — never infer "denied"
+      // from the dismissed flag, because iOS resets status to "undetermined"
+      // when the user re-enables tracking in Settings.
       if (status === "undetermined") {
-        setConsentState(dismissed === "1" ? "denied" : "needed");
+        handledRef.current = false;
+        setConsentState("needed");
       } else {
         setConsentState("denied");
       }
     }
 
     check();
+
+    // Re-check whenever the app comes back to the foreground. This catches the
+    // case where the user goes to Settings → Privacy → Tracking, changes the
+    // toggle, and returns to the app.
+    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        check();
+      }
+    });
+
+    return () => sub.remove();
   }, []);
 
   async function handleContinue() {
