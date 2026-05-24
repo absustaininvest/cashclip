@@ -65,8 +65,9 @@ const totpVerifyRateLimiter = rateLimit({
 
 // Resolved lazily so the server can start and pass the health check even when
 // JWT_TRIDENTE / JWT_SECRET hasn't been linked to the production environment yet.
-// Auth routes that call getJwtSecret() will return 500 if the secret is absent,
-// rather than crashing the whole process at import time.
+// After the EdDSA upgrade JWT_TRIDENTE is retained solely as: (a) the operator
+// recovery proof-of-identity key and (b) a fallback verifier for HS256 tokens
+// issued before the cutover (which expire naturally within 2 hours).
 function getJwtSecret(): string {
   const s = process.env.JWT_TRIDENTE ?? process.env.JWT_SECRET;
   if (!s) throw new Error("JWT_TRIDENTE (or JWT_SECRET) environment variable is required");
@@ -74,13 +75,9 @@ function getJwtSecret(): string {
   return s;
 }
 
-// ── Secret rotation support ───────────────────────────────────────────────────
-// During a key rotation:
-//   1. Set JWT_TRIDENTE_PREV = current JWT_TRIDENTE value
-//   2. Set JWT_TRIDENTE     = new 64-byte secret
-//   3. Restart the server — new tokens are signed with the new secret,
-//      but tokens signed with the old secret remain valid for their full 2h TTL.
-//   4. After 2 hours all old tokens have expired — clear JWT_TRIDENTE_PREV.
+// ── HS256 rotation fallback ───────────────────────────────────────────────────
+// Only used to verify tokens signed by the old HS256 secret during the 2h
+// transition window after a keyswitch.
 function getPrevJwtSecret(): string | null {
   const s = process.env.JWT_TRIDENTE_PREV;
   if (!s) return null;
@@ -89,6 +86,48 @@ function getPrevJwtSecret(): string | null {
     return null;
   }
   return s;
+}
+
+// ── EdDSA (Ed25519) key management via BRIDGE_INGRID_WICKED ──────────────────
+// All new tokens are signed with Ed25519 once this key is present.
+// HS256 remains active as a *verify-only* fallback for the 2h window after
+// cutover so in-flight tokens are not invalidated on restart.
+//
+// Key format: OpenSSH private key (-----BEGIN OPENSSH PRIVATE KEY-----)
+// or PKCS#8 PEM (-----BEGIN PRIVATE KEY-----). Both are supported by
+// Node.js crypto.createPrivateKey().
+let _edDsaPrivKey: import("crypto").KeyObject | null | undefined = undefined;
+let _edDsaPubKey: import("crypto").KeyObject | null | undefined = undefined;
+
+function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: import("crypto").KeyObject } | null {
+  if (_edDsaPrivKey === undefined) {
+    const raw = process.env.BRIDGE_INGRID_WICKED;
+    if (!raw) {
+      _edDsaPrivKey = null;
+      _edDsaPubKey = null;
+    } else {
+      try {
+        const privateKey = crypto.createPrivateKey(raw);
+        if (privateKey.asymmetricKeyType !== "ed25519") {
+          logger.warn("BRIDGE_INGRID_WICKED is not an Ed25519 key — EdDSA signing disabled, falling back to HS256");
+          _edDsaPrivKey = null;
+          _edDsaPubKey = null;
+        } else {
+          _edDsaPubKey = crypto.createPublicKey(privateKey);
+          _edDsaPrivKey = privateKey;
+          logger.info("EdDSA (Ed25519) JWT signing active via BRIDGE_INGRID_WICKED");
+        }
+      } catch (err) {
+        logger.error({ err }, "Failed to parse BRIDGE_INGRID_WICKED — EdDSA disabled, falling back to HS256");
+        _edDsaPrivKey = null;
+        _edDsaPubKey = null;
+      }
+    }
+  }
+  if (_edDsaPrivKey && _edDsaPubKey) {
+    return { privateKey: _edDsaPrivKey, publicKey: _edDsaPubKey };
+  }
+  return null;
 }
 
 const TOKEN_EXPIRY = "2h";
@@ -145,11 +184,37 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 setInterval(() => { pruneExpiredLoginAttempts(); }, 5 * 60 * 1000);
 
 function generateToken(userId: string, role: string, tokenVersion: number): string {
+  const edDsa = getEdDsaKeys();
+  if (edDsa) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (jwt.sign as any)({ userId, role, tokenVersion }, edDsa.privateKey, {
+      algorithm: "EdDSA",
+      expiresIn: TOKEN_EXPIRY,
+    }) as string;
+  }
   return jwt.sign({ userId, role, tokenVersion }, getJwtSecret(), { expiresIn: TOKEN_EXPIRY });
 }
 
 function verifyToken(token: string): { userId: string; role: string; tokenVersion: number } | null {
-  const secrets: string[] = [getJwtSecret()];
+  const edDsa = getEdDsaKeys();
+  if (edDsa) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const decoded = (jwt.verify as any)(token, edDsa.publicKey, { algorithms: ["EdDSA"] });
+      if (
+        typeof decoded === "object" && decoded !== null &&
+        "userId" in decoded && "role" in decoded && "tokenVersion" in decoded
+      ) {
+        return decoded as { userId: string; role: string; tokenVersion: number };
+      }
+    } catch { /* fall through to HS256 transition fallback */ }
+  }
+
+  // HS256 fallback — verifies tokens signed before the EdDSA cutover.
+  // These expire within 2h of the first EdDSA-enabled restart, after which
+  // this path will never succeed and can be removed.
+  const secrets: string[] = [];
+  try { secrets.push(getJwtSecret()); } catch { /* secret not configured */ }
   const prev = getPrevJwtSecret();
   if (prev) secrets.push(prev);
 
@@ -157,17 +222,12 @@ function verifyToken(token: string): { userId: string; role: string; tokenVersio
     try {
       const decoded = jwt.verify(token, secret);
       if (
-        typeof decoded === "object" &&
-        decoded !== null &&
-        "userId" in decoded &&
-        "role" in decoded &&
-        "tokenVersion" in decoded
+        typeof decoded === "object" && decoded !== null &&
+        "userId" in decoded && "role" in decoded && "tokenVersion" in decoded
       ) {
         return decoded as { userId: string; role: string; tokenVersion: number };
       }
-    } catch {
-      // try next secret
-    }
+    } catch { /* try next */ }
   }
   return null;
 }
@@ -436,11 +496,19 @@ export function registerAuthRoutes(app: Express) {
       // If TOTP is enabled, issue a short-lived pending token instead of the
       // full JWT. The client must complete login via POST /api/auth/totp/verify.
       if (user.totpEnabled && user.totpSecret) {
-        const totpSessionToken = jwt.sign(
-          { userId: user.id, type: "totp-pending", tokenVersion: user.tokenVersion },
-          getJwtSecret(),
-          { expiresIn: "5m" },
-        );
+        const _totpEdDsa = getEdDsaKeys();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totpSessionToken = _totpEdDsa
+          ? (jwt.sign as any)(
+              { userId: user.id, type: "totp-pending", tokenVersion: user.tokenVersion },
+              _totpEdDsa.privateKey,
+              { algorithm: "EdDSA", expiresIn: "5m" },
+            ) as string
+          : jwt.sign(
+              { userId: user.id, type: "totp-pending", tokenVersion: user.tokenVersion },
+              getJwtSecret(),
+              { expiresIn: "5m" },
+            );
         res.json({ requiresTotp: true, totpSessionToken });
         return;
       }
@@ -477,16 +545,33 @@ export function registerAuthRoutes(app: Express) {
       }
 
       let payload: { userId: string; type: string; tokenVersion: number; exp?: number } | null = null;
-      try {
-        const decoded = jwt.verify(totpSessionToken, getJwtSecret());
-        if (
-          typeof decoded === "object" && decoded !== null &&
-          "userId" in decoded && "type" in decoded &&
-          (decoded as Record<string, unknown>).type === "totp-pending"
-        ) {
-          payload = decoded as { userId: string; type: string; tokenVersion: number; exp?: number };
-        }
-      } catch { /* invalid token */ }
+      // Try EdDSA first, then HS256 fallback (transition window)
+      const _verifyEdDsa = getEdDsaKeys();
+      if (_verifyEdDsa) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const decoded = (jwt.verify as any)(totpSessionToken, _verifyEdDsa.publicKey, { algorithms: ["EdDSA"] });
+          if (
+            typeof decoded === "object" && decoded !== null &&
+            "userId" in decoded && "type" in decoded &&
+            (decoded as Record<string, unknown>).type === "totp-pending"
+          ) {
+            payload = decoded as { userId: string; type: string; tokenVersion: number; exp?: number };
+          }
+        } catch { /* fall through */ }
+      }
+      if (!payload) {
+        try {
+          const decoded = jwt.verify(totpSessionToken, getJwtSecret());
+          if (
+            typeof decoded === "object" && decoded !== null &&
+            "userId" in decoded && "type" in decoded &&
+            (decoded as Record<string, unknown>).type === "totp-pending"
+          ) {
+            payload = decoded as { userId: string; type: string; tokenVersion: number; exp?: number };
+          }
+        } catch { /* invalid token */ }
+      }
       if (!payload) {
         res.status(401).json({ error: "Invalid or expired session. Please log in again." });
         return;
