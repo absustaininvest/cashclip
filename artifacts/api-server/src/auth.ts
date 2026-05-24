@@ -185,6 +185,24 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 }
 
 export async function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  // A valid admin Bearer JWT is always sufficient — this covers the web portal.
+  // The INVECE console-token path is for internal/programmatic access only.
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const payload = verifyToken(token);
+    if (payload) {
+      const user = await storage.getUser(payload.userId);
+      if (user && user.tokenVersion === payload.tokenVersion && user.role === "admin") {
+        req.userId = user.id;
+        req.userRole = user.role;
+        next();
+        return;
+      }
+    }
+  }
+
+  // Fallback: console-token path (internal tooling / INVECE secret).
   const consoleToken = process.env.INVECE;
   if (consoleToken) {
     const provided = req.headers["x-console-token"];
@@ -193,8 +211,6 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
       return;
     }
   }
-
-  const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "No token provided" });
     return;
