@@ -1,0 +1,61 @@
+o optimize your revenue you can add the following code to your header or footer. The user gets an information automatically as soon as new surveys are available for him.
+
+Please replace the following information: {ext_user_id} and {app_id}
+On "const script4":
+Here you can change the link the user should get directed to, there are two options:
+If our frame is on your page, you can set the url to this site. Example: "https://your-site.com/file_to_cpxreserach_offerwallframe.php"
+You use your direct surveywall link: "https://offers.cpx-research.com/index.php?app_id={app_id}&ext_user_id={ext_user_id}&username={username}&email={email}"
+// you must replace ext_user_id , app_id and email would be a plus (it's not necessary)
+
+		
+		 <script>
+
+const script4 = {
+    div_id: "notification",
+    theme_style: 4,
+    position: 5, //number // default 1 // 1 = top center, 2 = top left, 3 top right, 4 bottom left, 5 bottom right, 6 bottom center
+    text: "",
+    link: "https://offers.cpx-research.com/index.php?app_id={app_id}&ext_user_id={ext_user_id}&username={username}&email={email}", // replace ext_user_id app_id and email (not necessary)
+    newtab: true
+};
+
+
+
+const config = {
+    general_config: {
+        app_id: {app_id}, //number
+        ext_user_id: "{ext_user_id}", // string
+				email: "{email}", // string
+        username: "{username}", // string
+				subid_1: "", // string
+        subid_2: "", // string
+    },
+    style_config: {
+        text_color: "#2b2b2b", // string // hex, rgba, colorcode
+        survey_box: {
+            topbar_background_color: "#45c4c6", // string // hex, rgba, colorcode
+            box_background_color: "white", // string // hex, rgba, colorcode
+            rounded_borders: false, // boolean true || false
+            stars_filled: "#2b2b2b", // string // hex, rgba, colorcode
+        },
+    },
+    script_config: [script4], // Object Array
+    debug: true, // boolean
+    
+
+    
+       
+};
+
+window.config = config;
+
+
+	    
+	    
+    </script>
+               <div id="notification"></div>
+
+<script type="text/javascript" src="https://cdn.cpx-research.com/assets/js/script_tag_v1.1.js"></script>
+
+		
+	
