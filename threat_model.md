@@ -18,14 +18,15 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 - **Public to authenticated to admin API surfaces** — routes in `artifacts/api-server/src` cross distinct trust levels; admin functionality must never rely on hidden UI routes alone.
 - **API to PostgreSQL** — the API has direct authority to mutate balances, sessions, users, and operational data. Any injection or authorization flaw here can fully compromise application integrity.
 - **API to external survey/offer/payments providers** — provider APIs and webhooks are outside the trust boundary and must be strongly authenticated before rewarding users or triggering payouts.
-- **Public website to admin portal boundary** — `artifacts/absustain` is mostly public marketing content but also serves a same-origin admin UI route (`/sc-portal`), so same-origin script injection would endanger admin tokens stored in the browser.
+- **Public website to admin portal boundary** — `artifacts/absustain` is mostly public marketing content but also serves a same-origin admin UI route (`/sc-portal`), so same-origin script injection or browser UI-redressing/frame-embedding issues would endanger admin tokens and privileged actions initiated from the browser.
+- **Public operator-metadata endpoints** — read-only routes that reveal live integration, health, or setup state sit at a public/admin trust boundary because they expose internal providers, secret presence, and operational readiness to unauthenticated users.
 - **Production vs dev-only code** — mock/demo artifacts and test-only paths are out of scope unless production reachability is demonstrated. Assume `NODE_ENV=production` in deployed environments.
 
 ## Scan Anchors
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
-- **Highest-risk areas:** auth/session handling, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, and PayPal payout logic.
-- **Public vs authenticated vs admin:** public marketing/lead routes and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
+- **Highest-risk areas:** auth/session handling, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, and the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`.
+- **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
 
 ## Threat Categories

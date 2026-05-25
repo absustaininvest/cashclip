@@ -1,0 +1,15 @@
+---
+id: "vuln-20260525-earn-race-cap-bypass"
+title: "Concurrent earn requests bypass spin cooldown and daily earning caps"
+level: HIGH
+files:
+  - "artifacts/api-server/src/routes/earnings.ts"
+  - "lib/db/src/schema/schema.ts"
+state: NOT_FIXED
+---
+
+An authenticated user can trigger multiple reward credits at once and receive more earnings than the app is supposed to allow. By sending several earn requests in parallel, an attacker can bypass the one-spin-per-2-hours rule and daily earning caps, then convert the extra tokens into real account balance.
+
+The earn-token issuance paths in `artifacts/api-server/src/routes/earnings.ts` enforce cooldowns and daily limits with separate read-before-write checks, but they do not serialize requests or enforce those rules at the database layer. In `/api/earn/spin/complete` the server validates a per-request challenge token, then performs `todayCount` and recent-spin queries (`lines 333-360`) before inserting a new `earn_tokens` row (`lines 364-372`). Because those checks are outside any transaction that locks the user row or the relevant earn-token rows, multiple concurrent requests with different valid `challengeToken` values can all observe the same pre-insert state and all succeed. The `/api/earnings/record` path has the same pattern for client-claimable actions such as `checkin`: it counts existing rows (`lines 191-207`) and then inserts a new token (`lines 241-249`) with no atomic guard.
+
+This is exploitable in production by a normal authenticated user. The attacker can call `/api/earn/spin/begin` repeatedly to mint several valid challenge tokens, wait the required 3 seconds, and then submit many `/api/earn/spin/complete` requests in parallel. Each request deletes only its own challenge from the in-memory map, then independently checks the database before any of the competing inserts become visible, allowing multiple spin rewards to be created during a single 2-hour window. The same race can be used against `/api/earnings/record` to exceed the one-per-day `checkin` cap. After the 3-hour pending window, `/api/earnings/claim` turns the extra `earn_tokens` into real balance. The schema in `lib/db/src/schema/schema.ts` provides no uniqueness or exclusion constraint on `(userId, actionType, time window)` for `earn_tokens` (`lines 339-357`), so the database does not stop the over-credit once the racing inserts arrive.
