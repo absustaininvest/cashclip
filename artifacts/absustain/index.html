@@ -135,6 +135,9 @@
   </head>
   <body>
     <script>
+      if (window.top !== window.self) { try { window.top.location = window.self.location; } catch(e) { document.body.innerHTML = ''; } }
+    </script>
+    <script>
       if (window.location.hostname.includes('replit.app') || window.location.hostname.includes('replit.dev')) {
         window.location.replace('https://absustaininvest.com/absustain/' + window.location.pathname.replace(/^\/absustain\/?/, '') + window.location.search + window.location.hash);
       }

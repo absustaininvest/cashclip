@@ -24,6 +24,32 @@ const MAINTENANCE_HTML =
   `</style></head><body><div><h1>Service temporarily unavailable</h1>` +
   `<p>We sincerely apologize for the inconvenience. We're offline for scheduled maintenance and will be back shortly. Thank you for your patience.</p></div></body></html>`;
 
+function antiClickjackPlugin(): Plugin {
+  const ANTI_FRAMING_HEADERS: Record<string, string> = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+  };
+  return {
+    name: "anti-clickjack",
+    configureServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        for (const [k, v] of Object.entries(ANTI_FRAMING_HEADERS)) {
+          res.setHeader(k, v);
+        }
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        for (const [k, v] of Object.entries(ANTI_FRAMING_HEADERS)) {
+          res.setHeader(k, v);
+        }
+        next();
+      });
+    },
+  };
+}
+
 function archiveGuardPlugin(): Plugin {
   return {
     name: "archive-guard",
@@ -82,6 +108,7 @@ function maintenancePlugin(): Plugin {
 export default defineConfig({
   base: basePath,
   plugins: [
+    antiClickjackPlugin(),
     archiveGuardPlugin(),
     ...(MAINTENANCE_MODE ? [maintenancePlugin()] : []),
     react(),
