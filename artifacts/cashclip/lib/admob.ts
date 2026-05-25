@@ -58,6 +58,23 @@ function shouldUseNonPersonalizedOnly(): boolean {
   return nonPersonalizedOnly;
 }
 
+function buildAdRequestConfig() {
+  return {
+    requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
+    keywords: [
+      "rewards",
+      "cashback",
+      "earn money",
+      "survey",
+      "gaming",
+      "gift cards",
+      "finance",
+      "mobile games",
+    ],
+    contentUrl: "https://cash-clip.app",
+  };
+}
+
 async function resolvePersonalizationConsent(): Promise<void> {
   if (Platform.OS === "android") {
     nonPersonalizedOnly = false;
@@ -175,9 +192,7 @@ export function preloadRewardedAd(adUnitId?: string): void {
     const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require("react-native-google-mobile-ads");
     const unitId = adUnitId || getAdUnitId("rewarded") || TestIds.REWARDED;
 
-    const rewarded = RewardedAd.createForAdRequest(unitId, {
-      requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
-    });
+    const rewarded = RewardedAd.createForAdRequest(unitId, buildAdRequestConfig());
 
     const unsubscribeLoaded = rewarded.addAdEventListener(
       RewardedAdEventType.LOADED,
@@ -297,9 +312,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
     let settled = false;
     let adShown = false;
 
-    const rewarded = RewardedAd.createForAdRequest(unitId, {
-      requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
-    });
+    const rewarded = RewardedAd.createForAdRequest(unitId, buildAdRequestConfig());
 
     let earned = false;
     let rewardAmount = 0;
@@ -415,9 +428,7 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
       let settled = false;
       let adShown = false;
 
-      const interstitial = InterstitialAd.createForAdRequest(unitId, {
-        requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
-      });
+      const interstitial = InterstitialAd.createForAdRequest(unitId, buildAdRequestConfig());
 
       const loadStartTime = Date.now();
 
