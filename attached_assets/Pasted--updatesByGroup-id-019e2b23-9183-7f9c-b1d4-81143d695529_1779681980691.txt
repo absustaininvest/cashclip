@@ -1,0 +1,1687 @@
+{
+  "updatesByGroup": [
+    {
+      "id": "019e2b23-9183-7f9c-b1d4-81143d695529",
+      "group": "5c7673e1-00d2-4269-b985-628d1b56428b",
+      "message": "Fix admin modals not opening on iOS",
+      "createdAt": "2026-05-15T10:16:51.843Z",
+      "updatedAt": "2026-05-15T10:16:51.843Z",
+      "isRollBackToEmbedded": false,
+      "codeSigningInfo": null,
+      "runtime": "1.0.0",
+      "platform": "ios",
+      "gitCommitHash": "d616b6f3921b7977b87a541f30080bc29e923322",
+      "isGitWorkingTreeDirty": false,
+      "manifestFragment": {
+        "extra": {
+          "expoClient": {
+            "ios": {
+              "infoPlist": {
+                "SKAdNetworkItems": [
+                  {
+                    "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "238da6jt44.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "294l99pt4k.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "32z4fx6l9h.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3qy4746246.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3rd42ekr43.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3sh42y64q3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "424m5254lk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "44jx6755aq.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "488r3q3dtq.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4pfyvq9l8r.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4w7y6s5ca2.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "578prtvx9j.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5a6flpkh64.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5f5u5tfb26.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5l3tpt7t6e.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5lm9lj6jb7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5tjdwbrq8w.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "6yxyv74ff7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "77y3x8wds4.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "7ug5zh24hu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "8s468mfl3y.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "97r2b46745.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9nlqeag3gk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9rd848q2bz.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9t245vhmpl.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "a2p9lx4jpn.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "a8cz6cu7e5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "av6w8kgt66.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "c6k4g5qg8m.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "e5fvkxwrpn.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f38h382jlk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f73kdq92p3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f7s53z58qe.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "feyaarzu9v.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "g6gcrrvk4p.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "glqzh8vgby.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "k674qkevps.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "k6y4y55b64.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "kbd757ywx3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "klf5c3l5u5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "lr83yxwka7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "m8dbw4sv7c.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mj797d8u6f.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mlmmfzh3r3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mp6xlyr22a.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mqn7fxpca7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "n9x2a789qt.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "p78axxw29g.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "ppxm28t8ap.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "prcb7njmu6.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "pwa73g5rt2.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "s39g8k73mm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "t38b2kh725.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "tl55sbb4fm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "uw77j35x4d.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v72qych5uu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v79kvwwj4g.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "vhf287vqwu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "w9q455wk68.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "wg4vff78zm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "wzmmz9fp6w.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "x44k69ngh6.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "xga6mpmplv.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "yclnxrl5pm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "zmvfpc5aq8.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "zq492l623r.skadnetwork"
+                  }
+                ],
+                "ITSAppUsesNonExemptEncryption": false,
+                "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission — tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking."
+              },
+              "buildNumber": "30",
+              "supportsTablet": false,
+              "bundleIdentifier": "app.replit.cashclip",
+              "privacyManifests": {
+                "NSPrivacyTracking": true,
+                "NSPrivacyTrackingDomains": [
+                  "googleadservices.com",
+                  "googlesyndication.com",
+                  "doubleclick.net",
+                  "google-analytics.com",
+                  "googletagmanager.com",
+                  "admob.com",
+                  "googleads.g.doubleclick.net",
+                  "pagead2.googlesyndication.com"
+                ],
+                "NSPrivacyAccessedAPITypes": [
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "CA92.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "C617.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "E174.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "35F9.1"
+                    ]
+                  }
+                ],
+                "NSPrivacyCollectedDataTypes": [
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+                      "NSPrivacyCollectedDataTypePurposeAnalytics"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+                      "NSPrivacyCollectedDataTypePurposeAnalytics"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": true
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherFinancialInfo",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAnalytics",
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeAdvertisingData",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": true
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+                    "NSPrivacyCollectedDataTypeLinked": false,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePerformanceData",
+                    "NSPrivacyCollectedDataTypeLinked": false,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  }
+                ]
+              }
+            },
+            "web": {
+              "favicon": "./assets/images/favicon.png"
+            },
+            "icon": "./assets/images/icon.png",
+            "name": "CashClip",
+            "slug": "cashclip",
+            "extra": {
+              "eas": {
+                "projectId": "10994af8-62e3-4a9d-9e35-7f4381965a31"
+              },
+              "router": {
+                "origin": "https://replit.com/"
+              }
+            },
+            "owner": "expodeveloper20",
+            "scheme": "cashclip",
+            "splash": {
+              "image": "./assets/images/splash-icon.png",
+              "resizeMode": "contain",
+              "backgroundColor": "#0A0A0F"
+            },
+            "android": {
+              "package": "app.replit.cashclip",
+              "permissions": [
+                "com.google.android.gms.permission.AD_ID"
+              ],
+              "versionCode": 1,
+              "adaptiveIcon": {
+                "backgroundColor": "#E6F4FE",
+                "backgroundImage": "./assets/images/android-icon-background.png",
+                "foregroundImage": "./assets/images/android-icon-foreground.png",
+                "monochromeImage": "./assets/images/android-icon-monochrome.png"
+              }
+            },
+            "plugins": [
+              [
+                "expo-router",
+                {
+                  "origin": "https://replit.com/"
+                }
+              ],
+              "expo-font",
+              "expo-web-browser",
+              [
+                "expo-tracking-transparency",
+                {
+                  "userTrackingPermission": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission — tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking."
+                }
+              ],
+              [
+                "react-native-google-mobile-ads",
+                {
+                  "iosAppId": "ca-app-pub-8679658921848348~6212139107",
+                  "androidAppId": "ca-app-pub-8679658921848348~6212139107"
+                }
+              ],
+              [
+                "expo-build-properties",
+                {
+                  "ios": {
+                    "extraPods": [
+                      {
+                        "name": "GoogleMobileAdsMediationUnity"
+                      }
+                    ],
+                    "deploymentTarget": "15.1"
+                  },
+                  "android": {}
+                }
+              ]
+            ],
+            "updates": {
+              "url": "https://u.expo.dev/10994af8-62e3-4a9d-9e35-7f4381965a31"
+            },
+            "version": "1.1.0",
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "sdkVersion": "54.0.0",
+            "experiments": {
+              "typedRoutes": true,
+              "reactCompiler": true
+            },
+            "orientation": "portrait",
+            "newArchEnabled": true,
+            "runtimeVersion": "1.0.0",
+            "userInterfaceStyle": "automatic"
+          }
+        },
+        "assets": [
+          {
+            "bundleKey": "7d40544b395c5949f4646f5e150fe020",
+            "fileSHA256": "LN_rjlzN55dvcBL7jM5zryIpAp7iHU8VCf7RFIccbNg",
+            "storageKey": "Pi65ns2w9xLI5G_m9aGrJ5wK5FpWcGcInSSFwnA_0aA",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "a132ecc4ba5c1517ff83c0fb321bc7fc",
+            "fileSHA256": "K3RDqaWOksoRpXW9wRWYYVpX3eMFzYznDWAmBrMCzZg",
+            "storageKey": "X3OAkUu5P_LqyKFx1bNkA_qDQFLlSjCYNAlVEaOamHE",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0ea69b5077e7c4696db85dbcba75b0e1",
+            "fileSHA256": "Pd0Hc-0n4j0leJ8wFzGzrEVa2L5aonoKG4OPicbSciU",
+            "storageKey": "FwJkAbrRNahBGX1KXnTAgiiwyzENu3D7DeEzCwmInyo",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "2d0a9133e39524f138be6d4db9f4851f",
+            "fileSHA256": "ku2BdqyMtENipfxqNwNiagAGrGt8snLumfWFAmLsBw4",
+            "storageKey": "I8dvryp2TLXxE9DKqjCm2NN54-HfFCrFNcg8F_7LXJA",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0a328cd9c1afd0afe8e3b1ec5165b1b4",
+            "fileSHA256": "mtuMXvypMuK3MrKT2oE70uMZUiYwVrzp4lF_7A8LanY",
+            "storageKey": "LM4SxB4vhDe2iN4tYT0dAlPP_dsY-Zme_H-JpULtHa8",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3cd68ccdb8938e3711da2e8831b85493",
+            "fileSHA256": "yGu0he7mh-BsUA_EI09RpnhLRTDCrhHQx2SBEQvOMQU",
+            "storageKey": "A08F4i_QzJW79C3BCIZYmmpH_p2FkQbdTQZ_2hVWDeg",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "61ca7e64b7d605716c57706cef640b9a",
+            "fileSHA256": "0Dpc16Zu8QxRR5FvnVh4stCgpa1G9AWjHNmWfvqlWv0",
+            "storageKey": "04lOdmTXc1loPyqacYwao1j0xlM34n0vGxtIFY7ETTs",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "aff2c65b39a296d4f7e96d0f58169170",
+            "fileSHA256": "q1YT0s5w-mfFkm6DE1NmSUUZn8GV-m_nbF_jzsRS4xo",
+            "storageKey": "4s0taS6e9_zozzhgsa6FogUB4b0LQc1LMNbBLkxlIz0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d8e7601e3df962f83c62371ac14964d8",
+            "fileSHA256": "xOVOagp95jaqFTN4-8YupKQWlb_t-Af5Dfexj_1zP2c",
+            "storageKey": "g6PisuFJa8j79kTi3ZKboB3DcerIBZXujlFBVhXkh1s",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3cd68ccdb8938e3711da2e8831b85493",
+            "fileSHA256": "yGu0he7mh-BsUA_EI09RpnhLRTDCrhHQx2SBEQvOMQU",
+            "storageKey": "A08F4i_QzJW79C3BCIZYmmpH_p2FkQbdTQZ_2hVWDeg",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0747a1317bbe9c6fc340b889ef8ab3ae",
+            "fileSHA256": "IyXFOnPlTEOMu8YN_92LUT1HG6QuL1ZxPvQEuV4Mofw",
+            "storageKey": "DP7IegcRXP-7kIHiKmplB43A2HIM9nT01_O4JsXZKXI",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d84e297c3b3e49a614248143d53e40ca",
+            "fileSHA256": "sbwYEMoj4sOM12lxxDWR1yYWEGEkDYt5KwV1cZbdtSg",
+            "storageKey": "aY8TciqT0pLONlgDC1iSLgQd6TyRf7NkBhUrJkfuqD0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "1190ab078c57159f4245a328118fcd9a",
+            "fileSHA256": "y9-SE-VfZcSNB2rNhCO3ya7k8bgRAf9slaOMTNioZGE",
+            "storageKey": "mJsf9KoBQiKLAHO11XdSt59xshQZeDJmGEa9jlA_GY4",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "78c625386b4d0690b421eb0fc78f7b9c",
+            "fileSHA256": "0FydMNefRaeOVYWi5-xnxqBqiD3ZE34dUFnoyHszznY",
+            "storageKey": "yag9GLD2iZjnBBRuIa9kgMTdG2sabQ7v5K3JoDYQcqY",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0747a1317bbe9c6fc340b889ef8ab3ae",
+            "fileSHA256": "IyXFOnPlTEOMu8YN_92LUT1HG6QuL1ZxPvQEuV4Mofw",
+            "storageKey": "DP7IegcRXP-7kIHiKmplB43A2HIM9nT01_O4JsXZKXI",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "dad2fa9f4394a630f0f9a0d6dabd44bc",
+            "fileSHA256": "3Fa5dr1FY44RJfZol0NSXmiGrgvvLI9GUZlIM2hagx8",
+            "storageKey": "dKG-AjtNeel2LjkGsDkmnWB4pQbGddnfBSLVF8WMiZo",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "f3a81967828232c893d547162e922764",
+            "fileSHA256": "7xP8DfxS7COBdYX9fhCfvfWTo7JUnEDOcaybDtoSzCw",
+            "storageKey": "YwOPYZk6RzR-yqrSLnzNa9-a6jKqlFcZk7-CyykA42Y",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d62ddc38b69aff346c20a28774933d6a",
+            "fileSHA256": "tDSnzxjC1M50fHCULqL-4tRBLZOWftkrNy-BC7kmHqU",
+            "storageKey": "uQY2IIL89sZpR_V6aLXhWoTtqSVXfWkY_P-nNyiRUyE",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "f3a81967828232c893d547162e922764",
+            "fileSHA256": "7xP8DfxS7COBdYX9fhCfvfWTo7JUnEDOcaybDtoSzCw",
+            "storageKey": "YwOPYZk6RzR-yqrSLnzNa9-a6jKqlFcZk7-CyykA42Y",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d1ea1496f9057eb392d5bbf3732a61b7",
+            "fileSHA256": "wV7HKnTROVchGAgxPVw13rf3YGxtItvdzrAADU4FR60",
+            "storageKey": "iiX0QENtWnFHr-ql_G75Cv2aoG8T9jbnoTrrLiduBMs",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "19eeb73b9593a38f8e9f418337fc7d10",
+            "fileSHA256": "ppou21tsYLhDPVttI8afUgzNimAvP2DnmW5Ilxi8F1w",
+            "storageKey": "0OEDV0a6nXu3m-NCyMZCejvRaLMgUJoN5kZZr6WGO9o",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "ab19f4cbc543357183a20571f68380a3",
+            "fileSHA256": "J_TSKdRAklv3IS1d__pF1Zayx7O7KQXJa4ObIIGh2-s",
+            "storageKey": "1QHSPNPuPJBWsSu-NeGsZJ65lgP9Nn9hUrFpSvorJ3Y",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d8b800c443b8972542883e0b9de2bdc6",
+            "fileSHA256": "cIp5z1YbiipIUM4CVFhNOlIxBGvgj7f630tu39sxF4s",
+            "storageKey": "F0VhhOdSAZAGWHzCBT8frAxWVDzVgNYGLlSTnInMLk0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "412dd9275b6b48ad28f5e3d81bb1f626",
+            "fileSHA256": "rPaRlXo7zOfRlYVtzpilzxTc4QvqKKpcELNVDAeOI7U",
+            "storageKey": "YbOaNgsSGzVwiIMg8au7XcXF5nhp0mKG64zufThcPZQ",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "017bc6ba3fc25503e5eb5e53826d48a8",
+            "fileSHA256": "beyjK1a5f6H6h_rNaZa0bMRRkKVTQA5_698dIJMJm1c",
+            "storageKey": "92813hASY0kS8OnTdsF2wf_z0FEi_ZDIIaK-dzQ6BRU",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "20e71bdf79e3a97bf55fd9e164041578",
+            "fileSHA256": "78edo8TJffsVcb_2IClYqwUpxaox6DkmAFeLPjWdFEc",
+            "storageKey": "Ij5rVfQl_Hbg8xU1LXrdNRR__q6WTEE-FIneYIROiLQ",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3f78af31cca60105799838a1a7a59fbd",
+            "fileSHA256": "CKnVtRPPlH4i7egemoQ72Nd2OmNETNIUhL_edmLMZUM",
+            "storageKey": "51uuCjGTCU4sQ2DlvYncpMxrjzNUU-DxroGC4-znlNA",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "31b5ffea3daddc69dd01a1f3d6cf63c5",
+            "fileSHA256": "FvkimFh7qytGm8E8DfxtXRcbyhC60MkFOtFrwCO_cX0",
+            "storageKey": "Tz7HDL7tVs8yUP1CqStYSbcz6mUPIuXtgRwpbwTGixk",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "140c53a7643ea949007aa9a282153849",
+            "fileSHA256": "pcrrTTlcXjLx1aMKyzgq68Zk8brf0UkxmQfyIV5OPiY",
+            "storageKey": "aCX8j_wkGaOOBHOkuIXWbhH6yhyVsMMwlFutnxbhmeg",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "ca4b48e04dc1ce10bfbddb262c8b835f",
+            "fileSHA256": "AriOrZGt5XENfKGO20Omllpx2TcywG8pDMB6bdJJ6Yc",
+            "storageKey": "9txakBJI25J_9RlUOUEgOsFwzThQSwT905I6GoKt6h4",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b49ae8ab2dbccb02c4d11caaacf09eab",
+            "fileSHA256": "lNq58dWxPqB2nRJKLaDQJDPzuZ1t6loHwERqdxWBAMA",
+            "storageKey": "zWHJhD8L0fwRUMyESxwM_1yU_l7AMQ7rqrWTKS3AS3E",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b06871f281fee6b241d60582ae9369b9",
+            "fileSHA256": "qljzPyOaD7AvXHpsRcBD16msmgkzNYBmlOzW1O3A1qg",
+            "storageKey": "Xfli-kf1XRINO0tWNFXg4Sea2u1s13cQads6HuCyEtY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "1f77739ca9ff2188b539c36f30ffa2be",
+            "fileSHA256": "xlG4pn0xkyBvYiw8Ow-8pKLycnEIxCErUsHiouhMmzE",
+            "storageKey": "-ztrlgOVBau3MVd5snzhMTpofNDcyq025Cu3BjmxlaU",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "605ed7926cf39a2ad5ec2d1f9d391d3d",
+            "fileSHA256": "PQavHzHNg6znomWgFLj7Xe4Vdw7KyPelVVUZDmJ-A8I",
+            "storageKey": "1oTh0vE-guosYvK5OjlH1Z99_PPyqhIVn90ThgK_DpA",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "3b89dd103490708d19a95adcae52210e",
+            "fileSHA256": "BvTQCSPqJGl99d8LkphBdZkdi9JXdqAtUxu0AeOT7EI",
+            "storageKey": "YNS6DXVAmeiUgSmdlbFc_fCAZaujkelyOX2Rghtfn84",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "370dd5af19f8364907b6e2c41f45dbbf",
+            "fileSHA256": "ZPn7YjaB8RImHpovl4JngkOfOSXeqPRKV9Hk25W6bP0",
+            "storageKey": "xFiD5BuX0evqTtkginUlDq-Qyr5jbYqHZrr8KXuzihY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "adec7d6f310bc577f05e8fe06a5daccf",
+            "fileSHA256": "MfCZwT9uS6BfG0cb8XDLVJMklHQiKRc3LePKXPKeaho",
+            "storageKey": "0wwPq6qruQ2LX-si7xoKmHIaJNFZ5RYHFpDZWGmKSjU",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "56c8d80832e37783f12c05db7c8849e2",
+            "fileSHA256": "vIRLWwLT862rtRTeTgwCCCUtMSNBO9A_Yof6RGrO6Fk",
+            "storageKey": "CVIcmCaZQuDeBZ8MzAr5YdjwhCQYp4XnI-yT38tQYAs",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "e20945d7c929279ef7a6f1db184a4470",
+            "fileSHA256": "fh3QPdTOkLZYBSVUzXRZ3xZxZxc4mlUvpMbVal-JM-Y",
+            "storageKey": "sOWngARxbNCRah897T7CxgL5sksuDS7GGcEK31nDRfw",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b4eb097d35f44ed943676fd56f6bdc51",
+            "fileSHA256": "-iq30lV4GbK_5QCeRoRO-nFwzxd753NdQ6oqwSlfHVQ",
+            "storageKey": "XnOBVccehfKLW9rMBYUCc-VhyHZzTI1ycP3XlCspgcE",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "6e435534bd35da5fef04168860a9b8fa",
+            "fileSHA256": "YeirpaTpgf4iz3yOi82-oAR251xiw38Bv37jM2HWhCg",
+            "storageKey": "DHrVvHO_E3UMRekAVSe2Zlq8s_atMSwFl9Atq2aTy8w",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "4e85bc9ebe07e0340c9c4fc2f6c38908",
+            "fileSHA256": "7xSfCL3S_wmk4shXNHa3sPP7sVtiOVSt5ZiZ5xdb7do",
+            "storageKey": "iIxOYwe_3gl5flQPjaaNzvd8vR7QAtWGZOunEfTbUnk",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "871378c6eab492a3e689a9385dc45a12",
+            "fileSHA256": "m8TZ9emU53S9w--amofadJr19QuGFHPvfRzD1vgikmc",
+            "storageKey": "9RTzReJBzM1jkB2aig97kyU19ec44u1kt9tmL_dQtIM",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "d2285965fe34b05465047401b8595dd0",
+            "fileSHA256": "P1Ad2wXHCCm7tRz-nKn_9X854GBFfCV7PM8l33Z_CHA",
+            "storageKey": "hebRPpDghURPdBWnNe7sOHYILoqFlyKrRBK2Y1mcJVo",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "1681f34aaca71b8dfb70756bca331eb2",
+            "fileSHA256": "3Y7kA7vL9eWLd9ykrAPrr6E6KEo9h9jqnKSQQ1qG-kg",
+            "storageKey": "ZliFpHGjHwU9GxxH1wxIhsNm_XIz1_Tn1cw6sTxHQPY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "9436ede677912e546299d6dc1759be53",
+            "fileSHA256": "qZJ5eYt49fR8XIbjh4gVMlgtBIVrSp86ySFxysElZ_0",
+            "storageKey": "XZ5NmE9sq44GgY0ED-AiNt6S6g4wPtlY5hLPKlLb2B0",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "8e84d4d3b8cd14aa5ef5dc677d18787f",
+            "fileSHA256": "WYqZFjO0rEAXIVGscnlPTsmxP-Gc61O6bKjDqqhWEKM",
+            "storageKey": "d8DUVQpb1G6QHRw42Epkf9_wg2lYSIdZGXGWJs4tEw8",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "61ca2433c112de1e9b1e3e8369e66862",
+            "fileSHA256": "O0VOpuovro3yFTzDrVxW3jtUnTKTBxeWgs_AdfAle_0",
+            "storageKey": "OwS15D8eJ24LRNBfPqsVBwsllZPTJLBPgCIZnQtpSX4",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "5fc3fef1a1a55711c147d344132a468d",
+            "fileSHA256": "8klFNlFHyeeD6R2GSZWbWb5rAMnuTs0vazOvuy3Ycf4",
+            "storageKey": "ym9MBxuDtwJ0XazkqnAT5PhnGtaZKfCjaou1R3FyoCY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "3af2e072a31b85b3c0a55ede786b31ab",
+            "fileSHA256": "FmmZXe53Q4tzLWVX1x7U6AfdbruCcEtVOFk4cnxoQeI",
+            "storageKey": "lYQGZRUciENBQ8mqvfstB6W6xLqnMrz74w9OFP1H_Pc",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "fff3440ed39188f5d5bf85305e8b6be8",
+            "fileSHA256": "Aw03PE4qZ9XpIqJpTh6qs7nxII8TAdupSnC96_UsHvo",
+            "storageKey": "fTs-4lXtGz6sw3dOIdNyyl8uuijv8Wb16quaUoVsDz8",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "91486df4e5279497efb060b0d3cc797b",
+            "fileSHA256": "ZlS5PSEwHsYYh9PO3WwR2d8bHftj-c9FrHmV9uIjWrE",
+            "storageKey": "g0XNUzt_BYUfJMXiJSxrfg9QJuSgBOHEEDSIrVUwsw0",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "4cd115d5b3ed69078a637417321cce18",
+            "fileSHA256": "f0UpSAQC9HeVsrTdSUQXtP8fBFTafX_7C2VuqQUj7Ec",
+            "storageKey": "U5kdK2k2fhLwg1SM6rgHxHbdRaKz2aTMKMsfs_L5Vks",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "bde7a22c710d75af9c1bcffc02bd902b",
+            "fileSHA256": "8kDmEowxp1qj9FbqH_Ow_aOCF2aBeIrj0kTQjj-n1s0",
+            "storageKey": "_qnFjHk1HiYHqVrdEIZg-dqIrAGKPpPbqxRJA3hchJo",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          }
+        ],
+        "launchAsset": {
+          "bundleKey": "ef0870dd57f06157a4bda973db7dfa9a",
+          "fileSHA256": "jMa0YkBpiFgvA6Catc1NPXtzpAbN4BwQPgmuSvm1Z_s",
+          "storageKey": "TIFCMFAF-QzmkBQVEKJBAJ5DeqQ8KcnIJskRmZBp658",
+          "contentType": "application/javascript",
+          "fileExtension": ".hbc"
+        }
+      }
+    },
+    {
+      "id": "019e2b23-9183-77f5-b48b-ae519992f7ae",
+      "group": "5c7673e1-00d2-4269-b985-628d1b56428b",
+      "message": "Fix admin modals not opening on iOS",
+      "createdAt": "2026-05-15T10:16:51.843Z",
+      "updatedAt": "2026-05-15T10:16:51.843Z",
+      "isRollBackToEmbedded": false,
+      "codeSigningInfo": null,
+      "runtime": "1.0.0",
+      "platform": "android",
+      "gitCommitHash": "d616b6f3921b7977b87a541f30080bc29e923322",
+      "isGitWorkingTreeDirty": false,
+      "manifestFragment": {
+        "extra": {
+          "expoClient": {
+            "ios": {
+              "infoPlist": {
+                "SKAdNetworkItems": [
+                  {
+                    "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "238da6jt44.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "294l99pt4k.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "32z4fx6l9h.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3qy4746246.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3rd42ekr43.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "3sh42y64q3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "424m5254lk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "44jx6755aq.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "488r3q3dtq.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4pfyvq9l8r.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "4w7y6s5ca2.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "578prtvx9j.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5a6flpkh64.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5f5u5tfb26.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5l3tpt7t6e.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5lm9lj6jb7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "5tjdwbrq8w.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "6yxyv74ff7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "77y3x8wds4.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "7ug5zh24hu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "8s468mfl3y.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "97r2b46745.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9nlqeag3gk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9rd848q2bz.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "9t245vhmpl.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "a2p9lx4jpn.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "a8cz6cu7e5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "av6w8kgt66.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "c6k4g5qg8m.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "e5fvkxwrpn.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f38h382jlk.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f73kdq92p3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "f7s53z58qe.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "feyaarzu9v.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "g6gcrrvk4p.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "glqzh8vgby.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "k674qkevps.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "k6y4y55b64.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "kbd757ywx3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "klf5c3l5u5.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "lr83yxwka7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "m8dbw4sv7c.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mj797d8u6f.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mlmmfzh3r3.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mp6xlyr22a.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "mqn7fxpca7.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "n9x2a789qt.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "p78axxw29g.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "ppxm28t8ap.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "prcb7njmu6.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "pwa73g5rt2.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "s39g8k73mm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "t38b2kh725.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "tl55sbb4fm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "uw77j35x4d.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v72qych5uu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v79kvwwj4g.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "vhf287vqwu.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "w9q455wk68.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "wg4vff78zm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "wzmmz9fp6w.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "x44k69ngh6.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "xga6mpmplv.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "yclnxrl5pm.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "zmvfpc5aq8.skadnetwork"
+                  },
+                  {
+                    "SKAdNetworkIdentifier": "zq492l623r.skadnetwork"
+                  }
+                ],
+                "ITSAppUsesNonExemptEncryption": false,
+                "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission — tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking."
+              },
+              "buildNumber": "30",
+              "supportsTablet": false,
+              "bundleIdentifier": "app.replit.cashclip",
+              "privacyManifests": {
+                "NSPrivacyTracking": true,
+                "NSPrivacyTrackingDomains": [
+                  "googleadservices.com",
+                  "googlesyndication.com",
+                  "doubleclick.net",
+                  "google-analytics.com",
+                  "googletagmanager.com",
+                  "admob.com",
+                  "googleads.g.doubleclick.net",
+                  "pagead2.googlesyndication.com"
+                ],
+                "NSPrivacyAccessedAPITypes": [
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "CA92.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "C617.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "E174.1"
+                    ]
+                  },
+                  {
+                    "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+                    "NSPrivacyAccessedAPITypeReasons": [
+                      "35F9.1"
+                    ]
+                  }
+                ],
+                "NSPrivacyCollectedDataTypes": [
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+                      "NSPrivacyCollectedDataTypePurposeAnalytics"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+                      "NSPrivacyCollectedDataTypePurposeAnalytics"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": true
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherFinancialInfo",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAnalytics",
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeAdvertisingData",
+                    "NSPrivacyCollectedDataTypeLinked": true,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": true
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+                    "NSPrivacyCollectedDataTypeLinked": false,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  },
+                  {
+                    "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePerformanceData",
+                    "NSPrivacyCollectedDataTypeLinked": false,
+                    "NSPrivacyCollectedDataTypePurposes": [
+                      "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                    ],
+                    "NSPrivacyCollectedDataTypeTracking": false
+                  }
+                ]
+              }
+            },
+            "web": {
+              "favicon": "./assets/images/favicon.png"
+            },
+            "icon": "./assets/images/icon.png",
+            "name": "CashClip",
+            "slug": "cashclip",
+            "extra": {
+              "eas": {
+                "projectId": "10994af8-62e3-4a9d-9e35-7f4381965a31"
+              },
+              "router": {
+                "origin": "https://replit.com/"
+              }
+            },
+            "owner": "expodeveloper20",
+            "scheme": "cashclip",
+            "splash": {
+              "image": "./assets/images/splash-icon.png",
+              "resizeMode": "contain",
+              "backgroundColor": "#0A0A0F"
+            },
+            "android": {
+              "package": "app.replit.cashclip",
+              "permissions": [
+                "com.google.android.gms.permission.AD_ID"
+              ],
+              "versionCode": 1,
+              "adaptiveIcon": {
+                "backgroundColor": "#E6F4FE",
+                "backgroundImage": "./assets/images/android-icon-background.png",
+                "foregroundImage": "./assets/images/android-icon-foreground.png",
+                "monochromeImage": "./assets/images/android-icon-monochrome.png"
+              }
+            },
+            "plugins": [
+              [
+                "expo-router",
+                {
+                  "origin": "https://replit.com/"
+                }
+              ],
+              "expo-font",
+              "expo-web-browser",
+              [
+                "expo-tracking-transparency",
+                {
+                  "userTrackingPermission": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission — tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking."
+                }
+              ],
+              [
+                "react-native-google-mobile-ads",
+                {
+                  "iosAppId": "ca-app-pub-8679658921848348~6212139107",
+                  "androidAppId": "ca-app-pub-8679658921848348~6212139107"
+                }
+              ],
+              [
+                "expo-build-properties",
+                {
+                  "ios": {
+                    "extraPods": [
+                      {
+                        "name": "GoogleMobileAdsMediationUnity"
+                      }
+                    ],
+                    "deploymentTarget": "15.1"
+                  },
+                  "android": {}
+                }
+              ]
+            ],
+            "updates": {
+              "url": "https://u.expo.dev/10994af8-62e3-4a9d-9e35-7f4381965a31"
+            },
+            "version": "1.1.0",
+            "platforms": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "sdkVersion": "54.0.0",
+            "experiments": {
+              "typedRoutes": true,
+              "reactCompiler": true
+            },
+            "orientation": "portrait",
+            "newArchEnabled": true,
+            "runtimeVersion": "1.0.0",
+            "userInterfaceStyle": "automatic"
+          }
+        },
+        "assets": [
+          {
+            "bundleKey": "778ffc9fe8773a878e9c30a6304784de",
+            "fileSHA256": "i2Gkx-9w3JJ1PwSUl2SC9m_UFQ7CPfx3KrZeEDc6-lU",
+            "storageKey": "idnX8z03q4vGLzhYMPaQGBADjhqvWe67_afPqJ1vGzM",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "c79c3606a1cf168006ad3979763c7e0c",
+            "fileSHA256": "kGZm3WiTRq2iMs42ia3vkHtCV_obWT8DY40rlJf2SIQ",
+            "storageKey": "k-3xHp3vP8mR36WdccUZVPTRJKpP-zlyboWdkXCIQpQ",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "02bc1fa7c0313217bde2d65ccbff40c9",
+            "fileSHA256": "_6fuRbdkBbpzkhSVAI99aMneY5X0tpQdsGNGX244IyA",
+            "storageKey": "lfqeUjiWFXwowhxVDBEzxsbTOEzYxMLebljy5Bh1mpU",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "35ba0eaec5a4f5ed12ca16fabeae451d",
+            "fileSHA256": "hM9es7ICUPaeDkczvrTaX0F_BoKJKlrRteYlcHU8IbE",
+            "storageKey": "fMoMrsUeB5xWw_Ugn8FqGJf-M2pld2hkXKR704z0MM8",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0a328cd9c1afd0afe8e3b1ec5165b1b4",
+            "fileSHA256": "mtuMXvypMuK3MrKT2oE70uMZUiYwVrzp4lF_7A8LanY",
+            "storageKey": "LM4SxB4vhDe2iN4tYT0dAlPP_dsY-Zme_H-JpULtHa8",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3cd68ccdb8938e3711da2e8831b85493",
+            "fileSHA256": "yGu0he7mh-BsUA_EI09RpnhLRTDCrhHQx2SBEQvOMQU",
+            "storageKey": "A08F4i_QzJW79C3BCIZYmmpH_p2FkQbdTQZ_2hVWDeg",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "61ca7e64b7d605716c57706cef640b9a",
+            "fileSHA256": "0Dpc16Zu8QxRR5FvnVh4stCgpa1G9AWjHNmWfvqlWv0",
+            "storageKey": "04lOdmTXc1loPyqacYwao1j0xlM34n0vGxtIFY7ETTs",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "aff2c65b39a296d4f7e96d0f58169170",
+            "fileSHA256": "q1YT0s5w-mfFkm6DE1NmSUUZn8GV-m_nbF_jzsRS4xo",
+            "storageKey": "4s0taS6e9_zozzhgsa6FogUB4b0LQc1LMNbBLkxlIz0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d8e7601e3df962f83c62371ac14964d8",
+            "fileSHA256": "xOVOagp95jaqFTN4-8YupKQWlb_t-Af5Dfexj_1zP2c",
+            "storageKey": "g6PisuFJa8j79kTi3ZKboB3DcerIBZXujlFBVhXkh1s",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3cd68ccdb8938e3711da2e8831b85493",
+            "fileSHA256": "yGu0he7mh-BsUA_EI09RpnhLRTDCrhHQx2SBEQvOMQU",
+            "storageKey": "A08F4i_QzJW79C3BCIZYmmpH_p2FkQbdTQZ_2hVWDeg",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0747a1317bbe9c6fc340b889ef8ab3ae",
+            "fileSHA256": "IyXFOnPlTEOMu8YN_92LUT1HG6QuL1ZxPvQEuV4Mofw",
+            "storageKey": "DP7IegcRXP-7kIHiKmplB43A2HIM9nT01_O4JsXZKXI",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d84e297c3b3e49a614248143d53e40ca",
+            "fileSHA256": "sbwYEMoj4sOM12lxxDWR1yYWEGEkDYt5KwV1cZbdtSg",
+            "storageKey": "aY8TciqT0pLONlgDC1iSLgQd6TyRf7NkBhUrJkfuqD0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "1190ab078c57159f4245a328118fcd9a",
+            "fileSHA256": "y9-SE-VfZcSNB2rNhCO3ya7k8bgRAf9slaOMTNioZGE",
+            "storageKey": "mJsf9KoBQiKLAHO11XdSt59xshQZeDJmGEa9jlA_GY4",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "78c625386b4d0690b421eb0fc78f7b9c",
+            "fileSHA256": "0FydMNefRaeOVYWi5-xnxqBqiD3ZE34dUFnoyHszznY",
+            "storageKey": "yag9GLD2iZjnBBRuIa9kgMTdG2sabQ7v5K3JoDYQcqY",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "0747a1317bbe9c6fc340b889ef8ab3ae",
+            "fileSHA256": "IyXFOnPlTEOMu8YN_92LUT1HG6QuL1ZxPvQEuV4Mofw",
+            "storageKey": "DP7IegcRXP-7kIHiKmplB43A2HIM9nT01_O4JsXZKXI",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "4403c6117ec30c859bc95d70ce4a71d3",
+            "fileSHA256": "unIvskv_CkxS5lbN8gXerFxd-F5briv20wcTvVDG1fc",
+            "storageKey": "uG5CihBixNlPMeYN0V5MRwARA2Ovn0seNtMvhelV3kE",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "069d99eb1fa6712c0b9034a58c6b57dd",
+            "fileSHA256": "UwD1C-NlnRfYzuho7E5sDT9OiZRP1YmdPCD2p2egRfU",
+            "storageKey": "dV5iuhAavksqtDhoNxjh3ZJ3mjhWaRm_k_QMsxTkJRg",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "c3273c9e5321f20d1e42c2efae2578c4",
+            "fileSHA256": "bI8Rv9HH4idp3BNcFuzQ4FO7VVVNqIuWEdnPcdEhNvE",
+            "storageKey": "r81JaSP6EG6dxkyPe8l7CAVizX4cmddQVze71LebmUo",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "286d67d3f74808a60a78d3ebf1a5fb57",
+            "fileSHA256": "XQdeDCh8T0RBtbXI_H6lzSfBG7YX7OoJdVlVvLGIkIM",
+            "storageKey": "m9yS4VLFfdQtO3uDS8O8dWqyH7JfIBfBd3VkPnFGw6c",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d1ea1496f9057eb392d5bbf3732a61b7",
+            "fileSHA256": "wV7HKnTROVchGAgxPVw13rf3YGxtItvdzrAADU4FR60",
+            "storageKey": "iiX0QENtWnFHr-ql_G75Cv2aoG8T9jbnoTrrLiduBMs",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "19eeb73b9593a38f8e9f418337fc7d10",
+            "fileSHA256": "ppou21tsYLhDPVttI8afUgzNimAvP2DnmW5Ilxi8F1w",
+            "storageKey": "0OEDV0a6nXu3m-NCyMZCejvRaLMgUJoN5kZZr6WGO9o",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "ab19f4cbc543357183a20571f68380a3",
+            "fileSHA256": "J_TSKdRAklv3IS1d__pF1Zayx7O7KQXJa4ObIIGh2-s",
+            "storageKey": "1QHSPNPuPJBWsSu-NeGsZJ65lgP9Nn9hUrFpSvorJ3Y",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "d8b800c443b8972542883e0b9de2bdc6",
+            "fileSHA256": "cIp5z1YbiipIUM4CVFhNOlIxBGvgj7f630tu39sxF4s",
+            "storageKey": "F0VhhOdSAZAGWHzCBT8frAxWVDzVgNYGLlSTnInMLk0",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "412dd9275b6b48ad28f5e3d81bb1f626",
+            "fileSHA256": "rPaRlXo7zOfRlYVtzpilzxTc4QvqKKpcELNVDAeOI7U",
+            "storageKey": "YbOaNgsSGzVwiIMg8au7XcXF5nhp0mKG64zufThcPZQ",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "017bc6ba3fc25503e5eb5e53826d48a8",
+            "fileSHA256": "beyjK1a5f6H6h_rNaZa0bMRRkKVTQA5_698dIJMJm1c",
+            "storageKey": "92813hASY0kS8OnTdsF2wf_z0FEi_ZDIIaK-dzQ6BRU",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "20e71bdf79e3a97bf55fd9e164041578",
+            "fileSHA256": "78edo8TJffsVcb_2IClYqwUpxaox6DkmAFeLPjWdFEc",
+            "storageKey": "Ij5rVfQl_Hbg8xU1LXrdNRR__q6WTEE-FIneYIROiLQ",
+            "contentType": "image/png",
+            "fileExtension": ".png"
+          },
+          {
+            "bundleKey": "3f78af31cca60105799838a1a7a59fbd",
+            "fileSHA256": "CKnVtRPPlH4i7egemoQ72Nd2OmNETNIUhL_edmLMZUM",
+            "storageKey": "51uuCjGTCU4sQ2DlvYncpMxrjzNUU-DxroGC4-znlNA",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "31b5ffea3daddc69dd01a1f3d6cf63c5",
+            "fileSHA256": "FvkimFh7qytGm8E8DfxtXRcbyhC60MkFOtFrwCO_cX0",
+            "storageKey": "Tz7HDL7tVs8yUP1CqStYSbcz6mUPIuXtgRwpbwTGixk",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "140c53a7643ea949007aa9a282153849",
+            "fileSHA256": "pcrrTTlcXjLx1aMKyzgq68Zk8brf0UkxmQfyIV5OPiY",
+            "storageKey": "aCX8j_wkGaOOBHOkuIXWbhH6yhyVsMMwlFutnxbhmeg",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "ca4b48e04dc1ce10bfbddb262c8b835f",
+            "fileSHA256": "AriOrZGt5XENfKGO20Omllpx2TcywG8pDMB6bdJJ6Yc",
+            "storageKey": "9txakBJI25J_9RlUOUEgOsFwzThQSwT905I6GoKt6h4",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b49ae8ab2dbccb02c4d11caaacf09eab",
+            "fileSHA256": "lNq58dWxPqB2nRJKLaDQJDPzuZ1t6loHwERqdxWBAMA",
+            "storageKey": "zWHJhD8L0fwRUMyESxwM_1yU_l7AMQ7rqrWTKS3AS3E",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b06871f281fee6b241d60582ae9369b9",
+            "fileSHA256": "qljzPyOaD7AvXHpsRcBD16msmgkzNYBmlOzW1O3A1qg",
+            "storageKey": "Xfli-kf1XRINO0tWNFXg4Sea2u1s13cQads6HuCyEtY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "1f77739ca9ff2188b539c36f30ffa2be",
+            "fileSHA256": "xlG4pn0xkyBvYiw8Ow-8pKLycnEIxCErUsHiouhMmzE",
+            "storageKey": "-ztrlgOVBau3MVd5snzhMTpofNDcyq025Cu3BjmxlaU",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "605ed7926cf39a2ad5ec2d1f9d391d3d",
+            "fileSHA256": "PQavHzHNg6znomWgFLj7Xe4Vdw7KyPelVVUZDmJ-A8I",
+            "storageKey": "1oTh0vE-guosYvK5OjlH1Z99_PPyqhIVn90ThgK_DpA",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "3b89dd103490708d19a95adcae52210e",
+            "fileSHA256": "BvTQCSPqJGl99d8LkphBdZkdi9JXdqAtUxu0AeOT7EI",
+            "storageKey": "YNS6DXVAmeiUgSmdlbFc_fCAZaujkelyOX2Rghtfn84",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "370dd5af19f8364907b6e2c41f45dbbf",
+            "fileSHA256": "ZPn7YjaB8RImHpovl4JngkOfOSXeqPRKV9Hk25W6bP0",
+            "storageKey": "xFiD5BuX0evqTtkginUlDq-Qyr5jbYqHZrr8KXuzihY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "adec7d6f310bc577f05e8fe06a5daccf",
+            "fileSHA256": "MfCZwT9uS6BfG0cb8XDLVJMklHQiKRc3LePKXPKeaho",
+            "storageKey": "0wwPq6qruQ2LX-si7xoKmHIaJNFZ5RYHFpDZWGmKSjU",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "56c8d80832e37783f12c05db7c8849e2",
+            "fileSHA256": "vIRLWwLT862rtRTeTgwCCCUtMSNBO9A_Yof6RGrO6Fk",
+            "storageKey": "CVIcmCaZQuDeBZ8MzAr5YdjwhCQYp4XnI-yT38tQYAs",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "e20945d7c929279ef7a6f1db184a4470",
+            "fileSHA256": "fh3QPdTOkLZYBSVUzXRZ3xZxZxc4mlUvpMbVal-JM-Y",
+            "storageKey": "sOWngARxbNCRah897T7CxgL5sksuDS7GGcEK31nDRfw",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "b4eb097d35f44ed943676fd56f6bdc51",
+            "fileSHA256": "-iq30lV4GbK_5QCeRoRO-nFwzxd753NdQ6oqwSlfHVQ",
+            "storageKey": "XnOBVccehfKLW9rMBYUCc-VhyHZzTI1ycP3XlCspgcE",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "6e435534bd35da5fef04168860a9b8fa",
+            "fileSHA256": "YeirpaTpgf4iz3yOi82-oAR251xiw38Bv37jM2HWhCg",
+            "storageKey": "DHrVvHO_E3UMRekAVSe2Zlq8s_atMSwFl9Atq2aTy8w",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "4e85bc9ebe07e0340c9c4fc2f6c38908",
+            "fileSHA256": "7xSfCL3S_wmk4shXNHa3sPP7sVtiOVSt5ZiZ5xdb7do",
+            "storageKey": "iIxOYwe_3gl5flQPjaaNzvd8vR7QAtWGZOunEfTbUnk",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "871378c6eab492a3e689a9385dc45a12",
+            "fileSHA256": "m8TZ9emU53S9w--amofadJr19QuGFHPvfRzD1vgikmc",
+            "storageKey": "9RTzReJBzM1jkB2aig97kyU19ec44u1kt9tmL_dQtIM",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "d2285965fe34b05465047401b8595dd0",
+            "fileSHA256": "P1Ad2wXHCCm7tRz-nKn_9X854GBFfCV7PM8l33Z_CHA",
+            "storageKey": "hebRPpDghURPdBWnNe7sOHYILoqFlyKrRBK2Y1mcJVo",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "1681f34aaca71b8dfb70756bca331eb2",
+            "fileSHA256": "3Y7kA7vL9eWLd9ykrAPrr6E6KEo9h9jqnKSQQ1qG-kg",
+            "storageKey": "ZliFpHGjHwU9GxxH1wxIhsNm_XIz1_Tn1cw6sTxHQPY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "9436ede677912e546299d6dc1759be53",
+            "fileSHA256": "qZJ5eYt49fR8XIbjh4gVMlgtBIVrSp86ySFxysElZ_0",
+            "storageKey": "XZ5NmE9sq44GgY0ED-AiNt6S6g4wPtlY5hLPKlLb2B0",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "8e84d4d3b8cd14aa5ef5dc677d18787f",
+            "fileSHA256": "WYqZFjO0rEAXIVGscnlPTsmxP-Gc61O6bKjDqqhWEKM",
+            "storageKey": "d8DUVQpb1G6QHRw42Epkf9_wg2lYSIdZGXGWJs4tEw8",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "61ca2433c112de1e9b1e3e8369e66862",
+            "fileSHA256": "O0VOpuovro3yFTzDrVxW3jtUnTKTBxeWgs_AdfAle_0",
+            "storageKey": "OwS15D8eJ24LRNBfPqsVBwsllZPTJLBPgCIZnQtpSX4",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "5fc3fef1a1a55711c147d344132a468d",
+            "fileSHA256": "8klFNlFHyeeD6R2GSZWbWb5rAMnuTs0vazOvuy3Ycf4",
+            "storageKey": "ym9MBxuDtwJ0XazkqnAT5PhnGtaZKfCjaou1R3FyoCY",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "3af2e072a31b85b3c0a55ede786b31ab",
+            "fileSHA256": "FmmZXe53Q4tzLWVX1x7U6AfdbruCcEtVOFk4cnxoQeI",
+            "storageKey": "lYQGZRUciENBQ8mqvfstB6W6xLqnMrz74w9OFP1H_Pc",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "fff3440ed39188f5d5bf85305e8b6be8",
+            "fileSHA256": "Aw03PE4qZ9XpIqJpTh6qs7nxII8TAdupSnC96_UsHvo",
+            "storageKey": "fTs-4lXtGz6sw3dOIdNyyl8uuijv8Wb16quaUoVsDz8",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "91486df4e5279497efb060b0d3cc797b",
+            "fileSHA256": "ZlS5PSEwHsYYh9PO3WwR2d8bHftj-c9FrHmV9uIjWrE",
+            "storageKey": "g0XNUzt_BYUfJMXiJSxrfg9QJuSgBOHEEDSIrVUwsw0",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "4cd115d5b3ed69078a637417321cce18",
+            "fileSHA256": "f0UpSAQC9HeVsrTdSUQXtP8fBFTafX_7C2VuqQUj7Ec",
+            "storageKey": "U5kdK2k2fhLwg1SM6rgHxHbdRaKz2aTMKMsfs_L5Vks",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          },
+          {
+            "bundleKey": "bde7a22c710d75af9c1bcffc02bd902b",
+            "fileSHA256": "8kDmEowxp1qj9FbqH_Ow_aOCF2aBeIrj0kTQjj-n1s0",
+            "storageKey": "_qnFjHk1HiYHqVrdEIZg-dqIrAGKPpPbqxRJA3hchJo",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf"
+          }
+        ],
+        "launchAsset": {
+          "bundleKey": "76041572dcc1edf073240dc54a049559",
+          "fileSHA256": "nwxycLThhh9PE6_1PxpWzGQal32cYT1B46jEfaBUNoo",
+          "storageKey": "ayoEtVM6B81hXOzccxQxHJG6HUXNLwjxWKCGRhNKMF8",
+          "contentType": "application/javascript",
+          "fileExtension": ".hbc"
+        }
+      }
+    }
+  ]
