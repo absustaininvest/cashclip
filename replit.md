@@ -21,6 +21,9 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `CPX_WEBHOOK_SECRET` | CPX Research webhook validation |
 | `BITLABS_API_KEY` | BitLabs survey integration |
 | `BITLABS_WEBHOOK_SECRET` | BitLabs webhook validation |
+| `LOOTABLY_API_KEY` | Lootably offerwall integration |
+| `ADJOE_SDK_KEY` | Adjoe offerwall SDK key |
+| `ADJOE_APP_ID` | Adjoe offerwall app ID |
 
 ## Apps / Artifacts
 

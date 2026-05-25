@@ -24,7 +24,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type OfferType = "app_install" | "signup" | "purchase" | "survey" | "video" | "task";
-type ProviderKey = "tapjoy" | "adgate" | "offertoro";
+type ProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe";
 type Difficulty = "easy" | "medium" | "hard";
 
 interface Offer {
@@ -45,6 +45,8 @@ const PROVIDER_COLORS: Record<string, string> = {
   tapjoy: "#FF6B35",
   adgate: "#00C853",
   offertoro: "#2979FF",
+  lootably: "#9C27B0",
+  adjoe: "#F44336",
 };
 
 const TYPE_ICONS: Record<OfferType, string> = {
@@ -299,6 +301,8 @@ export default function OfferwallsScreen() {
               { key: "tapjoy", name: "Tapjoy", color: "#FF6B35", env: "TAPJOY_SDK_KEY", desc: "Leading offerwall — app installs & sign-ups", url: "dev.tapjoy.com" },
               { key: "adgate", name: "AdGate Media", color: "#00C853", env: "ADGATE_API_KEY", desc: "Diverse offers: apps, videos, quizzes & more", url: "wall.adgaterewards.com" },
               { key: "offertoro", name: "OfferToro", color: "#2979FF", env: "OFFERTORO_API_KEY", desc: "Global offers from 200+ advertisers", url: "offertoro.com/publishers" },
+              { key: "lootably", name: "Lootably", color: "#9C27B0", env: "LOOTABLY_API_KEY", desc: "Self-serve offerwall — instant approval, strong US iOS fill", url: "lootably.com" },
+              { key: "adjoe", name: "Adjoe", color: "#F44336", env: "ADJOE_SDK_KEY + ADJOE_APP_ID", desc: "Playtime-based offers — highest eCPM offerwall", url: "adjoe.io" },
             ].map((p) => (
               <View key={p.key} style={[styles.setupCard, { borderColor: p.color + "30" }]}>
                 <View style={[styles.setupDot, { backgroundColor: p.color }]} />

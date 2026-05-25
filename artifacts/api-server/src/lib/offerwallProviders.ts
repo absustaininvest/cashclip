@@ -1,4 +1,4 @@
-export type OfferwallProviderKey = "tapjoy" | "adgate" | "offertoro";
+export type OfferwallProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe";
 
 export interface Offer {
   id: string;
@@ -87,6 +87,20 @@ function getProviderConfigs(): OfferwallProviderConfig[] {
       baseUrl: "https://www.offertoro.com/api/v1",
       isConfigured: !!process.env.OFFERTORO_API_KEY,
     },
+    {
+      key: "lootably",
+      name: "Lootably",
+      apiKey: process.env.LOOTABLY_API_KEY,
+      baseUrl: "https://api.lootably.com/api/v1",
+      isConfigured: !!process.env.LOOTABLY_API_KEY,
+    },
+    {
+      key: "adjoe",
+      name: "Adjoe",
+      apiKey: process.env.ADJOE_SDK_KEY,
+      baseUrl: "https://ad-backend.adjoe.io/v1",
+      isConfigured: !!process.env.ADJOE_SDK_KEY && !!process.env.ADJOE_APP_ID,
+    },
   ];
 }
 
@@ -166,6 +180,68 @@ async function fetchOfferToroOffers(config: OfferwallProviderConfig): Promise<Of
   }
 }
 
+async function fetchLootablyOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/offers?api_key=${config.apiKey}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Lootably API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.data || []).map((o: any): Offer => {
+      const payout = typeof o.payout === "number" ? o.payout : parseFloat(o.payout || o.reward || "0.30");
+      return {
+        id: `lootably_${o.offer_id || o.id}`,
+        provider: "lootably",
+        providerName: "Lootably",
+        title: o.name || o.title || "Lootably Offer",
+        description: o.description || o.instructions || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.offer_type || o.category || o.type),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: !!(o.purchase_required || o.requires_payment),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || `https://lootably.com/offer/${o.offer_id || o.id}`, config.apiKey),
+        brand: o.advertiser || o.brand,
+        expiresAt: o.expiry ? new Date(o.expiry).getTime() : undefined,
+      };
+    });
+  } catch (err) {
+    return [];
+  }
+}
+
+async function fetchAdjoeOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const appId = process.env.ADJOE_APP_ID || "";
+    const res = await fetch(`${config.baseUrl}/offers?app_id=${appId}`, {
+      headers: { "Authorization": `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Adjoe API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.campaigns || data.data || []).map((o: any): Offer => {
+      const payout = typeof o.payout === "number" ? o.payout
+        : typeof o.reward_amount === "number" ? o.reward_amount / 100
+        : parseFloat(o.payout || o.reward || "0.50");
+      return {
+        id: `adjoe_${o.offer_id || o.campaign_id || o.id}`,
+        provider: "adjoe",
+        providerName: "Adjoe",
+        title: o.app_name || o.name || o.title || "Adjoe Offer",
+        description: o.description || o.instructions || "Play this app and reach the required level to earn.",
+        reward: payout,
+        type: normalizeOfferType(o.offer_type || "app_install"),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: false,
+        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url || `https://adjoe.io/offer/${o.offer_id || o.id}`, config.apiKey),
+        brand: o.advertiser || o.developer || o.brand,
+        iconUrl: o.icon_url || o.app_icon,
+        expiresAt: o.end_date ? new Date(o.end_date).getTime() : undefined,
+      };
+    });
+  } catch (err) {
+    return [];
+  }
+}
+
 function sanitizeOfferUrl(url: string | undefined, apiKey: string | undefined): string {
   if (!url) return "";
   if (!apiKey || !url.includes(apiKey)) return url;
@@ -198,6 +274,8 @@ export async function fetchAllOffers(): Promise<OfferwallListResponse[]> {
       if (config.key === "tapjoy") offers = await fetchTapjoyOffers(config);
       else if (config.key === "adgate") offers = await fetchAdGateOffers(config);
       else if (config.key === "offertoro") offers = await fetchOfferToroOffers(config);
+      else if (config.key === "lootably") offers = await fetchLootablyOffers(config);
+      else if (config.key === "adjoe") offers = await fetchAdjoeOffers(config);
 
       return { offers, provider: config.key };
     })
@@ -234,6 +312,11 @@ export async function verifyOfferCompletion(req: OfferCompletionVerifyRequest): 
       endpoint = `${config.baseUrl}/conversions/${offer}/verify?api_key=${config.apiKey}&transaction_id=${txn}&user_id=${user}`;
     } else if (req.provider === "offertoro") {
       endpoint = `${config.baseUrl}/conversions/${offer}/verify?pub_id=${config.apiKey}&transaction_id=${txn}&user_id=${user}`;
+    } else if (req.provider === "lootably") {
+      endpoint = `${config.baseUrl}/conversions/verify?api_key=${config.apiKey}&transaction_id=${txn}&offer_id=${offer}&user_id=${user}`;
+    } else if (req.provider === "adjoe") {
+      endpoint = `${config.baseUrl}/conversions/verify?transaction_id=${txn}&offer_id=${offer}&user_id=${user}`;
+      headers["Authorization"] = `Bearer ${config.apiKey}`;
     }
 
     const res = await fetch(endpoint, { method: "GET", headers });
