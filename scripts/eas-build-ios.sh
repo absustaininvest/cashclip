@@ -118,8 +118,8 @@ export GIT_CONFIG_VALUE_0="*"
 
 cd "$MINI"
 git init
-git config user.email "andyballen0814@icloud.com"
-git config user.name "Andy Ballen"
+git config user.email "support@absustaininvest.com"
+git config user.name "AB Sustainability Investments"
 git add -A
 BUILD_NUM="$(python3 -c "import json; print(json.load(open('artifacts/cashclip/app.json'))['expo']['ios']['buildNumber'])")"
 git --no-pager commit --quiet -m "eas build $BUILD_NUM"

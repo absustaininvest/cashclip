@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
-      "buildNumber": "37",
+      "buildNumber": "35",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission \u2014 tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking.",
@@ -387,7 +387,7 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://cash-clip.app"
         }
       ],
       "expo-font",
@@ -426,8 +426,7 @@
         }
       ],
       "./plugins/withAndroidManifestFix",
-      "./plugins/withAndroidUnityAdapter",
-      "./plugins/withSslPinning"
+      "./plugins/withAndroidUnityAdapter"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -440,12 +439,7 @@
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
-      "codeSigningCertificate": "./certs/certificate.pem",
-      "codeSigningMetadata": {
-        "keyid": "main",
-        "alg": "rsa-v1_5-sha256"
-      }
+      "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
     }
   }
 }

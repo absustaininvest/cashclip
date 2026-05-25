@@ -15,7 +15,7 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_ENV": "development",
-        "EXPO_PUBLIC_DOMAIN": "cashclip-dev.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
       },
       "ios": {
         "simulator": true
@@ -23,15 +23,14 @@
     },
     "preview": {
       "extends": "base",
-      "distribution": "store",
+      "distribution": "internal",
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_ENV": "preview",
         "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
       },
       "ios": {
-        "resourceClass": "m-medium",
-        "credentialsSource": "remote"
+        "resourceClass": "m-medium"
       },
       "android": {
         "buildType": "apk"
@@ -71,12 +70,6 @@
       }
     },
     "preview": {
-      "ios": {
-        "appleId": "andyballen0814@icloud.com",
-        "ascAppId": "6759931285",
-        "appleTeamId": "FAX932PG78",
-        "bundleIdentifier": "app.replit.cashclip"
-      },
       "android": {
         "serviceAccountKeyPath": "./credentials/google-service-account.json",
         "track": "internal"
