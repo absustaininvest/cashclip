@@ -140,7 +140,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       // from the dismissed flag, because iOS resets status to "undetermined"
       // when the user re-enables tracking in Settings.
       if (status === "undetermined") {
-        handledRef.current = false;
+        if (handledRef.current) return;
         setConsentState("needed");
       } else {
         setConsentState("denied");
