@@ -184,78 +184,93 @@ export function registerEarningsRoutes(app: Express): void {
         }
 
         const config = ACTION_CONFIG[actionType];
-        const now      = new Date();
-        const dayStart = new Date(now);
-        dayStart.setUTCHours(0, 0, 0, 0);
+        const desc = typeof description === "string" ? description.slice(0, 120) : actionType;
 
-        // ── Daily cap check ─────────────────────────────────────────────────
-        const [{ todayCount }] = await db
-          .select({ todayCount: count() })
-          .from(earnTokens)
-          .where(and(
-            eq(earnTokens.userId, req.userId!),
-            eq(earnTokens.actionType, actionType),
-            gte(earnTokens.earnedAt, dayStart),
-          ));
+        // ── Serialize per-user earn operations via row-level lock ────────────
+        // All checks (daily cap, spin cooldown) and the insert are performed
+        // inside a single transaction that locks the user row first. This
+        // prevents concurrent requests from observing pre-insert state and
+        // racing past the caps.
+        type RecordResult =
+          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
+          | { ok: false; status: number; error: string; cap?: number; used?: number; nextAvailableAt?: string };
 
-        if (Number(todayCount) >= config.dailyCap) {
-          res.status(429).json({
-            error: `Daily limit reached for ${actionType}`,
-            cap:   config.dailyCap,
-            used:  Number(todayCount),
-          }); return;
-        }
+        const result: RecordResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+          // Acquire row-level lock — serialises concurrent earn requests for this user
+          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
 
-        // ── Server-side 2h spin cooldown (DB-enforced) ─────────────────────
-        // The client-side timer is UI-only convenience — this is the real gate.
-        if (actionType === "spin") {
-          const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
-          const [recentSpin]  = await db
-            .select({ earnedAt: earnTokens.earnedAt })
+          const now      = new Date();
+          const dayStart = new Date(now);
+          dayStart.setUTCHours(0, 0, 0, 0);
+
+          // ── Daily cap check ───────────────────────────────────────────────
+          const [{ todayCount }] = await tx
+            .select({ todayCount: count() })
             .from(earnTokens)
             .where(and(
               eq(earnTokens.userId, req.userId!),
-              eq(earnTokens.actionType, "spin"),
-              gte(earnTokens.earnedAt, cooldownSince),
-            ))
-            .limit(1);
+              eq(earnTokens.actionType, actionType),
+              gte(earnTokens.earnedAt, dayStart),
+            ));
 
-          if (recentSpin) {
-            const nextAt = new Date(recentSpin.earnedAt.getTime() + SPIN_COOLDOWN_MS);
-            res.status(429).json({
-              error:           "Spin cooldown active",
-              nextAvailableAt: nextAt.toISOString(),
-            }); return;
+          if (Number(todayCount) >= config.dailyCap) {
+            return { ok: false, status: 429, error: `Daily limit reached for ${actionType}`, cap: config.dailyCap, used: Number(todayCount) };
           }
+
+          // ── Server-side 2h spin cooldown (DB-enforced) ───────────────────
+          // The client-side timer is UI-only convenience — this is the real gate.
+          if (actionType === "spin") {
+            const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
+            const [recentSpin]  = await tx
+              .select({ earnedAt: earnTokens.earnedAt })
+              .from(earnTokens)
+              .where(and(
+                eq(earnTokens.userId, req.userId!),
+                eq(earnTokens.actionType, "spin"),
+                gte(earnTokens.earnedAt, cooldownSince),
+              ))
+              .limit(1);
+
+            if (recentSpin) {
+              const nextAt = new Date(recentSpin.earnedAt.getTime() + SPIN_COOLDOWN_MS);
+              return { ok: false, status: 429, error: "Spin cooldown active", nextAvailableAt: nextAt.toISOString() };
+            }
+          }
+
+          // ── Points are always server-determined ───────────────────────────
+          let pts: number;
+          if (config.points !== null)    pts = config.points;
+          else if (actionType === "spin") pts = pickRandom(SPIN_POOL);
+          else                            pts = pickRandom(GAME_POOL);
+
+          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+
+          const [token] = await tx.insert(earnTokens).values({
+            userId:      req.userId!,
+            points:      pts,
+            actionType,
+            description: desc,
+            earnedAt:    now,
+            claimableAt,
+            status:      "pending",
+          }).returning();
+
+          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
+        });
+
+        if (!result.ok) {
+          const { status, error, ...rest } = result;
+          res.status(status).json({ error, ...rest }); return;
         }
 
-        // ── Points are always server-determined ─────────────────────────────
-        let pts: number;
-        if (config.points !== null)   pts = config.points;
-        else if (actionType === "spin") pts = pickRandom(SPIN_POOL);
-        else                            pts = pickRandom(GAME_POOL);
-
-        const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
-        const desc = typeof description === "string" ? description.slice(0, 120) : actionType;
-
-        const [token] = await db.insert(earnTokens).values({
-          userId:      req.userId!,
-          points:      pts,
-          actionType,
-          description: desc,
-          earnedAt:    now,
-          claimableAt,
-          status:      "pending",
-        }).returning();
-
-        logger.info({ userId: req.userId, actionType, pts }, "earn token issued");
+        logger.info({ userId: req.userId, actionType, pts: result.points }, "earn token issued");
 
         res.status(201).json({
-          tokenId:     token.id,
-          points:      pts,
-          claimableAt: claimableAt.toISOString(),
-          dailyUsed:   Number(todayCount) + 1,
-          dailyCap:    config.dailyCap,
+          tokenId:     result.tokenId,
+          points:      result.points,
+          claimableAt: result.claimableAt,
+          dailyUsed:   result.dailyUsed,
+          dailyCap:    result.dailyCap,
         });
       } catch (err) {
         logger.error({ err }, "earnings/record error");
@@ -322,62 +337,84 @@ export function registerEarningsRoutes(app: Express): void {
           }); return;
         }
 
-        // Consume challenge — single use
+        // Consume challenge — single use (in-memory, done before the transaction)
         spinChallenges.delete(challengeToken);
 
         const config = ACTION_CONFIG.spin;
-        const now      = new Date();
-        const dayStart = new Date(now);
-        dayStart.setUTCHours(0, 0, 0, 0);
 
-        // Daily cap
-        const [{ todayCount }] = await db
-          .select({ todayCount: count() })
-          .from(earnTokens)
-          .where(and(
-            eq(earnTokens.userId, req.userId!),
-            eq(earnTokens.actionType, "spin"),
-            gte(earnTokens.earnedAt, dayStart),
-          ));
-        if (Number(todayCount) >= config.dailyCap) {
-          res.status(429).json({ error: "Daily spin limit reached", cap: config.dailyCap }); return;
+        // ── Serialize per-user spin operations via row-level lock ────────────
+        // Daily cap, 2h cooldown check, and insert are all performed inside a
+        // single transaction that locks the user row first. This prevents
+        // concurrent /complete requests (each with their own valid challenge
+        // token) from observing pre-insert state and racing past the limits.
+        type SpinResult =
+          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
+          | { ok: false; status: number; error: string; cap?: number; nextAvailableAt?: string };
+
+        const result: SpinResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+          // Acquire row-level lock — serialises concurrent spin completions for this user
+          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
+
+          const now      = new Date();
+          const dayStart = new Date(now);
+          dayStart.setUTCHours(0, 0, 0, 0);
+
+          // Daily cap
+          const [{ todayCount }] = await tx
+            .select({ todayCount: count() })
+            .from(earnTokens)
+            .where(and(
+              eq(earnTokens.userId, req.userId!),
+              eq(earnTokens.actionType, "spin"),
+              gte(earnTokens.earnedAt, dayStart),
+            ));
+          if (Number(todayCount) >= config.dailyCap) {
+            return { ok: false, status: 429, error: "Daily spin limit reached", cap: config.dailyCap };
+          }
+
+          // 2h cooldown
+          const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
+          const [recentSpin] = await tx
+            .select({ earnedAt: earnTokens.earnedAt })
+            .from(earnTokens)
+            .where(and(
+              eq(earnTokens.userId, req.userId!),
+              eq(earnTokens.actionType, "spin"),
+              gte(earnTokens.earnedAt, cooldownSince),
+            ))
+            .limit(1);
+          if (recentSpin) {
+            const nextAt = new Date(recentSpin.earnedAt.getTime() + SPIN_COOLDOWN_MS);
+            return { ok: false, status: 429, error: "Spin cooldown active", nextAvailableAt: nextAt.toISOString() };
+          }
+
+          const pts = pickRandom(SPIN_POOL);
+          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const [token] = await tx.insert(earnTokens).values({
+            userId:      req.userId!,
+            points:      pts,
+            actionType:  "spin",
+            description: "Spin wheel",
+            earnedAt:    now,
+            claimableAt,
+            status:      "pending",
+          }).returning();
+
+          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
+        });
+
+        if (!result.ok) {
+          const { status, error, ...rest } = result;
+          res.status(status).json({ error, ...rest }); return;
         }
 
-        // 2h cooldown
-        const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
-        const [recentSpin] = await db
-          .select({ earnedAt: earnTokens.earnedAt })
-          .from(earnTokens)
-          .where(and(
-            eq(earnTokens.userId, req.userId!),
-            eq(earnTokens.actionType, "spin"),
-            gte(earnTokens.earnedAt, cooldownSince),
-          ))
-          .limit(1);
-        if (recentSpin) {
-          const nextAt = new Date(recentSpin.earnedAt.getTime() + SPIN_COOLDOWN_MS);
-          res.status(429).json({ error: "Spin cooldown active", nextAvailableAt: nextAt.toISOString() }); return;
-        }
-
-        const pts = pickRandom(SPIN_POOL);
-        const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
-        const [token] = await db.insert(earnTokens).values({
-          userId:      req.userId!,
-          points:      pts,
-          actionType:  "spin",
-          description: "Spin wheel",
-          earnedAt:    now,
-          claimableAt,
-          status:      "pending",
-        }).returning();
-
-        logger.info({ userId: req.userId, pts }, "spin earn token issued via challenge");
+        logger.info({ userId: req.userId, pts: result.points }, "spin earn token issued via challenge");
         res.status(201).json({
-          tokenId:     token.id,
-          points:      pts,
-          claimableAt: claimableAt.toISOString(),
-          dailyUsed:   Number(todayCount) + 1,
-          dailyCap:    config.dailyCap,
+          tokenId:     result.tokenId,
+          points:      result.points,
+          claimableAt: result.claimableAt,
+          dailyUsed:   result.dailyUsed,
+          dailyCap:    result.dailyCap,
         });
       } catch (err) {
         logger.error({ err }, "earn/spin/complete error");
