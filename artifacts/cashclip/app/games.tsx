@@ -64,7 +64,7 @@ const CASUAL_GAMES: GameInfo[] = [
     descKey: "scratchCardDesc" as any,
     icon: "grid-outline",
     iconColor: "#FFD600",
-    rewardRange: "$0.10 - $0.50",
+    rewardRange: "100 - 500 pts",
     route: "/game/scratch-card",
   },
   {
@@ -73,7 +73,7 @@ const CASUAL_GAMES: GameInfo[] = [
     descKey: "memoryMatchDesc" as any,
     icon: "layers-outline",
     iconColor: "#00E676",
-    rewardRange: "$0.05 - $0.15",
+    rewardRange: "50 - 150 pts",
     route: "/game/memory-match",
   },
   {
@@ -82,7 +82,7 @@ const CASUAL_GAMES: GameInfo[] = [
     descKey: "triviaQuizDesc" as any, // nosemgrep: generic.secrets.gitleaks.generic-api-key
     icon: "help-circle-outline",
     iconColor: "#448AFF",
-    rewardRange: "$0.01 - $0.20",
+    rewardRange: "10 - 200 pts",
     route: "/game/trivia",
   },
 ];
@@ -94,7 +94,7 @@ const CLASSIC_GAMES: GameInfo[] = [
     descKey: "solitaireDesc" as any,
     icon: "card-outline",
     iconColor: "#FF5252",
-    rewardRange: "$0.05 - $0.25",
+    rewardRange: "50 - 250 pts",
     route: "/game/solitaire",
   },
   {
@@ -103,7 +103,7 @@ const CLASSIC_GAMES: GameInfo[] = [
     descKey: "dominoesDesc" as any,
     icon: "dice-outline",
     iconColor: "#FFFFFF",
-    rewardRange: "$0.05 - $0.20",
+    rewardRange: "50 - 200 pts",
     route: "/game/dominoes",
   },
 ];
@@ -115,7 +115,7 @@ const ARCADE_GAMES: GameInfo[] = [
     descKey: "tetrisDesc" as any,
     icon: "apps-outline",
     iconColor: "#00BCD4",
-    rewardRange: "$0.03 - $0.25",
+    rewardRange: "25 - 250 pts",
     route: "/game/tetris",
   },
   {
@@ -124,7 +124,7 @@ const ARCADE_GAMES: GameInfo[] = [
     descKey: "blockBlitzDesc" as any,
     icon: "cube-outline",
     iconColor: "#FF6D00",
-    rewardRange: "$0.03 - $0.25",
+    rewardRange: "25 - 250 pts",
     route: "/game/block-blitz",
   },
   {
@@ -133,7 +133,7 @@ const ARCADE_GAMES: GameInfo[] = [
     descKey: "coinCatcherDesc" as any,
     icon: "arrow-down-circle-outline",
     iconColor: "#FF9100",
-    rewardRange: "$0.01 - $0.15",
+    rewardRange: "10 - 150 pts",
     route: "/game/coin-catcher",
   },
   {
@@ -142,7 +142,7 @@ const ARCADE_GAMES: GameInfo[] = [
     descKey: "tapFrenzyDesc" as any,
     icon: "finger-print-outline",
     iconColor: "#E040FB",
-    rewardRange: "$0.03 - $0.25",
+    rewardRange: "25 - 250 pts",
     route: "/game/tap-frenzy",
   },
 ];

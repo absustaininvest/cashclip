@@ -27,6 +27,13 @@ import {
   type Transaction,
   type WithdrawalTier,
 } from "@/lib/storage";
+import {
+  refreshPendingFromServer,
+  claimAllReady,
+  formatPoints,
+  pointsToUsd,
+  type PendingState,
+} from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
@@ -166,6 +173,8 @@ export default function WalletScreen() {
   const [tiers, setTiers] = useState<WithdrawalTier[]>([]);
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [pendingState, setPendingState] = useState<PendingState | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -186,9 +195,14 @@ export default function WalletScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    const [s, t, srv] = await Promise.all([getUserStats(), getTransactions(), fetchServerBalance()]);
+    const [s, txns, srv, pending] = await Promise.all([
+      getUserStats(),
+      getTransactions(),
+      fetchServerBalance(),
+      refreshPendingFromServer(),
+    ]);
     setStats(s);
-    setTransactions(t);
+    setTransactions(txns);
     if (srv) {
       setServerBalance(srv.balance);
       setServerTotalEarned(srv.totalEarned);
@@ -196,7 +210,31 @@ export default function WalletScreen() {
     } else {
       setTiers(getWithdrawalTiers(s.balance));
     }
+    if (pending) setPendingState(pending);
   }, [fetchServerBalance]);
+
+  const handleConvertNow = useCallback(async () => {
+    if (isConverting || (pendingState?.claimablePoints ?? 0) === 0) return;
+    setIsConverting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const result = await claimAllReady();
+      if (result && result.claimed > 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          t.wallet.pointsConverted,
+          t.wallet.pointsConvertedMsg
+            .replace("{{pts}}", String(Math.round(result.creditedUsd * 1000)))
+            .replace("{{usd}}", result.creditedUsd.toFixed(2)),
+        );
+        await loadData();
+      }
+    } catch {
+      Alert.alert("Error", "Could not convert points. Please try again.");
+    } finally {
+      setIsConverting(false);
+    }
+  }, [isConverting, pendingState, t, loadData]);
 
   useEffect(() => {
     loadData();
@@ -338,6 +376,50 @@ export default function WalletScreen() {
                 </View>
               </View>
             </LinearGradient>
+
+            {/* Points Card */}
+            <View style={styles.pointsCard}>
+              <View style={styles.pointsCardHeader}>
+                <MaterialCommunityIcons name="star-four-points" size={14} color={Colors.primary} />
+                <Text style={styles.pointsCardTitle}>{t.wallet.pendingPoints}</Text>
+                <Text style={styles.pointsAutoNote}>{t.wallet.autoConverts}</Text>
+              </View>
+              <View style={styles.pointsStatsRow}>
+                <View style={styles.pointsStat}>
+                  <Text style={styles.pointsValue}>{formatPoints(pendingState?.pendingPoints ?? 0)}</Text>
+                  <Text style={styles.pointsStatLabel}>{t.wallet.holdFor3h}</Text>
+                </View>
+                <View style={styles.pointsDivider} />
+                <View style={styles.pointsStat}>
+                  <Text style={[styles.pointsValue, (pendingState?.claimablePoints ?? 0) > 0 && { color: Colors.primary }]}>
+                    {formatPoints(pendingState?.claimablePoints ?? 0)}
+                  </Text>
+                  <Text style={styles.pointsStatLabel}>{t.wallet.convertiblePoints}</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={handleConvertNow}
+                disabled={isConverting || (pendingState?.claimablePoints ?? 0) === 0}
+                style={({ pressed }) => [
+                  styles.convertButton,
+                  (pendingState?.claimablePoints ?? 0) === 0 && styles.convertButtonDisabled,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="swap-horizontal"
+                  size={15}
+                  color={(pendingState?.claimablePoints ?? 0) > 0 ? Colors.background : Colors.textMuted}
+                />
+                <Text style={[styles.convertText, (pendingState?.claimablePoints ?? 0) === 0 && { color: Colors.textMuted }]}>
+                  {isConverting
+                    ? t.wallet.converting
+                    : (pendingState?.claimablePoints ?? 0) > 0
+                      ? `${t.wallet.convertNow} · $${pointsToUsd(pendingState!.claimablePoints).toFixed(2)}`
+                      : t.wallet.convertNow}
+                </Text>
+              </Pressable>
+            </View>
 
             {nextTierAmount && (
               <View style={styles.nextTierCard}>
@@ -547,6 +629,24 @@ const styles = StyleSheet.create({
   statValue: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text, marginBottom: 2 },
   statLabel: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted },
   statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
+  pointsCard: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: "rgba(0, 230, 118, 0.12)",
+  },
+  pointsCardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  pointsCardTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.text, flex: 1 },
+  pointsAutoNote: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted },
+  pointsStatsRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  pointsStat: { flex: 1, alignItems: "center" },
+  pointsValue: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.textSecondary, marginBottom: 2 },
+  pointsStatLabel: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center" },
+  pointsDivider: { width: 1, height: 32, backgroundColor: Colors.border, marginHorizontal: 8 },
+  convertButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 10,
+  },
+  convertButtonDisabled: { backgroundColor: Colors.surfaceHighlight },
+  convertText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.background },
   nextTierCard: {
     backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: "rgba(255, 214, 0, 0.15)",

@@ -720,4 +720,120 @@ export function registerEarningsRoutes(app: Express): void {
       res.status(200).send("OK"); // Always 200 — stop Google retries
     }
   });
+
+  // ── 2-HOUR AUTO-CONVERSION JOB ────────────────────────────────────────────────
+  // Sweeps ALL users' eligible earn tokens (past 3-hour hold) and credits
+  // balances automatically every 2 hours. Respects the daily $5 cap per user.
+  // The manual /api/earnings/claim endpoint still exists for instant conversion.
+  const AUTO_CONVERT_INTERVAL_MS = 2 * 60 * 60 * 1000;
+
+  async function runAutoConvert(): Promise<void> {
+    try {
+      const now = new Date();
+      const expiryThreshold = new Date(now.getTime() - TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+      const usersWithTokens = await db
+        .selectDistinct({ userId: earnTokens.userId })
+        .from(earnTokens)
+        .where(and(
+          eq(earnTokens.status, "pending"),
+          lte(earnTokens.claimableAt, now),
+        ));
+
+      if (usersWithTokens.length === 0) return;
+
+      logger.info({ userCount: usersWithTokens.length }, "auto-convert: starting batch");
+
+      for (const { userId } of usersWithTokens) {
+        try {
+          await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+            await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+
+            await tx.update(earnTokens)
+              .set({ status: "expired" })
+              .where(and(
+                eq(earnTokens.userId, userId),
+                eq(earnTokens.status, "pending"),
+                lt(earnTokens.earnedAt, expiryThreshold),
+              ));
+
+            const dayStart = new Date(now);
+            dayStart.setUTCHours(0, 0, 0, 0);
+
+            const [{ claimedPts }] = await tx
+              .select({ claimedPts: sql<string>`COALESCE(SUM(${earnTokens.points}), 0)` })
+              .from(earnTokens)
+              .where(and(
+                eq(earnTokens.userId, userId),
+                eq(earnTokens.status, "claimed"),
+                gte(earnTokens.claimedAt, dayStart),
+              ));
+
+            const alreadyPts = parseInt(claimedPts ?? "0", 10);
+            const dailyCapPts = DAILY_CLAIM_CAP_USD * POINTS_PER_DOLLAR;
+            const remainingCapPts = dailyCapPts - alreadyPts;
+            if (remainingCapPts <= 0) return;
+
+            const ready = await tx.select().from(earnTokens)
+              .where(and(
+                eq(earnTokens.userId, userId),
+                eq(earnTokens.status, "pending"),
+                lte(earnTokens.claimableAt, now),
+              ));
+            if (ready.length === 0) return;
+
+            let totalPts = 0;
+            const tokenIds: string[] = [];
+            for (const tok of ready) {
+              if (totalPts + tok.points > remainingCapPts) break;
+              totalPts += tok.points;
+              tokenIds.push(tok.id);
+            }
+            if (totalPts === 0) return;
+
+            const creditUsd = parseFloat((totalPts / POINTS_PER_DOLLAR).toFixed(4));
+            const creditStr = creditUsd.toFixed(4);
+
+            await tx.update(earnTokens)
+              .set({ status: "claimed", claimedAt: now })
+              .where(and(
+                eq(earnTokens.userId, userId),
+                eq(earnTokens.status, "pending"),
+                lte(earnTokens.claimableAt, now),
+              ));
+
+            await tx.update(users)
+              .set({
+                balance:     sql`${users.balance} + ${creditStr}`,
+                totalEarned: sql`${users.totalEarned} + ${creditStr}`,
+              })
+              .where(eq(users.id, userId));
+
+            await tx.insert(earningsLedger).values({
+              userId,
+              amount:      creditStr,
+              type:        "bonus",
+              description: `Auto-converted ${tokenIds.length} token(s) · ${totalPts} pts`,
+            });
+
+            logger.info({ userId, tokensClaimed: tokenIds.length, totalPts, creditUsd }, "auto-convert: credited user");
+          });
+        } catch (userErr) {
+          logger.error({ err: userErr, userId }, "auto-convert: user transaction failed, skipping");
+        }
+      }
+
+      logger.info({ userCount: usersWithTokens.length }, "auto-convert: batch complete");
+    } catch (err) {
+      logger.error({ err }, "auto-convert: job error");
+    }
+  }
+
+  // Initial run 5 minutes after startup, then every 2 hours
+  setTimeout(() => {
+    runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: initial run failed"));
+    setInterval(() => {
+      runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: interval run failed"));
+    }, AUTO_CONVERT_INTERVAL_MS);
+  }, 5 * 60 * 1000);
 }
