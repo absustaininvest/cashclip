@@ -108,6 +108,9 @@ function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: im
       _edDsaPubKey = null;
     } else {
       try {
+        const hasLiteralNewlines = raw.includes("\\n");
+        const hasRealNewlines = raw.includes("\n");
+        logger.info({ hasLiteralNewlines, hasRealNewlines, length: raw.length, starts: raw.slice(0, 27) }, "BRIDGE_INGRID_WICKED format check");
         const normalized = raw.replace(/\\n/g, "\n");
         const privateKey = crypto.createPrivateKey(normalized);
         if (privateKey.asymmetricKeyType !== "ed25519") {
