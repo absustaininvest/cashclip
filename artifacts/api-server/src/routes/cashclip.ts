@@ -289,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/integrations/status", (_req, res) => {
+  app.get("/api/integrations/status", adminMiddleware, (_req, res) => {
     const statuses = getIntegrationStatuses();
     const summary = getIntegrationSummary();
 
@@ -690,7 +690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/integrations/:id", (req, res): void => {
+  app.get("/api/integrations/:id", adminMiddleware, (req, res): void => {
     const statuses = getIntegrationStatuses();
     const integration = statuses.find((s) => s.id === req.params.id);
     if (!integration) {
