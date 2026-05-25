@@ -98,7 +98,7 @@ if (MAINTENANCE_MODE) {
           `display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px}` +
           `h1{font-size:22px;font-weight:600;margin:0 0 8px}p{opacity:.7;margin:0;max-width:420px}` +
           `</style></head><body><div><h1>Service temporarily unavailable</h1>` +
-          `<p>We're offline for maintenance. Please check back soon.</p></div></body></html>`,
+          `<p>We sincerely apologize for the inconvenience. We're offline for scheduled maintenance and will be back shortly. Thank you for your patience.</p></div></body></html>`,
       );
     } else {
       res.json({ error: "Service temporarily unavailable", maintenance: true });

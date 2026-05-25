@@ -10,11 +10,11 @@ channel = "stable-25_05"
 
 [userenv.shared]
 BASE_PATH = "/absustain/"
-MAINTENANCE_MODE = "false"
 ADMOB_APP_ID = "ca-app-pub-8679658921848348~6212139107"
 
 [userenv.production]
 SEED_ADMIN_FORCE_RESET = "true"
+MAINTENANCE_MODE = "true"
 
 [workflows]
 runButton = "Project"
