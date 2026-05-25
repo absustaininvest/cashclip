@@ -2024,14 +2024,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate a single-use witness nonce. Stored in the DB attempt row
       // (DB-persisted, works across multi-instance deployments, single-use).
-      // ALSO set as an HttpOnly cookie so that clients without cookie support
-      // (plain curl without -c/-b) fail at /c even if they parse the ?w= nonce
-      // from the HTML — the cookie must arrive automatically with the request.
+      // Set as an HttpOnly cookie ONLY — the nonce is NEVER embedded in the
+      // HTML/JS response body. Clients must call /ack/:token (which validates
+      // the cookie server-side and returns an HMAC-signed ack token) before
+      // they can call /c/:token. The HMAC requires JWT_TRIDENTE, so even an
+      // attacker who captures the Set-Cookie header cannot forge an ack token.
       const { randomBytes: _rnd } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
       res.setHeader("Set-Cookie",
-        `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Lax`);
-      const completionPath = "/api/earn/sponsored/c/" + token + "?w=" + witnessNonce;
+        `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Strict`);
+      const ackPath = "/api/earn/sponsored/ack/" + token;
+      const completionPath = "/api/earn/sponsored/c/" + token;
 
       // Minimum time (ms) the interstitial must remain open before /c/:token
       // accepts the witnessedAt stamp. Enforced both client-side (countdown)
