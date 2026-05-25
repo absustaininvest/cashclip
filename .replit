@@ -16,6 +16,8 @@ CPX_APP_ID = "32891"
 
 [userenv.production]
 
+[userenv.development]
+
 [workflows]
 runButton = "Project"
 
