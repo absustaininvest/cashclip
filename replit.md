@@ -64,3 +64,6 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 
 - Keep it simple: CashClip + website only, no extra artifacts or background tasks.
 - Don't recover deleted files or artifacts.
+- All integrations must follow the same setup pattern as CPX Research: one secret per credential (API key, app ID, webhook secret each get their own named secret). No shared or bundled secrets across integrations.
+- All domains must use registered legal domains (absustaininvest.com, cash-clip.app) — never Replit subdomains — in any production-facing configuration, links, or API references.
+- Every fix requires explicit user approval before execution. No unsolicited changes.
