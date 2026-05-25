@@ -60,6 +60,7 @@ const totpVerifyRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => getClientIp(req) ?? req.ip ?? "unknown",
+  validate: { keyGeneratorIpFallback: false },
   message: { error: "Too many verification attempts. Please try again later." },
 });
 
