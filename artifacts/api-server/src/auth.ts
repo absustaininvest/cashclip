@@ -108,10 +108,13 @@ function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: im
       _edDsaPubKey = null;
     } else {
       try {
-        const hasLiteralNewlines = raw.includes("\\n");
-        const hasRealNewlines = raw.includes("\n");
-        logger.info({ hasLiteralNewlines, hasRealNewlines, length: raw.length, starts: raw.slice(0, 27) }, "BRIDGE_INGRID_WICKED format check");
-        const normalized = raw.replace(/\\n/g, "\n");
+        // Normalize: handle literal \n sequences or missing newlines (secrets panel may strip them)
+        let normalized = raw.replace(/\\n/g, "\n");
+        if (!normalized.includes("\n") && normalized.includes("-----BEGIN ") && normalized.includes("-----END ")) {
+          normalized = normalized
+            .replace(/(-----BEGIN [^-]+-----)([^-])/, "$1\n$2")
+            .replace(/([^-])(-----END )/, "$1\n$2");
+        }
         const privateKey = crypto.createPrivateKey(normalized);
         if (privateKey.asymmetricKeyType !== "ed25519") {
           logger.warn("BRIDGE_INGRID_WICKED is not an Ed25519 key — EdDSA signing disabled, falling back to HS256");
