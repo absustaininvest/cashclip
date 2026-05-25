@@ -68,6 +68,8 @@ function ProviderBadge({ provider }: { provider: string }) {
     pollfish: "#FF6B35",
     cint: "#4A90D9",
     lucid: "#7B61FF",
+    cpx: "#FF4F00",
+    bitlabs: "#6C3FC5",
     internal: Colors.primary,
   };
   const color = colors[provider] || Colors.primary;
@@ -75,6 +77,8 @@ function ProviderBadge({ provider }: { provider: string }) {
     pollfish: "Pollfish",
     cint: "Cint",
     lucid: "Lucid",
+    cpx: "CPX Research",
+    bitlabs: "BitLabs",
     internal: "CashClip",
   };
   return (
@@ -214,8 +218,26 @@ export default function SurveysScreen() {
         controlsColor: "#00C6A0",
         dismissButtonStyle: "done",
       });
-      // Browser closed — auto-claim the reward
       setIsLaunchingExternal(false);
+
+      // CPX and BitLabs credit via S2S webhook — no manual claim needed.
+      // Attempting a fake transaction ID against these providers always fails
+      // and shows a confusing error. Just close the modal and let the webhook land.
+      const isWebhookProvider = pendingExternalSurvey.provider === "cpx" || pendingExternalSurvey.provider === "bitlabs";
+      if (isWebhookProvider) {
+        setPendingExternalSurvey(null);
+        setExternalSessionToken(null);
+        queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
+        refetchExternal();
+        Alert.alert(
+          "Survey Submitted! 🎉",
+          "Your reward will appear in your balance within a few minutes — it's credited automatically.",
+          [{ text: "Got it" }]
+        );
+        return;
+      }
+
+      // For all other providers: auto-claim the reward on browser close
       setIsClaimingReward(true);
       const autoTxnId = `${sessionTok.substring(0, 12)}-auto-${Date.now()}`;
       await completeExternalMutation.mutateAsync({

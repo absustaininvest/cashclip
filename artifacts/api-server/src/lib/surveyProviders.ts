@@ -193,9 +193,16 @@ async function fetchLucidSurveys(config: ProviderConfig): Promise<ExternalSurvey
   }
 }
 
-export function buildCpxWallUrl(userId: string, appId: string, apiKey: string): string {
+export function buildCpxWallUrl(userId: string, appId: string, apiKey: string, username?: string, email?: string): string {
   const secureHash = md5hex(`${userId}-${apiKey}`);
-  return `https://offers.cpx-research.com/index.php?app_id=${encodeURIComponent(appId)}&ext_user_id=${encodeURIComponent(userId)}&secure_hash=${encodeURIComponent(secureHash)}`;
+  const params = new URLSearchParams({
+    app_id: appId,
+    ext_user_id: userId,
+    secure_hash: secureHash,
+  });
+  if (username) params.set("username", username);
+  if (email) params.set("email", email);
+  return `https://offers.cpx-research.com/index.php?${params.toString()}`;
 }
 
 async function fetchCpxSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {

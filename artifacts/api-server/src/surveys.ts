@@ -115,7 +115,16 @@ export function registerSurveyRoutes(app: Express): void {
         const appId = process.env.CPX_APP_ID;
         const apiKey = process.env.CPX_API_KEY;
         if (appId && apiKey) {
-          surveyEntryUrl = buildCpxWallUrl(req.userId!, appId, apiKey);
+          let cpxUsername: string | undefined;
+          let cpxEmail: string | undefined;
+          try {
+            const cpxUser = await storage.getUser(req.userId!);
+            if (cpxUser) {
+              cpxUsername = cpxUser.username;
+              cpxEmail = cpxUser.email ?? undefined;
+            }
+          } catch { /* non-fatal — proceed without enrichment */ }
+          surveyEntryUrl = buildCpxWallUrl(req.userId!, appId, apiKey, cpxUsername, cpxEmail);
         }
       } else if (surveyUrl && typeof surveyUrl === "string") {
         try {
