@@ -11,6 +11,7 @@ channel = "stable-25_05"
 [userenv.shared]
 BASE_PATH = "/absustain/"
 ADMOB_APP_ID = "ca-app-pub-8679658921848348~6212139107"
+EXPO_PUBLIC_DOMAIN = "cash-clip.app"
 
 [userenv.production]
 MAINTENANCE_MODE = "true"

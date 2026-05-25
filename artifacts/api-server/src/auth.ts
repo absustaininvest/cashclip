@@ -432,7 +432,7 @@ export function registerAuthRoutes(app: Express) {
         const verifyToken = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await storage.setEmailVerificationToken(created.id, verifyToken, expiresAt);
-        const domain = process.env["REPLIT_DOMAINS"]?.split(",")[0]?.trim() ?? "ad-revenue-engine.replit.app";
+        const domain = process.env["EXPO_PUBLIC_DOMAIN"] ?? "cash-clip.app";
         const verifyUrl = `https://${domain}/api/auth/verify-email?token=${verifyToken}`;
         sendEmailVerification({ to: email.trim().toLowerCase(), username: normalizedUsername, verifyUrl });
       }
