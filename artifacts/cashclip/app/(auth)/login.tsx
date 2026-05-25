@@ -20,6 +20,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getApiUrl } from "@/lib/query-client";
+import LanguageToggle from "@/components/LanguageToggle";
 
 type ForgotStep = "username" | "code" | "success";
 
@@ -145,6 +146,9 @@ export default function LoginScreen() {
           </LinearGradient>
           <Text style={styles.appName}>CashClip</Text>
           <Text style={styles.tagline}>{t.auth.welcomeBack}</Text>
+          <View style={{ marginTop: 16 }}>
+            <LanguageToggle />
+          </View>
         </View>
 
         <View style={styles.form}>

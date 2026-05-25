@@ -20,6 +20,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { addNotification } from "@/lib/storage";
+import LanguageToggle from "@/components/LanguageToggle";
 
 const PERKS = [
   { icon: "dollar-sign", label: "Earn Real Cash" },
@@ -108,6 +109,11 @@ export default function RegisterScreen() {
           </LinearGradient>
           <Text style={styles.appName}>CashClip</Text>
           <Text style={styles.tagline}>{t.auth.createAccount}</Text>
+        </View>
+
+        {/* ── Language toggle ── */}
+        <View style={{ marginBottom: 16 }}>
+          <LanguageToggle />
         </View>
 
         {/* ── Perk pills ── */}
