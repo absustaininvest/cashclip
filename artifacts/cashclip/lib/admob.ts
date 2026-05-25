@@ -52,6 +52,25 @@ export const isAdMobAvailable =
   Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 let adMobInitialized = false;
+let nonPersonalizedOnly = true;
+
+function shouldUseNonPersonalizedOnly(): boolean {
+  return nonPersonalizedOnly;
+}
+
+async function resolvePersonalizationConsent(): Promise<void> {
+  if (Platform.OS === "android") {
+    nonPersonalizedOnly = false;
+    return;
+  }
+  try {
+    const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
+    const { status } = await getTrackingPermissionsAsync();
+    nonPersonalizedOnly = status !== "granted";
+  } catch {
+    nonPersonalizedOnly = true;
+  }
+}
 
 export function isAdMobReady(): boolean {
   return isAdMobAvailable && adMobInitialized;
@@ -78,6 +97,8 @@ export async function initializeAdMob(): Promise<boolean> {
 
   try {
     // ATT and AdsConsent are handled by TrackingConsentGate before this runs.
+    // Resolve personalization consent now so ad requests use the correct flag.
+    await resolvePersonalizationConsent();
     const mobileAds = require("react-native-google-mobile-ads").default;
     await mobileAds().initialize();
     adMobInitialized = true;
@@ -155,7 +176,7 @@ export function preloadRewardedAd(adUnitId?: string): void {
     const unitId = adUnitId || getAdUnitId("rewarded") || TestIds.REWARDED;
 
     const rewarded = RewardedAd.createForAdRequest(unitId, {
-      requestNonPersonalizedAdsOnly: true,
+      requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
     });
 
     const unsubscribeLoaded = rewarded.addAdEventListener(
@@ -277,7 +298,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
     let adShown = false;
 
     const rewarded = RewardedAd.createForAdRequest(unitId, {
-      requestNonPersonalizedAdsOnly: true,
+      requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
     });
 
     let earned = false;
@@ -395,7 +416,7 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
       let adShown = false;
 
       const interstitial = InterstitialAd.createForAdRequest(unitId, {
-        requestNonPersonalizedAdsOnly: true,
+        requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
       });
 
       const loadStartTime = Date.now();
