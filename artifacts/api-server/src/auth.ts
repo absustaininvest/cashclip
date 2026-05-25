@@ -108,7 +108,8 @@ function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: im
       _edDsaPubKey = null;
     } else {
       try {
-        const privateKey = crypto.createPrivateKey(raw);
+        const normalized = raw.replace(/\\n/g, "\n");
+        const privateKey = crypto.createPrivateKey(normalized);
         if (privateKey.asymmetricKeyType !== "ed25519") {
           logger.warn("BRIDGE_INGRID_WICKED is not an Ed25519 key — EdDSA signing disabled, falling back to HS256");
           _edDsaPrivKey = null;
