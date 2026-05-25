@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
-      "buildNumber": "35",
+      "buildNumber": "37",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission \u2014 tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking.",
@@ -369,7 +369,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 2,
+      "versionCode": 37,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
       },
