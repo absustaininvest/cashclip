@@ -161,9 +161,13 @@ const server = http.createServer((req, res) => {
   let pathname = url.pathname;
 
   const host = safeHost.replace(/:\d+$/, "").toLowerCase();
+  const forwardedHost = typeof req.headers["x-forwarded-host"] === "string"
+    ? req.headers["x-forwarded-host"].split(",")[0].trim().toLowerCase().replace(/:\d+$/, "")
+    : "";
+  const effectiveHost = forwardedHost || host;
   const expoPlatform = req.headers["expo-platform"];
 
-  if (host === ABSUSTAIN_DOMAIN || host === `www.${ABSUSTAIN_DOMAIN}`) {
+  if (effectiveHost === ABSUSTAIN_DOMAIN || effectiveHost === `www.${ABSUSTAIN_DOMAIN}`) {
     const proxyReq = http.request(
       { hostname: "127.0.0.1", port: 8080, path: req.url, method: req.method, headers: req.headers },
       (proxyRes) => {
