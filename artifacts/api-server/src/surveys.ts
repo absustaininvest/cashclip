@@ -320,14 +320,17 @@ export function registerSurveyRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "cpx", auth.reason ?? "unknown");
       res.status(403).send("Forbidden"); return;
     }
-    const { trans_id, survey_id, ext_user_id, amount_local, status } = req.query;
+    const { trans_id, survey_id, ext_user_id, status } = req.query;
     if ((status === "1" || status === "completed") && trans_id && survey_id && ext_user_id) {
-      const reward = typeof amount_local === "string" ? parseFloat(amount_local) : undefined;
+      // Do not trust amount_local from the webhook request — it is attacker-controlled
+      // and unsigned. Use the server-committed expectedReward from the reward session
+      // instead (creditSurveyViaWebhook falls back to session.expectedReward when
+      // rewardValue is undefined, and clamps to PROVIDER_REWARD_RANGES in any case).
       await creditSurveyViaWebhook(
         "cpx",
         String(ext_user_id),
         `cpx_${survey_id}`,
-        Number.isFinite(reward) ? reward : undefined,
+        undefined,
         "[CPX Webhook]",
       );
     }
