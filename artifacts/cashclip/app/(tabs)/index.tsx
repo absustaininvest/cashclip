@@ -19,7 +19,7 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
-import { showRewardedAd, isAdMobReady } from "@/lib/admob";
+import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH } from "@/components/NativeAdCard";
 import InFeedBanner from "@/components/InFeedBanner";
