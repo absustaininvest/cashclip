@@ -11,7 +11,7 @@ import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
 import type { InsertUser } from "@workspace/db";
 import { db, passwordResetTokens, users } from "@workspace/db";
-import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as drizzleGte } from "drizzle-orm";
+import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as drizzleGte, lt as drizzleLt, sql as drizzleSql } from "drizzle-orm";
 import { generateTotpSecret, verifyTotp } from "./lib/totp";
 
 // ── TOTP verify failed-attempt tracker ───────────────────────────────────────
@@ -691,6 +691,9 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── POST /api/auth/reset-password ─────────────────────────────────────────
+  // Max wrong guesses before a reset token is burned.
+  const MAX_RESET_ATTEMPTS = 5;
+
   app.post("/api/auth/reset-password", async (req: Request, res: Response): Promise<void> => {
     try {
       const ip = getClientIp(req);
@@ -717,15 +720,15 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Invalid or expired code" });
         return;
       }
-      const tokenHash = crypto.createHash("sha256").update(String(code).trim()).digest("hex");
       const now = new Date();
+      // Look up the active token by userId only — not by hash — so we can
+      // track and limit wrong guesses regardless of which code is submitted.
       const [token] = await db
         .select()
         .from(passwordResetTokens)
         .where(
           drizzleAnd(
             drizzleEq(passwordResetTokens.userId, user.id),
-            drizzleEq(passwordResetTokens.tokenHash, tokenHash),
             drizzleIsNull(passwordResetTokens.usedAt),
             drizzleGte(passwordResetTokens.expiresAt, now),
           ),
@@ -735,7 +738,47 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Invalid or expired code" });
         return;
       }
-      await db.update(passwordResetTokens).set({ usedAt: now }).where(drizzleEq(passwordResetTokens.id, token.id));
+      const tokenHash = crypto.createHash("sha256").update(String(code).trim()).digest("hex");
+      if (token.tokenHash !== tokenHash) {
+        // Wrong code — atomically increment the failure counter in a single
+        // UPDATE statement so concurrent requests cannot race past the limit.
+        // The CASE expression burns the token (sets used_at) the moment
+        // failed_attempts reaches the threshold, and the WHERE clause ensures
+        // the UPDATE is a no-op if the token has already been burned.
+        await db
+          .update(passwordResetTokens)
+          .set({
+            failedAttempts: drizzleSql`failed_attempts + 1`,
+            usedAt: drizzleSql`CASE WHEN failed_attempts + 1 >= ${MAX_RESET_ATTEMPTS} THEN NOW() ELSE used_at END`,
+          })
+          .where(
+            drizzleAnd(
+              drizzleEq(passwordResetTokens.id, token.id),
+              drizzleIsNull(passwordResetTokens.usedAt),
+              drizzleGte(passwordResetTokens.expiresAt, now),
+              drizzleLt(passwordResetTokens.failedAttempts, MAX_RESET_ATTEMPTS),
+            ),
+          );
+        res.status(400).json({ error: "Invalid or expired code" });
+        return;
+      }
+      // Correct code — atomically consume the token.  The WHERE guards against
+      // double-use if two concurrent correct submissions race each other.
+      const [consumed] = await db
+        .update(passwordResetTokens)
+        .set({ usedAt: now })
+        .where(
+          drizzleAnd(
+            drizzleEq(passwordResetTokens.id, token.id),
+            drizzleIsNull(passwordResetTokens.usedAt),
+            drizzleGte(passwordResetTokens.expiresAt, now),
+          ),
+        )
+        .returning({ id: passwordResetTokens.id });
+      if (!consumed) {
+        res.status(400).json({ error: "Invalid or expired code" });
+        return;
+      }
       const hashed = await bcrypt.hash(newPassword, 10);
       await storage.updateUserPassword(user.id, hashed);
       logger.info({ userId: user.id }, "Password reset via OTP");
