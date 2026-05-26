@@ -2120,6 +2120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </div>
 <script>
 (function(){
+  var ackPath=${safeForScript(ackPath)};
   var completionPath=${safeForScript(completionPath)};
   var advertiserUrl=${safeForScript(safeTargetUrl)};
   var minMs=${MIN_INTERSTITIAL_MS};
@@ -2155,19 +2156,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Both iframe signal AND timer must have fired
     if(!timerFired||!iframeReady||settling)return;
     settling=true;
-    sendCompletion(0);
+    fetchAck(0);
   }
 
-  function sendCompletion(retryDelayMs){
-    if(retryDelayMs>0){setTimeout(function(){sendCompletion(0);},retryDelayMs);return;}
+  // Step 1: Exchange cc_w cookie for a server-issued HMAC ack token.
+  // The cookie is HttpOnly so JS cannot read it — the browser sends it
+  // automatically. /ack validates cookie+IP+UA and returns a signed token
+  // that /c requires. The raw nonce never appears in the request to /c.
+  function fetchAck(retryDelayMs){
+    if(retryDelayMs>0){setTimeout(function(){fetchAck(0);},retryDelayMs);return;}
     var xhr=new XMLHttpRequest();
-    xhr.open('GET',completionPath,true);
+    xhr.open('GET',ackPath,true);
     xhr.setRequestHeader('Accept','application/json');
     xhr.onload=function(){
       if(xhr.status===425){
-        // Server says too early — honour its retryAfterMs then retry once
-        try{var d=JSON.parse(xhr.responseText);sendCompletion((d.retryAfterMs||1000)+100);}
-        catch(e){sendCompletion(1100);}
+        try{var d=JSON.parse(xhr.responseText);fetchAck((d.retryAfterMs||1000)+100);}
+        catch(e){fetchAck(1100);}
+        return;
+      }
+      var ackToken='';
+      try{var d=JSON.parse(xhr.responseText);ackToken=d.ackToken||'';}catch(e){}
+      sendCompletion(ackToken,0);
+    };
+    xhr.onerror=function(){navigate();};
+    xhr.send();
+  }
+
+  // Step 2: Present the HMAC ack token to /c. The server validates the
+  // signature (requires JWT_TRIDENTE) — it cannot be forged from anything
+  // visible in the /r response headers or body.
+  function sendCompletion(ackToken,retryDelayMs){
+    if(retryDelayMs>0){setTimeout(function(){sendCompletion(ackToken,0);},retryDelayMs);return;}
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET',completionPath+'?ack='+encodeURIComponent(ackToken),true);
+    xhr.setRequestHeader('Accept','application/json');
+    xhr.onload=function(){
+      if(xhr.status===425){
+        try{var d=JSON.parse(xhr.responseText);sendCompletion(ackToken,(d.retryAfterMs||1000)+100);}
+        catch(e){sendCompletion(ackToken,1100);}
         return;
       }
       navigate();
@@ -2202,6 +2228,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(410).json({
       error: "This endpoint has been replaced. Please reopen the visit link.",
     });
+  });
+
+  /** Ack exchange — converts the cc_w HttpOnly cookie into a short-lived
+   *  HMAC-signed ack token that /c/:token requires.
+   *
+   *  Security design:
+   *  - The raw witnessNonce is NEVER returned to the client. The cookie value
+   *    is opaque to JavaScript (HttpOnly); the browser sends it automatically.
+   *  - /ack validates: (1) cookie matches DB nonce, (2) IP+UA binding,
+   *    (3) dwell time elapsed. On success it returns an HMAC-SHA256 token
+   *    signed with JWT_TRIDENTE — unforgeable without the server secret.
+   *  - An attacker who reads cc_w from the Set-Cookie response header of /r
+   *    can craft a Cookie header and call /ack, but still cannot forge the
+   *    ackToken itself and faces IP+UA binding on both /ack and /c.
+   */
+  app.get("/api/earn/sponsored/ack/:token", async (req, res) => {
+    try {
+      const token = String(req.params.token);
+      if (!/^[a-f0-9]{64}$/.test(token)) {
+        res.status(404).json({ error: "Not found" }); return;
+      }
+
+      const {
+        db: dbClient,
+        campaignVisitAttempts: attemptsTable,
+      } = await import("@workspace/db");
+      const { eq: drizzleEq } = await import("drizzle-orm");
+
+      const [attempt] = await dbClient.select().from(attemptsTable)
+        .where(drizzleEq(attemptsTable.token, token));
+      if (!attempt) { res.status(404).json({ error: "Not found" }); return; }
+      if (attempt.expiresAt.getTime() < Date.now()) {
+        res.status(410).json({ error: "Visit link expired" }); return;
+      }
+      if (attempt.settledAt) {
+        res.status(410).json({ error: "Already settled" }); return;
+      }
+      if (!attempt.witnessNonce) {
+        res.status(403).json({ error: "Witness nonce missing — reopen the link" }); return;
+      }
+
+      // Validate cc_w cookie against DB-stored nonce
+      const ccwCookie = (req.headers.cookie ?? "").split(";")
+        .map((s: string) => s.trim()).find((s: string) => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
+      if (!ccwCookie || ccwCookie !== attempt.witnessNonce) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: cookie/nonce mismatch");
+        res.status(403).json({ error: "Witness validation failed" }); return;
+      }
+
+      // IP+UA binding — same client that opened /r must call /ack
+      if (attempt.redirectIpHash || attempt.redirectUaHash) {
+        const { createHash: _ch } = await import("crypto");
+        const { getClientIp: _gcip } = await import("../lib/clientIp");
+        const currentIp = _gcip(req);
+        const currentUa = String(req.headers["user-agent"] ?? "");
+        const currentIpHash = _ch("sha256").update(currentIp).digest("hex");
+        const currentUaHash = _ch("sha256").update(currentUa).digest("hex");
+        const ipMismatch = attempt.redirectIpHash && attempt.redirectIpHash !== currentIpHash;
+        const uaMismatch = attempt.redirectUaHash && attempt.redirectUaHash !== currentUaHash;
+        if (ipMismatch || uaMismatch) {
+          req.log?.warn?.({ token: token.slice(0, 8) + "…", ipMismatch, uaMismatch }, "Sponsored ack: client binding mismatch");
+          res.status(403).json({ error: "Client binding mismatch" }); return;
+        }
+      }
+
+      // Dwell gate — must have waited the required interstitial time
+      if (!attempt.redirectedAt) {
+        res.status(400).json({ error: "Redirect step not completed" }); return;
+      }
+      const MIN_INTERSTITIAL_MS = Math.max(
+        1000,
+        parseInt(process.env.MIN_INTERSTITIAL_DWELL_MS ?? "5000", 10),
+      );
+      const redirectAge = Date.now() - attempt.redirectedAt.getTime();
+      if (redirectAge < MIN_INTERSTITIAL_MS) {
+        const retryAfterMs = Math.ceil(MIN_INTERSTITIAL_MS - redirectAge);
+        res.status(425).json({ error: "Too early — stay on the page.", retryAfterMs }); return;
+      }
+
+      // Issue HMAC-signed ack token bound to this token + nonce.
+      // JWT_TRIDENTE is required to produce a valid signature — an attacker
+      // who captures cc_w from Set-Cookie cannot forge this without the secret.
+      const { createHmac } = await import("crypto");
+      const secret = process.env.JWT_TRIDENTE ?? "";
+      const ackToken = createHmac("sha256", secret)
+        .update(token + ":" + attempt.witnessNonce)
+        .digest("hex");
+
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ackToken });
+    } catch (err: any) {
+      req.log?.error?.({ err }, "Sponsored ack failed");
+      res.status(500).json({ error: "Ack failed" });
+    }
   });
 
   /** Completion redirect — the server-observed gate for sponsored visits.
@@ -2252,26 +2372,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(410).send("Visit link expired"); return;
       }
 
-      // ── Witness nonce verification (DB-persisted, single-use) ─────────────
-      // /r/:token stored a random nonce in the DB AND set it as an HttpOnly
-      // cookie (cc_w). Here we require:
-      //   1. The cc_w cookie is present (auto-sent by browser; plain curl
-      //      without -c/-b never receives it, so it's absent on replay).
-      //   2. The ?w= query param matches (embedded in the JS completionPath).
-      //   3. Both match the server-stored nonce in the DB attempt row.
-      // The nonce is cleared from the DB on the witnessedAt update below
-      // (single-use semantics, prevents replay of the same /c call).
+      // ── HMAC ack token verification (DB-persisted nonce, single-use) ────────
+      // /r/:token stored a random witnessNonce in the DB and set it as an
+      // HttpOnly cookie. /ack/:token validated the cookie + IP/UA and returned
+      // an HMAC-SHA256(token:nonce, JWT_TRIDENTE) ack token. Here we:
+      //   1. Require a non-empty ?ack= query parameter.
+      //   2. Re-derive the expected HMAC from the DB nonce (JWT_TRIDENTE needed).
+      //   3. Compare with timingSafeEqual — cannot be forged without the secret.
+      // The nonce is cleared on the witnessedAt update below (single-use).
+      // The raw nonce is NEVER accepted here — /c only accepts the HMAC proof.
       if (!attempt.settledAt && !attempt.witnessedAt) {
-        const ccwCookie = (req.headers.cookie ?? "").split(";")
-          .map(s => s.trim()).find(s => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
-        const queryNonce = String(req.query.w ?? "");
+        const queryAck = String(req.query.ack ?? "");
         const storedNonce = attempt.witnessNonce;
         if (!storedNonce) {
           // /r was never completed or nonce already consumed — reject.
           res.status(403).send("Visit witness missing — please reopen the link"); return;
         }
-        if (!ccwCookie || ccwCookie !== storedNonce || queryNonce !== storedNonce) {
-          req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored visit witness nonce mismatch — rejected");
+        if (!queryAck) {
+          req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored visit: missing ack token");
+          res.status(403).send("Visit ack token required — please reopen the link"); return;
+        }
+        const { createHmac: _hmac, timingSafeEqual: _tse } = await import("crypto");
+        const _secret = process.env.JWT_TRIDENTE ?? "";
+        const expectedBuf = _hmac("sha256", _secret)
+          .update(token + ":" + storedNonce)
+          .digest();
+        let providedBuf: Buffer;
+        try { providedBuf = Buffer.from(queryAck, "hex"); } catch { providedBuf = Buffer.alloc(0); }
+        if (providedBuf.length !== expectedBuf.length || !_tse(providedBuf, expectedBuf)) {
+          req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored visit ack HMAC mismatch — rejected");
           res.status(403).send("Visit witness mismatch — please reopen the link"); return;
         }
       }

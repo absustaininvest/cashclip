@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
 import { authMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger } from "@workspace/db";
-import { eq, and, lte, gte, lt, sql, count } from "drizzle-orm";
+import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
 
@@ -507,15 +507,11 @@ export function registerEarningsRoutes(app: Express): void {
           const creditUsd = parseFloat((totalPts / POINTS_PER_DOLLAR).toFixed(4));
           const creditStr = creditUsd.toFixed(4);
 
-          // ── Mark claimed ───────────────────────────────────────────────────
+          // ── Mark claimed — only the capped subset, not all claimable ─────────
           await tx
             .update(earnTokens)
             .set({ status: "claimed", claimedAt: now })
-            .where(and(
-              eq(earnTokens.userId, req.userId!),
-              eq(earnTokens.status, "pending"),
-              lte(earnTokens.claimableAt, now),
-            ));
+            .where(inArray(earnTokens.id, tokenIds));
 
           // ── Credit real balance ────────────────────────────────────────────
           const [updated] = await tx
@@ -796,11 +792,7 @@ export function registerEarningsRoutes(app: Express): void {
 
             await tx.update(earnTokens)
               .set({ status: "claimed", claimedAt: now })
-              .where(and(
-                eq(earnTokens.userId, userId),
-                eq(earnTokens.status, "pending"),
-                lte(earnTokens.claimableAt, now),
-              ));
+              .where(inArray(earnTokens.id, tokenIds));
 
             await tx.update(users)
               .set({
