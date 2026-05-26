@@ -11,7 +11,6 @@ loadPersistedIntegrationKeys();
 // Per-account seed secrets — each admin account has its own independent secret
 // so resetting one never affects the other.
 const ADMIN_SEED_SECRETS: Record<string, string> = {
-  "jorge.ballen@cash-clip.app": "SEED_PASSWORD_CASHCLIP",
   "support@absustaininvest.com": "SEED_PASSWORD_SUPPORT",
 };
 
