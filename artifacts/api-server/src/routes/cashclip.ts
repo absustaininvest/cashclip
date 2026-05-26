@@ -2022,15 +2022,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Generate a single-use witness nonce. Stored in the DB attempt row
-      // (DB-persisted, works across multi-instance deployments, single-use).
-      // Set as an HttpOnly cookie ONLY — the nonce is NEVER embedded in the
-      // HTML/JS response body. Clients must call /ack/:token (which validates
-      // the cookie server-side and returns an HMAC-signed ack token) before
-      // they can call /c/:token. The HMAC requires JWT_TRIDENTE, so even an
-      // attacker who captures the Set-Cookie header cannot forge an ack token.
-      const { randomBytes: _rnd } = await import("node:crypto");
+      // Fail-closed: JWT_TRIDENTE must be set. Both /ack and /c derive HMAC
+      // proofs from this secret; without it the entire witness chain is broken.
+      const _jwtSecret = process.env.JWT_TRIDENTE;
+      if (!_jwtSecret) {
+        req.log?.error?.({}, "Sponsored redirect: JWT_TRIDENTE not configured");
+        res.status(500).send("Server configuration error"); return;
+      }
+
+      // Generate a single-use witness nonce. Stored in the DB attempt row.
+      // Set as an HttpOnly cookie so JavaScript cannot read it — the browser
+      // sends it automatically. A bodyToken derived from the nonce via HMAC is
+      // embedded in the HTML body ONLY (never in any header). /ack requires
+      // BOTH the cookie AND the bodyToken, so the attacker must fetch AND parse
+      // the HTML body — not just read Set-Cookie from response headers.
+      const { randomBytes: _rnd, createHmac: _hmacR } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
+      // bodyToken = HMAC-SHA256(nonce+":btok", JWT_TRIDENTE) — server-derivable
+      // for verification at /ack without storing an extra DB column.
+      const bodyToken = _hmacR("sha256", _jwtSecret)
+        .update(witnessNonce + ":btok")
+        .digest("hex");
       res.setHeader("Set-Cookie",
         `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Strict`);
       const ackPath = "/api/earn/sponsored/ack/" + token;
@@ -2121,6 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 <script>
 (function(){
   var ackPath=${safeForScript(ackPath)};
+  var bodyToken=${safeForScript(bodyToken)};
   var completionPath=${safeForScript(completionPath)};
   var advertiserUrl=${safeForScript(safeTargetUrl)};
   var minMs=${MIN_INTERSTITIAL_MS};
@@ -2159,14 +2172,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fetchAck(0);
   }
 
-  // Step 1: Exchange cc_w cookie for a server-issued HMAC ack token.
-  // The cookie is HttpOnly so JS cannot read it — the browser sends it
-  // automatically. /ack validates cookie+IP+UA and returns a signed token
-  // that /c requires. The raw nonce never appears in the request to /c.
+  // Step 1: Present the body token (embedded in HTML, not in any header)
+  // along with the cc_w HttpOnly cookie to /ack. /ack validates both — an
+  // attacker must fetch AND parse this HTML to obtain bodyToken; reading the
+  // Set-Cookie header from /r alone is insufficient to call /ack.
   function fetchAck(retryDelayMs){
     if(retryDelayMs>0){setTimeout(function(){fetchAck(0);},retryDelayMs);return;}
     var xhr=new XMLHttpRequest();
-    xhr.open('GET',ackPath,true);
+    xhr.open('GET',ackPath+'?bt='+encodeURIComponent(bodyToken),true);
     xhr.setRequestHeader('Accept','application/json');
     xhr.onload=function(){
       if(xhr.status===425){
@@ -2307,12 +2320,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(425).json({ error: "Too early — stay on the page.", retryAfterMs }); return;
       }
 
+      // Fail-closed: JWT_TRIDENTE must be set to produce valid HMAC proofs.
+      const ackSecret = process.env.JWT_TRIDENTE;
+      if (!ackSecret) {
+        req.log?.error?.({}, "Sponsored ack: JWT_TRIDENTE not configured");
+        res.status(500).json({ error: "Server configuration error" }); return;
+      }
+
+      // Validate the body token — HMAC-SHA256(witnessNonce+":btok", JWT_TRIDENTE).
+      // bodyToken was embedded in the /r HTML body (not in any header), so an
+      // attacker who only reads Set-Cookie must also fetch+parse the HTML to get it.
+      const { createHmac: _hmacA, timingSafeEqual: _tseA } = await import("crypto");
+      const queryBt = String(req.query.bt ?? "");
+      if (!queryBt) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: missing body token");
+        res.status(403).json({ error: "Body token required — reopen the link" }); return;
+      }
+      const expectedBtBuf = _hmacA("sha256", ackSecret)
+        .update(attempt.witnessNonce + ":btok")
+        .digest();
+      let providedBtBuf: Buffer;
+      try { providedBtBuf = Buffer.from(queryBt, "hex"); } catch { providedBtBuf = Buffer.alloc(0); }
+      if (providedBtBuf.length !== expectedBtBuf.length || !_tseA(providedBtBuf, expectedBtBuf)) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: body token HMAC mismatch");
+        res.status(403).json({ error: "Body token invalid — reopen the link" }); return;
+      }
+
       // Issue HMAC-signed ack token bound to this token + nonce.
-      // JWT_TRIDENTE is required to produce a valid signature — an attacker
-      // who captures cc_w from Set-Cookie cannot forge this without the secret.
-      const { createHmac } = await import("crypto");
-      const secret = process.env.JWT_TRIDENTE ?? "";
-      const ackToken = createHmac("sha256", secret)
+      // Requires JWT_TRIDENTE — cannot be forged from anything in /r response headers or body.
+      const ackToken = _hmacA("sha256", ackSecret)
         .update(token + ":" + attempt.witnessNonce)
         .digest("hex");
 
@@ -2393,7 +2429,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.status(403).send("Visit ack token required — please reopen the link"); return;
         }
         const { createHmac: _hmac, timingSafeEqual: _tse } = await import("crypto");
-        const _secret = process.env.JWT_TRIDENTE ?? "";
+        const _secret = process.env.JWT_TRIDENTE;
+        if (!_secret) {
+          req.log?.error?.({}, "Sponsored completion: JWT_TRIDENTE not configured");
+          res.status(500).send("Server configuration error"); return;
+        }
         const expectedBuf = _hmac("sha256", _secret)
           .update(token + ":" + storedNonce)
           .digest();
