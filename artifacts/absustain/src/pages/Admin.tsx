@@ -2,12 +2,54 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import QRCode from "qrcode";
 import type { LucideIcon } from "lucide-react";
 import {
-  LogOut, Filter, RefreshCw, Mail, User, Calendar, Tag, Plus, Trash2, Check, Clock,
-  TrendingUp, Users, MessageSquare, Bell, ChevronRight, ExternalLink,
-  Upload, FileText, Download, X, BookOpen, Calculator, Layers, AlertCircle,
-  Linkedin, Instagram, Facebook, Youtube, ShoppingCart, Copy, Music2,
-  Globe, Smartphone, Palette, Share2, Package, BarChart3, KeyRound, Eye, EyeOff,
-  Inbox, AtSign, Building2, Megaphone, Headphones, Shield, ShieldCheck,
+  LogOut,
+  Filter,
+  RefreshCw,
+  Mail,
+  User,
+  Calendar,
+  Tag,
+  Plus,
+  Trash2,
+  Check,
+  Clock,
+  TrendingUp,
+  Users,
+  MessageSquare,
+  Bell,
+  ChevronRight,
+  ExternalLink,
+  Upload,
+  FileText,
+  Download,
+  X,
+  BookOpen,
+  Calculator,
+  Layers,
+  AlertCircle,
+  Linkedin,
+  Instagram,
+  Facebook,
+  Youtube,
+  ShoppingCart,
+  Copy,
+  Music2,
+  Globe,
+  Smartphone,
+  Palette,
+  Share2,
+  Package,
+  BarChart3,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Inbox,
+  AtSign,
+  Building2,
+  Megaphone,
+  Headphones,
+  Shield,
+  ShieldCheck,
 } from "lucide-react";
 
 interface Lead {
@@ -59,7 +101,12 @@ function formatSize(bytes: number): string {
 function fileIcon(mime: string): string {
   if (mime === "application/pdf") return "🗒️";
   if (mime.startsWith("image/")) return "🖼️";
-  if (mime.includes("spreadsheet") || mime.includes("excel") || mime === "text/csv") return "📊";
+  if (
+    mime.includes("spreadsheet") ||
+    mime.includes("excel") ||
+    mime === "text/csv"
+  )
+    return "📊";
   if (mime.includes("word") || mime.includes("document")) return "📄";
   if (mime === "application/zip") return "🗜️";
   return "📎";
@@ -127,12 +174,22 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
     <div className="min-h-screen bg-[#06060E] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src={`${import.meta.env.BASE_URL}logo-full.png`} alt="AB Sustainability" className="h-12 rounded mx-auto mb-4" />
-          <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-white">Admin Dashboard</h1>
+          <img
+            src={`${import.meta.env.BASE_URL}logo-full.png`}
+            alt="AB Sustainability"
+            className="h-12 rounded mx-auto mb-4"
+          />
+          <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-white">
+            Admin Dashboard
+          </h1>
           {step === "password" ? (
-            <p className="text-white/40 text-sm mt-2">Sign in to manage your business</p>
+            <p className="text-white/40 text-sm mt-2">
+              Sign in to manage your business
+            </p>
           ) : (
-            <p className="text-white/40 text-sm mt-2">Enter the code from your authenticator app</p>
+            <p className="text-white/40 text-sm mt-2">
+              Enter the code from your authenticator app
+            </p>
           )}
         </div>
 
@@ -156,7 +213,9 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
               autoComplete="current-password"
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {error && (
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            )}
             <button
               type="submit"
               disabled={loading}
@@ -169,7 +228,9 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
           <form onSubmit={handleOtpSubmit} className="space-y-4">
             <div className="flex items-center gap-2 bg-[#00E676]/5 border border-[#00E676]/20 rounded-xl px-4 py-3">
               <ShieldCheck className="w-4 h-4 text-[#00E676] flex-shrink-0" />
-              <p className="text-white/60 text-sm">Two-factor authentication required</p>
+              <p className="text-white/60 text-sm">
+                Two-factor authentication required
+              </p>
             </div>
             <input
               type="text"
@@ -177,13 +238,17 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
               pattern="\d{6}"
               maxLength={6}
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) =>
+                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               placeholder="000000"
               required
               autoFocus
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.4em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {error && (
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            )}
             <button
               type="submit"
               disabled={loading || otp.length !== 6}
@@ -193,7 +258,11 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             </button>
             <button
               type="button"
-              onClick={() => { setStep("password"); setError(""); setOtp(""); }}
+              onClick={() => {
+                setStep("password");
+                setError("");
+                setOtp("");
+              }}
               className="w-full text-white/30 hover:text-white/60 text-sm transition-colors py-1"
             >
               ← Back to sign in
@@ -207,7 +276,10 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
 
 function TwoFactorPanel({ token }: { token: string }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [setupData, setSetupData] = useState<{ secret: string; uri: string } | null>(null);
+  const [setupData, setSetupData] = useState<{
+    secret: string;
+    uri: string;
+  } | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -215,15 +287,24 @@ function TwoFactorPanel({ token }: { token: string }) {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/totp/status", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/auth/totp/status", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then((d) => setEnabled(d.enabled ?? false))
       .catch(() => setEnabled(false));
   }, [token]);
 
   useEffect(() => {
-    if (!setupData?.uri) { setQrDataUrl(null); return; }
-    QRCode.toDataURL(setupData.uri, { margin: 2, width: 200, errorCorrectionLevel: "M" })
+    if (!setupData?.uri) {
+      setQrDataUrl(null);
+      return;
+    }
+    QRCode.toDataURL(setupData.uri, {
+      margin: 2,
+      width: 200,
+      errorCorrectionLevel: "M",
+    })
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
   }, [setupData?.uri]);
@@ -252,15 +333,23 @@ function TwoFactorPanel({ token }: { token: string }) {
     try {
       const res = await fetch("/api/auth/totp/enable", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ secret: setupData.secret, code }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to enable"); return; }
+      if (!res.ok) {
+        setError(data.error || "Failed to enable");
+        return;
+      }
       setEnabled(true);
       setSetupData(null);
       setCode("");
-      setSuccess("Two-factor authentication is now enabled. You'll need your authenticator app on every login.");
+      setSuccess(
+        "Two-factor authentication is now enabled. You'll need your authenticator app on every login.",
+      );
     } finally {
       setLoading(false);
     }
@@ -272,11 +361,17 @@ function TwoFactorPanel({ token }: { token: string }) {
     try {
       const res = await fetch("/api/auth/totp/disable", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ code }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to disable"); return; }
+      if (!res.ok) {
+        setError(data.error || "Failed to disable");
+        return;
+      }
       setEnabled(false);
       setCode("");
       setSuccess("Two-factor authentication has been disabled.");
@@ -292,8 +387,12 @@ function TwoFactorPanel({ token }: { token: string }) {
           <Shield className="w-5 h-5 text-[#00E676]" />
         </div>
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Two-Factor Authentication</h2>
-          <p className="text-white/40 text-sm">Add an extra layer of security to your admin account</p>
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            Two-Factor Authentication
+          </h2>
+          <p className="text-white/40 text-sm">
+            Add an extra layer of security to your admin account
+          </p>
         </div>
       </div>
 
@@ -304,9 +403,7 @@ function TwoFactorPanel({ token }: { token: string }) {
         </div>
       )}
 
-      {enabled === null && (
-        <p className="text-white/30 text-sm">Loading...</p>
-      )}
+      {enabled === null && <p className="text-white/30 text-sm">Loading...</p>}
 
       {enabled === true && !setupData && (
         <div className="space-y-4">
@@ -316,20 +413,28 @@ function TwoFactorPanel({ token }: { token: string }) {
             </div>
             <div>
               <p className="text-white font-medium text-sm">2FA is active</p>
-              <p className="text-white/40 text-xs mt-0.5">Your account requires an authenticator code on every login</p>
+              <p className="text-white/40 text-xs mt-0.5">
+                Your account requires an authenticator code on every login
+              </p>
             </div>
           </div>
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
-            <p className="text-white/60 text-sm">To disable 2FA, enter a valid code from your authenticator app:</p>
+            <p className="text-white/60 text-sm">
+              To disable 2FA, enter a valid code from your authenticator app:
+            </p>
             <input
               type="text"
               inputMode="numeric"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) =>
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               placeholder="000000"
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-red-500/50 transition-colors"
             />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {error && (
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            )}
             <button
               onClick={handleDisable}
               disabled={code.length !== 6 || loading}
@@ -346,8 +451,13 @@ function TwoFactorPanel({ token }: { token: string }) {
           <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-white font-medium text-sm">2FA is not enabled</p>
-              <p className="text-white/40 text-xs mt-1">Your account is protected by password only. Enabling 2FA significantly reduces the risk of unauthorized access.</p>
+              <p className="text-white font-medium text-sm">
+                2FA is not enabled
+              </p>
+              <p className="text-white/40 text-xs mt-1">
+                Your account is protected by password only. Enabling 2FA
+                significantly reduces the risk of unauthorized access.
+              </p>
             </div>
           </div>
           <button
@@ -364,8 +474,12 @@ function TwoFactorPanel({ token }: { token: string }) {
         <div className="space-y-4">
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
             <div>
-              <p className="text-white font-medium text-sm mb-1">1. Scan this QR code with your authenticator app</p>
-              <p className="text-white/40 text-xs">Use Google Authenticator, Authy, or any TOTP-compatible app</p>
+              <p className="text-white font-medium text-sm mb-1">
+                1. Scan this QR code with your authenticator app
+              </p>
+              <p className="text-white/40 text-xs">
+                Use Google Authenticator, Authy, or any TOTP-compatible app
+              </p>
             </div>
             <div className="flex justify-center">
               {qrDataUrl ? (
@@ -383,7 +497,9 @@ function TwoFactorPanel({ token }: { token: string }) {
               )}
             </div>
             <div>
-              <p className="text-white/40 text-xs mb-1.5">Can't scan? Enter this key manually in your app:</p>
+              <p className="text-white/40 text-xs mb-1.5">
+                Can't scan? Enter this key manually in your app:
+              </p>
               <div className="bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2.5 font-mono text-xs text-white/70 break-all select-all tracking-wider">
                 {setupData.secret}
               </div>
@@ -391,20 +507,30 @@ function TwoFactorPanel({ token }: { token: string }) {
           </div>
 
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
-            <p className="text-white font-medium text-sm">2. Enter the 6-digit code from your app to confirm setup</p>
+            <p className="text-white font-medium text-sm">
+              2. Enter the 6-digit code from your app to confirm setup
+            </p>
             <input
               type="text"
               inputMode="numeric"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) =>
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               placeholder="000000"
               autoFocus
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {error && (
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => { setSetupData(null); setCode(""); setError(""); }}
+                onClick={() => {
+                  setSetupData(null);
+                  setCode("");
+                  setError("");
+                }}
                 className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
               >
                 Cancel
@@ -424,7 +550,17 @@ function TwoFactorPanel({ token }: { token: string }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: number; color: string }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  color: string;
+}) {
   return (
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-colors">
       <div className="flex items-center justify-between mb-3">
@@ -432,7 +568,9 @@ function StatCard({ icon: Icon, label, value, color }: { icon: LucideIcon; label
           <Icon className="w-5 h-5" />
         </div>
       </div>
-      <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">{value}</p>
+      <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
+        {value}
+      </p>
       <p className="text-white/40 text-sm mt-1">{label}</p>
     </div>
   );
@@ -443,7 +581,11 @@ function MiniCalendar() {
   const month = now.toLocaleString("en-US", { month: "long", year: "numeric" });
   const today = now.getDate();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysInMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+  ).getDate();
 
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
@@ -453,17 +595,27 @@ function MiniCalendar() {
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Calendar className="w-4 h-4 text-[#00E676]" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">{month}</h3>
+        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          {month}
+        </h3>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs">
-        {["S","M","T","W","T","F","S"].map((d, i) => (
-          <div key={i} className="text-white/30 font-medium py-1">{d}</div>
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <div key={i} className="text-white/30 font-medium py-1">
+            {d}
+          </div>
         ))}
         {days.map((d, i) => (
-          <div key={i} className={`py-1.5 rounded-lg transition-colors ${
-            d === today ? "bg-[#00E676] text-[#06060E] font-bold"
-              : d ? "text-white/60 hover:bg-white/[0.05] cursor-default" : ""
-          }`}>
+          <div
+            key={i}
+            className={`py-1.5 rounded-lg transition-colors ${
+              d === today
+                ? "bg-[#00E676] text-[#06060E] font-bold"
+                : d
+                  ? "text-white/60 hover:bg-white/[0.05] cursor-default"
+                  : ""
+            }`}
+          >
             {d}
           </div>
         ))}
@@ -486,14 +638,21 @@ function RemindersPanel() {
   function addReminder() {
     if (!newText.trim()) return;
     setReminders([
-      { id: Date.now().toString(), text: newText.trim(), done: false, createdAt: new Date().toISOString() },
+      {
+        id: Date.now().toString(),
+        text: newText.trim(),
+        done: false,
+        createdAt: new Date().toISOString(),
+      },
       ...reminders,
     ]);
     setNewText("");
   }
 
   function toggleReminder(id: string) {
-    setReminders(reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)));
+    setReminders(
+      reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)),
+    );
   }
 
   function deleteReminder(id: string) {
@@ -504,8 +663,12 @@ function RemindersPanel() {
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Bell className="w-4 h-4 text-amber-400" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Reminders</h3>
-        <span className="ml-auto text-white/30 text-xs">{reminders.filter((r) => !r.done).length} active</span>
+        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          Reminders
+        </h3>
+        <span className="ml-auto text-white/30 text-xs">
+          {reminders.filter((r) => !r.done).length} active
+        </span>
       </div>
       <div className="flex gap-2 mb-3">
         <input
@@ -516,26 +679,40 @@ function RemindersPanel() {
           placeholder="Add a reminder..."
           className="flex-1 bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
         />
-        <button onClick={addReminder} className="p-2 bg-[#00E676]/10 text-[#00E676] rounded-lg hover:bg-[#00E676]/20 transition-colors">
+        <button
+          onClick={addReminder}
+          className="p-2 bg-[#00E676]/10 text-[#00E676] rounded-lg hover:bg-[#00E676]/20 transition-colors"
+        >
           <Plus className="w-4 h-4" />
         </button>
       </div>
       <div className="space-y-1.5 max-h-48 overflow-y-auto">
         {reminders.length === 0 ? (
-          <p className="text-white/20 text-xs text-center py-4">No reminders yet</p>
+          <p className="text-white/20 text-xs text-center py-4">
+            No reminders yet
+          </p>
         ) : (
           reminders.map((r) => (
             <div key={r.id} className="flex items-center gap-2 group">
               <button
                 onClick={() => toggleReminder(r.id)}
                 className={`w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors ${
-                  r.done ? "bg-[#00E676]/20 border-[#00E676]/40 text-[#00E676]" : "border-white/20 hover:border-white/40"
+                  r.done
+                    ? "bg-[#00E676]/20 border-[#00E676]/40 text-[#00E676]"
+                    : "border-white/20 hover:border-white/40"
                 }`}
               >
                 {r.done && <Check className="w-3 h-3" />}
               </button>
-              <span className={`text-sm flex-1 ${r.done ? "text-white/30 line-through" : "text-white/70"}`}>{r.text}</span>
-              <button onClick={() => deleteReminder(r.id)} className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all">
+              <span
+                className={`text-sm flex-1 ${r.done ? "text-white/30 line-through" : "text-white/70"}`}
+              >
+                {r.text}
+              </span>
+              <button
+                onClick={() => deleteReminder(r.id)}
+                className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all"
+              >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -548,16 +725,38 @@ function RemindersPanel() {
 
 function QuickActions() {
   const actions = [
-    { label: "Email Support Inbox", href: "mailto:support@absustaininvest.com", icon: Mail, color: "text-blue-400" },
-    { label: "CashClip Support", href: "mailto:support@absustaininvest.com", icon: Mail, color: "text-purple-400" },
-    { label: "CashClip App", href: "https://cash-clip.app", icon: ExternalLink, color: "text-[#00E676]" },
-    { label: "AB Sustainability Site", href: "https://absustaininvest.com", icon: ExternalLink, color: "text-amber-400" },
+    {
+      label: "Email Support Inbox",
+      href: "mailto:support@absustaininvest.com",
+      icon: Mail,
+      color: "text-blue-400",
+    },
+    {
+      label: "CashClip Support",
+      href: "mailto:support@absustaininvest.com",
+      icon: Mail,
+      color: "text-purple-400",
+    },
+    {
+      label: "CashClip App",
+      href: "https://cash-clip.app",
+      icon: ExternalLink,
+      color: "text-[#00E676]",
+    },
+    {
+      label: "AB Sustainability Site",
+      href: "https://absustaininvest.com",
+      icon: ExternalLink,
+      color: "text-amber-400",
+    },
   ];
   return (
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquare className="w-4 h-4 text-blue-400" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Quick Actions</h3>
+        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          Quick Actions
+        </h3>
       </div>
       <div className="space-y-1">
         {actions.map((a) => (
@@ -569,7 +768,9 @@ function QuickActions() {
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.05] transition-colors group"
           >
             <a.icon className={`w-4 h-4 ${a.color}`} />
-            <span className="text-white/60 text-sm group-hover:text-white transition-colors flex-1">{a.label}</span>
+            <span className="text-white/60 text-sm group-hover:text-white transition-colors flex-1">
+              {a.label}
+            </span>
             <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
           </a>
         ))}
@@ -602,7 +803,9 @@ function VenturesPanel({ token }: { token: string }) {
     }
   }
 
-  useEffect(() => { fetchFiles(); }, []);
+  useEffect(() => {
+    fetchFiles();
+  }, []);
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
@@ -657,34 +860,49 @@ function VenturesPanel({ token }: { token: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Solera — Food Service Files</h2>
-          <p className="text-white/40 text-sm mt-1">Upload restaurant files, proposals, and resources for the Ventures page.</p>
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            Solera — Food Service Files
+          </h2>
+          <p className="text-white/40 text-sm mt-1">
+            Upload restaurant files, proposals, and resources for the Ventures
+            page.
+          </p>
         </div>
-        <span className="text-white/30 text-sm">{files.length} {files.length === 1 ? "file" : "files"}</span>
+        <span className="text-white/30 text-sm">
+          {files.length} {files.length === 1 ? "file" : "files"}
+        </span>
       </div>
 
       {/* Upload form */}
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-5">
           <Upload className="w-4 h-4 text-[#00E676]" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Upload New File</h3>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Upload New File
+          </h3>
         </div>
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-white/40 text-xs mb-1.5">Category</label>
+              <label className="block text-white/40 text-xs mb-1.5">
+                Category
+              </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
               >
                 {VENTURE_CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-[#06060E]">{c}</option>
+                  <option key={c} value={c} className="bg-[#06060E]">
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-white/40 text-xs mb-1.5">Description (optional)</label>
+              <label className="block text-white/40 text-xs mb-1.5">
+                Description (optional)
+              </label>
               <input
                 type="text"
                 value={description}
@@ -695,21 +913,33 @@ function VenturesPanel({ token }: { token: string }) {
             </div>
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">File (PDF, images, Excel, Word, CSV — max 50 MB)</label>
+            <label className="block text-white/40 text-xs mb-1.5">
+              File (PDF, images, Excel, Word, CSV — max 50 MB)
+            </label>
             <div
               className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-[#00E676]/30 transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
               {selectedFile ? (
                 <div className="flex items-center justify-center gap-3">
-                  <span className="text-2xl">{fileIcon(selectedFile.type)}</span>
+                  <span className="text-2xl">
+                    {fileIcon(selectedFile.type)}
+                  </span>
                   <div className="text-left">
-                    <p className="text-white text-sm font-medium">{selectedFile.name}</p>
-                    <p className="text-white/40 text-xs">{formatSize(selectedFile.size)}</p>
+                    <p className="text-white text-sm font-medium">
+                      {selectedFile.name}
+                    </p>
+                    <p className="text-white/40 text-xs">
+                      {formatSize(selectedFile.size)}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
                     className="ml-2 text-white/30 hover:text-red-400 transition-colors"
                   >
                     <X className="w-4 h-4" />
@@ -718,7 +948,9 @@ function VenturesPanel({ token }: { token: string }) {
               ) : (
                 <div>
                   <Upload className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                  <p className="text-white/40 text-sm">Click to choose a file</p>
+                  <p className="text-white/40 text-sm">
+                    Click to choose a file
+                  </p>
                   <p className="text-white/20 text-xs mt-1">or drag and drop</p>
                 </div>
               )}
@@ -757,45 +989,78 @@ function VenturesPanel({ token }: { token: string }) {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[0.06]">
           <FileText className="w-4 h-4 text-white/40" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Uploaded Files</h3>
-          <button onClick={fetchFiles} className="ml-auto text-white/30 hover:text-white transition-colors">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Uploaded Files
+          </h3>
+          <button
+            onClick={fetchFiles}
+            className="ml-auto text-white/30 hover:text-white transition-colors"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
         {loading ? (
-          <div className="text-center py-12 text-white/30 text-sm">Loading files...</div>
+          <div className="text-center py-12 text-white/30 text-sm">
+            Loading files...
+          </div>
         ) : files.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="w-10 h-10 text-white/10 mx-auto mb-3" />
             <p className="text-white/30 text-sm">No files uploaded yet</p>
-            <p className="text-white/20 text-xs mt-1">Use the form above to upload your first file</p>
+            <p className="text-white/20 text-xs mt-1">
+              Use the form above to upload your first file
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
             {Object.entries(byCategory).map(([cat, catFiles]) => (
               <div key={cat}>
                 <div className="px-5 py-2 bg-white/[0.02]">
-                  <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">{cat}</span>
+                  <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+                    {cat}
+                  </span>
                 </div>
                 {catFiles.map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] transition-colors group">
-                    <span className="text-xl flex-shrink-0">{fileIcon(f.mimeType)}</span>
+                  <div
+                    key={f.id}
+                    className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] transition-colors group"
+                  >
+                    <span className="text-xl flex-shrink-0">
+                      {fileIcon(f.mimeType)}
+                    </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">{f.originalName}</p>
+                      <p className="text-white text-sm font-medium truncate">
+                        {f.originalName}
+                      </p>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-white/30 text-xs">{formatSize(f.size)}</span>
-                        {f.description && <span className="text-white/30 text-xs truncate">• {f.description}</span>}
+                        <span className="text-white/30 text-xs">
+                          {formatSize(f.size)}
+                        </span>
+                        {f.description && (
+                          <span className="text-white/30 text-xs truncate">
+                            • {f.description}
+                          </span>
+                        )}
                         <span className="text-white/20 text-xs">
-                          {new Date(f.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {new Date(f.uploadedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={async () => {
-                          const res = await fetch(`/api/ventures/files/${f.id}`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                          });
+                          const res = await fetch(
+                            `/api/ventures/files/${f.id}`,
+                            {
+                              headers: { Authorization: `Bearer ${token}` },
+                            },
+                          );
                           if (!res.ok) return;
                           const blob = await res.blob();
                           const url = URL.createObjectURL(blob);
@@ -871,14 +1136,22 @@ function AccountingPanel() {
     { label: "SPF", value: "include:zohomail.com ~all", status: "Configured" },
     { label: "DKIM", value: "default._domainkey", status: "Configured" },
     { label: "DMARC", value: "p=reject; pct=100", status: "Configured" },
-    { label: "Solera Subdomain", value: "solera-restaurant.absustaininvest.com", status: "Active" },
+    {
+      label: "Solera Subdomain",
+      value: "solera-restaurant.absustaininvest.com",
+      status: "Active",
+    },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Accounting & Business Tools</h2>
-        <p className="text-white/40 text-sm mt-1">Zoho suite for AB Sustainability Investments LLC — EIN 39-2640135</p>
+        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          Accounting & Business Tools
+        </h2>
+        <p className="text-white/40 text-sm mt-1">
+          Zoho suite for AB Sustainability Investments LLC — EIN 39-2640135
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -895,7 +1168,9 @@ function AccountingPanel() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-['Space_Grotesk'] font-bold text-white text-sm">{item.label}</span>
+                <span className="font-['Space_Grotesk'] font-bold text-white text-sm">
+                  {item.label}
+                </span>
                 <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-white/40 transition-colors" />
               </div>
               <p className="text-white/40 text-xs mt-0.5">{item.description}</p>
@@ -907,15 +1182,24 @@ function AccountingPanel() {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[0.06]">
           <Calculator className="w-4 h-4 text-[#00E676]" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Domain & Email Configuration</h3>
-          <span className="ml-auto text-[#00E676] text-xs font-medium">All systems active</span>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Domain & Email Configuration
+          </h3>
+          <span className="ml-auto text-[#00E676] text-xs font-medium">
+            All systems active
+          </span>
         </div>
         <div className="divide-y divide-white/[0.04]">
           {domainConfig.map((row) => (
-            <div key={row.label} className="flex items-center justify-between px-5 py-3.5">
+            <div
+              key={row.label}
+              className="flex items-center justify-between px-5 py-3.5"
+            >
               <div>
                 <span className="text-white/60 text-sm">{row.label}</span>
-                <p className="text-white/30 text-xs mt-0.5 font-mono">{row.value}</p>
+                <p className="text-white/30 text-xs mt-0.5 font-mono">
+                  {row.value}
+                </p>
               </div>
               <span className="text-[#00E676] text-xs font-semibold bg-[#00E676]/10 px-2.5 py-1 rounded-full border border-[#00E676]/20">
                 {row.status}
@@ -928,11 +1212,16 @@ function AccountingPanel() {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Layers className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Entity Information</h3>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Entity Information
+          </h3>
         </div>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { label: "Entity Name", value: "AB Sustainability Investments LLC" },
+            {
+              label: "Entity Name",
+              value: "AB Sustainability Investments LLC",
+            },
             { label: "EIN", value: "39-2640135" },
             { label: "State", value: "Georgia, USA" },
             { label: "D-U-N-S", value: "Certified" },
@@ -941,7 +1230,9 @@ function AccountingPanel() {
           ].map((item) => (
             <div key={item.label}>
               <p className="text-white/30 text-xs">{item.label}</p>
-              <p className="text-white text-sm font-medium mt-0.5">{item.value}</p>
+              <p className="text-white text-sm font-medium mt-0.5">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
@@ -952,8 +1243,13 @@ function AccountingPanel() {
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.87a8.16 8.16 0 0 0 4.78 1.52V7a4.85 4.85 0 0 1-1.01-.31z"/>
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.87a8.16 8.16 0 0 0 4.78 1.52V7a4.85 4.85 0 0 1-1.01-.31z" />
     </svg>
   );
 }
@@ -988,7 +1284,8 @@ function IntegrationsPanel() {
       handle: "ab-sustainability-investments",
       followers: "Building",
       status: "Live",
-      profileUrl: "https://www.linkedin.com/company/ab-sustainability-investments",
+      profileUrl:
+        "https://www.linkedin.com/company/ab-sustainability-investments",
       dashboardUrl: "https://www.linkedin.com/analytics/",
       analyticsUrl: "https://www.linkedin.com/analytics/",
       color: "text-blue-400",
@@ -1119,7 +1416,8 @@ What we're building:
   const mgmtTools = [
     {
       name: "Buffer",
-      description: "Schedule posts to LinkedIn, Instagram, Facebook, TikTok at once",
+      description:
+        "Schedule posts to LinkedIn, Instagram, Facebook, TikTok at once",
       href: "https://buffer.com",
       icon: Share2,
       color: "text-[#00E676]",
@@ -1127,7 +1425,8 @@ What we're building:
     },
     {
       name: "Meta Business Suite",
-      description: "Manage Facebook + Instagram posts, ads, and analytics together",
+      description:
+        "Manage Facebook + Instagram posts, ads, and analytics together",
       href: "https://business.facebook.com",
       icon: Facebook,
       color: "text-blue-400",
@@ -1160,20 +1459,32 @@ What we're building:
   return (
     <div className="space-y-10">
       <div>
-        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Integrations & Hubs</h2>
-        <p className="text-white/40 text-sm mt-1">Every platform you need to run AB Sustainability Investments — in one place.</p>
+        <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          Integrations & Hubs
+        </h2>
+        <p className="text-white/40 text-sm mt-1">
+          Every platform you need to run AB Sustainability Investments — in one
+          place.
+        </p>
       </div>
 
       {/* ── Social Media Hub ── */}
       <section>
         <div className="flex items-center gap-2 mb-5">
           <Share2 className="w-4 h-4 text-pink-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white">Social Media Hub</h3>
-          <span className="ml-auto text-white/30 text-xs">3 live • 1 needs rebrand • 1 planned</span>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white">
+            Social Media Hub
+          </h3>
+          <span className="ml-auto text-white/30 text-xs">
+            3 live • 1 needs rebrand • 1 planned
+          </span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {socials.map((s) => (
-            <div key={s.name} className={`rounded-2xl border bg-white/[0.02] p-5 space-y-4`}>
+            <div
+              key={s.name}
+              className={`rounded-2xl border bg-white/[0.02] p-5 space-y-4`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-xl border ${s.bg}`}>
@@ -1184,15 +1495,21 @@ What we're building:
                     )}
                   </div>
                   <div>
-                    <p className="font-['Space_Grotesk'] font-bold text-white text-sm">{s.name}</p>
+                    <p className="font-['Space_Grotesk'] font-bold text-white text-sm">
+                      {s.name}
+                    </p>
                     <p className="text-white/40 text-xs">{s.handle}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {s.followers && (
-                    <span className="text-white/30 text-xs hidden sm:block">{s.followers} followers</span>
+                    <span className="text-white/30 text-xs hidden sm:block">
+                      {s.followers} followers
+                    </span>
                   )}
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor[s.status]}`}>
+                  <span
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor[s.status]}`}
+                  >
                     {s.status}
                   </span>
                 </div>
@@ -1200,16 +1517,24 @@ What we're building:
 
               {/* Bio copy block */}
               <div className="bg-white/[0.03] rounded-xl border border-white/[0.06] p-3 relative group">
-                <p className="text-white/50 text-xs leading-relaxed whitespace-pre-line line-clamp-4">{s.bio}</p>
+                <p className="text-white/50 text-xs leading-relaxed whitespace-pre-line line-clamp-4">
+                  {s.bio}
+                </p>
                 <button
                   onClick={() => copyToClipboard(s.name, s.bio)}
                   className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/[0.05] text-white/30 hover:text-white hover:bg-white/[0.1] transition-colors"
                   title="Copy bio"
                 >
-                  {copied === s.name ? <Check className="w-3 h-3 text-[#00E676]" /> : <Copy className="w-3 h-3" />}
+                  {copied === s.name ? (
+                    <Check className="w-3 h-3 text-[#00E676]" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
                 </button>
                 {copied === s.name && (
-                  <span className="absolute bottom-2 right-2 text-[#00E676] text-[10px] font-medium">Copied!</span>
+                  <span className="absolute bottom-2 right-2 text-[#00E676] text-[10px] font-medium">
+                    Copied!
+                  </span>
                 )}
               </div>
 
@@ -1237,7 +1562,11 @@ What we're building:
                   onClick={() => copyToClipboard(`btn-${s.name}`, s.bio)}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-white/60 hover:text-white transition-colors ml-auto"
                 >
-                  {copied === `btn-${s.name}` ? <Check className="w-3 h-3 text-[#00E676]" /> : <Copy className="w-3 h-3" />}
+                  {copied === `btn-${s.name}` ? (
+                    <Check className="w-3 h-3 text-[#00E676]" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
                   {copied === `btn-${s.name}` ? "Copied!" : "Copy Bio"}
                 </button>
               </div>
@@ -1250,7 +1579,9 @@ What we're building:
       <section>
         <div className="flex items-center gap-2 mb-5">
           <Smartphone className="w-4 h-4 text-blue-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white">App Distribution Hub</h3>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white">
+            App Distribution Hub
+          </h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {appHubs.map((item) => (
@@ -1261,18 +1592,26 @@ What we're building:
               rel="noopener noreferrer"
               className="flex items-start gap-4 p-4 rounded-2xl border bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
             >
-              <div className={`p-2.5 rounded-xl border ${item.bg} flex-shrink-0`}>
+              <div
+                className={`p-2.5 rounded-xl border ${item.bg} flex-shrink-0`}
+              >
                 <item.icon className={`w-4 h-4 ${item.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-['Space_Grotesk'] font-bold text-white text-sm">{item.name}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.bg} ${item.color}`}>
+                  <span className="font-['Space_Grotesk'] font-bold text-white text-sm">
+                    {item.name}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.bg} ${item.color}`}
+                  >
                     {item.badge}
                   </span>
                   <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-white/40 ml-auto flex-shrink-0" />
                 </div>
-                <p className="text-white/40 text-xs mt-0.5">{item.description}</p>
+                <p className="text-white/40 text-xs mt-0.5">
+                  {item.description}
+                </p>
               </div>
             </a>
           ))}
@@ -1283,7 +1622,9 @@ What we're building:
       <section>
         <div className="flex items-center gap-2 mb-5">
           <ShoppingCart className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white">Business Procurement</h3>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white">
+            Business Procurement
+          </h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <a
@@ -1297,13 +1638,29 @@ What we're building:
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-['Space_Grotesk'] font-bold text-white">Amazon Business</span>
+                <span className="font-['Space_Grotesk'] font-bold text-white">
+                  Amazon Business
+                </span>
                 <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-amber-400 transition-colors" />
               </div>
-              <p className="text-white/40 text-xs mt-1">B2B purchasing for Solera restaurant supplies, office equipment, and business essentials. Tax-exempt purchasing, bulk pricing, and business analytics.</p>
+              <p className="text-white/40 text-xs mt-1">
+                B2B purchasing for Solera restaurant supplies, office equipment,
+                and business essentials. Tax-exempt purchasing, bulk pricing,
+                and business analytics.
+              </p>
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {["Restaurant Supplies", "Office", "Technology", "Tax-Exempt"].map((tag) => (
-                  <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">{tag}</span>
+                {[
+                  "Restaurant Supplies",
+                  "Office",
+                  "Technology",
+                  "Tax-Exempt",
+                ].map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium"
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
             </div>
@@ -1319,13 +1676,24 @@ What we're building:
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-['Space_Grotesk'] font-bold text-white">Costco Business Delivery</span>
+                <span className="font-['Space_Grotesk'] font-bold text-white">
+                  Costco Business Delivery
+                </span>
                 <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-white/40 transition-colors" />
               </div>
-              <p className="text-white/40 text-xs mt-1">Wholesale bulk purchasing for food service — ideal for Solera restaurant operations. No membership required for business delivery.</p>
+              <p className="text-white/40 text-xs mt-1">
+                Wholesale bulk purchasing for food service — ideal for Solera
+                restaurant operations. No membership required for business
+                delivery.
+              </p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {["Food Service", "Bulk", "Wholesale", "Solera"].map((tag) => (
-                  <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.1] text-white/40 font-medium">{tag}</span>
+                  <span
+                    key={tag}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.1] text-white/40 font-medium"
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
             </div>
@@ -1341,14 +1709,27 @@ What we're building:
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-['Space_Grotesk'] font-bold text-white">Sam's Club Business</span>
+                <span className="font-['Space_Grotesk'] font-bold text-white">
+                  Sam's Club Business
+                </span>
                 <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-blue-400 transition-colors" />
               </div>
-              <p className="text-white/40 text-xs mt-1">Membership-based wholesale for business supplies, food service inventory, and bulk essentials. Competitive pricing on high-volume purchases.</p>
+              <p className="text-white/40 text-xs mt-1">
+                Membership-based wholesale for business supplies, food service
+                inventory, and bulk essentials. Competitive pricing on
+                high-volume purchases.
+              </p>
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {["Wholesale", "Bulk", "Food Service", "Membership"].map((tag) => (
-                  <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium">{tag}</span>
-                ))}
+                {["Wholesale", "Bulk", "Food Service", "Membership"].map(
+                  (tag) => (
+                    <span
+                      key={tag}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium"
+                    >
+                      {tag}
+                    </span>
+                  ),
+                )}
               </div>
             </div>
           </a>
@@ -1359,8 +1740,12 @@ What we're building:
       <section>
         <div className="flex items-center gap-2 mb-5">
           <Globe className="w-4 h-4 text-[#00E676]" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white">Cross-Platform Management</h3>
-          <span className="ml-auto text-white/30 text-xs">Post everywhere from one place</span>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white">
+            Cross-Platform Management
+          </h3>
+          <span className="ml-auto text-white/30 text-xs">
+            Post everywhere from one place
+          </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {mgmtTools.map((tool) => (
@@ -1371,15 +1756,21 @@ What we're building:
               rel="noopener noreferrer"
               className="flex items-center gap-4 p-4 rounded-2xl border bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
             >
-              <div className={`p-2.5 rounded-xl border ${tool.bg} flex-shrink-0`}>
+              <div
+                className={`p-2.5 rounded-xl border ${tool.bg} flex-shrink-0`}
+              >
                 <tool.icon className={`w-4 h-4 ${tool.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-['Space_Grotesk'] font-bold text-white text-sm">{tool.name}</span>
+                  <span className="font-['Space_Grotesk'] font-bold text-white text-sm">
+                    {tool.name}
+                  </span>
                   <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-white/40 ml-auto flex-shrink-0" />
                 </div>
-                <p className="text-white/40 text-xs mt-0.5">{tool.description}</p>
+                <p className="text-white/40 text-xs mt-0.5">
+                  {tool.description}
+                </p>
               </div>
             </a>
           ))}
@@ -1415,7 +1806,10 @@ function ChangePasswordPanel({ token }: { token: string }) {
     try {
       const res = await fetch("/api/auth/change-password", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       const data = await res.json();
@@ -1438,15 +1832,21 @@ function ChangePasswordPanel({ token }: { token: string }) {
           <KeyRound className="w-5 h-5 text-[#00E676]" />
         </div>
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Change Password</h2>
-          <p className="text-white/40 text-sm">Update your admin account password</p>
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            Change Password
+          </h2>
+          <p className="text-white/40 text-sm">
+            Update your admin account password
+          </p>
         </div>
       </div>
 
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">Current Password</label>
+            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+              Current Password
+            </label>
             <div className="relative">
               <input
                 type={showCurrent ? "text" : "password"}
@@ -1461,13 +1861,19 @@ function ChangePasswordPanel({ token }: { token: string }) {
                 onClick={() => setShowCurrent(!showCurrent)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showCurrent ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">New Password</label>
+            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+              New Password
+            </label>
             <div className="relative">
               <input
                 type={showNew ? "text" : "password"}
@@ -1482,13 +1888,19 @@ function ChangePasswordPanel({ token }: { token: string }) {
                 onClick={() => setShowNew(!showNew)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showNew ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">Confirm New Password</label>
+            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+              Confirm New Password
+            </label>
             <input
               type="password"
               value={confirmPassword}
@@ -1514,7 +1926,9 @@ function ChangePasswordPanel({ token }: { token: string }) {
 
           <button
             type="submit"
-            disabled={loading || !currentPassword || !newPassword || !confirmPassword}
+            disabled={
+              loading || !currentPassword || !newPassword || !confirmPassword
+            }
             className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40"
           >
             {loading ? "Updating..." : "Update Password"}
@@ -1539,12 +1953,27 @@ interface InboxMessage {
   category: "corporate" | "app" | "pr" | "support" | "other";
 }
 
-const INBOX_CATEGORIES: { id: InboxMessage["category"] | "all"; label: string; icon: LucideIcon; color: string }[] = [
-  { id: "all",       label: "All",       icon: Inbox,      color: "text-white" },
-  { id: "corporate", label: "Corporate", icon: Building2,  color: "text-blue-400" },
-  { id: "app",       label: "CashClip",  icon: Smartphone, color: "text-[#00E676]" },
-  { id: "pr",        label: "PR",        icon: Megaphone,  color: "text-pink-400" },
-  { id: "support",   label: "Support",   icon: Headphones, color: "text-amber-400" },
+const INBOX_CATEGORIES: {
+  id: InboxMessage["category"] | "all";
+  label: string;
+  icon: LucideIcon;
+  color: string;
+}[] = [
+  { id: "all", label: "All", icon: Inbox, color: "text-white" },
+  {
+    id: "corporate",
+    label: "Corporate",
+    icon: Building2,
+    color: "text-blue-400",
+  },
+  { id: "app", label: "CashClip", icon: Smartphone, color: "text-[#00E676]" },
+  { id: "pr", label: "PR", icon: Megaphone, color: "text-pink-400" },
+  {
+    id: "support",
+    label: "Support",
+    icon: Headphones,
+    color: "text-amber-400",
+  },
 ];
 
 function timeAgoShort(dateStr: string) {
@@ -1561,7 +1990,9 @@ function InboxPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<InboxMessage["category"] | "all">("all");
+  const [activeCategory, setActiveCategory] = useState<
+    InboxMessage["category"] | "all"
+  >("all");
   const [selected, setSelected] = useState<InboxMessage | null>(null);
 
   const fetchMessages = useCallback(async () => {
@@ -1585,23 +2016,29 @@ function InboxPanel({ token }: { token: string }) {
     }
   }, [token]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
-  const filtered = activeCategory === "all"
-    ? messages
-    : messages.filter((m) => m.category === activeCategory);
+  const filtered =
+    activeCategory === "all"
+      ? messages
+      : messages.filter((m) => m.category === activeCategory);
 
   const counts = INBOX_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
-    acc[cat.id] = cat.id === "all" ? messages.length : messages.filter((m) => m.category === cat.id).length;
+    acc[cat.id] =
+      cat.id === "all"
+        ? messages.length
+        : messages.filter((m) => m.category === cat.id).length;
     return acc;
   }, {});
 
   const catColor: Record<InboxMessage["category"], string> = {
     corporate: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    app:       "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20",
-    pr:        "text-pink-400 bg-pink-500/10 border-pink-500/20",
-    support:   "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    other:     "text-white/40 bg-white/5 border-white/10",
+    app: "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20",
+    pr: "text-pink-400 bg-pink-500/10 border-pink-500/20",
+    support: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    other: "text-white/40 bg-white/5 border-white/10",
   };
 
   const catLabel: Record<InboxMessage["category"], string> = {
@@ -1616,7 +2053,9 @@ function InboxPanel({ token }: { token: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Unified Inbox</h2>
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            Unified Inbox
+          </h2>
           <p className="text-white/40 text-sm mt-0.5">
             All inboxes — one view.
             {fetchedAt && (
@@ -1631,7 +2070,9 @@ function InboxPanel({ token }: { token: string }) {
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+          />
           {loading ? "Syncing…" : "Sync Now"}
         </button>
       </div>
@@ -1644,7 +2085,10 @@ function InboxPanel({ token }: { token: string }) {
           return (
             <button
               key={cat.id}
-              onClick={() => { setActiveCategory(cat.id); setSelected(null); }}
+              onClick={() => {
+                setActiveCategory(cat.id);
+                setSelected(null);
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 active
                   ? "bg-white/[0.08] text-white"
@@ -1653,9 +2097,13 @@ function InboxPanel({ token }: { token: string }) {
             >
               <Icon className={`w-3.5 h-3.5 ${active ? cat.color : ""}`} />
               {cat.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
-                active ? "bg-white/10 text-white" : "bg-white/[0.05] text-white/30"
-              }`}>
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                  active
+                    ? "bg-white/10 text-white"
+                    : "bg-white/[0.05] text-white/30"
+                }`}
+              >
                 {counts[cat.id] ?? 0}
               </span>
             </button>
@@ -1676,38 +2124,52 @@ function InboxPanel({ token }: { token: string }) {
           <p className="text-white/40 text-sm">Connecting to mail server…</p>
         </div>
       ) : (
-        <div className={`grid gap-4 ${selected ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
+        <div
+          className={`grid gap-4 ${selected ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}
+        >
           {/* Message list */}
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="text-center py-16">
                 <Inbox className="w-10 h-10 text-white/10 mx-auto mb-3" />
-                <p className="text-white/30 text-sm">No messages in this inbox</p>
+                <p className="text-white/30 text-sm">
+                  No messages in this inbox
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-white/[0.04] max-h-[600px] overflow-y-auto">
                 {filtered.map((msg) => (
                   <button
                     key={msg.uid}
-                    onClick={() => setSelected(selected?.uid === msg.uid ? null : msg)}
+                    onClick={() =>
+                      setSelected(selected?.uid === msg.uid ? null : msg)
+                    }
                     className={`w-full text-left flex items-start gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors ${
                       selected?.uid === msg.uid ? "bg-white/[0.06]" : ""
                     }`}
                   >
                     <div className="flex-shrink-0 mt-0.5">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                        msg.category === "corporate" ? "bg-blue-500/15 text-blue-400" :
-                        msg.category === "app"       ? "bg-[#00E676]/15 text-[#00E676]" :
-                        msg.category === "pr"        ? "bg-pink-500/15 text-pink-400" :
-                        msg.category === "support"   ? "bg-amber-500/15 text-amber-400" :
-                                                       "bg-white/10 text-white/40"
-                      }`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                          msg.category === "corporate"
+                            ? "bg-blue-500/15 text-blue-400"
+                            : msg.category === "app"
+                              ? "bg-[#00E676]/15 text-[#00E676]"
+                              : msg.category === "pr"
+                                ? "bg-pink-500/15 text-pink-400"
+                                : msg.category === "support"
+                                  ? "bg-amber-500/15 text-amber-400"
+                                  : "bg-white/10 text-white/40"
+                        }`}
+                      >
                         {(msg.from[0] ?? "?").toUpperCase()}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`text-sm font-semibold truncate ${msg.seen ? "text-white/60" : "text-white"}`}>
+                        <span
+                          className={`text-sm font-semibold truncate ${msg.seen ? "text-white/60" : "text-white"}`}
+                        >
                           {msg.from}
                         </span>
                         {!msg.seen && (
@@ -1717,12 +2179,18 @@ function InboxPanel({ token }: { token: string }) {
                           {timeAgoShort(msg.date)}
                         </span>
                       </div>
-                      <p className={`text-sm truncate mb-1 ${msg.seen ? "text-white/40" : "text-white/80 font-medium"}`}>
+                      <p
+                        className={`text-sm truncate mb-1 ${msg.seen ? "text-white/40" : "text-white/80 font-medium"}`}
+                      >
                         {msg.subject}
                       </p>
                       <div className="flex items-center gap-2">
-                        <p className="text-white/25 text-xs truncate">{msg.preview}</p>
-                        <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${catColor[msg.category]}`}>
+                        <p className="text-white/25 text-xs truncate">
+                          {msg.preview}
+                        </p>
+                        <span
+                          className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${catColor[msg.category]}`}
+                        >
                           {catLabel[msg.category]}
                         </span>
                       </div>
@@ -1738,11 +2206,18 @@ function InboxPanel({ token }: { token: string }) {
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catColor[selected.category]}`}>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catColor[selected.category]}`}
+                  >
                     {catLabel[selected.category]}
                   </span>
                   <span className="text-white/30 text-xs">
-                    {new Date(selected.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    {new Date(selected.date).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </div>
                 <button
@@ -1831,7 +2306,11 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [resetPwdMap, setResetPwdMap] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState<CashClipUser | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
-  const [limitConfig, setLimitConfig] = useState({ maxWithdrawal: "7", minBalance: "5", dailyLimit: "7" });
+  const [limitConfig, setLimitConfig] = useState({
+    maxWithdrawal: "7",
+    minBalance: "5",
+    dailyLimit: "7",
+  });
   const [savingLimits, setSavingLimits] = useState(false);
 
   const PAGE_SIZE = 25;
@@ -1841,28 +2320,35 @@ function CashClipUsersPanel({ token }: { token: string }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchUsers = useCallback(async (searchTerm: string, pageNum: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
-        offset: String(pageNum * PAGE_SIZE),
-        ...(searchTerm ? { search: searchTerm } : {}),
-      });
-      const res = await fetch(`/api/admin/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Failed to fetch users");
-      const data = await res.json();
-      setUsers(data.users ?? []);
-      setTotal(data.total ?? 0);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  const fetchUsers = useCallback(
+    async (searchTerm: string, pageNum: number) => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          limit: String(PAGE_SIZE),
+          offset: String(pageNum * PAGE_SIZE),
+          ...(searchTerm ? { search: searchTerm } : {}),
+        });
+        const res = await fetch(`/api/admin/users?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed to fetch users");
+        const data = await res.json();
+        setUsers(data.users ?? []);
+        setTotal(data.total ?? 0);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token],
+  );
 
-  useEffect(() => { fetchUsers(search, page); }, [search, page, fetchUsers]);
+  useEffect(() => {
+    fetchUsers(search, page);
+  }, [search, page, fetchUsers]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -1872,17 +2358,27 @@ function CashClipUsersPanel({ token }: { token: string }) {
 
   async function handleResetPassword(u: CashClipUser) {
     const pwd = resetPwdMap[u.id] ?? "";
-    if (pwd.length < 8) { showToast("Password must be at least 8 characters", false); return; }
+    if (pwd.length < 8) {
+      showToast("Password must be at least 8 characters", false);
+      return;
+    }
     setActionLoading(`reset-${u.id}`);
     try {
       const res = await fetch(`/api/admin/users/${u.id}/reset-password`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ newPassword: pwd }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
-      setResetPwdMap((prev) => { const n = { ...prev }; delete n[u.id]; return n; });
+      setResetPwdMap((prev) => {
+        const n = { ...prev };
+        delete n[u.id];
+        return n;
+      });
       showToast(`Password reset for ${u.username}`);
     } catch (err: any) {
       showToast(err.message, false);
@@ -1912,13 +2408,23 @@ function CashClipUsersPanel({ token }: { token: string }) {
 
   async function handleZeroBalance(u: CashClipUser) {
     const diff = -Number(u.balance);
-    if (diff === 0) { showToast("Balance is already $0.00", false); return; }
+    if (diff === 0) {
+      showToast("Balance is already $0.00", false);
+      return;
+    }
     setActionLoading(`zero-${u.id}`);
     try {
       const res = await fetch(`/api/admin/credit`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ username: u.username, amount: diff, note: "Admin balance correction" }),
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: u.username,
+          amount: diff,
+          note: "Admin balance correction",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
@@ -1933,7 +2439,11 @@ function CashClipUsersPanel({ token }: { token: string }) {
 
   function fmt(dateStr: string | null) {
     if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   function fmtDob(dob: string | null) {
@@ -1941,9 +2451,13 @@ function CashClipUsersPanel({ token }: { token: string }) {
     try {
       const d = new Date(dob);
       if (isNaN(d.getTime())) return dob;
-      const age = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      const age = Math.floor(
+        (Date.now() - d.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+      );
       return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} (${age} yrs)`;
-    } catch { return dob; }
+    } catch {
+      return dob;
+    }
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -1952,8 +2466,14 @@ function CashClipUsersPanel({ token }: { token: string }) {
     <div className="space-y-6">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#06060E]" : "bg-red-500 text-white"}`}>
-          {toast.ok ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#06060E]" : "bg-red-500 text-white"}`}
+        >
+          {toast.ok ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <AlertCircle className="w-4 h-4" />
+          )}
           {toast.msg}
         </div>
       )}
@@ -1962,14 +2482,30 @@ function CashClipUsersPanel({ token }: { token: string }) {
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
           <div className="bg-[#111118] border border-white/10 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">Delete User?</h3>
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Delete User?
+            </h3>
             <p className="text-white/50 text-sm mb-1">
-              This will permanently delete <span className="text-white font-semibold">{confirmDelete.username}</span> and all their data — earnings, transactions, and withdrawals.
+              This will permanently delete{" "}
+              <span className="text-white font-semibold">
+                {confirmDelete.username}
+              </span>{" "}
+              and all their data — earnings, transactions, and withdrawals.
             </p>
             <p className="text-red-400 text-xs mb-6">This cannot be undone.</p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors">Cancel</button>
-              <button onClick={() => handleDelete(confirmDelete)} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors">Delete</button>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete)}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -1980,7 +2516,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
           <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-[#00E676]" /> CashClip Users
           </h2>
-          <p className="text-white/40 text-sm mt-1">{total} total registered users</p>
+          <p className="text-white/40 text-sm mt-1">
+            {total} total registered users
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <form onSubmit={handleSearch} className="flex items-center gap-2">
@@ -1991,14 +2529,30 @@ function CashClipUsersPanel({ token }: { token: string }) {
               placeholder="Search by username or email…"
               className="bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 w-64 transition-colors"
             />
-            <button type="submit" className="px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-sm hover:bg-[#00E676]/20 transition-colors">Search</button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-sm hover:bg-[#00E676]/20 transition-colors"
+            >
+              Search
+            </button>
             {search && (
-              <button type="button" onClick={() => { setSearch(""); setSearchInput(""); setPage(0); }} className="text-white/30 hover:text-white transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setSearchInput("");
+                  setPage(0);
+                }}
+                className="text-white/30 hover:text-white transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             )}
           </form>
-          <button onClick={() => fetchUsers(search, page)} className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors">
+          <button
+            onClick={() => fetchUsers(search, page)}
+            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+          >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -2008,34 +2562,50 @@ function CashClipUsersPanel({ token }: { token: string }) {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">Withdrawal Limits</h3>
-          <span className="text-white/30 text-xs ml-auto">Enforced server-side at withdrawal request time</span>
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Withdrawal Limits
+          </h3>
+          <span className="text-white/30 text-xs ml-auto">
+            Enforced server-side at withdrawal request time
+          </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">Max single withdrawal ($)</label>
+            <label className="block text-white/40 text-xs mb-1.5">
+              Max single withdrawal ($)
+            </label>
             <input
               type="number"
               value={limitConfig.maxWithdrawal}
-              onChange={(e) => setLimitConfig((p) => ({ ...p, maxWithdrawal: e.target.value }))}
+              onChange={(e) =>
+                setLimitConfig((p) => ({ ...p, maxWithdrawal: e.target.value }))
+              }
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">Min balance to withdraw ($)</label>
+            <label className="block text-white/40 text-xs mb-1.5">
+              Min balance to withdraw ($)
+            </label>
             <input
               type="number"
               value={limitConfig.minBalance}
-              onChange={(e) => setLimitConfig((p) => ({ ...p, minBalance: e.target.value }))}
+              onChange={(e) =>
+                setLimitConfig((p) => ({ ...p, minBalance: e.target.value }))
+              }
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">Max per-user daily earnings ($)</label>
+            <label className="block text-white/40 text-xs mb-1.5">
+              Max per-user daily earnings ($)
+            </label>
             <input
               type="number"
               value={limitConfig.dailyLimit}
-              onChange={(e) => setLimitConfig((p) => ({ ...p, dailyLimit: e.target.value }))}
+              onChange={(e) =>
+                setLimitConfig((p) => ({ ...p, dailyLimit: e.target.value }))
+              }
               className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
           </div>
@@ -2053,13 +2623,16 @@ function CashClipUsersPanel({ token }: { token: string }) {
           >
             {savingLimits ? "Saving…" : "Save Limits"}
           </button>
-          <p className="text-white/20 text-xs">These values will be enforced when users request withdrawals.</p>
+          <p className="text-white/20 text-xs">
+            These values will be enforced when users request withdrawals.
+          </p>
         </div>
       </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
         </div>
       )}
 
@@ -2076,11 +2649,15 @@ function CashClipUsersPanel({ token }: { token: string }) {
           <span></span>
         </div>
         {loading ? (
-          <div className="text-center py-16 text-white/30 text-sm">Loading users…</div>
+          <div className="text-center py-16 text-white/30 text-sm">
+            Loading users…
+          </div>
         ) : users.length === 0 ? (
           <div className="text-center py-16">
             <Users className="w-10 h-10 text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">{search ? "No users match your search" : "No users yet"}</p>
+            <p className="text-white/30 text-sm">
+              {search ? "No users match your search" : "No users yet"}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
@@ -2088,42 +2665,68 @@ function CashClipUsersPanel({ token }: { token: string }) {
               <div key={u.id}>
                 <div
                   className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors cursor-pointer"
-                  onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}
+                  onClick={() =>
+                    setExpandedId(expandedId === u.id ? null : u.id)
+                  }
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-[#00E676]/10 border border-[#00E676]/20 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[#00E676] font-bold text-xs">{u.username.charAt(0).toUpperCase()}</span>
+                      <span className="text-[#00E676] font-bold text-xs">
+                        {u.username.charAt(0).toUpperCase()}
+                      </span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold truncate">{u.username}</p>
+                      <p className="text-white text-sm font-semibold truncate">
+                        {u.username}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {u.role === "admin" && (
-                          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded px-1.5 py-0.5 font-bold">ADMIN</span>
+                          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded px-1.5 py-0.5 font-bold">
+                            ADMIN
+                          </span>
                         )}
                         {u.profileComplete ? (
-                          <span className="text-[10px] bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 rounded px-1.5 py-0.5">Verified</span>
+                          <span className="text-[10px] bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 rounded px-1.5 py-0.5">
+                            Verified
+                          </span>
                         ) : (
-                          <span className="text-[10px] bg-white/[0.05] text-white/30 border border-white/10 rounded px-1.5 py-0.5">Incomplete</span>
+                          <span className="text-[10px] bg-white/[0.05] text-white/30 border border-white/10 rounded px-1.5 py-0.5">
+                            Incomplete
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="min-w-0">
                     {u.email ? (
-                      <a href={`mailto:${u.email}`} onClick={(e) => e.stopPropagation()} className="text-[#00E676]/80 hover:text-[#00E676] text-xs truncate block transition-colors">
+                      <a
+                        href={`mailto:${u.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#00E676]/80 hover:text-[#00E676] text-xs truncate block transition-colors"
+                      >
                         {u.email}
                       </a>
                     ) : (
                       <span className="text-white/20 text-xs">—</span>
                     )}
                   </div>
-                  <span className={`text-sm font-bold ${Number(u.balance) > 0 ? "text-[#00E676]" : "text-white/40"}`}>
+                  <span
+                    className={`text-sm font-bold ${Number(u.balance) > 0 ? "text-[#00E676]" : "text-white/40"}`}
+                  >
                     ${Number(u.balance).toFixed(2)}
                   </span>
-                  <span className="text-white/60 text-sm">${Number(u.totalEarned).toFixed(2)}</span>
-                  <span className="text-white/50 text-xs">{u.country ?? "—"}</span>
-                  <span className="text-white/30 text-xs">{fmt(u.createdAt)}</span>
-                  <ChevronRight className={`w-4 h-4 text-white/20 transition-transform ${expandedId === u.id ? "rotate-90" : ""}`} />
+                  <span className="text-white/60 text-sm">
+                    ${Number(u.totalEarned).toFixed(2)}
+                  </span>
+                  <span className="text-white/50 text-xs">
+                    {u.country ?? "—"}
+                  </span>
+                  <span className="text-white/30 text-xs">
+                    {fmt(u.createdAt)}
+                  </span>
+                  <ChevronRight
+                    className={`w-4 h-4 text-white/20 transition-transform ${expandedId === u.id ? "rotate-90" : ""}`}
+                  />
                 </div>
 
                 {expandedId === u.id && (
@@ -2132,21 +2735,37 @@ function CashClipUsersPanel({ token }: { token: string }) {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 mb-5 mt-3">
                       {[
                         { label: "User ID", value: u.id },
-                        { label: "Date of Birth", value: fmtDob(u.dateOfBirth) },
+                        {
+                          label: "Date of Birth",
+                          value: fmtDob(u.dateOfBirth),
+                        },
                         { label: "Gender", value: u.gender ?? "—" },
                         { label: "Zip Code", value: u.zipCode ?? "—" },
                         { label: "Country", value: u.country ?? "—" },
-                        { label: "Employment", value: u.employmentStatus ?? "—" },
-                        { label: "Household Income", value: u.householdIncome ?? "—" },
+                        {
+                          label: "Employment",
+                          value: u.employmentStatus ?? "—",
+                        },
+                        {
+                          label: "Household Income",
+                          value: u.householdIncome ?? "—",
+                        },
                         { label: "Education", value: u.educationLevel ?? "—" },
                         { label: "Ethnicity", value: u.ethnicity ?? "—" },
                         { label: "Referred By", value: u.referredBy ?? "—" },
-                        { label: "Profile Complete", value: u.profileComplete ? "Yes" : "No" },
+                        {
+                          label: "Profile Complete",
+                          value: u.profileComplete ? "Yes" : "No",
+                        },
                         { label: "Role", value: u.role },
                       ].map(({ label, value }) => (
                         <div key={label}>
-                          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-0.5">{label}</p>
-                          <p className="text-white/80 text-xs font-medium break-all">{value}</p>
+                          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-0.5">
+                            {label}
+                          </p>
+                          <p className="text-white/80 text-xs font-medium break-all">
+                            {value}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -2157,30 +2776,50 @@ function CashClipUsersPanel({ token }: { token: string }) {
                         <input
                           type="password"
                           value={resetPwdMap[u.id] ?? ""}
-                          onChange={(e) => setResetPwdMap((p) => ({ ...p, [u.id]: e.target.value }))}
+                          onChange={(e) =>
+                            setResetPwdMap((p) => ({
+                              ...p,
+                              [u.id]: e.target.value,
+                            }))
+                          }
                           placeholder="New password (min 8 chars)"
                           onClick={(e) => e.stopPropagation()}
                           className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
                         />
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleResetPassword(u); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetPassword(u);
+                          }}
                           disabled={actionLoading === `reset-${u.id}`}
                           className="px-3 py-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
-                          {actionLoading === `reset-${u.id}` ? "…" : "Reset Password"}
+                          {actionLoading === `reset-${u.id}`
+                            ? "…"
+                            : "Reset Password"}
                         </button>
                       </div>
                       {u.role !== "admin" && (
                         <>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleZeroBalance(u); }}
-                            disabled={!!actionLoading || Number(u.balance) === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleZeroBalance(u);
+                            }}
+                            disabled={
+                              !!actionLoading || Number(u.balance) === 0
+                            }
                             className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-medium hover:bg-amber-500/20 transition-colors disabled:opacity-40 whitespace-nowrap"
                           >
-                            {actionLoading === `zero-${u.id}` ? "…" : "Zero Balance"}
+                            {actionLoading === `zero-${u.id}`
+                              ? "…"
+                              : "Zero Balance"}
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); setConfirmDelete(u); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDelete(u);
+                            }}
                             disabled={!!actionLoading}
                             className="px-3 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-40 whitespace-nowrap flex items-center gap-1.5"
                           >
@@ -2200,7 +2839,8 @@ function CashClipUsersPanel({ token }: { token: string }) {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.06]">
             <span className="text-white/30 text-xs">
-              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+              Showing {page * PAGE_SIZE + 1}–
+              {Math.min((page + 1) * PAGE_SIZE, total)} of {total}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -2211,7 +2851,14 @@ function CashClipUsersPanel({ token }: { token: string }) {
                 ← Prev
               </button>
               {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                const p = totalPages <= 7 ? i : page < 4 ? i : page > totalPages - 4 ? totalPages - 7 + i : page - 3 + i;
+                const p =
+                  totalPages <= 7
+                    ? i
+                    : page < 4
+                      ? i
+                      : page > totalPages - 4
+                        ? totalPages - 7 + i
+                        : page - 3 + i;
                 return (
                   <button
                     key={p}
@@ -2237,9 +2884,23 @@ function CashClipUsersPanel({ token }: { token: string }) {
   );
 }
 
-type Tab = "submissions" | "ventures" | "accounting" | "integrations" | "inbox" | "account" | "cashclip" | "security";
+type Tab =
+  | "submissions"
+  | "ventures"
+  | "accounting"
+  | "integrations"
+  | "inbox"
+  | "account"
+  | "cashclip"
+  | "security";
 
-function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
+function Dashboard({
+  token,
+  onLogout,
+}: {
+  token: string;
+  onLogout: () => void;
+}) {
   const [tab, setTab] = useState<Tab>("submissions");
 
   const loggedInAs = (() => {
@@ -2260,8 +2921,13 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     setError("");
     try {
       const url = filter === "all" ? "/api/leads" : `/api/leads?type=${filter}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401 || res.status === 403) { onLogout(); return; }
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        onLogout();
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch");
       setLeads(await res.json());
     } catch (err: any) {
@@ -2271,11 +2937,17 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     }
   }
 
-  useEffect(() => { if (tab === "submissions") fetchLeads(); }, [filter, tab]);
+  useEffect(() => {
+    if (tab === "submissions") fetchLeads();
+  }, [filter, tab]);
 
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   }
 
@@ -2290,7 +2962,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   const investorCount = leads.filter((l) => l.type === "investor").length;
   const contactCount = leads.filter((l) => l.type === "contact").length;
-  const recentCount = leads.filter((l) => Date.now() - new Date(l.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
+  const recentCount = leads.filter(
+    (l) =>
+      Date.now() - new Date(l.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000,
+  ).length;
 
   const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "submissions", label: "Submissions", icon: MessageSquare },
@@ -2308,17 +2983,33 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       <header className="border-b border-white/[0.06] px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}logo-full.png`} alt="AB Sustainability" className="h-8 rounded" />
+            <img
+              src={`${import.meta.env.BASE_URL}logo-full.png`}
+              alt="AB Sustainability"
+              className="h-8 rounded"
+            />
             <div>
-              <span className="font-['Space_Grotesk'] font-bold text-lg block leading-tight">Admin Dashboard</span>
-              <span className="text-white/30 text-xs">AB Sustainability Investments</span>
+              <span className="font-['Space_Grotesk'] font-bold text-lg block leading-tight">
+                Admin Dashboard
+              </span>
+              <span className="text-white/30 text-xs">
+                AB Sustainability Investments
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-white/30 text-xs hidden sm:block">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
             </span>
-            <button onClick={onLogout} className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm">
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm"
+            >
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
           </div>
@@ -2346,17 +3037,42 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         {tab === "submissions" && (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <StatCard icon={TrendingUp} label="Total Submissions" value={leads.length} color="bg-[#00E676]/10 text-[#00E676]" />
-              <StatCard icon={Users} label="Investors" value={investorCount} color="bg-emerald-500/10 text-emerald-400" />
-              <StatCard icon={MessageSquare} label="Contacts" value={contactCount} color="bg-blue-500/10 text-blue-400" />
-              <StatCard icon={Clock} label="This Week" value={recentCount} color="bg-amber-500/10 text-amber-400" />
+              <StatCard
+                icon={TrendingUp}
+                label="Total Submissions"
+                value={leads.length}
+                color="bg-[#00E676]/10 text-[#00E676]"
+              />
+              <StatCard
+                icon={Users}
+                label="Investors"
+                value={investorCount}
+                color="bg-emerald-500/10 text-emerald-400"
+              />
+              <StatCard
+                icon={MessageSquare}
+                label="Contacts"
+                value={contactCount}
+                color="bg-blue-500/10 text-blue-400"
+              />
+              <StatCard
+                icon={Clock}
+                label="This Week"
+                value={recentCount}
+                color="bg-amber-500/10 text-amber-400"
+              />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
                   <div>
-                    <h2 className="font-['Space_Grotesk'] text-xl font-bold">Submissions</h2>
-                    <p className="text-white/40 text-sm mt-0.5">{leads.length} total {filter !== "all" ? filter : ""} submissions</p>
+                    <h2 className="font-['Space_Grotesk'] text-xl font-bold">
+                      Submissions
+                    </h2>
+                    <p className="text-white/40 text-sm mt-0.5">
+                      {leads.length} total {filter !== "all" ? filter : ""}{" "}
+                      submissions
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-xl p-1">
@@ -2365,53 +3081,82 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                           key={f}
                           onClick={() => setFilter(f)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                            filter === f ? "bg-[#00E676] text-[#06060E]" : "text-white/50 hover:text-white"
+                            filter === f
+                              ? "bg-[#00E676] text-[#06060E]"
+                              : "text-white/50 hover:text-white"
                           }`}
                         >
-                          {f === "all" ? "All" : f === "investor" ? "Investors" : "Contacts"}
+                          {f === "all"
+                            ? "All"
+                            : f === "investor"
+                              ? "Investors"
+                              : "Contacts"}
                         </button>
                       ))}
                     </div>
-                    <button onClick={fetchLeads} className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors">
-                      <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                    <button
+                      onClick={fetchLeads}
+                      className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                      />
                     </button>
                   </div>
                 </div>
                 {error && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4 text-red-400 text-sm">{error}</div>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4 text-red-400 text-sm">
+                    {error}
+                  </div>
                 )}
                 <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
                   {loading ? (
-                    <div className="text-center py-16 text-white/30">Loading submissions...</div>
+                    <div className="text-center py-16 text-white/30">
+                      Loading submissions...
+                    </div>
                   ) : leads.length === 0 ? (
                     <div className="text-center py-16">
                       <Filter className="w-10 h-10 text-white/10 mx-auto mb-3" />
-                      <p className="text-white/30 text-sm">No submissions yet</p>
-                      <p className="text-white/20 text-xs mt-1">Submissions from your website forms will appear here</p>
+                      <p className="text-white/30 text-sm">
+                        No submissions yet
+                      </p>
+                      <p className="text-white/20 text-xs mt-1">
+                        Submissions from your website forms will appear here
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y divide-white/[0.04]">
                       {leads.map((lead) => (
-                        <div key={lead.id} className="px-5 py-4 hover:bg-white/[0.02] transition-colors">
+                        <div
+                          key={lead.id}
+                          className="px-5 py-4 hover:bg-white/[0.02] transition-colors"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                  lead.type === "investor"
-                                    ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
-                                    : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                }`}>
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                    lead.type === "investor"
+                                      ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
+                                      : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  }`}
+                                >
                                   <Tag className="w-2.5 h-2.5" />
                                   {lead.type}
                                 </span>
-                                <span className="text-white/20 text-[10px]">{lead.source}</span>
+                                <span className="text-white/20 text-[10px]">
+                                  {lead.source}
+                                </span>
                               </div>
                               <div className="flex items-center gap-3 flex-wrap">
                                 <span className="flex items-center gap-1.5 text-white font-medium text-sm">
                                   <User className="w-3.5 h-3.5 text-white/30" />
                                   {lead.name}
                                 </span>
-                                <a href={`mailto:${encodeURIComponent(lead.email)}`} className="flex items-center gap-1.5 text-[#00E676] hover:underline text-xs">
+                                <a
+                                  href={`mailto:${encodeURIComponent(lead.email)}`}
+                                  className="flex items-center gap-1.5 text-[#00E676] hover:underline text-xs"
+                                >
                                   <Mail className="w-3.5 h-3.5" />
                                   {lead.email}
                                 </a>
@@ -2423,8 +3168,12 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                               )}
                             </div>
                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                              <span className="text-white/20 text-[10px]">{timeAgo(lead.createdAt)}</span>
-                              <span className="text-white/15 text-[10px]">{formatDate(lead.createdAt)}</span>
+                              <span className="text-white/20 text-[10px]">
+                                {timeAgo(lead.createdAt)}
+                              </span>
+                              <span className="text-white/15 text-[10px]">
+                                {formatDate(lead.createdAt)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -2454,13 +3203,21 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 <User className="w-5 h-5 text-[#00E676]" />
               </div>
               <div>
-                <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">Account</h2>
-                <p className="text-white/40 text-sm">Manage your admin credentials</p>
+                <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+                  Account
+                </h2>
+                <p className="text-white/40 text-sm">
+                  Manage your admin credentials
+                </p>
               </div>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Signed in as</p>
-              <p className="text-white font-medium text-sm">{loggedInAs ?? "Admin"}</p>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">
+                Signed in as
+              </p>
+              <p className="text-white font-medium text-sm">
+                {loggedInAs ?? "Admin"}
+              </p>
             </div>
             <ChangePasswordPanel token={token} />
           </div>
