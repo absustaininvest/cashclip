@@ -253,32 +253,41 @@ export default function RegisterScreen() {
           )}
 
           {/* Terms checkbox */}
-          <View style={styles.termsRow}>
+          <View style={styles.termsRow} testID="register-terms">
             <Pressable
               onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
-              testID="register-terms"
               hitSlop={8}
             >
               <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
                 {agreedToTerms && <Feather name="check" size={12} color="#0A0A0F" />}
               </View>
             </Pressable>
-            <Text style={styles.termsText}>
-              I agree to the{" "}
+            <View style={styles.termsLabelRow}>
+              <Text
+                style={styles.termsLabelText}
+                onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
+              >
+                {"I agree to the "}
+              </Text>
               <Text
                 style={styles.termsLink}
                 onPress={() => Linking.openURL("https://absustaininvest.com/cashclip/terms")}
               >
                 Terms of Service
               </Text>
-              {" "}and{" "}
+              <Text
+                style={styles.termsLabelText}
+                onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
+              >
+                {" and "}
+              </Text>
               <Text
                 style={styles.termsLink}
                 onPress={() => Linking.openURL("https://absustaininvest.com/cashclip/privacy")}
               >
                 Privacy Policy
               </Text>
-            </Text>
+            </View>
           </View>
 
           {/* Submit */}
@@ -353,8 +362,9 @@ const styles = StyleSheet.create({
   termsRow:           { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 6, marginBottom: 14 },
   checkbox:           { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
   checkboxChecked:    { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  termsText:          { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, flex: 1, lineHeight: 20 },
-  termsLink:          { fontFamily: "Outfit_600SemiBold", color: Colors.primary },
+  termsLabelRow:      { flex: 1, flexDirection: "row", flexWrap: "wrap", alignItems: "baseline" },
+  termsLabelText:     { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
+  termsLink:          { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.primary, lineHeight: 20 },
 
   primaryBtn:         { borderRadius: 14, overflow: "hidden" },
   primaryBtnGradient: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14 },
