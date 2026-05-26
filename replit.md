@@ -16,6 +16,7 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `ADMIN_TOKEN` | Admin console token — signs session cookies and gates operator routes |
 | `SEED_PASSWORD_CASHCLIP` | Seeds `jorge.ballen@cash-clip.app` password on startup (independent per-account) |
 | `SEED_PASSWORD_SUPPORT` | Seeds `support@absustaininvest.com` password on startup (independent per-account) |
+| `SEED_PASSWORD_HINT` | Reserved seed password slot (not yet wired to an account) |
 | `SEED_ADMIN_PASSWORD` | Seeds reserved admin accounts on API startup |
 | `SECRETS_PASSPHRASE` | High-privilege gate for rotating integration keys via API |
 | `DATABASE_URL` | PostgreSQL connection string |
