@@ -7,7 +7,7 @@
     "prepare": "git config core.hooksPath scripts/git-hooks 2>/dev/null || true",
     "check-public-archives": "pnpm --filter @workspace/scripts run check-public-archives",
     "check-signing-md-sync": "pnpm --filter @workspace/scripts run check-signing-md-sync",
-    "build": "pnpm run check-public-archives && pnpm run typecheck:deploy && pnpm -r --if-present run build",
+    "build": "pnpm run check-public-archives && pnpm run typecheck:deploy && BASE_PATH=/ pnpm --filter @workspace/absustain run build && pnpm --filter @workspace/api-server run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "typecheck:deploy": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck",

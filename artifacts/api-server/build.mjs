@@ -125,6 +125,15 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     path.resolve(distDir, "templates"),
     { recursive: true, force: true }
   );
+
+  // Copy absustain static site (built with BASE_PATH=/) for host-based routing
+  const absustainSrc = path.resolve(artifactDir, "../absustain/dist/public");
+  try {
+    await cp(absustainSrc, path.resolve(distDir, "absustain-static"), { recursive: true, force: true });
+    console.log("Copied absustain static site into dist/absustain-static");
+  } catch {
+    console.warn("absustain dist not found — skipping copy (run absustain build first)");
+  }
 }
 
 buildAll().catch((err) => {

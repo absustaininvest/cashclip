@@ -202,6 +202,30 @@ const privacyHtml = loadTemplate("privacy-page.html");
 const supportHtml = loadTemplate("support-page.html");
 const surveyDoneHtml = loadTemplate("survey-done.html");
 
+// ── HOST-BASED ROUTING: absustaininvest.com → corporate site ─────────────────
+// When the request hostname matches the corporate domain, serve the absustain
+// React+Vite SPA (built with BASE_PATH=/) as a static site with SPA fallback.
+// All other hostnames continue to the API + CashClip routes below.
+const ABSUSTAIN_HOSTS = new Set(["absustaininvest.com", "www.absustaininvest.com"]);
+const absustainStaticDir = path.resolve(import.meta.dirname ?? __dirname, "absustain-static");
+
+if (fs.existsSync(absustainStaticDir)) {
+  const serveAbsustainStatic = express.static(absustainStaticDir, { index: false });
+  app.use((req, res, next) => {
+    if (!ABSUSTAIN_HOSTS.has(req.hostname)) return next();
+    serveAbsustainStatic(req, res, () => {
+      const indexPath = path.join(absustainStaticDir, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        next();
+      }
+    });
+  });
+} else {
+  logger.warn("absustain-static dir not found — corporate site will not be served (run build first)");
+}
+
 if (landingHtml) {
   app.get("/api", (_req, res) => {
     res.type("html").send(landingHtml);
