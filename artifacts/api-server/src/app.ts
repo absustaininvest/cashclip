@@ -213,6 +213,8 @@ if (fs.existsSync(absustainStaticDir)) {
   const serveAbsustainStatic = express.static(absustainStaticDir, { index: false });
   app.use((req, res, next) => {
     if (!ABSUSTAIN_HOSTS.has(req.hostname)) return next();
+    // Let /api/* and /survey-done pass through to the API router
+    if (req.path.startsWith("/api") || req.path.startsWith("/survey-done")) return next();
     serveAbsustainStatic(req, res, () => {
       const indexPath = path.join(absustainStaticDir, "index.html");
       if (fs.existsSync(indexPath)) {
