@@ -27,7 +27,10 @@ interface Props {
 async function getTrackingStatus(): Promise<string> {
   try {
     const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
-    const { status } = await getTrackingPermissionsAsync();
+    const timeout = new Promise<{ status: string }>((resolve) =>
+      setTimeout(() => resolve({ status: "unavailable" }), 3000),
+    );
+    const { status } = await Promise.race([getTrackingPermissionsAsync(), timeout]);
     return status;
   } catch {
     return "unavailable";

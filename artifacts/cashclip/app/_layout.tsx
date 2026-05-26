@@ -105,12 +105,13 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     Outfit_700Bold,
   });
+  const [consentReady, setConsentReady] = React.useState(false);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && consentReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, consentReady]);
 
   useEffect(() => {
     startAdAnalyticsFlush();
@@ -131,8 +132,10 @@ export default function RootLayout() {
                   {/* TrackingConsentGate shows Apple-style pre-permission screens
                       first, fires the ATT prompt, then AdsConsent — fully
                       serialized. Only after the user taps Continue does AdMob
-                      initialize. Applies on all builds (dev + production). */}
+                      initialize. Splash screen is held until consent resolves
+                      to prevent a blank-screen flash on launch. */}
                   <TrackingConsentGate onConsentDone={() => {
+                    setConsentReady(true);
                     initializeAdMob().then((initialized) => {
                       if (initialized) preloadRewardedAd();
                     });
