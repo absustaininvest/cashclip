@@ -151,9 +151,11 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
   if (nativeAdRef.current) {
     const { NativeAdView } = require("react-native-google-mobile-ads");
     return (
-      <NativeAdView nativeAd={nativeAdRef.current} style={{ width: CARD_WIDTH }}>
-        <Pressable onPress={onPress}>{CardContent}</Pressable>
-      </NativeAdView>
+      <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
+        <NativeAdView nativeAd={nativeAdRef.current} style={{ flex: 1 }}>
+          {CardContent}
+        </NativeAdView>
+      </Pressable>
     );
   }
 
