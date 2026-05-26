@@ -24,8 +24,8 @@ const ALLOWED_ORIGINS = [
 
 // ── COOKIE SESSION SECRET (ADMIN_TOKEN) ──────────────────────────────────────
 // ADMIN_TOKEN signs the sid cookie envelope. JWT_ACCESS_SECRET validates the token inside.
-const INVECE_SECRET = process.env.ADMIN_TOKEN ?? "";
-if (!INVECE_SECRET) {
+const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN ?? "";
+if (!ADMIN_TOKEN_SECRET) {
   logger.warn("ADMIN_TOKEN not set — signed cookie session layer is disabled");
 }
 
@@ -64,7 +64,7 @@ app.use(
   }),
 );
 
-app.use(cookieParser(INVECE_SECRET || undefined));
+app.use(cookieParser(ADMIN_TOKEN_SECRET || undefined));
 
 // ── MAINTENANCE MODE ─────────────────────────────────────────────────────────
 // Set MAINTENANCE_MODE=1 to take the API offline for the public.

@@ -2038,7 +2038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // the HTML body — not just read Set-Cookie from response headers.
       const { randomBytes: _rnd, createHmac: _hmacR } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
-      // bodyToken = HMAC-SHA256(nonce+":btok", JWT_TRIDENTE) — server-derivable
+      // bodyToken = HMAC-SHA256(nonce+":btok", JWT_ACCESS_SECRET) — server-derivable
       // for verification at /ack without storing an extra DB column.
       const bodyToken = _hmacR("sha256", _jwtSecret)
         .update(witnessNonce + ":btok")
@@ -2196,7 +2196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Step 2: Present the HMAC ack token to /c. The server validates the
-  // signature (requires JWT_TRIDENTE) — it cannot be forged from anything
+  // signature (requires JWT_ACCESS_SECRET) — it cannot be forged from anything
   // visible in the /r response headers or body.
   function sendCompletion(ackToken,retryDelayMs){
     if(retryDelayMs>0){setTimeout(function(){sendCompletion(ackToken,0);},retryDelayMs);return;}
@@ -2251,7 +2251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *    is opaque to JavaScript (HttpOnly); the browser sends it automatically.
    *  - /ack validates: (1) cookie matches DB nonce, (2) IP+UA binding,
    *    (3) dwell time elapsed. On success it returns an HMAC-SHA256 token
-   *    signed with JWT_TRIDENTE — unforgeable without the server secret.
+   *    signed with JWT_ACCESS_SECRET — unforgeable without the server secret.
    *  - An attacker who reads cc_w from the Set-Cookie response header of /r
    *    can craft a Cookie header and call /ack, but still cannot forge the
    *    ackToken itself and faces IP+UA binding on both /ack and /c.
@@ -2347,7 +2347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Issue HMAC-signed ack token bound to this token + nonce.
-      // Requires JWT_TRIDENTE — cannot be forged from anything in /r response headers or body.
+      // Requires JWT_ACCESS_SECRET — cannot be forged from anything in /r response headers or body.
       const ackToken = _hmacA("sha256", ackSecret)
         .update(token + ":" + attempt.witnessNonce)
         .digest("hex");
@@ -2411,9 +2411,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ── HMAC ack token verification (DB-persisted nonce, single-use) ────────
       // /r/:token stored a random witnessNonce in the DB and set it as an
       // HttpOnly cookie. /ack/:token validated the cookie + IP/UA and returned
-      // an HMAC-SHA256(token:nonce, JWT_TRIDENTE) ack token. Here we:
+      // an HMAC-SHA256(token:nonce, JWT_ACCESS_SECRET) ack token. Here we:
       //   1. Require a non-empty ?ack= query parameter.
-      //   2. Re-derive the expected HMAC from the DB nonce (JWT_TRIDENTE needed).
+      //   2. Re-derive the expected HMAC from the DB nonce (JWT_ACCESS_SECRET needed).
       //   3. Compare with timingSafeEqual — cannot be forged without the secret.
       // The nonce is cleared on the witnessedAt update below (single-use).
       // The raw nonce is NEVER accepted here — /c only accepts the HMAC proof.

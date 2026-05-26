@@ -58,13 +58,13 @@ let app: Express;
 
 beforeAll(async () => {
   const TEST_SECRET = "test-jwt-secret-for-auth-tests-padded-to-64-chars-minimum-aabbccdd";
-  // Pin JWT_TRIDENTE so the module uses the test secret (not a real Replit env value).
-  process.env["JWT_TRIDENTE"] = TEST_SECRET;
+  // Pin JWT_ACCESS_SECRET so the module uses the test secret (not a real Replit env value).
+  process.env["JWT_ACCESS_SECRET"] = TEST_SECRET;
   process.env["JWT_SECRET"] = TEST_SECRET;
   // Clear cookie-signing secrets so login doesn't attempt signed cookies
   // (the test app has no cookie-parser middleware).
-  delete process.env["INVECE"];
-  delete process.env["RIPRENDERE"];
+  delete process.env["ADMIN_TOKEN"];
+  delete process.env["JWT_REFRESH_SECRET"];
   process.env["DATABASE_URL"] ??= "postgres://test:test@127.0.0.1:5432/test";
 
   vi.resetModules();

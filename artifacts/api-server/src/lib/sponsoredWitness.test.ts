@@ -137,9 +137,8 @@ const OTHER_TOKEN  = "b".repeat(64);
 let app: Express;
 
 beforeAll(async () => {
-  // Pin both JWT env vars to the test secret so the HMAC sig matches regardless
-  // of which env var the server code prefers (JWT_TRIDENTE ?? JWT_SECRET).
-  process.env.JWT_TRIDENTE    = TEST_JWT_SECRET;
+  // Pin JWT_ACCESS_SECRET to the test secret so the HMAC sig matches.
+  process.env.JWT_ACCESS_SECRET = TEST_JWT_SECRET;
   process.env.JWT_SECRET      = TEST_JWT_SECRET;
   process.env.DATABASE_URL  ??= "postgres://test:test@127.0.0.1:5432/test";
   process.env.MIN_SPONSORED_VISIT_MS = "0"; // disable dwell-time gate for tests

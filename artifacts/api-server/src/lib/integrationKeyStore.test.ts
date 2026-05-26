@@ -14,7 +14,7 @@ const ENV_KEYS = [
 let tmpDir: string;
 let filePath: string;
 const originalJwt = process.env["JWT_SECRET"];
-const originalTridente = process.env["JWT_TRIDENTE"];
+const originalAccessSecret = process.env["JWT_ACCESS_SECRET"];
 const originalPath = process.env["INTEGRATION_KEYS_PATH"];
 
 async function loadStore(): Promise<Store> {
@@ -26,8 +26,8 @@ beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), "intkey-test-"));
   filePath = join(tmpDir, "keys.enc.json");
   process.env["INTEGRATION_KEYS_PATH"] = filePath;
-  // Clear JWT_TRIDENTE so tests control the encryption secret via JWT_SECRET alone.
-  delete process.env["JWT_TRIDENTE"];
+  // Clear JWT_ACCESS_SECRET so tests control the encryption secret via JWT_SECRET alone.
+  delete process.env["JWT_ACCESS_SECRET"];
   process.env["JWT_SECRET"] = "test-secret-long-enough";
   for (const k of ENV_KEYS) delete process.env[k];
 });
@@ -36,8 +36,8 @@ afterEach(() => {
   for (const k of ENV_KEYS) delete process.env[k];
   if (originalJwt === undefined) delete process.env["JWT_SECRET"];
   else process.env["JWT_SECRET"] = originalJwt;
-  if (originalTridente === undefined) delete process.env["JWT_TRIDENTE"];
-  else process.env["JWT_TRIDENTE"] = originalTridente;
+  if (originalAccessSecret === undefined) delete process.env["JWT_ACCESS_SECRET"];
+  else process.env["JWT_ACCESS_SECRET"] = originalAccessSecret;
   if (originalPath === undefined) delete process.env["INTEGRATION_KEYS_PATH"];
   else process.env["INTEGRATION_KEYS_PATH"] = originalPath;
   rmSync(tmpDir, { recursive: true, force: true });

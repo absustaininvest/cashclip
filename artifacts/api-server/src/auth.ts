@@ -89,22 +89,22 @@ const TOKEN_EXPIRY = "2h";
 // Signs long-lived refresh tokens (30d) stored in the rid httpOnly cookie.
 // When the short-lived JWT (2h) expires, POST /api/auth/refresh
 // exchanges a valid rid cookie for a fresh JWT + sid cookie without re-login.
-const RIPRENDERE_SECRET = process.env.JWT_REFRESH_SECRET;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const RID_COOKIE = "rid";
 
 function generateRefreshToken(userId: string, tokenVersion: number): string | null {
-  if (!RIPRENDERE_SECRET) return null;
-  return jwt.sign({ userId, tokenVersion, type: "refresh" }, RIPRENDERE_SECRET, {
+  if (!REFRESH_SECRET) return null;
+  return jwt.sign({ userId, tokenVersion, type: "refresh" }, REFRESH_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRY,
   });
 }
 
 function verifyRefreshToken(token: string): { userId: string; tokenVersion: number } | null {
-  if (!RIPRENDERE_SECRET) return null;
+  if (!REFRESH_SECRET) return null;
   try {
-    const decoded = jwt.verify(token, RIPRENDERE_SECRET);
+    const decoded = jwt.verify(token, REFRESH_SECRET);
     if (
       typeof decoded === "object" && decoded !== null &&
       "userId" in decoded && "tokenVersion" in decoded &&
@@ -192,7 +192,7 @@ export function clearRefreshCookie(res: Response): void {
 
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
-  // Accept Bearer header first, then fall back to signed sid cookie (INVECE layer).
+  // Accept Bearer header first, then fall back to signed sid cookie (ADMIN_TOKEN layer).
   let token: string | undefined;
   if (authHeader?.startsWith("Bearer ")) {
     token = authHeader.split(" ")[1];
@@ -224,7 +224,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
 export async function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   // A valid admin Bearer JWT is always sufficient — this covers the web portal.
-  // The INVECE console-token path is for internal/programmatic access only.
+  // The ADMIN_TOKEN console-token path is for internal/programmatic access only.
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
@@ -746,7 +746,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ── POST /api/auth/refresh (RIPRENDERE layer) ─────────────────────────────
+  // ── POST /api/auth/refresh ────────────────────────────────────────────────
   // Exchanges a valid rid cookie for a new JWT + refreshed sid + rid cookies.
   // No credentials required — the signed rid cookie is the proof of identity.
   app.post("/api/auth/refresh", async (req: Request, res: Response): Promise<void> => {

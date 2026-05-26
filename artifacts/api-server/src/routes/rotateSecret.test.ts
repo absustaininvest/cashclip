@@ -28,10 +28,10 @@ beforeAll(async () => {
   const filePath = join(tmpDir, "keys.enc.json");
 
   // Point the store at a temp file and set the "old" secret.
-  // Clear JWT_TRIDENTE so the key-store uses JWT_SECRET alone (keeps test secret
+  // Clear JWT_ACCESS_SECRET so the key-store uses JWT_SECRET alone (keeps test secret
   // independent of any real Replit env value).
   process.env["INTEGRATION_KEYS_PATH"] = filePath;
-  delete process.env["JWT_TRIDENTE"];
+  delete process.env["JWT_ACCESS_SECRET"];
   process.env["JWT_SECRET"] = OLD_SECRET;
   process.env["DATABASE_URL"] ??= "postgres://test:test@127.0.0.1:5432/test";
   for (const k of ENV_KEYS) delete process.env[k];
