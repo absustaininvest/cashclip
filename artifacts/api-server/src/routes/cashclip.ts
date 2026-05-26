@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import jwt from "jsonwebtoken";
 import { getIntegrationStatuses, getIntegrationSummary, integrations } from "../integrations";
@@ -21,7 +21,9 @@ import { storage } from "../storage";
 import { updateUserProfileSchema } from "@workspace/db";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
-import { sendPayPalPayout, isPayPalConfigured } from "../paypal";
+import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
+import { logWebhookVerificationFailure } from "../lib/webhookAuth";
+import { webhookRateLimiter } from "../lib/webhookRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
@@ -1030,7 +1032,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       configured: isPayPalConfigured(),
       mode: process.env.PAYPAL_MODE || "sandbox",
+      webhookConfigured: !!(process.env.PAYPAL_WEBHOOK_ID),
     });
+  });
+
+  // PayPal Payouts webhook — receives payout status notifications from PayPal.
+  // Public endpoint (called by PayPal, not users). Verifies the signature via
+  // PayPal's /v1/notifications/verify-webhook-signature API before acting.
+  // Register this URL in PayPal Developer → CashClip Payouts app → Webhooks:
+  //   https://api.cash-clip.app/api/paypal/webhook
+  app.post("/api/paypal/webhook", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rawBody = (req as unknown as Record<string, unknown>).rawBody as Buffer | undefined;
+      if (!rawBody) {
+        res.status(400).json({ error: "Missing raw body" }); return;
+      }
+
+      const verification = await verifyPayPalWebhook(
+        req.headers as Record<string, string | string[] | undefined>,
+        rawBody,
+      );
+      if (!verification.ok) {
+        logWebhookVerificationFailure(req, "paypal", verification.reason ?? "unknown");
+        res.status(401).json({ error: "Webhook verification failed" }); return;
+      }
+
+      const event = req.body as {
+        event_type?: string;
+        resource?: {
+          payout_item?: { sender_item_id?: string };
+          sender_batch_id?: string;
+        };
+      };
+
+      const eventType = event?.event_type;
+      if (!eventType) {
+        res.status(400).json({ error: "Missing event_type" }); return;
+      }
+
+      // Derive withdrawal ID from sender_item_id (item-level events) or
+      // sender_batch_id in format "cashclip_{withdrawalId}" (batch-level).
+      let withdrawalId: string | undefined;
+      const senderItemId = event.resource?.payout_item?.sender_item_id;
+      const senderBatchId = event.resource?.sender_batch_id;
+      if (senderItemId) {
+        withdrawalId = senderItemId;
+      } else if (typeof senderBatchId === "string" && senderBatchId.startsWith("cashclip_")) {
+        withdrawalId = senderBatchId.slice("cashclip_".length);
+      }
+
+      if (!withdrawalId) {
+        res.status(200).json({ status: "ignored", reason: "no withdrawal id" }); return;
+      }
+
+      const withdrawal = await storage.getWithdrawalById(withdrawalId);
+      if (!withdrawal) {
+        res.status(200).json({ status: "ignored", reason: "withdrawal not found" }); return;
+      }
+
+      if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
+        await storage.updateWithdrawalStatusIfStatus(
+          withdrawal.id,
+          ["paying"],
+          "paid",
+          `PayPal webhook: ${eventType}`,
+        );
+        sendWithdrawalStatusUpdate({
+          toEmail: withdrawal.paypalEmail,
+          username: withdrawal.username,
+          amount: withdrawal.amount,
+          totalPayout: withdrawal.totalPayout,
+          status: "paid",
+        }).catch(() => {});
+        res.status(200).json({ status: "ok" }); return;
+      }
+
+      const FAILURE_EVENTS = new Set([
+        "PAYMENT.PAYOUTS-ITEM.FAILED",
+        "PAYMENT.PAYOUTS-ITEM.DENIED",
+        "PAYMENT.PAYOUTS-ITEM.BLOCKED",
+        "PAYMENT.PAYOUTS-ITEM.RETURNED",
+        "PAYMENT.PAYOUTS-ITEM.UNCLAIMED",
+      ]);
+
+      if (FAILURE_EVENTS.has(eventType)) {
+        const claimed = await storage.updateWithdrawalStatusIfStatus(
+          withdrawal.id,
+          ["paying"],
+          "rejected",
+          `PayPal webhook: ${eventType}`,
+        );
+        if (claimed) {
+          await storage.creditUser({
+            userId: claimed.userId,
+            amount: parseFloat(claimed.amount),
+            type: "withdrawal_refund",
+            description: `PayPal payout failed (${eventType}) — balance refunded`,
+            refId: claimed.id,
+          });
+          sendWithdrawalStatusUpdate({
+            toEmail: claimed.paypalEmail,
+            username: claimed.username,
+            amount: claimed.amount,
+            totalPayout: claimed.totalPayout,
+            status: "rejected",
+            adminNote: `PayPal payout failed: ${eventType}`,
+          }).catch(() => {});
+        }
+        res.status(200).json({ status: "ok" }); return;
+      }
+
+      res.status(200).json({ status: "ignored", reason: `unhandled event: ${eventType}` });
+    } catch (err: any) {
+      req.log?.error({ err }, "PayPal webhook processing error");
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
   });
 
   // Admin-only manual balance credit. Used for screenshots, support refunds,

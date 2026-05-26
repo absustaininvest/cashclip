@@ -173,7 +173,7 @@ app.use(
   express.json({
     limit: "64kb",
     verify: (req, _res, buf) => {
-      if (req.url?.includes("/webhook/")) {
+      if (req.url?.includes("/webhook")) {
         (req as unknown as Record<string, unknown>).rawBody = buf;
       }
     },

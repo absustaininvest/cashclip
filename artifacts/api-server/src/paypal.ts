@@ -160,3 +160,78 @@ export async function sendPayPalPayout(
 export function isPayPalConfigured(): boolean {
   return !!(process.env.PAYPAL_CLIENT_ID && getPayPalSecret());
 }
+
+export function isPayPalWebhookConfigured(): boolean {
+  return !!(process.env.PAYPAL_WEBHOOK_ID);
+}
+
+function headerStr(
+  headers: Record<string, string | string[] | undefined>,
+  name: string,
+): string | undefined {
+  const v = headers[name];
+  if (typeof v === "string") return v;
+  if (Array.isArray(v) && v.length > 0) return v[0];
+  return undefined;
+}
+
+export async function verifyPayPalWebhook(
+  headers: Record<string, string | string[] | undefined>,
+  rawBody: Buffer | string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) {
+    return { ok: false, reason: "PAYPAL_WEBHOOK_ID not configured — webhook verification disabled" };
+  }
+
+  const transmissionId = headerStr(headers, "paypal-transmission-id");
+  const transmissionTime = headerStr(headers, "paypal-transmission-time");
+  const certUrl = headerStr(headers, "paypal-cert-url");
+  const authAlgo = headerStr(headers, "paypal-auth-algo");
+  const transmissionSig = headerStr(headers, "paypal-transmission-sig");
+
+  if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
+    return { ok: false, reason: "Missing required PayPal webhook headers" };
+  }
+
+  let webhookEvent: unknown;
+  try {
+    const bodyStr = typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
+    webhookEvent = JSON.parse(bodyStr);
+  } catch {
+    return { ok: false, reason: "Invalid JSON body" };
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+    const verifyRes = await fetch(`${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        auth_algo: authAlgo,
+        cert_url: certUrl,
+        transmission_id: transmissionId,
+        transmission_sig: transmissionSig,
+        transmission_time: transmissionTime,
+        webhook_id: webhookId,
+        webhook_event: webhookEvent,
+      }),
+    });
+
+    if (!verifyRes.ok) {
+      const text = await verifyRes.text();
+      return { ok: false, reason: `PayPal verification API error: ${verifyRes.status} ${text}` };
+    }
+
+    const result = (await verifyRes.json()) as { verification_status: string };
+    if (result.verification_status === "SUCCESS") {
+      return { ok: true };
+    }
+    return { ok: false, reason: `PayPal verification_status: ${result.verification_status}` };
+  } catch (err: any) {
+    return { ok: false, reason: `PayPal verification request failed: ${err.message}` };
+  }
+}
