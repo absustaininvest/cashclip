@@ -172,11 +172,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (host === ABSUSTAIN_DOMAIN && !expoPlatform && (pathname === "/" || pathname === basePath || pathname === basePath + "/")) {
-    res.writeHead(302, { location: `https://${ABSUSTAIN_DOMAIN}/absustain/` });
-    res.end();
-    return;
-  }
 
   if (basePath && pathname.startsWith(basePath)) {
     pathname = pathname.slice(basePath.length) || "/";
