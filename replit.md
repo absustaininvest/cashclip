@@ -9,13 +9,17 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | Secret Name | Purpose |
 |-------------|---------|
 | `EXPO_TOKLAST` | Expo/EAS authentication token (used by EAS build scripts as EXPO_TOKEN) |
-| `JWT_TRIDENTE` | JWT signing secret for access tokens (HS256) |
-| `RIPRENDERE` | JWT signing secret for refresh tokens (30-day session renewal) |
-| `INVECE` | Admin console token |
-| `WORKAROUND_CASHCLIP` | Seeds `jorge.ballen@cash-clip.app` password on startup (independent per-account) |
-| `WORKAROUND_SUPPORT` | Seeds `support@absustaininvest.com` password on startup (independent per-account) |
+| `JWT_ACCESS_SECRET` | JWT signing secret for access tokens (HS256) |
+| `JWT_ACCESS_SECRET_PREV` | Previous access token secret for graceful rotation (optional) |
+| `JWT_REFRESH_SECRET` | JWT signing secret for refresh tokens (30-day session renewal) |
+| `JWT_EDDSA_KEY` | Ed25519 private key for EdDSA JWT signing (optional, falls back to HS256) |
+| `ADMIN_TOKEN` | Admin console token — signs session cookies and gates operator routes |
+| `SEED_PASSWORD_CASHCLIP` | Seeds `jorge.ballen@cash-clip.app` password on startup (independent per-account) |
+| `SEED_PASSWORD_SUPPORT` | Seeds `support@absustaininvest.com` password on startup (independent per-account) |
 | `SEED_ADMIN_PASSWORD` | Seeds reserved admin accounts on API startup |
+| `SECRETS_PASSPHRASE` | High-privilege gate for rotating integration keys via API |
 | `DATABASE_URL` | PostgreSQL connection string |
+| `ZOHO_SMTP_PASSWORD` | Zoho SMTP password for sending emails (OTPs, support) |
 | `CPX_API_KEY` | CPX Research survey integration |
 | `CPX_APP_ID` | CPX Research app ID |
 | `CPX_WEBHOOK_SECRET` | CPX Research webhook validation |
@@ -49,7 +53,7 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 ### Backend (artifacts/api-server/)
 
 - **Framework**: Express 5 + TypeScript
-- **Auth**: JWT via `JWT_TRIDENTE` secret
+- **Auth**: JWT via `JWT_ACCESS_SECRET` secret
 - **Database**: PostgreSQL via Drizzle ORM (`@workspace/db`)
 - **Production URL**: `https://cash-clip.replit.app` (Replit deployment)
 - **Production API domain (baked into EAS builds)**: `api.cash-clip.app` — add as custom domain in Replit deployment panel, then set CNAME `api.cash-clip.app` → `cash-clip.replit.app` at DNS registrar

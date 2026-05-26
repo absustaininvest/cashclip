@@ -27,7 +27,7 @@ function deriveKey(secret: string): Buffer {
 }
 
 function getSecret(): Buffer | null {
-  const secret = process.env["JWT_TRIDENTE"] ?? process.env["JWT_SECRET"];
+  const secret = process.env["JWT_ACCESS_SECRET"] ?? process.env["JWT_SECRET"];
   if (!secret || secret.length < 8) {
     return null;
   }

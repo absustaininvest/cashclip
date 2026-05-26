@@ -606,16 +606,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }); return;
     }
 
-    const newSecret = process.env["JWT_TRIDENTE"] ?? process.env["JWT_SECRET"];
+    const newSecret = process.env["JWT_ACCESS_SECRET"] ?? process.env["JWT_SECRET"];
     if (!newSecret || newSecret.length < 8) {
       res.status(500).json({
-        error: "JWT_TRIDENTE is not configured on the server — cannot derive a new encryption key",
+        error: "JWT_ACCESS_SECRET is not configured on the server — cannot derive a new encryption key",
       }); return;
     }
 
     if (oldSecret === newSecret) {
       res.status(400).json({
-        error: "oldSecret is identical to the current JWT_TRIDENTE — rotation is a no-op",
+        error: "oldSecret is identical to the current JWT_ACCESS_SECRET — rotation is a no-op",
       }); return;
     }
 
@@ -2022,11 +2022,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Fail-closed: JWT_TRIDENTE must be set. Both /ack and /c derive HMAC
+      // Fail-closed: JWT_ACCESS_SECRET must be set. Both /ack and /c derive HMAC
       // proofs from this secret; without it the entire witness chain is broken.
-      const _jwtSecret = process.env.JWT_TRIDENTE;
+      const _jwtSecret = process.env.JWT_ACCESS_SECRET;
       if (!_jwtSecret) {
-        req.log?.error?.({}, "Sponsored redirect: JWT_TRIDENTE not configured");
+        req.log?.error?.({}, "Sponsored redirect: JWT_ACCESS_SECRET not configured");
         res.status(500).send("Server configuration error"); return;
       }
 
@@ -2320,14 +2320,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(425).json({ error: "Too early — stay on the page.", retryAfterMs }); return;
       }
 
-      // Fail-closed: JWT_TRIDENTE must be set to produce valid HMAC proofs.
-      const ackSecret = process.env.JWT_TRIDENTE;
+      // Fail-closed: JWT_ACCESS_SECRET must be set to produce valid HMAC proofs.
+      const ackSecret = process.env.JWT_ACCESS_SECRET;
       if (!ackSecret) {
-        req.log?.error?.({}, "Sponsored ack: JWT_TRIDENTE not configured");
+        req.log?.error?.({}, "Sponsored ack: JWT_ACCESS_SECRET not configured");
         res.status(500).json({ error: "Server configuration error" }); return;
       }
 
-      // Validate the body token — HMAC-SHA256(witnessNonce+":btok", JWT_TRIDENTE).
+      // Validate the body token — HMAC-SHA256(witnessNonce+":btok", JWT_ACCESS_SECRET).
       // bodyToken was embedded in the /r HTML body (not in any header), so an
       // attacker who only reads Set-Cookie must also fetch+parse the HTML to get it.
       const { createHmac: _hmacA, timingSafeEqual: _tseA } = await import("crypto");
@@ -2429,9 +2429,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.status(403).send("Visit ack token required — please reopen the link"); return;
         }
         const { createHmac: _hmac, timingSafeEqual: _tse } = await import("crypto");
-        const _secret = process.env.JWT_TRIDENTE;
+        const _secret = process.env.JWT_ACCESS_SECRET;
         if (!_secret) {
-          req.log?.error?.({}, "Sponsored completion: JWT_TRIDENTE not configured");
+          req.log?.error?.({}, "Sponsored completion: JWT_ACCESS_SECRET not configured");
           res.status(500).send("Server configuration error"); return;
         }
         const expectedBuf = _hmac("sha256", _secret)

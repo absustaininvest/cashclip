@@ -22,11 +22,11 @@ const ALLOWED_ORIGINS = [
   /^https:\/\/www\.absustaininvest\.com$/,
 ];
 
-// ── COOKIE SESSION SECRET (INVECE) ───────────────────────────────────────────
-// INVECE signs the sid cookie envelope. JWT_TRIDENTE validates the token inside.
-const INVECE_SECRET = process.env.INVECE ?? "";
+// ── COOKIE SESSION SECRET (ADMIN_TOKEN) ──────────────────────────────────────
+// ADMIN_TOKEN signs the sid cookie envelope. JWT_ACCESS_SECRET validates the token inside.
+const INVECE_SECRET = process.env.ADMIN_TOKEN ?? "";
 if (!INVECE_SECRET) {
-  logger.warn("INVECE not set — signed cookie session layer is disabled");
+  logger.warn("ADMIN_TOKEN not set — signed cookie session layer is disabled");
 }
 
 const app: Express = express();

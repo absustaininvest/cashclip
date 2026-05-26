@@ -65,14 +65,12 @@ const totpVerifyRateLimiter = rateLimit({
 });
 
 // Resolved lazily so the server can start and pass the health check even when
-// JWT_TRIDENTE / JWT_SECRET hasn't been linked to the production environment yet.
-// After the EdDSA upgrade JWT_TRIDENTE is retained solely as: (a) the operator
-// recovery proof-of-identity key and (b) a fallback verifier for HS256 tokens
-// issued before the cutover (which expire naturally within 2 hours).
+// JWT_ACCESS_SECRET hasn't been linked to the production environment yet.
+// JWT_ACCESS_SECRET is the primary signing key for access tokens (HS256 fallback).
+// JWT_SECRET is accepted as a legacy alias.
 function getJwtSecret(): string {
-  const s = process.env.JWT_TRIDENTE ?? process.env.JWT_SECRET;
-  if (!s) throw new Error("JWT_TRIDENTE (or JWT_SECRET) environment variable is required");
-  if (s.length < 64) throw new Error("JWT_TRIDENTE is too short — must be at least 64 characters.");
+  const s = process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET;
+  if (!s) throw new Error("JWT_ACCESS_SECRET environment variable is required");
   return s;
 }
 
@@ -80,16 +78,12 @@ function getJwtSecret(): string {
 // Only used to verify tokens signed by the old HS256 secret during the 2h
 // transition window after a keyswitch.
 function getPrevJwtSecret(): string | null {
-  const s = process.env.JWT_TRIDENTE_PREV;
+  const s = process.env.JWT_ACCESS_SECRET_PREV;
   if (!s) return null;
-  if (s.length < 64) {
-    logger.warn("JWT_TRIDENTE_PREV is set but too short (<64 chars) — ignoring it");
-    return null;
-  }
   return s;
 }
 
-// ── EdDSA (Ed25519) key management via BRIDGE_INGRID_WICKED ──────────────────
+// ── EdDSA (Ed25519) key management via JWT_EDDSA_KEY ─────────────────────────
 // All new tokens are signed with Ed25519 once this key is present.
 // HS256 remains active as a *verify-only* fallback for the 2h window after
 // cutover so in-flight tokens are not invalidated on restart.
@@ -102,7 +96,7 @@ let _edDsaPubKey: import("crypto").KeyObject | null | undefined = undefined;
 
 function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: import("crypto").KeyObject } | null {
   if (_edDsaPrivKey === undefined) {
-    const raw = process.env.BRIDGE_INGRID_WICKED;
+    const raw = process.env.JWT_EDDSA_KEY;
     if (!raw) {
       _edDsaPrivKey = null;
       _edDsaPubKey = null;
@@ -117,16 +111,16 @@ function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: im
         }
         const privateKey = crypto.createPrivateKey(normalized);
         if (privateKey.asymmetricKeyType !== "ed25519") {
-          logger.warn("BRIDGE_INGRID_WICKED is not an Ed25519 key — EdDSA signing disabled, falling back to HS256");
+          logger.warn("JWT_EDDSA_KEY is not an Ed25519 key — EdDSA signing disabled, falling back to HS256");
           _edDsaPrivKey = null;
           _edDsaPubKey = null;
         } else {
           _edDsaPubKey = crypto.createPublicKey(privateKey);
           _edDsaPrivKey = privateKey;
-          logger.info("EdDSA (Ed25519) JWT signing active via BRIDGE_INGRID_WICKED");
+          logger.info("EdDSA (Ed25519) JWT signing active via JWT_EDDSA_KEY");
         }
       } catch (err) {
-        logger.error({ err }, "Failed to parse BRIDGE_INGRID_WICKED — EdDSA disabled, falling back to HS256");
+        logger.error({ err }, "Failed to parse JWT_EDDSA_KEY — EdDSA disabled, falling back to HS256");
         _edDsaPrivKey = null;
         _edDsaPubKey = null;
       }
@@ -140,11 +134,11 @@ function getEdDsaKeys(): { privateKey: import("crypto").KeyObject; publicKey: im
 
 const TOKEN_EXPIRY = "2h";
 
-// ── RIPRENDERE — refresh token layer ─────────────────────────────────────────
+// ── JWT_REFRESH_SECRET — refresh token layer ──────────────────────────────────
 // Signs long-lived refresh tokens (30d) stored in the rid httpOnly cookie.
-// When the short-lived JWT (TRIDENTE, 2h) expires, POST /api/auth/refresh
+// When the short-lived JWT (2h) expires, POST /api/auth/refresh
 // exchanges a valid rid cookie for a fresh JWT + sid cookie without re-login.
-const RIPRENDERE_SECRET = process.env.RIPRENDERE;
+const RIPRENDERE_SECRET = process.env.JWT_REFRESH_SECRET;
 const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const RID_COOKIE = "rid";
@@ -251,7 +245,7 @@ const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const isProd = process.env.NODE_ENV === "production";
 
 export function setSessionCookie(res: Response, token: string): void {
-  if (!process.env.INVECE) return;
+  if (!process.env.ADMIN_TOKEN) return;
   res.cookie(SID_COOKIE, token, {
     signed: true, httpOnly: true, secure: isProd, sameSite: "strict",
     maxAge: COOKIE_MAX_AGE_MS,
@@ -325,8 +319,8 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
     }
   }
 
-  // Fallback: console-token path (internal tooling / INVECE secret).
-  const consoleToken = process.env.INVECE;
+  // Fallback: console-token path (internal tooling / ADMIN_TOKEN secret).
+  const consoleToken = process.env.ADMIN_TOKEN;
   if (consoleToken) {
     const provided = req.headers["x-console-token"];
     if (typeof provided !== "string" || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(consoleToken))) {
@@ -862,9 +856,9 @@ export function registerAuthRoutes(app: Express) {
   // Only works for accounts that already have role=admin in the database.
   app.post("/api/auth/operator-recovery", async (req: Request, res: Response): Promise<void> => {
     try {
-      // Require X-Console-Token (INVECE layer) — same guard used on all admin routes.
-      // This means an attacker must possess BOTH JWT_TRIDENTE and INVECE to recover.
-      const consoleToken = process.env.INVECE;
+      // Require X-Console-Token (ADMIN_TOKEN layer) — same guard used on all admin routes.
+      // This means an attacker must possess BOTH JWT_ACCESS_SECRET and ADMIN_TOKEN to recover.
+      const consoleToken = process.env.ADMIN_TOKEN;
       if (consoleToken) {
         const provided = req.headers["x-console-token"];
         let tokenMatch = false;
@@ -883,7 +877,7 @@ export function registerAuthRoutes(app: Express) {
       if (!operatorKey || !username) {
         res.status(400).json({ error: "operatorKey and username are required" }); return;
       }
-      const secret = process.env.JWT_TRIDENTE ?? process.env.JWT_SECRET;
+      const secret = process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET;
       if (!secret) {
         res.status(503).json({ error: "Recovery unavailable" }); return;
       }
