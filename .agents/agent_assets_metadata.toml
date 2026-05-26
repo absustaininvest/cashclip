@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "RGhu94kRjpj8MSxt1Kyof"
+uri = "file://bealls_dm_script.pdf"
+type = "pdf"
+title = "Bealls District Manager Onboarding Script & Scorecard"

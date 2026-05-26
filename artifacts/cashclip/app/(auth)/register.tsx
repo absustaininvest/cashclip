@@ -253,14 +253,16 @@ export default function RegisterScreen() {
           )}
 
           {/* Terms checkbox */}
-          <Pressable
-            onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
-            style={styles.termsRow}
-            testID="register-terms"
-          >
-            <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
-              {agreedToTerms && <Feather name="check" size={12} color="#0A0A0F" />}
-            </View>
+          <View style={styles.termsRow}>
+            <Pressable
+              onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
+              testID="register-terms"
+              hitSlop={8}
+            >
+              <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                {agreedToTerms && <Feather name="check" size={12} color="#0A0A0F" />}
+              </View>
+            </Pressable>
             <Text style={styles.termsText}>
               I agree to the{" "}
               <Text
@@ -277,7 +279,7 @@ export default function RegisterScreen() {
                 Privacy Policy
               </Text>
             </Text>
-          </Pressable>
+          </View>
 
           {/* Submit */}
           <Pressable
