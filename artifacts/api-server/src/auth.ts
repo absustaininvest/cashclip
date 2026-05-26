@@ -746,64 +746,6 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ── POST /api/auth/operator-recovery (TRIDENTE layer) ────────────────────
-  // Issues a fresh admin token to the operator without needing a password.
-  // Proof of identity is possession of JWT_TRIDENTE (the signing secret).
-  // Only works for accounts that already have role=admin in the database.
-  app.post("/api/auth/operator-recovery", async (req: Request, res: Response): Promise<void> => {
-    try {
-      // Require X-Console-Token (ADMIN_TOKEN layer) — same guard used on all admin routes.
-      // This means an attacker must possess BOTH JWT_ACCESS_SECRET and ADMIN_TOKEN to recover.
-      const consoleToken = process.env.ADMIN_TOKEN;
-      if (consoleToken) {
-        const provided = req.headers["x-console-token"];
-        let tokenMatch = false;
-        try {
-          tokenMatch = typeof provided === "string" &&
-            provided.length === consoleToken.length &&
-            crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(consoleToken));
-        } catch { tokenMatch = false; }
-        if (!tokenMatch) {
-          logger.warn({ ip: req.ip }, "operator-recovery blocked: missing/invalid X-Console-Token");
-          res.status(401).json({ error: "Unauthorized" }); return;
-        }
-      }
-
-      const { operatorKey, username } = req.body;
-      if (!operatorKey || !username) {
-        res.status(400).json({ error: "operatorKey and username are required" }); return;
-      }
-      const secret = process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET;
-      if (!secret) {
-        res.status(503).json({ error: "Recovery unavailable" }); return;
-      }
-      // Constant-time comparison to prevent timing attacks
-      let match = false;
-      try {
-        const a = Buffer.from(String(operatorKey));
-        const b = Buffer.from(secret);
-        match = a.length === b.length && crypto.timingSafeEqual(a, b);
-      } catch {
-        match = false;
-      }
-      if (!match) {
-        res.status(401).json({ error: "Invalid operator key" }); return;
-      }
-      const user = await storage.getUserByUsername(String(username).trim().toLowerCase());
-      if (!user || user.role !== "admin") {
-        res.status(403).json({ error: "No admin account found for that username" }); return;
-      }
-      const token = generateToken(user.id, user.role, user.tokenVersion);
-      setSessionCookie(res, token);
-      setRefreshCookie(res, user.id, user.tokenVersion);
-      logger.warn({ username: user.username }, "Admin token issued via operator-recovery (TRIDENTE)");
-      res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
-    } catch (err: unknown) {
-      logger.error({ err }, "Operator recovery error");
-      res.status(500).json({ error: "Recovery failed" });
-    }
-  });
-
   // ── POST /api/auth/refresh (RIPRENDERE layer) ─────────────────────────────
   // Exchanges a valid rid cookie for a new JWT + refreshed sid + rid cookies.
   // No credentials required — the signed rid cookie is the proof of identity.
