@@ -25,7 +25,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 ## Scan Anchors
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
-- **Highest-risk areas:** auth/session handling, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, and the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`.
+- **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, and the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
 
@@ -33,7 +33,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 ### Spoofing
 
-CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party webhook traffic from survey/offerwall providers. The system must verify every protected request with a valid server-issued token and must authenticate webhooks with provider-specific secrets or signatures before treating them as proof of a completed earning event.
+CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party webhook traffic from survey/offerwall providers. The system must verify every protected request with a valid server-issued token, harden account-recovery proofs so reset codes cannot be guessed online at account scale, and authenticate webhooks with provider-specific secrets or signatures before treating them as proof of a completed earning event.
 
 ### Tampering
 
@@ -53,4 +53,4 @@ Public endpoints such as login, password reset, webhooks, lead capture, and any 
 
 ### Elevation of Privilege
 
-The main privilege-escalation risks are broken access control on admin and cross-user API routes, secret-based bypasses that overexpose operator powers, and business-logic flaws that let normal users turn authenticated access into monetary gain. All admin, payout, secret-management, and cross-account operations must enforce server-side role checks and object ownership checks on every request.
+The main privilege-escalation risks are broken access control on admin and cross-user API routes, weak account-recovery flows that let attackers reset another user's credentials, secret-based bypasses that overexpose operator powers, and business-logic flaws that let normal users turn authenticated access into monetary gain. All admin, payout, secret-management, account-recovery, and cross-account operations must enforce server-side role checks, object ownership checks, and recovery abuse controls on every request.
