@@ -2249,7 +2249,7 @@ function InboxPanel({ token }: { token: string }) {
               </div>
               <div className="px-5 py-3 border-t border-white/[0.06] flex items-center gap-3">
                 <a
-                  href={`mailto:${selected.fromEmail}?subject=Re: ${encodeURIComponent(selected.subject)}`}
+                  href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
                   className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors"
                 >
                   <Mail className="w-3.5 h-3.5" />
@@ -2700,7 +2700,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
                   <div className="min-w-0">
                     {u.email ? (
                       <a
-                        href={`mailto:${u.email}`}
+                        href={`mailto:${encodeURIComponent(u.email)}`}
                         onClick={(e) => e.stopPropagation()}
                         className="text-[#00E676]/80 hover:text-[#00E676] text-xs truncate block transition-colors"
                       >

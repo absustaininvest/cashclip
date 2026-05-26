@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import NotFound from "@/pages/not-found";
 import { PageLayout } from "./components/layout/PageLayout";
@@ -6,17 +7,22 @@ import Ventures from "./pages/Ventures";
 import About from "./pages/About";
 import Investors from "./pages/Investors";
 import Contact from "./pages/Contact";
-import Admin from "./pages/Admin";
 import PressKit from "./pages/PressKit";
 import Solera from "./pages/Solera";
 import CashClipPrivacy from "./pages/CashClipPrivacy";
 import CashClipTerms from "./pages/CashClipTerms";
 import { LanguageProvider } from "./lib/i18n";
 
+const Admin = lazy(() => import("./pages/Admin"));
+
 function Router() {
   return (
     <Switch>
-      <Route path="/sc-portal" component={Admin} />
+      <Route path="/sc-portal">
+        <Suspense fallback={null}>
+          <Admin />
+        </Suspense>
+      </Route>
       <Route>
         <PageLayout>
           <Switch>

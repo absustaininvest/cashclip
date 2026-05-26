@@ -1,4 +1,5 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URI_RESERVED_IN_LOCAL = /[?#&%]/;
 
 /**
  * Known privacy-relay, anonymous-forwarding, and hide-my-email domains.
@@ -29,6 +30,10 @@ export function validateRegistrationEmail(email: string): { valid: boolean; reas
   }
 
   const atIndex = normalized.indexOf("@");
+  const localPart = atIndex >= 0 ? normalized.slice(0, atIndex) : normalized;
+  if (URI_RESERVED_IN_LOCAL.test(localPart)) {
+    return { valid: false, reason: "Invalid email address" };
+  }
   const domain = atIndex >= 0 ? normalized.slice(atIndex + 1) : "";
 
   if (RELAY_DOMAINS.has(domain)) {
