@@ -145,9 +145,23 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       if (status === "undetermined") {
         if (handledRef.current) return;
         setConsentState("needed");
-      } else {
-        setConsentState("denied");
+        return;
       }
+
+      // "denied" — only show the info screen the first time. If the user already
+      // acknowledged it (dismissed key set), skip straight to done so the gate
+      // does not reappear on every subsequent launch.
+      const dismissed = await AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null);
+      if (dismissed) {
+        setConsentState("done");
+        if (!consentDoneFiredRef.current) {
+          consentDoneFiredRef.current = true;
+          onConsentDone?.();
+        }
+        return;
+      }
+
+      setConsentState("denied");
     }
 
     check();
