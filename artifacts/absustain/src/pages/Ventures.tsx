@@ -1,4 +1,4 @@
-import { ArrowUpRight, Smartphone, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor, Car, Headphones, BadgeCheck, UserCheck } from "lucide-react";
+import { ArrowUpRight, Smartphone, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor } from "lucide-react";
 import { Link } from "wouter";
 import { useLang } from "../lib/i18n";
 
@@ -190,82 +190,6 @@ export default function Ventures() {
               </a>
             </div>
 
-          </div>
-        </div>
-      </div>
-
-      {/* Business Hub — Sixt Corporate */}
-      <div className="mt-32 pt-16 border-t border-white/[0.06]">
-        <div className="text-center mb-12">
-          <div className="section-label">Corporate Benefits</div>
-          <h2 className="font-['Space_Grotesk'] text-3xl md:text-4xl font-bold text-white mt-4 mb-4">Business Hub</h2>
-          <p className="text-white/40 max-w-2xl mx-auto text-sm">
-            As an AB Sustainability partner, your corporate account unlocks exclusive access to premium services and benefits designed to support your business mobility needs.
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-[#FF6900]/20 bg-gradient-to-br from-[#FF6900]/[0.06] to-[#06060E] overflow-hidden">
-          <div className="flex flex-col md:flex-row items-stretch">
-            <div className="md:w-64 bg-[#FF6900]/10 border-b md:border-b-0 md:border-r border-[#FF6900]/20 flex flex-col items-center justify-center p-10 gap-4">
-              <Car className="w-16 h-16 text-[#FF6900]" />
-              <div className="text-center">
-                <p className="text-white font-['Space_Grotesk'] font-bold text-xl tracking-tight">Sixt</p>
-                <p className="text-[#FF6900] text-xs font-semibold tracking-widest uppercase mt-1">Corporate Partner</p>
-              </div>
-              <a
-                href="https://www.sixt.com/#/?page=loginregister"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-2 bg-[#FF6900] hover:bg-[#FF6900]/90 text-white font-['Space_Grotesk'] font-bold text-sm py-2.5 px-5 rounded-full transition-colors"
-              >
-                Access Hub <ArrowUpRight className="w-4 h-4" />
-              </a>
-            </div>
-
-            <div className="flex-1 p-8 md:p-10">
-              <p className="text-white/60 text-sm mb-8 leading-relaxed">
-                Your Sixt corporate account grants you access to a world of benefits and advantages — premium vehicles, dedicated support, and transparent pricing tailored to your needs.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#FF6900]/10 border border-[#FF6900]/20 flex items-center justify-center flex-shrink-0">
-                    <Car className="w-5 h-5 text-[#FF6900]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm mb-1">Refined Fleet</p>
-                    <p className="text-white/40 text-xs leading-relaxed">Premium cars from compact models to spacious SUVs, meticulously maintained for your needs.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#FF6900]/10 border border-[#FF6900]/20 flex items-center justify-center flex-shrink-0">
-                    <Headphones className="w-5 h-5 text-[#FF6900]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm mb-1">Unwavering Support</p>
-                    <p className="text-white/40 text-xs leading-relaxed">Client Services & Reservation Hotline available for reservations and current rentals.</p>
-                    <a href="tel:18887498111" className="text-[#FF6900] text-xs font-semibold mt-1 inline-block hover:underline">1-888-749-8111</a>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#FF6900]/10 border border-[#FF6900]/20 flex items-center justify-center flex-shrink-0">
-                    <BadgeCheck className="w-5 h-5 text-[#FF6900]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm mb-1">Competitive Rates</p>
-                    <p className="text-white/40 text-xs leading-relaxed">Industry-best pricing with full transparency — no hidden fees or surprises.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#FF6900]/10 border border-[#FF6900]/20 flex items-center justify-center flex-shrink-0">
-                    <UserCheck className="w-5 h-5 text-[#FF6900]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm mb-1">Personalized Attention</p>
-                    <p className="text-white/40 text-xs leading-relaxed">Your dedicated Account Manager provides tailored guidance for your unique requirements.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

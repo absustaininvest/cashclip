@@ -50,6 +50,7 @@ import {
   Headphones,
   Shield,
   ShieldCheck,
+  Car,
 } from "lucide-react";
 
 interface Lead {
@@ -1568,6 +1569,37 @@ What we're building:
                     </span>
                   ),
                 )}
+              </div>
+            </div>
+          </a>
+          <a
+            href="https://www.sixt.com/#/?page=loginregister"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-4 p-5 rounded-2xl border border-[#FF6900]/20 bg-[#FF6900]/5 hover:bg-[#FF6900]/10 transition-colors group"
+          >
+            <div className="p-3 rounded-xl bg-[#FF6900]/10 border border-[#FF6900]/20 flex-shrink-0">
+              <Car className="w-5 h-5 text-[#FF6900]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-['Space_Grotesk'] font-bold text-white">
+                  Sixt
+                </span>
+                <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-[#FF6900] transition-colors" />
+              </div>
+              <p className="text-white/40 text-xs mt-1">
+                Corporate account for premium vehicle rentals. Luxury fleet from compact to SUV. Contact Client Services at 1-888-749-8111.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {["Corporate Account", "Vehicle Rental", "Luxury Fleet", "1-888-749-8111"].map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF6900]/10 border border-[#FF6900]/20 text-[#FF6900] font-medium"
+                  >
+                    {tag}
+                  </span>
+                ))}
               </div>
             </div>
           </a>
