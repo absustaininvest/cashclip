@@ -163,6 +163,19 @@ const server = http.createServer((req, res) => {
   const host = safeHost.replace(/:\d+$/, "").toLowerCase();
   const expoPlatform = req.headers["expo-platform"];
 
+  if (host === ABSUSTAIN_DOMAIN || host === `www.${ABSUSTAIN_DOMAIN}`) {
+    const proxyReq = http.request(
+      { hostname: "127.0.0.1", port: 8080, path: req.url, method: req.method, headers: req.headers },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res, { end: true });
+      }
+    );
+    proxyReq.on("error", () => { res.writeHead(502); res.end("Bad Gateway"); });
+    req.pipe(proxyReq, { end: true });
+    return;
+  }
+
   if (REPLIT_DOMAIN_PATTERN.test(host) && !expoPlatform) {
     const target = pathname.startsWith("/absustain")
       ? `https://${ABSUSTAIN_DOMAIN}${pathname}`
