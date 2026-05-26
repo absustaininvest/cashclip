@@ -194,11 +194,16 @@ setInterval(() => { pruneExpiredLoginAttempts(); }, 5 * 60 * 1000);
 function generateToken(userId: string, role: string, tokenVersion: number): string {
   const edDsa = getEdDsaKeys();
   if (edDsa) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (jwt.sign as any)({ userId, role, tokenVersion }, edDsa.privateKey, {
-      algorithm: "EdDSA",
-      expiresIn: TOKEN_EXPIRY,
-    }) as string;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (jwt.sign as any)({ userId, role, tokenVersion }, edDsa.privateKey, {
+        algorithm: "EdDSA",
+        expiresIn: TOKEN_EXPIRY,
+      }) as string;
+    } catch (edDsaErr) {
+      // jsonwebtoken v9 does not support EdDSA natively — fall through to HS256
+      logger.warn({ err: edDsaErr }, "EdDSA signing failed — falling back to HS256");
+    }
   }
   return jwt.sign({ userId, role, tokenVersion }, getJwtSecret(), { expiresIn: TOKEN_EXPIRY });
 }
