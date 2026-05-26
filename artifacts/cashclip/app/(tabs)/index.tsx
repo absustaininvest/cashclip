@@ -89,6 +89,7 @@ export default function HomeScreen() {
   useEffect(() => {
     getUserStats().then(setStats);
     getUnreadNotificationCount().then(setUnreadCount);
+    if (isAdMobReady()) preloadRewardedAd();
   }, []);
 
   const handleAdPress = useCallback(async () => {
