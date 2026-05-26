@@ -13,14 +13,14 @@ import CashClipPrivacy from "./pages/CashClipPrivacy";
 import CashClipTerms from "./pages/CashClipTerms";
 import { LanguageProvider } from "./lib/i18n";
 
-const Admin = lazy(() => import("./pages/Admin"));
+const AdminGate = lazy(() => import("./pages/AdminGate"));
 
 function Router() {
   return (
     <Switch>
       <Route path="/sc-portal">
         <Suspense fallback={null}>
-          <Admin />
+          <AdminGate />
         </Suspense>
       </Route>
       <Route>
