@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm, cp } from "node:fs/promises";
+import { rm, cp, access } from "node:fs/promises";
+import { execSync } from "node:child_process";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -126,13 +127,25 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     { recursive: true, force: true }
   );
 
-  // Copy absustain static site (built with BASE_PATH=/) for host-based routing
-  const absustainSrc = path.resolve(artifactDir, "../absustain/dist/public");
+  // Copy absustain static site (built with BASE_PATH=/) for host-based routing.
+  // If the dist isn't present, build it first so production builds are self-contained.
+  const absustainDir = path.resolve(artifactDir, "../absustain");
+  const absustainSrc = path.resolve(absustainDir, "dist/public");
+  try {
+    await access(absustainSrc);
+  } catch {
+    console.log("absustain dist not found — building absustain now...");
+    execSync("pnpm run build", {
+      cwd: absustainDir,
+      stdio: "inherit",
+      env: { ...process.env, BASE_PATH: "/" },
+    });
+  }
   try {
     await cp(absustainSrc, path.resolve(distDir, "absustain-static"), { recursive: true, force: true });
     console.log("Copied absustain static site into dist/absustain-static");
-  } catch {
-    console.warn("absustain dist not found — skipping copy (run absustain build first)");
+  } catch (err) {
+    console.warn("absustain copy failed:", err.message);
   }
 }
 
