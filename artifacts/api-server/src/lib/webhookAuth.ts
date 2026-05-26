@@ -124,6 +124,19 @@ const PROVIDER_VERIFIERS: Record<string, ProviderVerifier> = {
   },
 
   cpx(secret: string, req: Request): boolean {
+    // Guard: if CPX_WEBHOOK_SECRET equals CPX_API_KEY, the webhook secret is
+    // derivable by any authenticated user from the survey wall URL they already
+    // received (which embeds secure_hash = md5(userId + "-" + CPX_API_KEY)).
+    // An attacker would simply set trans_id = their userId and replay that hash
+    // to pass this check, then credit arbitrary rewards. Refuse verification
+    // until the operator configures a distinct CPX_WEBHOOK_SECRET.
+    const cpxApiKey = process.env.CPX_API_KEY;
+    if (cpxApiKey && secret === cpxApiKey) {
+      logger.error(
+        "CPX_WEBHOOK_SECRET must not equal CPX_API_KEY — webhook crediting disabled until they differ. Set CPX_WEBHOOK_SECRET to the separate webhook secret from the CPX Research dashboard.",
+      );
+      return false;
+    }
     const sig = qs(req.query.secure_hash ?? req.query.hash);
     if (!sig) return false;
     const transId = qs(req.query.trans_id);
