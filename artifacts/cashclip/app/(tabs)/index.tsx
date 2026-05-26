@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,15 +18,14 @@ import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from 
 import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
-import { getUserStats, getUnreadNotificationCount, type UserStats } from "@/lib/storage";
-import { showInterstitialAd } from "@/lib/admob";
+import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
+import { showRewardedAd, isAdMobReady } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH } from "@/components/NativeAdCard";
 import InFeedBanner from "@/components/InFeedBanner";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const AD_CARD_COUNT = 25;
-const INTERSTITIAL_EVERY = 5;
 
 const QUICK_ACCESS = [
   { icon: "film", label: "Videos", color: "#00E676", route: "/earn" },
@@ -81,7 +80,7 @@ export default function HomeScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const tapCountRef = useRef(0);
+  const [adLoading, setAdLoading] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -93,12 +92,20 @@ export default function HomeScreen() {
   }, []);
 
   const handleAdPress = useCallback(async () => {
+    if (adLoading) return;
+    if (!isAdMobReady()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    tapCountRef.current += 1;
-    if (tapCountRef.current % INTERSTITIAL_EVERY === 0) {
-      await showInterstitialAd();
+    setAdLoading(true);
+    try {
+      const result = await showRewardedAd();
+      if (result.rewarded) {
+        await recordAdWatch();
+        getUserStats().then(setStats);
+      }
+    } finally {
+      setAdLoading(false);
     }
-  }, []);
+  }, [adLoading]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
