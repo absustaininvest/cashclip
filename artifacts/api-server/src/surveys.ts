@@ -337,6 +337,12 @@ export function registerSurveyRoutes(app: Express): void {
     res.status(200).send("OK");
   });
 
+  // BitLabs sends a GET to {webhook_url}/no-sig when you save the postback URL in their dashboard
+  // to confirm the endpoint is reachable. Return 200 immediately — no signature, no reward crediting.
+  app.get("/api/surveys/webhook/bitlabs/no-sig", (_req: Request, res: Response): void => {
+    res.status(200).send("OK");
+  });
+
   app.get("/api/surveys/webhook/bitlabs", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
     const auth = verifyWebhook("bitlabs", req);
     if (!auth.ok) {
