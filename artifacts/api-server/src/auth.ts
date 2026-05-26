@@ -120,6 +120,7 @@ function verifyRefreshToken(token: string): { userId: string; tokenVersion: numb
 
 export const RESERVED_ADMIN_USERNAMES: ReadonlySet<string> = new Set([
   "support@absustaininvest.com",
+  "support@cash-clip.app",
 ]);
 
 export interface AuthRequest extends Request {
