@@ -262,32 +262,25 @@ export default function RegisterScreen() {
                 {agreedToTerms && <Feather name="check" size={12} color="#0A0A0F" />}
               </View>
             </Pressable>
-            <View style={styles.termsLabelRow}>
-              <Text
-                style={styles.termsLabelText}
-                onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
-              >
-                {"I agree to the "}
-              </Text>
+            <Pressable
+              style={styles.termsLabelRow}
+              onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
+            >
+              <Text style={styles.termsLabelText}>{"I agree to the "}</Text>
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL("https://absustaininvest.com/cashclip/terms")}
+                onPress={(e) => { e.stopPropagation(); Linking.openURL("https://absustaininvest.com/cashclip/terms"); }}
               >
                 Terms of Service
               </Text>
-              <Text
-                style={styles.termsLabelText}
-                onPress={() => { setAgreedToTerms(!agreedToTerms); Haptics.selectionAsync(); }}
-              >
-                {" and "}
-              </Text>
+              <Text style={styles.termsLabelText}>{" and "}</Text>
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL("https://absustaininvest.com/cashclip/privacy")}
+                onPress={(e) => { e.stopPropagation(); Linking.openURL("https://absustaininvest.com/cashclip/privacy"); }}
               >
                 Privacy Policy
               </Text>
-            </View>
+            </Pressable>
           </View>
 
           {/* Submit */}
