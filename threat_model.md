@@ -16,9 +16,10 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 - **Mobile/Web client to API** — all client input is attacker-controlled. The server must authenticate, authorize, validate, and enforce business rules independently of frontend behavior.
 - **Public to authenticated to admin API surfaces** — routes in `artifacts/api-server/src` cross distinct trust levels; admin functionality must never rely on hidden UI routes alone.
+- **Autoscaled replicas vs shared abuse controls** — production runs on an autoscaled fleet, so any abuse-control state kept only in process memory or the default in-memory Express rate-limit store is replica-local and must not be treated as a global guard for auth or money-moving routes.
 - **API to PostgreSQL** — the API has direct authority to mutate balances, sessions, users, and operational data. Any injection or authorization flaw here can fully compromise application integrity.
 - **API to external survey/offer/payments providers** — provider APIs and webhooks are outside the trust boundary and must be strongly authenticated before rewarding users or triggering payouts.
-- **Public website to admin portal boundary** — `artifacts/absustain` is mostly public marketing content but also serves a same-origin admin UI route (`/sc-portal`), so same-origin script injection or browser UI-redressing/frame-embedding issues would endanger admin tokens and privileged actions initiated from the browser.
+- **Public website to admin portal boundary** — `artifacts/absustain` is mostly public marketing content but also serves a same-origin admin UI route (`/sc-portal`), so same-origin script injection or browser UI-redressing/frame-embedding issues would endanger admin tokens and privileged actions initiated from the browser. Because the admin SPA is bundled into the public website build, any hardcoded operator metadata embedded in frontend code is effectively public even if the route itself is login-gated.
 - **Public operator-metadata endpoints** — read-only routes that reveal live integration, health, or setup state sit at a public/admin trust boundary because they expose internal providers, secret presence, and operational readiness to unauthenticated users.
 - **Production vs dev-only code** — mock/demo artifacts and test-only paths are out of scope unless production reachability is demonstrated. Assume `NODE_ENV=production` in deployed environments.
 
@@ -26,6 +27,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
 - **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, and the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`.
+- **Production abuse-control anchor:** prioritize DB-backed or otherwise shared enforcement on login/TOTP, password reset, sponsored visits, withdrawals, and webhook-related throttles; memory-only counters do not hold across replicas.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
 
@@ -45,7 +47,7 @@ Administrative actions such as balance credits, withdrawal approval/payout, user
 
 ### Information Disclosure
 
-The API stores PII, payout addresses, operational analytics, and integration health information. Responses and logs must not expose secrets, provider credentials, sensitive admin data, or cross-user records. The public website must not introduce same-origin script injection that can steal admin tokens from browser storage, and admin setup flows must not disclose long-lived TOTP seeds to third-party services or browser-visible cross-origin requests.
+The API stores PII, payout addresses, operational analytics, and integration health information. Responses and logs must not expose secrets, provider credentials, sensitive admin data, or cross-user records. The public website must not introduce same-origin script injection that can steal admin tokens from browser storage, and admin setup flows must not disclose long-lived TOTP seeds to third-party services or browser-visible cross-origin requests. Operator-only business metadata that is hardcoded into the admin SPA should be treated as public if it ships in the website bundle.
 
 ### Denial of Service
 
