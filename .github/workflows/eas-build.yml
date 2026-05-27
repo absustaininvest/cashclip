@@ -42,13 +42,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Write Apple ASC API Key
+        run: |
+          echo "${{ secrets.APPLE_ASC_PRIVATE_KEY }}" > /tmp/asc-api-key.p8
+          chmod 600 /tmp/asc-api-key.p8
+
       - name: Build
         working-directory: artifacts/cashclip
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
-          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
-          EXPO_APPLE_APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPLE_ASC_PRIVATE_KEY }}
+          EXPO_ASC_API_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          EXPO_ASC_API_KEY: /tmp/asc-api-key.p8
           EAS_BUILD_NO_EXPO_GO_WARNING: true
         run: |
           npx eas-cli build \
