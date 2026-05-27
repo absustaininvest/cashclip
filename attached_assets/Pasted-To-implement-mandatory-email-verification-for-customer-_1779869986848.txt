@@ -1,0 +1,109 @@
+To implement mandatory email verification for customer registration, you must generate a secure token, email it to the user, and prevent account activation until they verify it. 
+Here is a complete, language-agnostic code implementation using Node.js (Backend) and a SQL Database.
+
+1. Database Schema
+Your database table must track the verification token and the user's status. 
+
+sql
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    verification_token VARCHAR(64),
+    is_verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+Use code with caution.
+
+
+
+2. Registration API (Backend)
+When a customer registers, generate a unique token, save it to the database with is_verified = false, and send the verification link. 
+
+javascript
+const crypto = require('crypto');
+const nodemailer = require('nodemailer'); // For sending emails
+
+async function registerCustomer(req, res) {
+    const { email, password } = req.body;
+    
+    // 1. Hash password and generate a secure random token
+    const passwordHash = await hashPassword(password);
+    const token = crypto.randomBytes(32).toString('hex');
+
+    try {
+        // 2. Save user to database as unverified
+        await db.query(
+            'INSERT INTO users (email, password_hash, verification_token, is_verified) VALUES (?, ?, ?, false)',
+            [email, passwordHash, token]
+        );
+
+        // 3. Send verification email
+        const verificationUrl = `https://yourapp.com{token}`;
+        await sendEmail(email, "Verify Your Account", `Click here to verify: ${verificationUrl}`);
+
+        return res.status(201).json({ message: "Registration successful. Please check your email to verify your account." });
+    } catch (error) {
+        return res.status(500).json({ error: "Registration failed." });
+    }
+}
+Use code with caution.
+
+
+
+3. Verification API (Backend)
+Create an endpoint to process the token when the user clicks the link. 
+
+javascript
+async function verifyEmail(req, res) {
+    const { token } = req.query;
+
+    try {
+        // 1. Find user with matching token
+        const [user] = await db.query('SELECT * FROM users WHERE verification_token = ?', [token]);
+        
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired verification token." });
+        }
+
+        // 2. Activate user and clear token
+        await db.query(
+            'UPDATE users SET is_verified = true, verification_token = NULL WHERE id = ?',
+            [user.id]
+        );
+
+        return res.status(200).json({ message: "Email verified successfully! You can now log in." });
+    } catch (error) {
+        return res.status(500).json({ error: "Verification failed." });
+    }
+}
+Use code with caution.
+
+
+
+4. Login Guard (Backend)
+Block access to protected app routes if the user is registered but not verified. 
+
+javascript
+async function loginCustomer(req, res) {
+    const { email, password } = req.body;
+    const user = await db.findUserByEmail(email);
+
+    // Enforce mandatory verification check
+    if (user && !user.is_verified) {
+        return res.status(403).json({ error: "Account not verified. Please check your inbox." });
+    }
+
+    // Proceed with standard password check and token generation...
+}
+Use code with caution.
+
+
+
+5. App Client UI Logic
+If your mobile or web application receives a 403status code during login, redirect the user to a "Verify Your Email" screen and block access to the main dashboard.
+If you want to tailor this logic, let me know:
+* Your backend programming language/framework(e.g., Python/Django, Firebase, PHP, C#)
+* Your database type (e.g., PostgreSQL, MongoDB)
+* Your email delivery service (e.g., SendGrid, AWS SES) 
+I can generate the exact production-ready boilerplate for your stack.

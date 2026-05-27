@@ -139,24 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!regRes.ok) {
         return { success: false, error: regData.error || "Registration failed" };
       }
-      const loginRes = await fetch(new URL("/api/auth/login", baseUrl).toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const loginData = await loginRes.json();
-      if (!loginRes.ok) {
-        return { success: false, error: loginData.error || "Login after registration failed" };
-      }
-      if (typeof loginData.token !== "string" || !loginData.token) {
-        return { success: false, error: "Server did not return a session token. Please try again." };
-      }
-      await secureSet(AUTH_TOKEN_KEY, loginData.token);
-      if (typeof loginData.refreshToken === "string" && loginData.refreshToken) {
-        await secureSet(REFRESH_TOKEN_KEY, loginData.refreshToken);
-      }
-      setToken(loginData.token);
-      setUser(loginData.user);
+      // Registration succeeded — the API sends a verification email. Do NOT
+      // attempt auto-login here because the login gate blocks unverified accounts
+      // with a 403. The register screen handles the "check your email" UI when
+      // success is true.
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || "Network error" };

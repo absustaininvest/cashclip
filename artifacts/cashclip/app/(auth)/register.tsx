@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -45,6 +45,11 @@ export default function RegisterScreen() {
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState("");
   const [registered, setRegistered]       = useState(false);
+
+  // Clear stale error banner as soon as the user edits any field.
+  useEffect(() => {
+    if (error) setError("");
+  }, [username, email, password, confirmPassword, agreedToTerms]);
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
 
