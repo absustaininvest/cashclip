@@ -390,6 +390,10 @@ export function registerAuthRoutes(app: Express) {
       await storage.setEmailVerificationToken(user.id, verifyToken, expiresAt);
       const domain = process.env["EXPO_PUBLIC_DOMAIN"] ?? "cash-clip.app";
       const verifyUrl = `https://${domain}/api/auth/verify-email?token=${verifyToken}`;
+      if (!user.email) {
+        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+        return;
+      }
       sendEmailVerification({ to: user.email, username: user.username, verifyUrl });
       res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
     } catch (err) {
@@ -405,7 +409,7 @@ export function registerAuthRoutes(app: Express) {
     };
     if (!token || typeof token !== "string") { fail("Invalid or missing verification link."); return; }
     try {
-      const user = await storage.getUserByEmailVerificationToken(token);
+      const user = await storage.getUserByVerificationToken(token);
       if (!user) { fail("This verification link is invalid or has already been used."); return; }
       if (user.emailVerificationExpiresAt && new Date() > new Date(user.emailVerificationExpiresAt)) {
         fail("This verification link has expired. Please register again or contact support."); return;
