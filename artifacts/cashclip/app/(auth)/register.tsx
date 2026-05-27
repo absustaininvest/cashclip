@@ -44,6 +44,7 @@ export default function RegisterScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState("");
+  const [registered, setRegistered]       = useState(false);
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
 
@@ -88,7 +89,32 @@ export default function RegisterScreen() {
           "You're all set! Complete surveys, watch videos, play games, and refer friends to start earning real cash. Withdraw anytime via PayPal.",
         type: "promo",
       });
+      setRegistered(true);
     }
+  }
+
+  if (registered) {
+    return (
+      <View style={[styles.container, { alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingTop: insets.top }]}>
+        <LinearGradient colors={[Colors.primary, Colors.accent]} style={styles.logoCircle}>
+          <Feather name="mail" size={34} color="#0A0A0F" />
+        </LinearGradient>
+        <Text style={[styles.appName, { marginTop: 20, marginBottom: 8 }]}>Check your email</Text>
+        <Text style={[styles.tagline, { textAlign: "center", lineHeight: 22, marginBottom: 32 }]}>
+          We sent a verification link to{"\n"}<Text style={{ color: Colors.primary, fontFamily: "Outfit_600SemiBold" }}>{email.trim()}</Text>
+          {"\n\n"}Tap the link in the email to activate your account, then come back and log in.
+        </Text>
+        <Pressable
+          onPress={() => router.replace("/(auth)/login")}
+          style={({ pressed }) => [styles.primaryBtn, { width: "100%", opacity: pressed ? 0.85 : 1 }]}
+        >
+          <LinearGradient colors={[Colors.primary, "#00C853"]} style={styles.primaryBtnGradient}>
+            <Feather name="log-in" size={16} color="#0A0A0F" />
+            <Text style={styles.primaryBtnText}>Go to Login</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    );
   }
 
   return (

@@ -373,6 +373,26 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  app.get("/api/auth/verify-email", async (req: Request, res: Response): Promise<void> => {
+    const { token } = req.query;
+    const fail = (msg: string) => {
+      res.status(400).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CashClip</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0A0A0F;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.card{background:#141420;border-radius:20px;padding:40px 32px;max-width:400px;width:100%;text-align:center}.icon{font-size:48px;margin-bottom:16px}.title{font-size:22px;font-weight:700;margin-bottom:8px}.msg{font-size:15px;color:#888;line-height:1.5;margin-bottom:28px}.btn{display:inline-block;background:#B0FF4C;color:#0A0A0F;font-weight:700;font-size:16px;padding:14px 32px;border-radius:12px;text-decoration:none}</style></head><body><div class="card"><div class="icon">❌</div><div class="title">Verification Failed</div><div class="msg">${msg}</div><a class="btn" href="cashclip://">Open CashClip</a></div></body></html>`);
+    };
+    if (!token || typeof token !== "string") { fail("Invalid or missing verification link."); return; }
+    try {
+      const user = await storage.getUserByEmailVerificationToken(token);
+      if (!user) { fail("This verification link is invalid or has already been used."); return; }
+      if (user.emailVerificationExpiresAt && new Date() > new Date(user.emailVerificationExpiresAt)) {
+        fail("This verification link has expired. Please register again or contact support."); return;
+      }
+      await storage.markEmailVerified(user.id);
+      res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CashClip — Email Verified</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0A0A0F;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.card{background:#141420;border-radius:20px;padding:40px 32px;max-width:400px;width:100%;text-align:center}.icon{font-size:48px;margin-bottom:16px}.title{font-size:22px;font-weight:700;margin-bottom:8px;color:#B0FF4C}.msg{font-size:15px;color:#888;line-height:1.5;margin-bottom:28px}.btn{display:inline-block;background:#B0FF4C;color:#0A0A0F;font-weight:700;font-size:16px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:12px;display:block}.sub{font-size:13px;color:#555}</style></head><body><div class="card"><div class="icon">✅</div><div class="title">Email Verified!</div><div class="msg">Your CashClip account is now active. Open the app and log in to start earning.</div><a class="btn" href="cashclip://">Open CashClip</a><div class="sub">If the app doesn't open, launch CashClip manually and log in.</div></div></body></html>`);
+    } catch (err) {
+      logger.error({ err }, "verify-email error");
+      fail("Something went wrong. Please try again or contact support.");
+    }
+  });
+
   app.post("/api/auth/login", async (req: Request, res: Response): Promise<void> => {
     try {
       const ip = getClientIp(req);
