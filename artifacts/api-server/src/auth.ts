@@ -373,6 +373,31 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  app.post("/api/auth/resend-verification", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { username } = req.body;
+      if (!username || typeof username !== "string") {
+        res.status(400).json({ error: "Username is required" });
+        return;
+      }
+      const user = await storage.getUserByUsername(username.toLowerCase().trim());
+      if (!user || user.emailVerified) {
+        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+        return;
+      }
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await storage.setEmailVerificationToken(user.id, verifyToken, expiresAt);
+      const domain = process.env["EXPO_PUBLIC_DOMAIN"] ?? "cash-clip.app";
+      const verifyUrl = `https://${domain}/api/auth/verify-email?token=${verifyToken}`;
+      sendEmailVerification({ to: user.email, username: user.username, verifyUrl });
+      res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+    } catch (err) {
+      logger.error({ err }, "resend-verification error");
+      res.status(500).json({ error: "Failed to resend verification email" });
+    }
+  });
+
   app.get("/api/auth/verify-email", async (req: Request, res: Response): Promise<void> => {
     const { token } = req.query;
     const fail = (msg: string) => {

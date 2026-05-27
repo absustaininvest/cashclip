@@ -34,6 +34,9 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
 
   const [showForgot, setShowForgot] = useState(false);
   const [forgotStep, setForgotStep] = useState<ForgotStep>("username");
@@ -66,14 +69,33 @@ export default function LoginScreen() {
   async function handleLogin() {
     if (!username.trim() || !password) return;
     setError("");
+    setShowResend(false);
+    setResendDone(false);
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const result = await login(username.trim(), password);
     setLoading(false);
     if (!result.success) {
       setError(result.error || "Login failed");
+      if ((result as any).code === "EMAIL_NOT_VERIFIED") setShowResend(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
+  }
+
+  async function handleResendVerification() {
+    setResendLoading(true);
+    try {
+      const baseUrl = getApiUrl();
+      await fetch(new URL("/api/auth/resend-verification", baseUrl).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim() }),
+      });
+      setResendDone(true);
+    } catch {
+      // silent — user can tap again
+    }
+    setResendLoading(false);
   }
 
   async function handleSendCode() {
@@ -155,7 +177,20 @@ export default function LoginScreen() {
           {error ? (
             <View style={styles.errorBox}>
               <Feather name="alert-circle" size={16} color={Colors.error} />
-              <Text style={styles.errorText}>{error}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorText}>{error}</Text>
+                {showResend && (
+                  resendDone ? (
+                    <Text style={styles.resendDoneText}>✓ Verification email sent — check your inbox</Text>
+                  ) : (
+                    <Pressable onPress={handleResendVerification} disabled={resendLoading} style={{ marginTop: 6 }}>
+                      <Text style={styles.resendText}>
+                        {resendLoading ? "Sending…" : "Resend verification email"}
+                      </Text>
+                    </Pressable>
+                  )
+                )}
+              </View>
             </View>
           ) : null}
 
@@ -390,8 +425,10 @@ const styles = StyleSheet.create({
   appName: { fontFamily: "Outfit_700Bold", fontSize: 32, color: Colors.text, marginBottom: 4 },
   tagline: { fontFamily: "Outfit_400Regular", fontSize: 16, color: Colors.textSecondary },
   form: { gap: 14 },
-  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(244,67,54,0.12)", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "rgba(244,67,54,0.3)" },
-  errorText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.error, flex: 1 },
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "rgba(244,67,54,0.12)", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "rgba(244,67,54,0.3)" },
+  errorText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.error },
+  resendText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.primary, textDecorationLine: "underline" },
+  resendDoneText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.primary, marginTop: 4 },
   inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, height: 52 },
   inputIcon: { marginRight: 10 },
   input: { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 15, color: Colors.text, height: "100%" as any },

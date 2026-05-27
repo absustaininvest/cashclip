@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || "Login failed" };
+        return { success: false, error: data.error || "Login failed", code: data.code };
       }
       if (typeof data.token !== "string" || !data.token) {
         return { success: false, error: "Server did not return a session token. Please try again." };
