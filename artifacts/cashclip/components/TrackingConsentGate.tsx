@@ -112,53 +112,65 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
   const [consentState, setConsentState] = useState<ConsentState>("checking");
   const handledRef = useRef(false);
   const consentDoneFiredRef = useRef(false);
+  const consentDoneRef = useRef(false);
+
+  function markDone() {
+    consentDoneRef.current = true;
+    setConsentState("done");
+    if (!consentDoneFiredRef.current) {
+      consentDoneFiredRef.current = true;
+      onConsentDone?.();
+    }
+  }
 
   useEffect(() => {
     if (Platform.OS === "web") {
-      setConsentState("done");
-      onConsentDone?.();
+      markDone();
       return;
     }
 
     if (Platform.OS !== "ios") {
       requestAdsConsent().catch(() => {});
-      setConsentState("done");
-      onConsentDone?.();
+      markDone();
       return;
     }
 
     async function check() {
+      // Once done, never re-evaluate — prevents gate from reappearing on
+      // foreground transitions after the user has already resolved consent.
+      if (consentDoneRef.current) return;
+
       const status = await getTrackingStatus();
 
       if (status === "authorized" || status === "unavailable") {
-        setConsentState("done");
-        if (!consentDoneFiredRef.current) {
-          consentDoneFiredRef.current = true;
-          onConsentDone?.();
-        }
+        markDone();
         return;
       }
 
-      // "undetermined" means iOS hasn't recorded a decision yet (or reset it
-      // after a Settings toggle). Always show the prompt — never infer "denied"
-      // from the dismissed flag, because iOS resets status to "undetermined"
-      // when the user re-enables tracking in Settings.
+      // "undetermined" — if user has already been through the flow once
+      // (dismissed key set), silently re-request ATT without showing the
+      // custom gate again. Only show the gate on first-ever launch.
       if (status === "undetermined") {
         if (handledRef.current) return;
+        const dismissed = await AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null);
+        if (dismissed) {
+          // User has seen the gate before — request ATT silently and proceed.
+          handledRef.current = true;
+          const newStatus = await requestATT().catch(() => "denied");
+          await requestAdsConsent().catch(() => {});
+          await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
+          markDone();
+          return;
+        }
         setConsentState("needed");
         return;
       }
 
       // "denied" — only show the info screen the first time. If the user already
-      // acknowledged it (dismissed key set), skip straight to done so the gate
-      // does not reappear on every subsequent launch.
+      // acknowledged it (dismissed key set), skip straight to done.
       const dismissed = await AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null);
       if (dismissed) {
-        setConsentState("done");
-        if (!consentDoneFiredRef.current) {
-          consentDoneFiredRef.current = true;
-          onConsentDone?.();
-        }
+        markDone();
         return;
       }
 
@@ -167,9 +179,9 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
 
     check();
 
-    // Re-check whenever the app comes back to the foreground. This catches the
-    // case where the user goes to Settings → Privacy → Tracking, changes the
-    // toggle, and returns to the app.
+    // Re-check on foreground transitions — catches Settings → Privacy → Tracking
+    // changes. The consentDoneRef guard prevents the gate from reappearing once
+    // the user has fully resolved consent.
     const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (nextState === "active") {
         check();
