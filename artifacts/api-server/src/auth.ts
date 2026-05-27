@@ -449,7 +449,7 @@ export function registerAuthRoutes(app: Express) {
       res.json({
         token,
         ...(refreshToken ? { refreshToken } : {}),
-        user: { id: user.id, username: user.username, role: user.role },
+        user: { id: user.id, username: user.username, role: user.role, emailVerified: user.emailVerified },
       });
     } catch (err: unknown) {
       logger.error({ err }, "Login error");

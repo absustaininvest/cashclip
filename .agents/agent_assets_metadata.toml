@@ -6,3 +6,21 @@ id = "RGhu94kRjpj8MSxt1Kyof"
 uri = "file://bealls_dm_script.pdf"
 type = "pdf"
 title = "Bealls District Manager Onboarding Script & Scorecard"
+
+[[outputs]]
+id = "-WiSIDGSXOhKjH9WutIuD"
+uri = "file://cashclip.tar.gz"
+type = "unspecified"
+title = "CashClip (mobile app)"
+
+[[outputs]]
+id = "Lp-hESXiPIMXitXupT6LZ"
+uri = "file://absustain.tar.gz"
+type = "unspecified"
+title = "AB Sustainability Website"
+
+[[outputs]]
+id = "HlltHWtvbUfy9u1aZoirI"
+uri = "file://api-server.tar.gz"
+type = "unspecified"
+title = "API Server (backend)"
