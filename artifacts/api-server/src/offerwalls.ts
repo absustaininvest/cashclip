@@ -22,7 +22,7 @@ const PROVIDER_REWARD_BOUNDS: Record<string, { min: number; max: number }> = {
 };
 
 export function registerOfferwallRoutes(app: Express): void {
-  app.get("/api/offerwalls/providers", (_req: Request, res: Response) => {
+  app.get("/api/offerwalls/providers", authMiddleware, (_req: Request, res: Response) => {
     const statuses = getOfferwallProviderStatus();
     res.json({
       providers: statuses,

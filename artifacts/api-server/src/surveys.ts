@@ -27,7 +27,7 @@ const PROVIDER_REWARD_RANGES: Record<SurveyProviderKey | string, { min: number; 
 };
 
 export function registerSurveyRoutes(app: Express): void {
-  app.get("/api/surveys/providers", (_req: Request, res: Response) => {
+  app.get("/api/surveys/providers", authMiddleware, (_req: Request, res: Response) => {
     const statuses = getProviderStatus();
     res.json({
       providers: statuses,
