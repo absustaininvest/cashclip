@@ -2,11 +2,10 @@ import type { Express, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { rateLimit } from "express-rate-limit";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
 import { sendEmailVerification, sendPasswordResetOTP } from "./lib/email";
-import { recordLoginAttempt, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
+import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
 import type { InsertUser } from "@workspace/db";
@@ -14,55 +13,16 @@ import { db, passwordResetTokens, users } from "@workspace/db";
 import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as drizzleGte, lt as drizzleLt, sql as drizzleSql } from "drizzle-orm";
 import { generateTotpSecret, verifyTotp } from "./lib/totp";
 
-// ── TOTP verify failed-attempt tracker ───────────────────────────────────────
-// Tracks per-pending-token failure counts so repeated wrong guesses against the
-// same totpSessionToken are rejected after MAX_TOTP_ATTEMPTS failures.
-const MAX_TOTP_ATTEMPTS = 5;
-const totpFailedAttempts = new Map<string, { count: number; expiresAt: number }>();
+// ── TOTP verify rate-limit constants ─────────────────────────────────────────
+// Both counters are DB-backed so they are shared across all autoscaled replicas.
+const MAX_TOTP_ATTEMPTS = 5;          // per pending-token (5-minute window)
+const MAX_TOTP_ATTEMPTS_PER_IP = 20;  // per IP (15-minute window)
+const TOTP_TOKEN_WINDOW_MS = 5 * 60 * 1000;   // matches pending-token lifetime
+const TOTP_IP_WINDOW_MS   = 15 * 60 * 1000;
 
 function getTotpTokenKey(totpSessionToken: string): string {
-  return crypto.createHash("sha256").update(totpSessionToken).digest("hex");
+  return "totp:token:" + crypto.createHash("sha256").update(totpSessionToken).digest("hex");
 }
-
-function recordTotpFailure(key: string, tokenExpiresAt: number): number {
-  const entry = totpFailedAttempts.get(key);
-  const count = (entry?.count ?? 0) + 1;
-  totpFailedAttempts.set(key, { count, expiresAt: tokenExpiresAt });
-  return count;
-}
-
-function isTotpTokenLocked(key: string): boolean {
-  const entry = totpFailedAttempts.get(key);
-  if (!entry) return false;
-  if (Date.now() > entry.expiresAt) {
-    totpFailedAttempts.delete(key);
-    return false;
-  }
-  return entry.count >= MAX_TOTP_ATTEMPTS;
-}
-
-function clearTotpFailures(key: string): void {
-  totpFailedAttempts.delete(key);
-}
-
-// Periodically prune expired entries to avoid unbounded memory growth.
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of totpFailedAttempts) {
-    if (now > entry.expiresAt) totpFailedAttempts.delete(key);
-  }
-}, 60_000);
-
-// IP-based rate limiter for the TOTP verify endpoint.
-const totpVerifyRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => getClientIp(req) ?? req.ip ?? "unknown",
-  validate: { keyGeneratorIpFallback: false },
-  message: { error: "Too many verification attempts. Please try again later." },
-});
 
 // Resolved lazily so the server can start and pass the health check even when
 // JWT_ACCESS_SECRET hasn't been linked to the production environment yet.
@@ -499,7 +459,7 @@ export function registerAuthRoutes(app: Express) {
 
   // ── TOTP 2FA routes ───────────────────────────────────────────────────────
 
-  app.post("/api/auth/totp/verify", totpVerifyRateLimiter, async (req: Request, res: Response): Promise<void> => {
+  app.post("/api/auth/totp/verify", async (req: Request, res: Response): Promise<void> => {
     try {
       const { totpSessionToken, code } = req.body;
       if (!totpSessionToken || !code) {
@@ -507,8 +467,22 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
+      // DB-backed per-IP rate limit (shared across all replicas).
+      const ip = getClientIp(req) ?? "unknown";
+      const { allowed: ipAllowed } = await recordLoginAttempt(
+        `totp:ip:${ip}`,
+        MAX_TOTP_ATTEMPTS_PER_IP,
+        TOTP_IP_WINDOW_MS,
+      );
+      if (!ipAllowed) {
+        res.status(429).json({ error: "Too many verification attempts. Please try again later." });
+        return;
+      }
+
+      // DB-backed per-pending-token failure limit (shared across all replicas).
       const tokenKey = getTotpTokenKey(totpSessionToken);
-      if (isTotpTokenLocked(tokenKey)) {
+      const { allowed: tokenAllowed } = await checkLoginAttempts(tokenKey, MAX_TOTP_ATTEMPTS);
+      if (!tokenAllowed) {
         res.status(429).json({ error: "Too many incorrect attempts. Please log in again." });
         return;
       }
@@ -537,9 +511,8 @@ export function registerAuthRoutes(app: Express) {
         res.status(401).json({ error: "Invalid or expired session. Please log in again." });
         return;
       }
-      const tokenExpiresAt = (payload.exp ?? 0) * 1000;
       if (!verifyTotp(user.totpSecret, String(code))) {
-        const failures = recordTotpFailure(tokenKey, tokenExpiresAt);
+        const { count: failures } = await recordLoginAttempt(tokenKey, MAX_TOTP_ATTEMPTS, TOTP_TOKEN_WINDOW_MS);
         const remaining = MAX_TOTP_ATTEMPTS - failures;
         if (remaining <= 0) {
           res.status(429).json({ error: "Too many incorrect attempts. Please log in again." });
@@ -548,7 +521,7 @@ export function registerAuthRoutes(app: Express) {
         }
         return;
       }
-      clearTotpFailures(tokenKey);
+      await clearLoginAttempts(tokenKey);
       const token = generateToken(user.id, user.role, user.tokenVersion);
       const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
       setSessionCookie(res, token);
