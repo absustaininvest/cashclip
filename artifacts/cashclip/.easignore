@@ -5,3 +5,12 @@
 ../../artifacts/cashclip-video
 ../../artifacts/mockup-sandbox
 ../../scripts/exports
+
+# Exclude root and workspace node_modules (EAS installs its own)
+../../node_modules
+../../artifacts/api-server/node_modules
+../../artifacts/absustain/node_modules
+
+# Build artifacts
+../../artifacts/api-server/dist
+../../artifacts/absustain/dist
