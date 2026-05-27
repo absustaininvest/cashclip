@@ -121,6 +121,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
     }
 
     if (Platform.OS !== "ios") {
+      requestAdsConsent().catch(() => {});
       setConsentState("done");
       onConsentDone?.();
       return;
