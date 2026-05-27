@@ -74,6 +74,20 @@ export async function clearLoginAttempts(key: string): Promise<void> {
 }
 
 /**
+ * Decrement the attempt counter for a key by one (minimum 0).
+ * Used to release a reserved slot when a rate-limited operation did not
+ * ultimately complete successfully (e.g. settlement failed for a
+ * legitimate reason such as budget exhaustion).
+ */
+export async function decrementLoginAttempt(key: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE login_attempts
+    SET count = GREATEST(0, count - 1)
+    WHERE key = ${key} AND expires_at >= NOW()
+  `);
+}
+
+/**
  * Purge rows whose window has expired.  Safe to call on a schedule.
  */
 export async function pruneExpiredLoginAttempts(): Promise<void> {

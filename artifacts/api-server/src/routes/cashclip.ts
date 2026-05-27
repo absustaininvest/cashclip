@@ -2668,6 +2668,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  to prove the user actually had the page open.
    */
   app.post("/api/earn/sponsored/:id/visit", authMiddleware, async (req: AuthRequest, res) => {
+    // Declared outside the try block so releaseIpSlot is reachable from the
+    // outer catch. ipKey is set once computed inside the try.
+    let ipSlotConsumed = false;
+    let ipKey = "";
+    const releaseIpSlot = async (reason: string) => {
+      if (!ipSlotConsumed) return;
+      ipSlotConsumed = false;
+      try {
+        const { decrementLoginAttempt } = await import("../lib/dbRateLimit");
+        await decrementLoginAttempt(ipKey);
+      } catch (decErr) {
+        req.log.warn({ err: decErr, reason }, "Sponsored /visit IP cap decrement failed");
+      }
+    };
     try {
       const campaignId = String(req.params.id);
 
@@ -2729,19 +2743,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // bounds how much money any single source IP can drain in 24h across
       // any number of Sybil accounts. Default 8/day; override via env.
       //
-      // IMPORTANT: only peek here (checkLoginAttempts). The counter is
-      // incremented (recordLoginAttempt) AFTER a successful settlement so
-      // legitimate users whose request 4xxs out (budget exhausted, already
-      // visited, dwell-time too short, …) are not soft-banned for the day.
-      // Two concurrent requests racing past the peek is acceptable for a
-      // daily cap at this magnitude.
+      // ATOMIC consume-on-check design: we increment the counter BEFORE
+      // settlement so that concurrent requests each get a unique counter value
+      // and cannot all race past the same pre-increment count. If the slot is
+      // over the limit, or if the subsequent settlement fails for a legitimate
+      // reason (budget exhausted, dwell-time too short, already visited, …),
+      // we decrement the counter back so the user is not soft-banned for the
+      // day. We only keep the slot consumed when a settlement actually
+      // succeeds and money is moved. This eliminates the TOCTOU window that
+      // previously allowed N concurrent requests to all observe count=0 and
+      // all credit rewards before any increment landed.
       const { getClientIp: getIp } = await import("../lib/clientIp");
-      const { checkLoginAttempts: peek } = await import("../lib/dbRateLimit");
+      const { recordLoginAttempt: consumeSlot } = await import("../lib/dbRateLimit");
       const visitIpLimit = Math.max(1, parseInt(process.env.SPONSORED_VISIT_IP_LIMIT ?? "8", 10));
-      const ipKey = `sponsored:visit:ip:${getIp(req)}`;
+      ipKey = `sponsored:visit:ip:${getIp(req)}`;
       try {
-        const ipCheck = await peek(ipKey, visitIpLimit);
+        const ipCheck = await consumeSlot(ipKey, visitIpLimit, 24 * 60 * 60 * 1000);
+        ipSlotConsumed = true;
         if (!ipCheck.allowed) {
+          // Over the daily cap — release the slot immediately so that rejected
+          // requests do not erode the budget for legitimate subsequent attempts
+          // from the same network (prevents cap exhaustion via unanswered probes).
+          await releaseIpSlot("over-limit");
           res.status(429).json({
             error: "Daily sponsored-visit limit reached for this network. Try again tomorrow.",
           });
@@ -2760,6 +2783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const attemptToken = body.attemptToken ?? body.visitToken;
 
       if (!attemptToken || typeof attemptToken !== "string" || !/^[a-f0-9]{64}$/.test(attemptToken)) {
+        await releaseIpSlot("invalid-token-format");
         res.status(400).json({ error: "attemptToken is required — call /begin first." });
         return;
       }
@@ -2782,18 +2806,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [attempt] = await dbClient.select().from(attemptsTable)
         .where(drizzleEqLocal(attemptsTable.token, attemptToken));
       if (!attempt) {
+        await releaseIpSlot("invalid-attempt-token");
         res.status(400).json({ error: "Invalid or expired visit token." }); return;
       }
       if (attempt.userId !== req.userId || attempt.campaignId !== campaignId) {
+        await releaseIpSlot("token-mismatch");
         res.status(400).json({ error: "Visit token does not match this campaign." }); return;
       }
       if (attempt.expiresAt.getTime() < Date.now()) {
+        await releaseIpSlot("token-expired");
         res.status(400).json({ error: "Visit token expired — please try again." }); return;
       }
       if (attempt.settledAt) {
+        await releaseIpSlot("already-settled");
         res.status(409).json({ error: "Visit already claimed", alreadyVisited: true }); return;
       }
       if (!attempt.redirectedAt) {
+        await releaseIpSlot("not-redirected");
         res.status(400).json({ error: "Open the visit link before claiming the reward." }); return;
       }
       // Witness beacon must have fired — proves a real browser executed the
@@ -2801,6 +2830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // gate /visit could be claimed by `curl /begin; curl /r/:token; sleep
       // 5; curl /visit` against every active campaign.
       if (!attempt.witnessedAt) {
+        await releaseIpSlot("not-witnessed");
         res.status(400).json({
           error: "Visit not confirmed — please reopen the link in your browser and stay on the page.",
         });
@@ -2818,6 +2848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const MIN_VISIT_MS = parseInt(process.env.MIN_SPONSORED_VISIT_MS ?? "10000", 10);
       const elapsed = Date.now() - attempt.witnessedAt!.getTime();
       if (elapsed < MIN_VISIT_MS) {
+        await releaseIpSlot("dwell-too-short");
         res.status(400).json({
           error: "Visit recorded too quickly — please spend a moment on the page.",
           retryAfterMs: Math.ceil(MIN_VISIT_MS - elapsed),
@@ -2830,8 +2861,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The authoritative budget/active checks happen inside the transaction
       // below via a conditional UPDATE so the result is race-free.
       const [campaign] = await dbClient.select().from(campaignsTable).where(drizzleEqLocal(campaignsTable.id, campaignId));
-      if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
-      if (campaign.userId === req.userId) { res.status(400).json({ error: "You cannot visit your own campaign" }); return; }
+      if (!campaign) { await releaseIpSlot("campaign-not-found"); res.status(404).json({ error: "Campaign not found" }); return; }
+      if (campaign.userId === req.userId) { await releaseIpSlot("self-visit"); res.status(400).json({ error: "You cannot visit your own campaign" }); return; }
 
       // Use the reward amount captured at /begin time (rewardSnapshot), NOT the
       // current campaign.rewardPerVisit. This locks the payout to what was
@@ -2848,6 +2879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { campaignId, userId: req.userId, snapshot: reward, live: Number(campaign.rewardPerVisit) },
           "Reward snapshot out of range — refusing settlement",
         );
+        await releaseIpSlot("reward-snapshot-invalid");
         res.status(400).json({ error: "Invalid visit token — please start a new visit." });
         return;
       }
@@ -2974,9 +3006,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (txErr: any) {
         const settlement: SettlementError | undefined = txErr?.settlement;
         if (settlement === "BUDGET_EXHAUSTED") {
+          await releaseIpSlot("budget-exhausted");
           res.status(400).json({ error: "Campaign budget exhausted" }); return;
         }
         if (settlement === "DAILY_CAP") {
+          await releaseIpSlot("per-user-daily-cap");
           res.status(429).json({
             error: "Daily sponsored-visit earnings cap reached. Try again tomorrow.",
             dailyCap,
@@ -2984,27 +3018,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         if (settlement === "USER_MISSING") {
+          await releaseIpSlot("user-missing");
           res.status(404).json({ error: "User not found" }); return;
         }
         // Unique constraint violation = already visited.
         if (txErr?.code === "23505" || txErr?.cause?.code === "23505") {
+          await releaseIpSlot("already-visited");
           res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true }); return;
         }
         throw txErr;
       }
 
-      // Only consume an IP-cap slot AFTER the settlement actually credited.
-      // Best-effort: a failed counter write must not undo the credit.
-      try {
-        const { recordLoginAttempt: rec } = await import("../lib/dbRateLimit");
-        await rec(ipKey, visitIpLimit, 24 * 60 * 60 * 1000);
-      } catch (incErr) {
-        req.log.warn({ err: incErr }, "Sponsored /visit IP cap increment failed (settlement already credited)");
-      }
+      // Settlement succeeded — IP slot is legitimately consumed. Clear the
+      // flag so the outer catch does not double-decrement on an unrelated error.
+      ipSlotConsumed = false;
 
       req.log.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
       res.json({ ok: true, reward, message: `You earned $${reward.toFixed(2)}!` });
     } catch (err: any) {
+      // Release the IP slot for any unhandled error so that unexpected failures
+      // do not permanently consume a user's daily allowance.
+      await releaseIpSlot("unhandled-error");
       if (err?.code === "23505") {
         res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true });
         return;
