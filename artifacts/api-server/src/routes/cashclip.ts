@@ -24,6 +24,7 @@ import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { webhookRateLimiter } from "../lib/webhookRateLimit";
+import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
@@ -1043,6 +1044,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   https://api.cash-clip.app/api/paypal/webhook
   app.post("/api/paypal/webhook", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
     try {
+      // DB-backed per-IP rate limit — shared across all replicas so an attacker
+      // cannot multiply their budget by hitting different autoscaled instances.
+      // Applied before verifyPayPalWebhook() to prevent the outbound PayPal
+      // OAuth + verify-webhook-signature calls from being used as an amplifier.
+      const { getClientIp } = await import("../lib/clientIp");
+      const ip = getClientIp(req);
+      const ipCheck = await recordLoginAttempt(`paypal-webhook:ip:${ip}`, 30, 15 * 60 * 1000);
+      if (!ipCheck.allowed) {
+        res.status(429).json({ error: "Too many requests. Please try again later." }); return;
+      }
+
       const rawBody = (req as unknown as Record<string, unknown>).rawBody as Buffer | undefined;
       if (!rawBody) {
         res.status(400).json({ error: "Missing raw body" }); return;
