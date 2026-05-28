@@ -2124,18 +2124,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(token + ":" + req.userId! + ":vst")
         .digest("hex");
 
-      // visitChallenge: HMAC-SHA256(attemptToken:userId:challenge, JWT_ACCESS_SECRET).
-      // Returned to the authenticated caller alongside the redirect URL.
-      // The mobile app uses this challenge as input to the appAttestation
-      // computation at /visit time. The server re-derives it deterministically
-      // from the stored attempt row (no extra DB column required).
-      const visitChallenge = _hmacBegin("sha256", _vBeginSecret)
-        .update(token + ":" + req.userId! + ":challenge")
-        .digest("hex");
-
       const redirectUrl = `${base.replace(/\/+$/, "")}/api/earn/sponsored/r/${token}?vst=${visitSessionToken}`;
 
-      res.json({ attemptToken: token, redirectUrl, visitSessionToken, visitChallenge });
+      res.json({ attemptToken: token, redirectUrl, visitSessionToken });
     } catch (err: any) {
       req.log.error({ err }, "Sponsored visit begin failed");
       res.status(500).json({ error: "Failed to begin visit" });
@@ -2824,13 +2815,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Record witnessedAt on this server-observed redirect — the server
         // itself calls this endpoint (not the client), so this timestamp is
         // server-controlled. Combined with the Sec-Fetch-Mode gate above and
-        // the appAttestation required at /visit, these form layered controls:
+        // the VST binding, these form layered controls:
         //   • Sec-Fetch-Mode: raises the bar against browser-based scripts.
-        //   • witnessedAt (set here): proves /c was reached via the chain;
-        //     scripted non-browser clients can reach /c but still cannot
-        //     satisfy the appAttestation gate at /visit.
-        //   • appAttestation (validated at /visit): requires a secret baked
-        //     into the app binary — not present in any HTTP response.
+        //   • witnessedAt (set here): proves /c was reached via the chain.
+        //   • VST binding: ties the chain to the originating session.
         // COALESCE guard ensures concurrent /c calls are idempotent.
         await dbClient.update(attemptsTable)
           .set({
@@ -3132,7 +3120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       // Accept attemptToken (current) or visitToken (older clients).
-      const body = (req.body ?? {}) as { attemptToken?: string; visitToken?: string; appAttestation?: string };
+      const body = (req.body ?? {}) as { attemptToken?: string; visitToken?: string };
       const attemptToken = body.attemptToken ?? body.visitToken;
 
       if (!attemptToken || typeof attemptToken !== "string" || !/^[a-f0-9]{64}$/.test(attemptToken)) {
@@ -3189,77 +3177,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // ── App-attestation gate (primary anti-replay control) ────────────────
-      // Prevents scripted claims by requiring a value that only the compiled
-      // CashClip binary can compute.
-      //
-      // APP_VISIT_PROOF_KEY is an EAS secret injected into the app binary at
-      // build time via app.config.js `extra.appVisitProofKey`. It is accessed
-      // in the app via Constants.expoConfig.extra.appVisitProofKey — NOT an
-      // EXPO_PUBLIC_* variable (not "intentionally client-exposed" per Expo
-      // docs). Extracting it requires decompiling the compiled .jsbundle or
-      // native binary.
-      //
-      // Protocol:
-      //   visitChallenge = HMAC-SHA256(attemptToken:userId:challenge,
-      //                                JWT_ACCESS_SECRET)
-      //     — deterministically re-derived from the stored attempt row;
-      //       returned by /begin so the app can use it as HMAC input.
-      //   ts2min = floor(unix_seconds / 120)   — 2-minute rolling time bucket
-      //   appAttestation = HMAC-SHA256(
-      //       visitChallenge:attemptToken:ts2min:attest,
-      //       APP_VISIT_PROOF_KEY)
-      //
-      // Security model:
-      //   • A plain-HTTP script that calls /begin receives visitChallenge but
-      //     cannot compute appAttestation without APP_VISIT_PROOF_KEY (never
-      //     in any HTTP response). This blocks casual/automated scripting.
-      //   • The 2-minute TTL (ts2min) prevents replayed attestations.
-      //   • One-time consume: the attempt settles exactly once (settledAt
-      //     gate above). A second /visit for the same attempt → 409.
-      //   • Residual risk: a sophisticated attacker who reverse-engineers the
-      //     binary can extract the key. For stronger guarantees use Apple
-      //     DeviceCheck / Google Play Integrity (future work).
-      //   • Fails closed: if APP_VISIT_PROOF_KEY is unconfigured, /visit
-      //     returns 503 rather than silently accepting claims.
-      {
-        const appProofKey = process.env.APP_VISIT_PROOF_KEY ?? "";
-        if (!appProofKey) {
-          await releaseIpSlot("proof-key-unconfigured");
-          req.log.error({}, "Sponsored /visit: APP_VISIT_PROOF_KEY not configured — rejecting");
-          res.status(503).json({ error: "Server configuration error — please try again later." });
-          return;
-        }
-        const { createHmac: _hmacAt, timingSafeEqual: _tseAt } = await import("crypto");
-        const jwtSecret = process.env.JWT_ACCESS_SECRET ?? "";
-        // Re-derive visitChallenge deterministically — no extra DB column needed.
-        const visitChallenge = _hmacAt("sha256", jwtSecret)
-          .update(attemptToken + ":" + attempt.userId + ":challenge")
-          .digest("hex");
-        const nowSec = Math.floor(Date.now() / 1000);
-        const ts2minNow = Math.floor(nowSec / 120);
-        // Accept current and previous bucket for clock-skew / processing delay.
-        const validAttestations = [ts2minNow, ts2minNow - 1].map(bucket =>
-          _hmacAt("sha256", appProofKey)
-            .update(visitChallenge + ":" + attemptToken + ":" + bucket + ":attest")
-            .digest("hex"),
-        );
-        const provided = typeof body.appAttestation === "string" ? body.appAttestation : "";
-        const attestValid = provided.length === 64 && validAttestations.some(expected => {
-          try {
-            return _tseAt(Buffer.from(provided, "hex"), Buffer.from(expected, "hex"));
-          } catch { return false; }
-        });
-        if (!attestValid) {
-          await releaseIpSlot("invalid-app-attestation");
-          req.log.warn({ userId: req.userId }, "Sponsored /visit: appAttestation invalid or expired");
-          res.status(400).json({
-            error: "App attestation required — please update the CashClip app.",
-          });
-          return;
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────────
 
       // Dwell time is measured from witnessedAt (set by /c), not redirectedAt. This means:
       //   • The interstitial minimum dwell (MIN_INTERSTITIAL_DWELL_MS, default 5 s)

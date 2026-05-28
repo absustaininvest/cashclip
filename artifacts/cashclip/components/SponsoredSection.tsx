@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator, Linking } 
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import { APP_VERSION, getAppVisitProofKey } from "@/constants/app";
+import { APP_VERSION } from "@/constants/app";
 
 interface SponsoredCampaign {
   id: string;
@@ -19,33 +19,6 @@ interface SponsoredCampaign {
 // + MIN_SPONSORED_VISIT_MS (10 s, /c→/visit gap) = 15 s.
 // Add a 1 s buffer so the client never hits the /visit dwell gate.
 const MIN_VISIT_MS = 16000;
-
-/**
- * Compute HMAC-SHA256 using the Web Crypto API (available in React Native
- * 0.73+ via globalThis.crypto.subtle; this app targets RN 0.81.5).
- * Returns a lowercase hex string.
- *
- * Used to compute the app attestation for sponsored-visit settlement.
- * The key is read from Constants.expoConfig.extra (via getAppVisitProofKey) —
- * baked into the binary by app.config.js at EAS build time, NOT exposed via
- * any EXPO_PUBLIC_* process.env variable.
- */
-async function hmacSha256Hex(keyStr: string, message: string): Promise<string> {
-  const enc = new TextEncoder();
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle) throw new Error("SubtleCrypto unavailable — requires RN 0.73+");
-  const cryptoKey = await subtle.importKey(
-    "raw",
-    enc.encode(keyStr),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await subtle.sign("HMAC", cryptoKey, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 export default function SponsoredSection() {
   const [campaigns, setCampaigns] = useState<SponsoredCampaign[]>([]);
@@ -87,8 +60,7 @@ export default function SponsoredSection() {
       };
 
       // Step 1: Begin the visit.
-      // Server checks eligibility and issues attemptToken + visitChallenge.
-      // visitChallenge is used as input to the appAttestation HMAC below.
+      // Server checks eligibility and issues attemptToken + redirectUrl.
       const beginRes = await globalThis.fetch(
         new URL(`/api/earn/sponsored/${c.id}/begin`, base).toString(),
         { method: "POST", headers: authHeaders, body: "{}" },
@@ -104,51 +76,30 @@ export default function SponsoredSection() {
         return;
       }
 
-      const { attemptToken, redirectUrl, visitChallenge } =
-        beginData as { attemptToken: string; redirectUrl: string; visitChallenge: string };
+      const { attemptToken, redirectUrl } =
+        beginData as { attemptToken: string; redirectUrl: string };
 
-      // Step 2: Pre-compute appAttestation before opening the URL.
-      //
-      // appAttestation = HMAC-SHA256(
-      //     visitChallenge:attemptToken:ts2min:attest,
-      //     APP_VISIT_PROOF_KEY)
-      //
-      // APP_VISIT_PROOF_KEY comes from Constants.expoConfig.extra — embedded
-      // in the binary by app.config.js at EAS build time (NOT EXPO_PUBLIC_*,
-      // so not accessible via process.env in normal Expo execution). A plain
-      // HTTP script that calls /begin gets visitChallenge but cannot compute
-      // this HMAC without extracting the key from the compiled binary.
-      //
-      // The server validates the same two time buckets (current + previous
-      // 2-minute window) to allow for processing delay / clock skew.
-      const appProofKey = getAppVisitProofKey();
-      const ts2min = Math.floor(Date.now() / 1000 / 120);
-      const appAttestation = await hmacSha256Hex(
-        appProofKey,
-        `${visitChallenge}:${attemptToken}:${ts2min}:attest`,
-      );
-
-      // Step 3: Open the server interstitial URL (includes VST in query string).
+      // Step 2: Open the server interstitial URL (includes VST in query string).
       // The interstitial counts down MIN_INTERSTITIAL_DWELL_MS then navigates
       // to /c, which records witnessedAt server-side and redirects to the
       // advertiser. An optional <img> tracking pixel is appended as ?cashclip_cb
       // for advertiser-side corroboration (not required for settlement).
       await Linking.openURL(redirectUrl).catch(() => {});
 
-      // Step 4: Wait for combined dwell (interstitial + sponsor page).
+      // Step 3: Wait for combined dwell (interstitial + sponsor page).
       // The server enforces dwell from witnessedAt; this client-side wait
       // avoids the retryAfterMs response on first /visit attempt.
       await new Promise<void>((resolve) => setTimeout(resolve, MIN_VISIT_MS + 500));
 
-      // Step 5: Claim the reward.
-      // Server validates: witnessedAt set (by /c), appAttestation correct,
-      // dwell elapsed, attempt not yet settled, VST + IP/UA binding intact.
+      // Step 4: Claim the reward.
+      // Server validates: witnessedAt set (by /c), dwell elapsed, attempt not
+      // yet settled, VST + IP/UA binding intact.
       const visitRes = await globalThis.fetch(
         new URL(`/api/earn/sponsored/${c.id}/visit`, base).toString(),
         {
           method: "POST",
           headers: authHeaders,
-          body: JSON.stringify({ attemptToken, appAttestation }),
+          body: JSON.stringify({ attemptToken }),
         },
       );
       const visitData = await visitRes.json();
