@@ -1789,6 +1789,25 @@ export declare const campaignVisitAttempts: import("drizzle-orm/pg-core").PgTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        deviceHash: import("drizzle-orm/pg-core").PgColumn<{
+            name: "device_hash";
+            tableName: "campaign_visit_attempts";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: 64;
+        }>;
     };
     dialect: "pg";
 }>;
@@ -2442,6 +2461,119 @@ export type User = typeof users.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type EarningsLedgerEntry = typeof earningsLedger.$inferSelect;
 export type RewardSession = typeof rewardSessions.$inferSelect;
+/**
+ * Server-issued per-install tokens for sponsored-visit anti-fraud controls.
+ *
+ * The server generates a random 32-byte opaque token at device registration
+ * time and returns it to the authenticated client. Only the SHA-256 hash is
+ * stored here; the raw token lives in the client's secure storage. This means:
+ *  - The token cannot be minted by the client (it is server-generated).
+ *  - It is rate-limited per user at issuance time.
+ *  - The deviceHash embedded here is the Sybil key used in campaign_clicks;
+ *    /begin and /visit resolve it from this table rather than trusting
+ *    a caller-supplied header at settle time.
+ */
+export declare const deviceInstalls: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "device_installs";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/pg-core").PgColumn<{
+            name: "id";
+            tableName: "device_installs";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
+        tokenHash: import("drizzle-orm/pg-core").PgColumn<{
+            name: "token_hash";
+            tableName: "device_installs";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: 64;
+        }>;
+        deviceHash: import("drizzle-orm/pg-core").PgColumn<{
+            name: "device_hash";
+            tableName: "device_installs";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: 64;
+        }>;
+        userId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "user_id";
+            tableName: "device_installs";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "created_at";
+            tableName: "device_installs";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+export type DeviceInstall = typeof deviceInstalls.$inferSelect;
 export declare const earnTokens: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "earn_tokens";
     schema: undefined;

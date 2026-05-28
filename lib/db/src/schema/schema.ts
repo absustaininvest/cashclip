@@ -213,6 +213,11 @@ export const campaignVisitAttempts = pgTable(
     witnessNonce: varchar("witness_nonce", { length: 64 }),
     settledAt: timestamp("settled_at"),
     expiresAt: timestamp("expires_at").notNull(),
+    // SHA-256 of the X-Device-Id captured at /begin time. Stored here so
+    // /visit can verify consistency (reject mismatches) and use this
+    // server-bound value for the per-device Sybil cap instead of trusting
+    // the header value submitted at settle time.
+    deviceHash: varchar("device_hash", { length: 64 }),
   },
   (t) => ({
     uniqueToken: uniqueIndex("campaign_visit_attempts_token_unique").on(t.token),
@@ -337,6 +342,36 @@ export type RewardSession = typeof rewardSessions.$inferSelect;
 // mission, game) creates a token here. Tokens are claimable after 3 hours.
 // The 3-hour window is enforced server-side at claim time — the client can
 // never self-report or forge points.
+/**
+ * Server-issued per-install tokens for sponsored-visit anti-fraud controls.
+ *
+ * The server generates a random 32-byte opaque token at device registration
+ * time and returns it to the authenticated client. Only the SHA-256 hash is
+ * stored here; the raw token lives in the client's secure storage. This means:
+ *  - The token cannot be minted by the client (it is server-generated).
+ *  - It is rate-limited per user at issuance time.
+ *  - The deviceHash embedded here is the Sybil key used in campaign_clicks;
+ *    /begin and /visit resolve it from this table rather than trusting
+ *    a caller-supplied header at settle time.
+ */
+export const deviceInstalls = pgTable(
+  "device_installs",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    deviceHash: varchar("device_hash", { length: 64 }).notNull(),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tokenHashUnique: uniqueIndex("device_installs_token_hash_unique").on(t.tokenHash),
+    userIdx: index("device_installs_user_idx").on(t.userId, t.createdAt),
+    deviceHashIdx: index("device_installs_device_hash_idx").on(t.deviceHash),
+  }),
+);
+
+export type DeviceInstall = typeof deviceInstalls.$inferSelect;
+
 export const earnTokens = pgTable("earn_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),

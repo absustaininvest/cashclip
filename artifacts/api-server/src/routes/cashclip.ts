@@ -2060,6 +2060,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * Device registration — issues a server-generated install token.
+   *
+   * The client calls this ONCE per device+user pair (on first sponsored-visit
+   * flow) and stores the returned token in secure storage. All subsequent
+   * sponsored /begin and /visit calls present the token via X-Install-Token.
+   *
+   * The server stores only the SHA-256 hash; the raw token is never persisted
+   * server-side. The token cannot be minted by the client — it is server-
+   * generated, so an attacker cannot freely rotate it per account without
+   * going through this rate-limited endpoint again.
+   */
+  app.post("/api/device/register", authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const rawDeviceId = String(req.headers["x-device-id"] ?? "").slice(0, 128);
+      if (!rawDeviceId || !/^[0-9a-fA-F-]{8,128}$/.test(rawDeviceId)) {
+        res.status(400).json({ error: "Invalid or missing device identifier." });
+        return;
+      }
+
+      const { createHash: hashFn, randomBytes } = await import("crypto");
+      const deviceHash = hashFn("sha256").update(rawDeviceId).digest("hex");
+
+      const { db: dbClient, deviceInstalls: deviceInstallsTable } = await import("@workspace/db");
+      const { sql: sqlReg } = await import("drizzle-orm");
+
+      // Per-user token cap (default 5): rate-limits how many server-issued
+      // install credentials a single account can accumulate. DB-backed so the
+      // cap holds across all replicas and survives restarts.
+      //
+      // Note: we intentionally do NOT enforce a one-device-one-account policy
+      // here. Such a policy would be derived from a client-supplied device UUID,
+      // which is untrusted (a modified client can rotate it freely). Applying it
+      // would give false confidence in a bypassable control. Instead, payout
+      // decisions rely exclusively on server-authoritative gates (IP cap,
+      // per-account/per-campaign dedup, witnessedAt, dwell time). Device UUID
+      // is stored in device_installs for forensics/logging only.
+      const maxTokens = Math.max(1, parseInt(process.env.MAX_INSTALL_TOKENS_PER_USER ?? "5", 10));
+      const countRows = await dbClient.execute(sqlReg`
+        SELECT COUNT(*)::int AS n FROM device_installs WHERE user_id = ${req.userId!}
+      `);
+      const existing = Number((countRows.rows[0] as { n: number }).n);
+      if (existing >= maxTokens) {
+        req.log.warn({ userId: req.userId, existing }, "Device registration refused — token limit reached");
+        res.status(429).json({ error: "Device registration limit reached for this account." });
+        return;
+      }
+
+      // Generate an opaque 32-byte install token. Only its hash is stored.
+      const rawToken = randomBytes(32).toString("hex");
+      const tokenHash = hashFn("sha256").update(rawToken).digest("hex");
+
+      await dbClient.insert(deviceInstallsTable).values({
+        tokenHash,
+        deviceHash,
+        userId: req.userId!,
+      });
+
+      req.log.info({ userId: req.userId, tokenHashPrefix: tokenHash.slice(0, 8) }, "Device install token issued");
+      res.status(201).json({ installToken: rawToken });
+    } catch (err: any) {
+      req.log.error({ err }, "Device registration failed");
+      res.status(500).json({ error: "Failed to register device." });
+    }
+  });
+
   /** Earn: begin a sponsored visit — issues a short-lived visit token.
    *  The client must call this BEFORE opening the target URL, then present
    *  the token when calling /visit after spending time on the page.
@@ -2099,16 +2165,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Stateful attempt: 32 random bytes (64 hex chars) — unguessable single-use
       // token bound to (user, campaign). The token is the public handle for both
       // the /r/:token redirect endpoint and the /visit settle call.
-      const { randomBytes, createHmac: _hmacBegin } = await import("crypto");
+      const { randomBytes, createHmac: _hmacBegin, createHash: _hashBegin } = await import("crypto");
       const token = randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
+      // Validate the server-issued install token.
+      // The token is minted by /api/device/register (auth-required, per-user
+      // rate-limited, DB-backed). It is an access gate: it proves the client
+      // went through a server-mediated credential issuance step and is not
+      // freely rotatable on a per-request basis.
+      //
+      // We store SHA-256(installToken) in the attempt row. /visit verifies this
+      // hash matches so the same credential must be presented end-to-end — a
+      // pure token-identity consistency check with no device-hash involvement.
+      //
+      // FAIL-CLOSED: missing, malformed, unknown, or cross-user tokens → 400/403.
+      const beginRawInstallToken = String(req.headers["x-install-token"] ?? "").slice(0, 64);
+      if (!beginRawInstallToken || !/^[a-f0-9]{64}$/.test(beginRawInstallToken)) {
+        res.status(400).json({ error: "Invalid or missing install token — call /api/device/register first." });
+        return;
+      }
+      const beginInstallTokenHash = _hashBegin("sha256").update(beginRawInstallToken).digest("hex");
+      const { deviceInstalls: deviceInstallsTable } = await import("@workspace/db");
+      const { eq: _eqInstall } = await import("drizzle-orm");
+      const [installRecord] = await dbClient.select().from(deviceInstallsTable)
+        .where(_eqInstall(deviceInstallsTable.tokenHash, beginInstallTokenHash));
+      if (!installRecord) {
+        res.status(403).json({ error: "Unrecognised install token — call /api/device/register first." });
+        return;
+      }
+      if (installRecord.userId !== req.userId) {
+        res.status(403).json({ error: "Install token does not belong to this account." });
+        return;
+      }
+
+      // Store the install token hash (not deviceHash) so /visit can confirm
+      // the same server-issued credential is presented end-to-end.
       await dbClient.insert(attemptsTable).values({
         token,
         campaignId,
         userId: req.userId!,
         rewardSnapshot: String(campaign.rewardPerVisit),
         expiresAt,
+        deviceHash: beginInstallTokenHash,
       });
 
       // Build the redirect URL on our own domain. The mobile/web client opens
@@ -3032,58 +3131,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const campaignId = String(req.params.id);
 
-      // Per-install Sybil cap — the mobile client mints a persistent UUID in
-      // AsyncStorage on first launch and sends it as X-Device-Id. If the
-      // same install has already credited more than N distinct user accounts
-      // in the last 24h we refuse — this is the strongest signal we have
-      // that someone is farming throwaway accounts on one physical device.
-      // Default 2 distinct accounts/day per device; override via env.
-      const rawDeviceId = String(req.headers["x-device-id"] ?? "").slice(0, 128);
-      let deviceHash: string | null = null;
-      if (rawDeviceId && /^[0-9a-fA-F-]{8,128}$/.test(rawDeviceId)) {
-        const { createHash: hashFn } = await import("crypto");
-        deviceHash = hashFn("sha256").update(rawDeviceId).digest("hex");
-        const deviceAccountCap = Math.max(
-          1,
-          parseInt(process.env.SPONSORED_VISIT_DEVICE_ACCOUNT_CAP ?? "2", 10),
-        );
-        try {
-          const { db: dbCheck } = await import("@workspace/db");
-          const { sql: sqlCheck } = await import("drizzle-orm");
-          const rows = await dbCheck.execute(sqlCheck`
-            SELECT COUNT(DISTINCT visitor_user_id)::int AS n
-            FROM campaign_clicks
-            WHERE visitor_device_hash = ${deviceHash}
-              AND created_at >= NOW() - INTERVAL '24 hours'
-          `);
-          const distinct = Number((rows.rows[0] as { n: number }).n);
-          // Allow this user if they already appear in the set; otherwise the
-          // (existing + 1) projection must stay within the cap.
-          const { db: dbExists } = await import("@workspace/db");
-          const existsRows = await dbExists.execute(sqlCheck`
-            SELECT 1 FROM campaign_clicks
-            WHERE visitor_device_hash = ${deviceHash}
-              AND visitor_user_id = ${req.userId!}
-              AND created_at >= NOW() - INTERVAL '24 hours'
-            LIMIT 1
-          `);
-          const alreadyCounted = existsRows.rows.length > 0;
-          if (!alreadyCounted && distinct + 1 > deviceAccountCap) {
-            req.log.warn(
-              { userId: req.userId, deviceHashPrefix: deviceHash.slice(0, 8), distinct },
-              "Sponsored visit refused — too many accounts on one device install",
-            );
-            res.status(429).json({
-              error: "Too many accounts active on this device. Try again tomorrow.",
-            });
-            return;
-          }
-        } catch (devErr: any) {
-          req.log.error({ err: devErr }, "Device-ID Sybil check failed");
-          res.status(503).json({ error: "Abuse check unavailable — please retry." });
-          return;
-        }
+      // Resolve device hash from the server-issued install token.
+      // The install token is server-generated (not client-minted), rate-limited
+      // at issuance, and stored in device_installs. By looking up the device
+      // hash here, the Sybil key is server-owned and cannot be rotated per-
+      // request by changing a header value.
+      //
+      // FAIL-CLOSED: missing / malformed / unknown / cross-user tokens → 400/403.
+      // The stored hash from the attempt row (written at /begin) is then compared
+      // against the install record's hash to prevent token swapping between steps.
+      const visitRawInstallToken = String(req.headers["x-install-token"] ?? "").slice(0, 64);
+      if (!visitRawInstallToken || !/^[a-f0-9]{64}$/.test(visitRawInstallToken)) {
+        req.log.warn({ userId: req.userId }, "Sponsored visit refused — missing or malformed X-Install-Token");
+        res.status(400).json({ error: "Invalid or missing install token — call /api/device/register first." });
+        return;
       }
+      const { createHash: hashFn } = await import("crypto");
+      const visitInstallTokenHash = hashFn("sha256").update(visitRawInstallToken).digest("hex");
+      // Install record is validated against the attempt further below once the
+      // attempt row is loaded. visitInstallTokenHash is available from here on.
 
       // Per-IP daily settle cap — the most important damage limiter. Even if
       // an attacker bypasses the witness gate with a headless browser, this
@@ -3197,6 +3263,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Visit recorded too quickly — please spend a moment on the page.",
           retryAfterMs: Math.ceil(MIN_VISIT_MS - elapsed),
         });
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
+      // ── Install token: access gate + cross-step token consistency ────────
+      // The install token (X-Install-Token) is a server-issued, per-user rate-
+      // limited access credential.  It is NOT a Sybil detection key.  Its sole
+      // role here is:
+      //
+      //   1. Access gate: the token must exist in device_installs (issued by
+      //      /api/device/register) and must belong to this authenticated user.
+      //      A client cannot mint a valid token without going through the
+      //      server-mediated, rate-limited registration step.
+      //   2. Cross-step consistency: if the attempt row has a stored token hash
+      //      (written by /begin), we verify that the same server-issued token is
+      //      being presented at /visit. This prevents token swapping between the
+      //      two steps. Pre-migration attempts (null stored hash) skip this check
+      //      and proceed — they are protected by the same server-authoritative
+      //      payout gates listed below.
+      //
+      // No device-based Sybil cap is applied at payout time. Device UUID is a
+      // client-supplied identifier; a modified client can rotate it freely and
+      // produce unlimited synthetic device identities regardless of any server-
+      // side check that trusts it. Applying such a cap would give false
+      // confidence in a bypassable control. The device hash from the install
+      // record is stored in campaign_clicks for telemetry/forensics only.
+      //
+      // Payout decisions rely exclusively on server-authoritative gates:
+      //   - Per-account daily visit COUNT cap (DB-backed, enforced below)
+      //   - Per-IP daily settle cap (DB-backed, enforced above)
+      //   - Per-account per-campaign dedup (atomic in the transaction below)
+      //   - Per-account daily earnings cap (enforced in the transaction below)
+      //   - witnessedAt proof (enforced above)
+      //   - Minimum dwell time (enforced above)
+      //   - Campaign budget limit (atomic in the transaction below)
+      let deviceHash = attempt.deviceHash ?? "";   // kept for campaign_clicks logging only
+      try {
+        const { db: dbInstall, deviceInstalls: diTable } = await import("@workspace/db");
+        const { eq: eqInstall } = await import("drizzle-orm");
+        const [visitInstall] = await dbInstall.select().from(diTable)
+          .where(eqInstall(diTable.tokenHash, visitInstallTokenHash));
+        if (!visitInstall) {
+          req.log.warn({ userId: req.userId }, "Sponsored visit refused — unrecognised install token");
+          await releaseIpSlot("unknown-install-token");
+          res.status(403).json({ error: "Unrecognised install token — call /api/device/register first." });
+          return;
+        }
+        if (visitInstall.userId !== req.userId) {
+          req.log.warn({ userId: req.userId, tokenOwner: visitInstall.userId }, "Sponsored visit refused — install token cross-user");
+          await releaseIpSlot("install-token-cross-user");
+          res.status(403).json({ error: "Install token does not belong to this account." });
+          return;
+        }
+        // Cross-step consistency: if /begin stored the install token hash, the
+        // same token must be presented now.  null means a pre-migration attempt
+        // — skip the check and proceed (other gates cover payout integrity).
+        if (attempt.deviceHash !== null && visitInstallTokenHash !== attempt.deviceHash) {
+          req.log.warn(
+            { userId: req.userId, storedHashPrefix: attempt.deviceHash.slice(0, 8) },
+            "Sponsored visit refused — install token mismatch between /begin and /visit",
+          );
+          await releaseIpSlot("install-token-mismatch");
+          res.status(400).json({ error: "Credential mismatch — please restart the visit from the app." });
+          return;
+        }
+        // deviceHash from the install record is stored in campaign_clicks for
+        // fraud telemetry and forensics only — NOT used as a payout-deny gate.
+        // The device UUID is client-supplied at registration; a modified client
+        // can rotate it per account, so any settlement-time cap keyed to it
+        // gives false confidence without hardware attestation (iOS DeviceCheck /
+        // Android Play Integrity). Payout gating uses only server-authoritative
+        // signals listed below.
+        deviceHash = visitInstall.deviceHash;
+
+        // ── Per-account daily visit count cap (server-authoritative) ─────────
+        // Keyed to req.userId from the verified JWT — no client-supplied device
+        // identity involved. Counts settled sponsored visits in the past 24h.
+        // This is the primary server-authoritative anti-farming bound at payout
+        // time. Fail-closed: 503 on DB error. Configurable via
+        // SPONSORED_VISIT_ACCOUNT_DAILY_MAX (default 10).
+        // Complements: per-IP cap (cross-account same-IP), per-campaign dedup
+        // (atomic), per-account earnings cap, witnessedAt, dwell time, budget.
+        const acctVisitMax = Math.max(
+          1,
+          parseInt(process.env.SPONSORED_VISIT_ACCOUNT_DAILY_MAX ?? "10", 10),
+        );
+        const { sql: sqlAcct } = await import("drizzle-orm");
+        const acctRows = await dbInstall.execute(sqlAcct`
+          SELECT COUNT(*)::int AS n
+          FROM campaign_clicks
+          WHERE visitor_user_id = ${req.userId!}
+            AND created_at >= NOW() - INTERVAL '24 hours'
+        `);
+        const acctCount = Number((acctRows.rows[0] as { n: number }).n);
+        if (acctCount >= acctVisitMax) {
+          req.log.warn(
+            { userId: req.userId, acctCount, acctVisitMax },
+            "Sponsored visit refused — per-account daily visit count cap reached",
+          );
+          await releaseIpSlot("account-daily-visit-cap");
+          res.status(429).json({ error: "Daily sponsored-visit limit reached for this account. Try again tomorrow." });
+          return;
+        }
+      } catch (devErr: any) {
+        req.log.error({ err: devErr }, "Install token / account visit cap check failed");
+        await releaseIpSlot("install-token-check-error");
+        res.status(503).json({ error: "Abuse check unavailable — please retry." });
         return;
       }
       // ─────────────────────────────────────────────────────────────────────

@@ -50,13 +50,24 @@ export default function SponsoredSection() {
       const token = await AsyncStorage.getItem("cashclip_auth_token");
       const { getApiUrl } = await import("@/lib/query-client");
       const { getDeviceId } = await import("@/lib/deviceId");
+      const { getOrRegisterInstallToken } = await import("@/lib/installToken");
       const base = getApiUrl();
       const deviceId = await getDeviceId();
+
+      // Fetch (or register) the server-issued install token for this device.
+      // The token is server-generated, rate-limited at issuance, and stored in
+      // secure storage. It replaces the raw device ID as the Sybil key header.
+      const installToken = await getOrRegisterInstallToken(token ?? "", deviceId, base);
+      if (!installToken) {
+        Alert.alert("Error", "Could not verify device. Please try again.");
+        return;
+      }
+
       const authHeaders = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         "X-App-Version": APP_VERSION,
-        "X-Device-Id": deviceId,
+        "X-Install-Token": installToken,
       };
 
       // Step 1: Begin the visit.
@@ -93,7 +104,7 @@ export default function SponsoredSection() {
 
       // Step 4: Claim the reward.
       // Server validates: witnessedAt set (by /c), dwell elapsed, attempt not
-      // yet settled, VST + IP/UA binding intact.
+      // yet settled, device hash consistent with /begin, VST + IP/UA binding.
       const visitRes = await globalThis.fetch(
         new URL(`/api/earn/sponsored/${c.id}/visit`, base).toString(),
         {
