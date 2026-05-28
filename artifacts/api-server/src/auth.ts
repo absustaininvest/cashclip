@@ -104,6 +104,28 @@ export interface AuthRequest extends Request {
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS_PER_IP = 10;
+// Per-(IP, account) ceiling: limits how many password guesses any single IP
+// can make against any single account within one window.  Because the key
+// includes BOTH the IP and the normalised username, this does not create a
+// per-account DoS surface — a different IP is still able to log in to the
+// same account, so an attacker cannot keep an account permanently locked out
+// the way they could with a plain per-account counter.  DB-backed so the
+// guard is shared across all autoscaled replicas.
+const MAX_LOGIN_ATTEMPTS_PER_IP_ACCOUNT = 5;
+// Global per-account failure budget (across ALL source IPs).
+// Checked (read-only) before the bcrypt comparison so the gate fires even
+// when the attacker rotates IPs to evade the per-IP and per-(IP,account)
+// ceilings above.  Only genuine password failures increment this counter;
+// the counter is cleared on successful login so legitimate users always
+// recover once they supply the correct password.
+//
+// The threshold is intentionally higher than the per-(IP,account) cap to
+// bound the DoS window: exhausting this counter requires 20 failed attempts
+// sourced from different IPs, and the self-expiring 15-minute DB window
+// means the account becomes accessible again without any operator action.
+// This is a deliberate trade-off between brute-force resistance and DoS
+// impact — neither a permanent lockout nor an unconstrained guessing surface.
+const MAX_LOGIN_FAILURES_PER_ACCOUNT = 20;
 const MAX_REGISTER_ATTEMPTS_PER_IP = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
@@ -428,14 +450,23 @@ export function registerAuthRoutes(app: Express) {
 
       const normalizedUsername = username.toLowerCase().trim();
 
-      // Per-account lockout was removed: keying the lockout counter on username
-      // alone made it trivially attacker-triggerable for any known username —
-      // five garbage-password requests from one IP were enough to lock an
-      // account for 15 minutes. Because admin usernames are publicly seeded
-      // constants, the entire admin pool could be kept continuously locked out
-      // by a handful of IPs. The per-IP DB-backed counter (above) is the correct
-      // brute-force boundary: it is shared across all replicas, cannot be evaded
-      // by rotating target usernames, and does not expose a targeted DoS surface.
+      // Per-(IP, account) guard: each source IP is limited to
+      // MAX_LOGIN_ATTEMPTS_PER_IP_ACCOUNT guesses against any single account
+      // per window.  The combined key means a different IP is completely
+      // unaffected, so this does not create the per-account DoS surface that
+      // made a plain per-account lockout dangerous (where any IP could
+      // continuously lock out known admin accounts).  DB-backed so the counter
+      // is shared across all autoscaled replicas.
+      const { allowed: ipAccountAllowed } = await recordLoginAttempt(
+        `acctip:${ip}:${normalizedUsername}`,
+        MAX_LOGIN_ATTEMPTS_PER_IP_ACCOUNT,
+        RATE_LIMIT_WINDOW_MS,
+      );
+      if (!ipAccountAllowed) {
+        res.status(429).json({ error: "Too many attempts. Please try again later." });
+        return;
+      }
+
       const user = await storage.getUserByUsername(normalizedUsername);
       if (!user) {
         await bcrypt.hash("dummy-timing-equalization", 10);
@@ -443,11 +474,33 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
+      // Global per-account failure gate — enforced across all source IPs.
+      // Using checkLoginAttempts (read-only) before bcrypt avoids burning a
+      // slot on an already-locked account and short-circuits expensive hashing.
+      // Key is user.id (not username) so the counter is immune to username
+      // enumeration.
+      const { allowed: acctAllowed } = await checkLoginAttempts(
+        `acct:${user.id}`,
+        MAX_LOGIN_FAILURES_PER_ACCOUNT,
+      );
+      if (!acctAllowed) {
+        res.status(429).json({ error: "Too many attempts. Please try again later." });
+        return;
+      }
+
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
+        // Increment the global per-account failure counter on a genuine bad
+        // password.  The self-expiring window means no operator action is
+        // required to unblock the account after the window elapses.
+        await recordLoginAttempt(`acct:${user.id}`, MAX_LOGIN_FAILURES_PER_ACCOUNT, RATE_LIMIT_WINDOW_MS);
         res.status(401).json({ error: "Invalid credentials" });
         return;
       }
+
+      // Successful password — reset the global failure counter so legitimate
+      // users who had a few failures can log in again immediately next time.
+      await clearLoginAttempts(`acct:${user.id}`);
 
       // Non-admin accounts must verify their email before receiving a token.
       // Admin accounts bypass this gate so operators are never locked out.
