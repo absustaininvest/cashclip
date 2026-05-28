@@ -1904,7 +1904,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
                     <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-white/[0.06]">
                       <div className="flex items-center gap-2 flex-1 min-w-[240px]">
                         <input
-                          type="password"
+                          type="text"
                           value={resetPwdMap[u.id] ?? ""}
                           onChange={(e) =>
                             setResetPwdMap((p) => ({
@@ -1914,8 +1914,47 @@ function CashClipUsersPanel({ token }: { token: string }) {
                           }
                           placeholder="New password (min 8 chars)"
                           onClick={(e) => e.stopPropagation()}
-                          className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                          className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors font-mono"
                         />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+                            const cryptoObj = (globalThis as { crypto?: Crypto }).crypto;
+                            const arr = new Uint32Array(14);
+                            if (cryptoObj?.getRandomValues) {
+                              cryptoObj.getRandomValues(arr);
+                            } else {
+                              for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 0xFFFFFFFF);
+                            }
+                            let pwd = "";
+                            for (let i = 0; i < arr.length; i++) pwd += chars[arr[i]! % chars.length];
+                            setResetPwdMap((p) => ({ ...p, [u.id]: pwd }));
+                          }}
+                          className="px-3 py-2 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-xl text-xs font-medium hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+                          title="Generate a strong random password"
+                        >
+                          Generate
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const pwd = resetPwdMap[u.id] ?? "";
+                            if (!pwd) return;
+                            const navAny = navigator as Navigator & { clipboard?: { writeText: (s: string) => Promise<void> } };
+                            if (navAny.clipboard?.writeText) {
+                              navAny.clipboard.writeText(pwd).then(
+                                () => showToast("Password copied"),
+                                () => showToast("Copy failed", false),
+                              );
+                            }
+                          }}
+                          disabled={!resetPwdMap[u.id]}
+                          className="px-3 py-2 bg-white/[0.05] border border-white/10 text-white/70 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-30 whitespace-nowrap"
+                          title="Copy password to clipboard"
+                        >
+                          Copy
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
