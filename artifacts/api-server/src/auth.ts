@@ -646,8 +646,18 @@ export function registerAuthRoutes(app: Express) {
       const user = await storage.getUser(req.userId!);
       if (!user) { res.status(401).json({ error: "User not found" }); return; }
       if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
-      const { secret, code } = req.body;
+      const { secret, code, currentCode } = req.body;
       if (!secret || !code) { res.status(400).json({ error: "secret and code are required" }); return; }
+      if (user.totpEnabled && user.totpSecret) {
+        if (!currentCode) {
+          res.status(400).json({ error: "currentCode is required to replace an existing 2FA secret" });
+          return;
+        }
+        if (!verifyTotp(user.totpSecret, String(currentCode))) {
+          res.status(400).json({ error: "Current 2FA code is invalid" });
+          return;
+        }
+      }
       if (!verifyTotp(String(secret), String(code))) {
         res.status(400).json({ error: "Invalid code. Please try again." });
         return;

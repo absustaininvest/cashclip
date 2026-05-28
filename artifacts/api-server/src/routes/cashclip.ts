@@ -1305,6 +1305,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ error: "User not found" });
         return;
       }
+      if (target.role === "admin") {
+        res.status(403).json({ error: "Admin account passwords cannot be reset via this endpoint" });
+        return;
+      }
       const bcrypt = await import("bcryptjs");
       const hashed = await bcrypt.hash(newPassword, 10);
       await storage.updateUserPassword(userId, hashed);
