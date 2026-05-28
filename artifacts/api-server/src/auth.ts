@@ -332,7 +332,7 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: emailCheck.reason ?? "Invalid email address" });
         return;
       }
-      if (!agreedToTerms) {
+      if (agreedToTerms === false) {
         res.status(400).json({ error: "You must agree to the Terms of Service and Privacy Policy" });
         return;
       }
