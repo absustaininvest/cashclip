@@ -3,13 +3,20 @@ import { logger } from "./logger";
 import { getClientIp } from "./clientIp";
 
 // ---------------------------------------------------------------------------
-// Per-replica webhook rate limiter
+// Per-replica webhook rate limiter — fast-path, non-authoritative filter
 //
-// NOTE: This limiter uses the default in-process memory store from
-// express-rate-limit. In an autoscaled deployment each replica enforces its
-// own independent budget, so the effective fleet-wide budget is
-// `limit * replica_count`. This is a known limitation; a shared Redis-backed
-// store would be needed for a globally authoritative limit.
+// This limiter uses the default in-process memory store from express-rate-limit.
+// In an autoscaled deployment each replica enforces its own independent budget,
+// so the effective fleet-wide budget is `limit * replica_count`. This limiter
+// is intentionally a non-authoritative fast-path filter: it quickly sheds
+// obvious per-IP bulk traffic on a single replica before requests reach
+// handler logic, but it does NOT provide a globally authoritative cap.
+//
+// Endpoints that perform expensive or money-moving work (e.g. outbound PayPal
+// OAuth + verify-webhook-signature calls) MUST enforce a DB-backed, shared
+// rate check inside the handler — before the expensive operation — so the cap
+// holds across the entire autoscaled fleet.  The in-memory limiter here is
+// complementary, not a substitute for that fleet-wide guard.
 //
 // For protection against write-amplification DoS (flooding webhook_audit with
 // invalid requests that slip under the per-replica budget), a separate per-IP

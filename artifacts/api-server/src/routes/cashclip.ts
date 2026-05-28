@@ -23,7 +23,6 @@ import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
-import { webhookRateLimiter } from "../lib/webhookRateLimit";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
@@ -1042,12 +1041,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PayPal's /v1/notifications/verify-webhook-signature API before acting.
   // Register this URL in PayPal Developer → CashClip Payouts app → Webhooks:
   //   https://api.cash-clip.app/api/paypal/webhook
-  app.post("/api/paypal/webhook", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
+  app.post("/api/paypal/webhook", async (req: Request, res: Response): Promise<void> => {
     try {
-      // DB-backed per-IP rate limit — shared across all replicas so an attacker
-      // cannot multiply their budget by hitting different autoscaled instances.
-      // Applied before verifyPayPalWebhook() to prevent the outbound PayPal
-      // OAuth + verify-webhook-signature calls from being used as an amplifier.
+      // Fleet-wide DB-backed rate limit — shared across all autoscaled replicas.
+      // This is the authoritative abuse control for this endpoint: it enforces a
+      // global per-IP cap before verifyPayPalWebhook() can be called, preventing
+      // an attacker from spreading requests across replicas to multiply the allowed
+      // traffic and drive repeated expensive outbound PayPal OAuth + signature
+      // verification calls.  The global /api in-memory limiter (app.ts) still
+      // applies as a cheap first-pass, but it is not fleet-wide authoritative.
       const { getClientIp } = await import("../lib/clientIp");
       const ip = getClientIp(req);
       const ipCheck = await recordLoginAttempt(`paypal-webhook:ip:${ip}`, 30, 15 * 60 * 1000);
