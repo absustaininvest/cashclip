@@ -254,6 +254,8 @@ export class DatabaseStorage implements IStorage {
         username: insertUser.username,
         password: insertUser.password,
         role: insertUser.role || "user",
+        email: insertUser.email,
+        referredBy: insertUser.referredBy,
       })
       .returning();
     return user;
