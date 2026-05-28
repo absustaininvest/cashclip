@@ -1,0 +1,22 @@
+[expo-cli] Require stack:
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/lib/config/files/plugins.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/lib/config/files/index.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/@babel+core@7.29.0/node_modules/@babel/core/lib/index.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/@expo+metro-config@54.0.15_expo@54.0.34/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/@expo+metro-config@54.0.15_expo@54.0.34/node_modules/@expo/metro-config/build/transform-worker/transform-worker.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/metro@0.83.3/node_modules/metro/src/DeltaBundler/Worker.flow.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/metro@0.83.3/node_modules/metro/src/DeltaBundler/Worker.js
+[expo-cli] - /Users/jorgeballen/cashclip/node_modules/.pnpm/jest-worker@29.7.0/node_modules/jest-worker/build/workers/processChild.js
+[expo-cli] 
+[expo-cli] Make sure that all the Babel plugins and presets you are using
+[expo-cli] are defined as dependencies or devDependencies in your package.json
+[expo-cli] file. It's possible that the missing plugin is loaded by a preset
+[expo-cli] you are using that forgot to add the plugin to its dependencies: you
+[expo-cli] can workaround this problem by explicitly adding the missing package
+[expo-cli] to your top-level package.json.
+✖ Export failed
+/Users/jorgeballen/cashclip/node_modules/.pnpm/expo@54.0.34_@babel+core@7.29.0_@expo+metro-runtime@6.1.2_expo-router@6.0.23_graphql@16_1d4c6922f0c177e86f2756e97c2500c0/node_modules/expo/bin/cli export --output-dir dist --source-maps --dump-assetmap --platform ios --platform android exited with non-zero code: 1
+    Error: update command failed.
+jorgeballen@Jorges-MacBook-Air cashclip % node -v ; pnpm -v ; eas --version ; git --version
+
+
