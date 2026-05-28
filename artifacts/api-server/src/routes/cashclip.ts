@@ -22,6 +22,7 @@ import { updateUserProfileSchema } from "@workspace/db";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
+import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
@@ -789,6 +790,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(req.userId!);
       if (!user) {
         res.status(401).json({ error: "User not found" }); return;
+      }
+
+      // Anti-fraud: block withdrawals from accounts using anonymous/relay email
+      // services. Signup is allowed with these addresses so legitimate users
+      // (especially iPhone users with Apple Hide My Email) aren't locked out at
+      // the door, but cashing out requires a standard email so we can reach the
+      // account holder and so throwaway accounts can't be farmed for payouts.
+      // Apple Hide My Email (@privaterelay.appleid.com) is NOT in the relay set
+      // and is allowed through both signup and withdrawal.
+      if (user.email && isRelayEmail(user.email)) {
+        res.status(403).json({
+          error: "Withdrawals require a standard email address on your account. Your account currently uses a private-relay or anonymous forwarding address, which we can't use for payout verification. Please contact support@absustaininvest.com to update your account email before requesting a withdrawal.",
+          code: "RELAY_EMAIL_NOT_ALLOWED_FOR_WITHDRAWAL",
+        });
+        return;
       }
 
       const dayStart = new Date();
