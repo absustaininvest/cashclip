@@ -6,9 +6,9 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 ## Assets
 
-- **User accounts and sessions** — usernames, emails, hashed passwords, JWTs, optional session/refresh cookies, TOTP enrollment state, and admin sessions. Compromise allows account takeover or admin impersonation.
+- **User accounts and sessions** — usernames, emails, hashed passwords, access JWTs, long-lived refresh tokens, optional session/refresh cookies, TOTP enrollment state, and admin sessions. Compromise allows account takeover or admin impersonation.
 - **CashClip balances and earnings state** — wallet balances, ledger entries, reward sessions, withdrawal requests, and ad/survey/offer completion records. Tampering here directly creates financial loss.
-- **Admin capabilities and operator secrets** — `JWT_TRIDENTE`/JWT signing secret, optional `INVECE` console token, `SEED_ADMIN_PASSWORD`, `SECRETS_PASSPHRASE`, and integration key material. Compromise enables full administrative control and third-party account abuse.
+- **Admin capabilities and operator secrets** — `JWT_ACCESS_SECRET`, optional `JWT_ACCESS_SECRET_PREV` during key rotation, optional `JWT_EDDSA_KEY`, `ADMIN_TOKEN`, `SEED_ADMIN_PASSWORD`, `SECRETS_PASSPHRASE`, and integration key material. Compromise enables full administrative control and third-party account abuse.
 - **Third-party integration credentials and webhook trust** — PayPal, CPX, BitLabs, and other survey/offerwall provider credentials and webhook secrets. Misuse can produce fraudulent payouts, fake reward credits, or data leakage.
 - **User PII and support/business data** — profile data, support tickets, lead submissions, venture files, publisher and campaign records, payout addresses, and operational analytics.
 
@@ -35,11 +35,11 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 ### Spoofing
 
-CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party webhook traffic from survey/offerwall providers. The system must verify every protected request with a valid server-issued token, harden account-recovery proofs so reset codes cannot be guessed online at account scale, and authenticate webhooks with provider-specific secrets or signatures before treating them as proof of a completed earning event.
+CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party webhook traffic from survey/offerwall providers. The system must verify every protected request with a valid server-issued token, harden account-recovery proofs so reset codes cannot be guessed online at account scale, strictly sunset any previous JWT signing key used for rotation, and authenticate webhooks with provider-specific secrets or signatures before treating them as proof of a completed earning event.
 
 ### Tampering
 
-The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, and payout eligibility must be derived from trusted server-side records and verified provider callbacks, not from optimistic client claims.
+The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, payout eligibility, and sponsored-visit completion must be derived from trusted server-side records and verified provider callbacks or reliable proof of delivery, not from optimistic client claims or replayable browser choreography alone.
 
 ### Repudiation
 
