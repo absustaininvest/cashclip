@@ -291,6 +291,13 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
 export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/register", async (req: Request, res: Response): Promise<void> => {
     try {
+      if (process.env.REGISTRATION_PAUSED === "true") {
+        res.status(503).json({
+          error: "We're polishing CashClip for our next release — new signups reopen in a few days. Thanks for your patience!",
+          paused: true,
+        });
+        return;
+      }
       const ip = getClientIp(req);
       const { allowed: ipRegAllowed } = await recordLoginAttempt(`reg:${ip}`, MAX_REGISTER_ATTEMPTS_PER_IP, RATE_LIMIT_WINDOW_MS);
       if (!ipRegAllowed) {

@@ -40,6 +40,54 @@ const EARN_HIGHLIGHTS = [
   { icon: "users", label: "Refer", value: "$0.50/friend", color: "#E53935" },
 ];
 
+function AnnouncementBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  const STORAGE_KEY = "cashclip_announcement_v37_dismissed";
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+        const v = await AsyncStorage.getItem(STORAGE_KEY);
+        if (v === "1") setDismissed(true);
+      } catch {}
+    })();
+  }, []);
+
+  if (dismissed) return null;
+
+  const onDismiss = async () => {
+    setDismissed(true);
+    try {
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.setItem(STORAGE_KEY, "1");
+    } catch {}
+  };
+
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: 10,
+      backgroundColor: "rgba(0,198,160,0.10)",
+      borderColor: "rgba(0,198,160,0.30)", borderWidth: 1,
+      borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+      marginBottom: 12,
+    }}>
+      <MaterialCommunityIcons name="rocket-launch" size={20} color={Colors.primary} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: "Outfit_700Bold", fontSize: 13, color: Colors.text }}>
+          New surveys & partners coming soon
+        </Text>
+        <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 }}>
+          Our next update unlocks higher-paying offers — keep earning with games & ads in the meantime!
+        </Text>
+      </View>
+      <Pressable onPress={onDismiss} hitSlop={10}>
+        <Feather name="x" size={18} color={Colors.textMuted} />
+      </Pressable>
+    </View>
+  );
+}
+
 function EarnHighlightStrip({ router }: { router: any }) {
   return (
     <Pressable
@@ -190,6 +238,9 @@ export default function HomeScreen() {
                 </Pressable>
               ))}
             </View>
+
+            {/* Announcement: upcoming release */}
+            <AnnouncementBanner />
 
             {/* Sponsored campaigns */}
             <SponsoredSection />

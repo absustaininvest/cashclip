@@ -1,6 +1,12 @@
-import * as Device from "expo-device";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
+
+let _Device: typeof import("expo-device") | null = null;
+try {
+  _Device = require("expo-device");
+} catch {
+  _Device = null;
+}
 
 export type IntegrityResult = {
   clean: boolean;
@@ -10,15 +16,22 @@ export type IntegrityResult = {
 let _cached: IntegrityResult | null = null;
 
 async function _runChecks(): Promise<IntegrityResult> {
+  if (!_Device) {
+    return { clean: true, reason: null };
+  }
+
   const isProductionBuild = process.env.EXPO_PUBLIC_ENV === "production";
 
-  if (isProductionBuild && !Device.isDevice) {
-    return { clean: false, reason: "simulator_blocked_in_production" };
+  try {
+    if (isProductionBuild && !_Device.isDevice) {
+      return { clean: false, reason: "simulator_blocked_in_production" };
+    }
+  } catch {
   }
 
   if (Platform.OS === "android") {
     try {
-      const rooted = await Device.isRootedExperimentalAsync();
+      const rooted = await _Device.isRootedExperimentalAsync();
       if (rooted) {
         return { clean: false, reason: "rooted_android" };
       }
