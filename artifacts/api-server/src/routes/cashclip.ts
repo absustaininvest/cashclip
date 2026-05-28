@@ -1006,19 +1006,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (result.success) {
-        const updated = await storage.updateWithdrawalStatus(
-          claimed.id,
-          "paid",
-          `PayPal batch: ${result.batchId}`
-        );
-        res.json({ withdrawal: updated, batchId: result.batchId });
-        sendWithdrawalStatusUpdate({
-          toEmail: claimed.paypalEmail,
-          username: claimed.username,
-          amount: claimed.amount,
-          totalPayout: claimed.totalPayout,
-          status: "paid",
-        }).catch(() => {});
+        // PayPal has accepted the batch creation request but settlement is NOT
+        // final yet. Item-level completion is confirmed asynchronously via
+        // webhook (PAYMENT.PAYOUTS-ITEM.SUCCEEDED / FAILED / RETURNED / etc.).
+        // Leave the withdrawal in "paying" so the webhook handler can make the
+        // authoritative paid/rejected transition with a balance refund if needed.
+        // Marking "paid" here would cause later failure webhooks to no-op
+        // (updateWithdrawalStatusIfStatus only transitions from "paying") and
+        // the user's balance would never be restored.
+        const fresh = await storage.getWithdrawalById(claimed.id);
+        res.json({
+          withdrawal: fresh,
+          batchId: result.batchId,
+          note: "Payout submitted to PayPal. Final status will be updated via webhook.",
+        });
       } else if (result.ambiguous) {
         // The request was dispatched but the outcome is uncertain (network
         // timeout, connection drop, or duplicate batch detected). Do NOT roll
