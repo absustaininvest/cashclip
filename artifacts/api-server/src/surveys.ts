@@ -10,7 +10,7 @@ import {
 } from "./lib/surveyProviders";
 import { verifyWebhook, logWebhookVerificationFailure } from "./lib/webhookAuth";
 import { webhookRateLimiter } from "./lib/webhookRateLimit";
-import { authMiddleware, type AuthRequest } from "./auth";
+import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
 import { buildDemographicEntryUrl } from "./lib/demographicUrl";
@@ -27,7 +27,7 @@ const PROVIDER_REWARD_RANGES: Record<SurveyProviderKey | string, { min: number; 
 };
 
 export function registerSurveyRoutes(app: Express): void {
-  app.get("/api/surveys/providers", authMiddleware, (_req: Request, res: Response) => {
+  app.get("/api/surveys/providers", adminMiddleware, (_req: Request, res: Response) => {
     const statuses = getProviderStatus();
     res.json({
       providers: statuses,

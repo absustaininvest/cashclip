@@ -9,7 +9,7 @@ import {
 } from "./lib/offerwallProviders";
 import { verifyWebhook, logWebhookVerificationFailure } from "./lib/webhookAuth";
 import { webhookRateLimiter } from "./lib/webhookRateLimit";
-import { authMiddleware, type AuthRequest } from "./auth";
+import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
 
@@ -22,7 +22,7 @@ const PROVIDER_REWARD_BOUNDS: Record<string, { min: number; max: number }> = {
 };
 
 export function registerOfferwallRoutes(app: Express): void {
-  app.get("/api/offerwalls/providers", authMiddleware, (_req: Request, res: Response) => {
+  app.get("/api/offerwalls/providers", adminMiddleware, (_req: Request, res: Response) => {
     const statuses = getOfferwallProviderStatus();
     res.json({
       providers: statuses,
