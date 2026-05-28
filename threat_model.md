@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This monorepo contains two production-facing products: the CashClip rewards platform (Expo mobile client in `artifacts/cashclip`, Express + TypeScript API in `artifacts/api-server`, PostgreSQL via `@workspace/db`) and the AB Sustainability Investments marketing website (`artifacts/absustain`, React + Vite). The production deployment is public on the internet, so public HTTP endpoints must be treated as internet-reachable. The mobile client is an untrusted client; all security decisions must be enforced on the API.
+This monorepo contains two production-facing products: the CashClip rewards platform (Expo client in `artifacts/cashclip`, including mobile builds and a browser-served web build, Express + TypeScript API in `artifacts/api-server`, PostgreSQL via `@workspace/db`) and the AB Sustainability Investments marketing website (`artifacts/absustain`, React + Vite). The production deployment is public on the internet, so public HTTP endpoints must be treated as internet-reachable. Both the mobile client and the CashClip web client are untrusted clients; all security decisions must be enforced on the API.
 
 ## Assets
 
@@ -15,6 +15,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 ## Trust Boundaries
 
 - **Mobile/Web client to API** — all client input is attacker-controlled. The server must authenticate, authorize, validate, and enforce business rules independently of frontend behavior.
+- **CashClip web app/admin browser surface** — `artifacts/cashclip` also ships a browser-served web build with operator pages such as admin and setup flows. Browser-only attacks like clickjacking, token theft via same-origin script execution, and UI redressing matter here independently of the API's Helmet protections, because the Expo static server is a separate trust boundary from the Express API.
 - **Public to authenticated to admin API surfaces** — routes in `artifacts/api-server/src` cross distinct trust levels; admin functionality must never rely on hidden UI routes alone.
 - **Autoscaled replicas vs shared abuse controls** — production runs on an autoscaled fleet, so any abuse-control state kept only in process memory or the default in-memory Express rate-limit store is replica-local and must not be treated as a global guard for auth or money-moving routes.
 - **API to PostgreSQL** — the API has direct authority to mutate balances, sessions, users, and operational data. Any injection or authorization flaw here can fully compromise application integrity.
@@ -26,7 +27,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 ## Scan Anchors
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
-- **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, and the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`.
+- **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`, and browser-served CashClip admin/setup routes under `artifacts/cashclip/app`.
 - **Production abuse-control anchor:** prioritize DB-backed or otherwise shared enforcement on login/TOTP, password reset, sponsored visits, withdrawals, and webhook-related throttles; memory-only counters do not hold across replicas.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
