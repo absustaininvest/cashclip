@@ -7,7 +7,11 @@ const URI_RESERVED_IN_LOCAL = /[?#&%]/;
  * cannot be used to contact or identify the account holder.
  */
 const RELAY_DOMAINS = new Set([
-  "privaterelay.appleid.com",
+  // NOTE: privaterelay.appleid.com is intentionally NOT in this list.
+  // Apple's "Hide My Email" is a guaranteed-delivery forwarding service —
+  // verification emails are reliably forwarded to the user's real iCloud
+  // inbox. Blocking it locks out iPhone users whose email field autofills
+  // with @privaterelay.appleid.com.
   "relay.firefox.com",
   "mozmail.com",
   "anonaddy.com",

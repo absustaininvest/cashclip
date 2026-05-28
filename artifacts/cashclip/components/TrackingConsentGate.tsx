@@ -200,14 +200,12 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
     await requestAdsConsent();
 
     await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
-    setConsentState("done");
-    onConsentDone?.();
+    markDone();
   }
 
   async function handleContinueAnyway() {
     await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
-    setConsentState("done");
-    onConsentDone?.();
+    markDone();
   }
 
   if (consentState === "checking") {
