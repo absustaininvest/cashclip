@@ -37,13 +37,27 @@ function getJwtSecret(): string {
 // ── HS256 rotation fallback ───────────────────────────────────────────────────
 // Only used to verify tokens signed by the old HS256 secret during the 2h
 // transition window after a keyswitch.
-function getPrevJwtSecret(): string | null {
+// Both JWT_ACCESS_SECRET_PREV and JWT_ACCESS_SECRET_PREV_CUTOFF (Unix seconds)
+// must be set for the fallback to activate. The cutoff is the time at which the
+// key was rotated; only tokens issued at or before that time are accepted.
+function getPrevJwtSecretAndCutoff(): { secret: string; cutoff: number } | null {
   const s = process.env.JWT_ACCESS_SECRET_PREV;
-  if (!s) return null;
-  return s;
+  const c = process.env.JWT_ACCESS_SECRET_PREV_CUTOFF;
+  if (!s || !c) return null;
+  const cutoff = parseInt(c, 10);
+  if (!Number.isFinite(cutoff) || cutoff <= 0) return null;
+  // Hard server-time sunset: once the maximum token lifetime (2h) has elapsed
+  // since the rotation cutoff, stop accepting the old key entirely. This
+  // prevents an attacker who backdates `iat` to a value ≤ cutoff from keeping
+  // a forged token alive indefinitely — after this window the old key is gone
+  // from the server's perspective regardless of what the token claims.
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec > cutoff + TOKEN_EXPIRY_SECONDS) return null;
+  return { secret: s, cutoff };
 }
 
 const TOKEN_EXPIRY = "2h";
+const TOKEN_EXPIRY_SECONDS = 2 * 60 * 60; // numeric equivalent of TOKEN_EXPIRY, used for sunset window
 
 // ── JWT_REFRESH_SECRET — refresh token layer ──────────────────────────────────
 // Signs long-lived refresh tokens (30d) stored in the rid httpOnly cookie.
@@ -101,22 +115,37 @@ function generateToken(userId: string, role: string, tokenVersion: number): stri
 }
 
 function verifyToken(token: string): { userId: string; role: string; tokenVersion: number } | null {
-  const secrets: string[] = [];
-  try { secrets.push(getJwtSecret()); } catch { /* secret not configured */ }
-  const prev = getPrevJwtSecret();
-  if (prev) secrets.push(prev);
+  // Try current signing secret first.
+  try {
+    const decoded = jwt.verify(token, getJwtSecret());
+    if (
+      typeof decoded === "object" && decoded !== null &&
+      "userId" in decoded && "role" in decoded && "tokenVersion" in decoded
+    ) {
+      return decoded as { userId: string; role: string; tokenVersion: number };
+    }
+  } catch { /* try fallback */ }
 
-  for (const secret of secrets) {
+  // Try previous signing secret only when both the secret and a rotation
+  // cutoff timestamp are explicitly configured. Only tokens whose iat is at
+  // or before the cutoff are accepted — this prevents an attacker who knows
+  // the old secret from minting fresh tokens with arbitrary future iat values.
+  const prev = getPrevJwtSecretAndCutoff();
+  if (prev) {
     try {
-      const decoded = jwt.verify(token, secret);
+      const decoded = jwt.verify(token, prev.secret);
       if (
         typeof decoded === "object" && decoded !== null &&
         "userId" in decoded && "role" in decoded && "tokenVersion" in decoded
       ) {
-        return decoded as { userId: string; role: string; tokenVersion: number };
+        const iat = (decoded as Record<string, unknown>).iat;
+        if (typeof iat === "number" && iat <= prev.cutoff) {
+          return decoded as { userId: string; role: string; tokenVersion: number };
+        }
       }
-    } catch { /* try next */ }
+    } catch { /* invalid token */ }
   }
+
   return null;
 }
 
@@ -811,6 +840,67 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // ── POST /api/auth/logout ─────────────────────────────────────────────────
+  // Increments tokenVersion so all outstanding refresh tokens for the user are
+  // immediately invalidated server-side. Clears the rid and sid cookies.
+  // Accepts the request on a best-effort basis even without a valid access
+  // token so that clients can always sign out cleanly.
+  app.post("/api/auth/logout", async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Attempt to identify the user so we can bump their tokenVersion and
+      // immediately invalidate all outstanding refresh tokens server-side.
+      // Try access token first (Bearer header or sid cookie), then fall back to
+      // the refresh token (rid cookie, body, or x-refresh-token header) so that
+      // logout works correctly even when the access token is already expired.
+      let userId: string | undefined;
+
+      const authHeader = req.headers.authorization;
+      let accessToken: string | undefined;
+      if (authHeader?.startsWith("Bearer ")) {
+        accessToken = authHeader.split(" ")[1];
+      } else if (req.signedCookies?.[SID_COOKIE]) {
+        accessToken = req.signedCookies[SID_COOKIE] as string;
+      }
+      if (accessToken) {
+        const payload = verifyToken(accessToken);
+        if (payload) userId = payload.userId;
+      }
+
+      // If access token didn't yield a user (e.g. expired), try the refresh token.
+      // Only accept the refresh token if its tokenVersion matches the user's
+      // current DB record — a stale/replayed token must not force-logout a
+      // legitimate active session.
+      if (!userId) {
+        const ridToken =
+          (req.cookies?.[RID_COOKIE] as string | undefined) ||
+          (req.body?.refreshToken as string | undefined) ||
+          (req.headers?.["x-refresh-token"] as string | undefined);
+        if (ridToken) {
+          const refreshPayload = verifyRefreshToken(ridToken);
+          if (refreshPayload) {
+            const candidate = await storage.getUser(refreshPayload.userId);
+            if (candidate && candidate.tokenVersion === refreshPayload.tokenVersion) {
+              userId = candidate.id;
+            }
+          }
+        }
+      }
+
+      if (userId) {
+        await storage.incrementTokenVersion(userId);
+        logger.info({ userId }, "User logged out — tokenVersion incremented");
+      }
+      clearRefreshCookie(res);
+      clearSessionCookie(res);
+      res.json({ message: "Logged out" });
+    } catch (err: unknown) {
+      logger.error({ err }, "Logout error");
+      clearRefreshCookie(res);
+      clearSessionCookie(res);
+      res.json({ message: "Logged out" });
+    }
+  });
+
   // ── POST /api/auth/refresh ────────────────────────────────────────────────
   // Exchanges a valid rid cookie for a new JWT + refreshed sid + rid cookies.
   // No credentials required — the signed rid cookie is the proof of identity.
@@ -834,10 +924,14 @@ export function registerAuthRoutes(app: Express) {
         clearRefreshCookie(res);
         res.status(401).json({ error: "Session invalidated — please log in again" }); return;
       }
-      const newToken = generateToken(user.id, user.role, user.tokenVersion);
-      const newRefreshToken = generateRefreshToken(user.id, user.tokenVersion);
+      // Rotate tokenVersion on every refresh so the just-consumed refresh token
+      // is immediately invalidated server-side. Any replay of the old token will
+      // fail the tokenVersion check above.
+      const { tokenVersion: newVersion } = await storage.incrementTokenVersion(user.id);
+      const newToken = generateToken(user.id, user.role, newVersion);
+      const newRefreshToken = generateRefreshToken(user.id, newVersion);
       setSessionCookie(res, newToken);
-      setRefreshCookie(res, user.id, user.tokenVersion);
+      setRefreshCookie(res, user.id, newVersion);
       res.json({
         token: newToken,
         ...(newRefreshToken ? { refreshToken: newRefreshToken } : {}),

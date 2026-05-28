@@ -150,6 +150,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      const storedToken = await secureGet(AUTH_TOKEN_KEY);
+      const storedRefreshToken = await secureGet(REFRESH_TOKEN_KEY);
+      const baseUrl = getApiUrl();
+      await fetch(new URL("/api/auth/logout", baseUrl).toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+        },
+        body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
+      });
+    } catch {
+      // Best-effort: always clear local state regardless of network failure
+    }
     await secureMultiDelete([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]);
     setToken(null);
     setUser(null);
