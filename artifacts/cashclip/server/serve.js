@@ -67,6 +67,11 @@ function serveManifest(platform, res) {
   res.end(manifest);
 }
 
+const ANTI_FRAMING_HEADERS = {
+  "x-frame-options": "DENY",
+  "content-security-policy": "frame-ancestors 'none'",
+};
+
 function serveLandingPage(res, landingPageTemplate, appName) {
   const baseUrl = htmlEscape(`https://${CONFIGURED_HOSTNAME}`);
   const expsUrl = htmlEscape(CONFIGURED_HOSTNAME);
@@ -81,7 +86,7 @@ function serveLandingPage(res, landingPageTemplate, appName) {
     .replace(/DEEP_LINK_JS_PLACEHOLDER/g, deepLinkJs)
     .replace(/APP_NAME_PLACEHOLDER/g, htmlEscape(appName));
 
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...ANTI_FRAMING_HEADERS });
   res.end(html);
 }
 
@@ -104,7 +109,8 @@ function serveStaticFile(urlPath, res) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
   const content = fs.readFileSync(filePath);
-  res.writeHead(200, { "content-type": contentType });
+  const extraHeaders = ext === ".html" ? ANTI_FRAMING_HEADERS : {};
+  res.writeHead(200, { "content-type": contentType, ...extraHeaders });
   res.end(content);
 }
 
@@ -114,7 +120,7 @@ const supportPageHtml = fs.readFileSync(SUPPORT_PATH, "utf-8");
 const appName = getAppName();
 
 function serveStaticHtml(html, res) {
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...ANTI_FRAMING_HEADERS });
   res.end(html);
 }
 
