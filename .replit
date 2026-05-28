@@ -21,6 +21,7 @@ UNITY_ADS_GAME_ID_IOS = "6110341"
 [userenv.production]
 
 [userenv.development]
+APP_VISIT_PROOF_KEY = "dev-placeholder-replace-in-eas-build"
 
 [workflows]
 runButton = "Project"

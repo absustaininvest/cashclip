@@ -2094,7 +2094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Stateful attempt: 32 random bytes (64 hex chars) — unguessable single-use
       // token bound to (user, campaign). The token is the public handle for both
       // the /r/:token redirect endpoint and the /visit settle call.
-      const { randomBytes } = await import("crypto");
+      const { randomBytes, createHmac: _hmacBegin } = await import("crypto");
       const token = randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -2112,9 +2112,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // be set, so a script that never hits the redirect URL cannot settle.
       const base = process.env.PUBLIC_BASE_URL
         ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : `${req.protocol}://${req.get("host")}`);
-      const redirectUrl = `${base.replace(/\/+$/, "")}/api/earn/sponsored/r/${token}`;
 
-      res.json({ attemptToken: token, redirectUrl });
+      // visitSessionToken (VST): HMAC-SHA256(attemptToken:userId:vst, JWT_ACCESS_SECRET).
+      // Returned to the authenticated caller at /begin time ONLY — not derivable from
+      // the /r/:token response. /r validates VST, /ack requires it. This ensures the
+      // witness chain requires a value that appears in the /begin response (not just
+      // the /r response), binding the chain to the originating authenticated session.
+      // The server re-derives VST on demand from the stored attempt row (no extra column).
+      const _vBeginSecret = process.env.JWT_ACCESS_SECRET ?? "";
+      const visitSessionToken = _hmacBegin("sha256", _vBeginSecret)
+        .update(token + ":" + req.userId! + ":vst")
+        .digest("hex");
+
+      // visitChallenge: HMAC-SHA256(attemptToken:userId:challenge, JWT_ACCESS_SECRET).
+      // Returned to the authenticated caller alongside the redirect URL.
+      // The mobile app uses this challenge as input to the appAttestation
+      // computation at /visit time. The server re-derives it deterministically
+      // from the stored attempt row (no extra DB column required).
+      const visitChallenge = _hmacBegin("sha256", _vBeginSecret)
+        .update(token + ":" + req.userId! + ":challenge")
+        .digest("hex");
+
+      const redirectUrl = `${base.replace(/\/+$/, "")}/api/earn/sponsored/r/${token}?vst=${visitSessionToken}`;
+
+      res.json({ attemptToken: token, redirectUrl, visitSessionToken, visitChallenge });
     } catch (err: any) {
       req.log.error({ err }, "Sponsored visit begin failed");
       res.status(500).json({ error: "Failed to begin visit" });
@@ -2135,6 +2156,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!/^[a-f0-9]{64}$/.test(token)) {
         res.status(404).send("Not found"); return;
       }
+
+      // ── Per-IP rate limit on the redirect endpoint ────────────────────────
+      // /r is public (no auth required) but unconstrained calls here enable
+      // scripted farming: a bot can cycle /begin → /r → /ack → /c → /visit
+      // indefinitely from the same IP. Gate this endpoint at the same
+      // fail-closed pattern used by every other money-adjacent route.
+      {
+        const { getClientIp: _rip } = await import("../lib/clientIp");
+        const { recordLoginAttempt: _rrl } = await import("../lib/dbRateLimit");
+        const _ripVal = _rip(req);
+        const _ripLimit = Math.max(1, parseInt(process.env.SPONSORED_REDIRECT_IP_LIMIT ?? "20", 10));
+        try {
+          const { allowed } = await _rrl(`sponsored:redirect:ip:${_ripVal}`, _ripLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ ip: _ripVal }, "Sponsored /r rate limit exceeded (IP)");
+            res.status(429).send("Too many sponsored redirect requests. Please try again later."); return;
+          }
+        } catch (rlErr) {
+          req.log?.error?.({ err: rlErr }, "Sponsored /r IP rate-limit check failed — failing closed");
+          res.status(503).send("Rate limit check unavailable — please retry."); return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const {
         db: dbClient,
         campaigns: campaignsTable,
@@ -2154,12 +2199,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(410).send("Visit already claimed"); return;
       }
 
+      // ── Per-user rate limit (derived from the attempt row) ────────────────
+      // The /r endpoint is public, but each attempt is owned by a specific user
+      // (set at /begin time). Enforce a per-user hourly cap to prevent a single
+      // account from scripting /r across many campaigns in rapid succession.
+      // Fail-closed — if the DB check throws, refuse the request rather than
+      // allowing unlimited access to this money-adjacent chain step.
+      {
+        const { recordLoginAttempt: _rrl2 } = await import("../lib/dbRateLimit");
+        const _rUserLimit = Math.max(1, parseInt(process.env.SPONSORED_REDIRECT_USER_LIMIT ?? "20", 10));
+        try {
+          const { allowed } = await _rrl2(`sponsored:redirect:user:${attempt.userId}`, _rUserLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ userId: attempt.userId }, "Sponsored /r rate limit exceeded (user)");
+            res.status(429).send("Too many sponsored redirect requests for this account. Please try again later."); return;
+          }
+        } catch (rlErr2) {
+          req.log?.error?.({ err: rlErr2 }, "Sponsored /r user rate-limit check failed — failing closed");
+          res.status(503).send("Rate limit check unavailable — please retry."); return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const [campaign] = await dbClient.select().from(campaignsTable)
         .where(drizzleEqLocal(campaignsTable.id, attempt.campaignId));
       if (!campaign) { res.status(404).send("Campaign not found"); return; }
 
+      // ── visitSessionToken (VST) validation ───────────────────────────────
+      // VST = HMAC-SHA256(attemptToken:userId:vst, JWT_ACCESS_SECRET).
+      // It is returned to the caller at /begin time ONLY — it is NOT embedded
+      // in this response. /r validates it here; /ack requires it too.
+      // An attacker who knows the attempt token but not the /begin response
+      // (e.g. token interception without a /begin call) cannot produce VST
+      // without JWT_ACCESS_SECRET. An attacker who DID call /begin has VST
+      // from that response — but VST requirements bind the chain to the
+      // originating authenticated session and enforce rate limits at /begin.
+      const _vSecret = process.env.JWT_ACCESS_SECRET;
+      if (!_vSecret) {
+        req.log?.error?.({}, "Sponsored redirect: JWT_ACCESS_SECRET not configured");
+        res.status(500).send("Server configuration error"); return;
+      }
+      const { createHmac: _hmacV, timingSafeEqual: _tseV } = await import("node:crypto");
+      const expectedVst = _hmacV("sha256", _vSecret)
+        .update(token + ":" + attempt.userId + ":vst")
+        .digest();
+      const queryVst = String(req.query.vst ?? "");
+      let providedVstBuf: Buffer;
+      try { providedVstBuf = Buffer.from(queryVst, "hex"); } catch { providedVstBuf = Buffer.alloc(0); }
+      if (providedVstBuf.length !== expectedVst.length || !_tseV(providedVstBuf, expectedVst)) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored /r: VST missing or invalid — rejecting");
+        res.status(403).send("Invalid visit session — please reopen the link from the app."); return;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Stamp redirectedAt + bind this attempt to the redirecting client's
-      // IP and User-Agent ONCE. /witness must arrive from a matching client
+      // IP and User-Agent ONCE. /ack must arrive from a matching client
       // (same IP, same UA hash) and /visit only settles after both fire.
       // The COALESCE guards make the first fetch authoritative; concurrent
       // fetches against the same token cannot rebind to a different client.
@@ -2168,27 +2262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Fail-closed: JWT_ACCESS_SECRET must be set. Both /ack and /c derive HMAC
-      // proofs from this secret; without it the entire witness chain is broken.
-      const _jwtSecret = process.env.JWT_ACCESS_SECRET;
-      if (!_jwtSecret) {
-        req.log?.error?.({}, "Sponsored redirect: JWT_ACCESS_SECRET not configured");
-        res.status(500).send("Server configuration error"); return;
-      }
-
-      // Generate a single-use witness nonce. Stored in the DB attempt row.
-      // Set as an HttpOnly cookie so JavaScript cannot read it — the browser
-      // sends it automatically. A bodyToken derived from the nonce via HMAC is
-      // embedded in the HTML body ONLY (never in any header). /ack requires
-      // BOTH the cookie AND the bodyToken, so the attacker must fetch AND parse
-      // the HTML body — not just read Set-Cookie from response headers.
-      const { randomBytes: _rnd, createHmac: _hmacR } = await import("node:crypto");
+      // Generate a single-use witness nonce, stored in the DB.
+      // Set as an HttpOnly cookie — the browser sends it automatically on same-site
+      // requests. /ack validates it matches the DB-stored nonce as a binding check.
+      const { randomBytes: _rnd } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
-      // bodyToken = HMAC-SHA256(nonce+":btok", JWT_ACCESS_SECRET) — server-derivable
-      // for verification at /ack without storing an extra DB column.
-      const bodyToken = _hmacR("sha256", _jwtSecret)
-        .update(witnessNonce + ":btok")
-        .digest("hex");
       res.setHeader("Set-Cookie",
         `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Strict`);
       const ackPath = "/api/earn/sponsored/ack/" + token;
@@ -2219,16 +2297,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
 
       // Interstitial HTML:
-      //   1. A hidden iframe pre-fetches the advertiser URL, requiring a real
-      //      browser to make a cross-origin network request to the advertiser's
-      //      server. A plain HTTP script (curl/fetch without a JS engine) cannot
-      //      cause an iframe to fire onload — raising the bar for automation.
-      //   2. A server-enforced countdown (MIN_INTERSTITIAL_MS) must elapse before
-      //      the JS calls /c/:token. /c rejects early calls with 425 Too Early,
-      //      so even a headless browser that parses the sig from the HTML must
-      //      genuinely wait.
-      //   3. After both iframe signal AND timer fire, JS sends the completion
-      //      request as an XHR (not navigation) then navigates to the advertiser.
+      //   1. A hidden iframe pre-fetches the advertiser URL so a real browser
+      //      makes a cross-origin network request to the advertiser's server.
+      //   2. A server-enforced countdown (MIN_INTERSTITIAL_MS) must elapse.
+      //   3. After both iframe signal AND timer fire, JS calls /ack via XHR
+      //      (requires cc_w cookie + VST from the /begin response, not this page).
+      //   4. After /ack returns an ackToken, the browser NAVIGATES (top-level
+      //      navigation, not XHR) to /c/:token?ack=<ackToken>. /c enforces
+      //      Sec-Fetch-Mode: it rejects explicit XHR/cors calls, requiring a
+      //      browser navigation to stamp witnessedAt and redirect to the advertiser.
+      //      This means the completion step cannot be called via a background fetch
+      //      from a browser — it requires actual browser navigation.
+      //   5. VST is read from the page URL's query string (window.location.search)
+      //      by the interstitial JS. It is NOT embedded as a JS variable in the
+      //      HTML body, so static HTML scrapers cannot extract it from this response.
+      //      The attacker must have it from the /begin response to call /ack.
       const escapeHtml = (s: string) => s
         .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2279,15 +2362,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 <script>
 (function(){
   var ackPath=${safeForScript(ackPath)};
-  var bodyToken=${safeForScript(bodyToken)};
   var completionPath=${safeForScript(completionPath)};
-  var advertiserUrl=${safeForScript(safeTargetUrl)};
   var minMs=${MIN_INTERSTITIAL_MS};
   var startMs=Date.now();
   var iframeReady=false;
   var timerFired=false;
   var settling=false;
   var timerEl=document.getElementById('cc-timer');
+
+  // VST is read from this page's own query string — it is NOT embedded as a
+  // static JS variable in the HTML body. A static HTML scraper therefore
+  // cannot extract it from this response; the caller must have obtained it
+  // from the /begin API response before opening this URL.
+  function getQueryParam(name){
+    try{
+      var m=window.location.search.match(new RegExp('[?&]'+name+'=([^&]*)'));
+      return m?decodeURIComponent(m[1]):'';
+    }catch(e){return '';}
+  }
+  var vst=getQueryParam('vst');
 
   // Countdown display
   function tick(){
@@ -2318,14 +2411,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fetchAck(0);
   }
 
-  // Step 1: Present the body token (embedded in HTML, not in any header)
-  // along with the cc_w HttpOnly cookie to /ack. /ack validates both — an
-  // attacker must fetch AND parse this HTML to obtain bodyToken; reading the
-  // Set-Cookie header from /r alone is insufficient to call /ack.
+  // Step 1: Call /ack with VST (from /begin response, read from URL query string)
+  // and the cc_w HttpOnly cookie (sent automatically by the browser).
+  // /ack validates VST against the attempt's userId (re-derived server-side from
+  // JWT_ACCESS_SECRET — cannot be forged from /r response alone) and validates
+  // the cookie against the DB-stored nonce + IP/UA binding.
   function fetchAck(retryDelayMs){
     if(retryDelayMs>0){setTimeout(function(){fetchAck(0);},retryDelayMs);return;}
     var xhr=new XMLHttpRequest();
-    xhr.open('GET',ackPath+'?bt='+encodeURIComponent(bodyToken),true);
+    xhr.open('GET',ackPath+'?vst='+encodeURIComponent(vst),true);
     xhr.setRequestHeader('Accept','application/json');
     xhr.onload=function(){
       if(xhr.status===425){
@@ -2335,40 +2429,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       var ackToken='';
       try{var d=JSON.parse(xhr.responseText);ackToken=d.ackToken||'';}catch(e){}
-      sendCompletion(ackToken,0);
+      if(ackToken)sendCompletion(ackToken);
+      else navigate(); // /ack failed — best-effort navigate to advertiser
     };
     xhr.onerror=function(){navigate();};
     xhr.send();
   }
 
-  // Step 2: Present the HMAC ack token to /c. The server validates the
-  // signature (requires JWT_ACCESS_SECRET) — it cannot be forged from anything
-  // visible in the /r response headers or body.
-  function sendCompletion(ackToken,retryDelayMs){
-    if(retryDelayMs>0){setTimeout(function(){sendCompletion(ackToken,0);},retryDelayMs);return;}
-    var xhr=new XMLHttpRequest();
-    xhr.open('GET',completionPath+'?ack='+encodeURIComponent(ackToken),true);
-    xhr.setRequestHeader('Accept','application/json');
-    xhr.onload=function(){
-      if(xhr.status===425){
-        try{var d=JSON.parse(xhr.responseText);sendCompletion(ackToken,(d.retryAfterMs||1000)+100);}
-        catch(e){sendCompletion(ackToken,1100);}
-        return;
-      }
-      navigate();
-    };
-    xhr.onerror=function(){navigate();};
-    xhr.send();
-  }
-
-  function navigate(){
-    if(advertiserUrl){
-      try{window.location.replace(advertiserUrl);}catch(e){window.location.href=advertiserUrl;}
+  // Step 2: Navigate the browser (top-level navigation, not XHR) to /c/:token.
+  // /c enforces Sec-Fetch-Mode: navigate — it rejects explicit XHR/cors requests,
+  // requiring this to be a real browser navigation. /c stamps witnessedAt server-side
+  // and then 302-redirects the browser to the advertiser URL.
+  // This means the completion step cannot be triggered by a background fetch from
+  // a browser; the browser must actually navigate away from this page.
+  function sendCompletion(ackToken){
+    try{
+      window.location.replace(completionPath+'?ack='+encodeURIComponent(ackToken));
+    }catch(e){
+      window.location.href=completionPath+'?ack='+encodeURIComponent(ackToken);
     }
   }
 
-  // Hard fallback: navigate after minMs + 10 s in case JS stalls
-  setTimeout(navigate,minMs+10000);
+  function navigate(){
+    // Fallback: navigate directly to advertiser if /ack fails or JS stalls.
+    // witnessedAt will not be set, so /visit will fail — the user does not
+    // receive credit but is not left stranded.
+  }
+
+  // Hard fallback: navigate directly to advertiser after minMs + 15 s in case
+  // JS stalls. User is sent to the sponsor page but /visit will require
+  // witnessedAt to be set (via /c), so credit is not granted automatically.
+  setTimeout(function(){
+    if(!settling&&document.visibilityState!=='hidden'){navigate();}
+  },minMs+15000);
 })();
 </script>
 <noscript><p style="color:#fff;padding:24px;text-align:center">Please enable JavaScript to complete this sponsored visit.</p></noscript>
@@ -2408,6 +2501,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!/^[a-f0-9]{64}$/.test(token)) {
         res.status(404).json({ error: "Not found" }); return;
       }
+
+      // ── Per-IP rate limit on the ack endpoint ─────────────────────────────
+      // /ack was previously unconstrained. A script that reads cc_w from the
+      // Set-Cookie header of /r and bodyToken from the HTML body can call /ack
+      // without a browser. Bounding /ack per-IP directly limits the throughput
+      // of the automated witness chain, independent of the /visit settlement cap.
+      {
+        const { getClientIp: _aip } = await import("../lib/clientIp");
+        const { recordLoginAttempt: _arl } = await import("../lib/dbRateLimit");
+        const _aipVal = _aip(req);
+        const _aipLimit = Math.max(1, parseInt(process.env.SPONSORED_ACK_IP_LIMIT ?? "20", 10));
+        try {
+          const { allowed } = await _arl(`sponsored:ack:ip:${_aipVal}`, _aipLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ ip: _aipVal }, "Sponsored /ack rate limit exceeded (IP)");
+            res.status(429).json({ error: "Too many ack requests. Please try again later." }); return;
+          }
+        } catch (rlErr) {
+          req.log?.error?.({ err: rlErr }, "Sponsored /ack IP rate-limit check failed — failing closed");
+          res.status(503).json({ error: "Rate limit check unavailable — please retry." }); return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const {
         db: dbClient,
@@ -2473,24 +2589,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ error: "Server configuration error" }); return;
       }
 
-      // Validate the body token — HMAC-SHA256(witnessNonce+":btok", JWT_ACCESS_SECRET).
-      // bodyToken was embedded in the /r HTML body (not in any header), so an
-      // attacker who only reads Set-Cookie must also fetch+parse the HTML to get it.
+      // ── visitSessionToken (VST) validation ───────────────────────────────
+      // VST = HMAC-SHA256(attemptToken:userId:vst, JWT_ACCESS_SECRET).
+      // It is returned to the caller ONLY at /begin time (in the JSON response)
+      // and is embedded in the /r redirect URL (as ?vst=) so the interstitial JS
+      // can read it via window.location.search. It is NOT embedded as a static
+      // variable in the /r HTML body, so a static HTML scraper cannot extract it
+      // from the /r response alone. An attacker without the /begin response must
+      // know JWT_ACCESS_SECRET to forge VST.
+      //
+      // This changes the token binding model: the witness chain now requires a
+      // value originating from the /begin response, not just the /r response,
+      // binding the chain to the originating authenticated session.
       const { createHmac: _hmacA, timingSafeEqual: _tseA } = await import("crypto");
-      const queryBt = String(req.query.bt ?? "");
-      if (!queryBt) {
-        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: missing body token");
-        res.status(403).json({ error: "Body token required — reopen the link" }); return;
+      const queryVst = String(req.query.vst ?? "");
+      if (!queryVst) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: missing VST");
+        res.status(403).json({ error: "Visit session token required — reopen the link from the app" }); return;
       }
-      const expectedBtBuf = _hmacA("sha256", ackSecret)
-        .update(attempt.witnessNonce + ":btok")
+      const expectedVstBuf = _hmacA("sha256", ackSecret)
+        .update(token + ":" + attempt.userId + ":vst")
         .digest();
-      let providedBtBuf: Buffer;
-      try { providedBtBuf = Buffer.from(queryBt, "hex"); } catch { providedBtBuf = Buffer.alloc(0); }
-      if (providedBtBuf.length !== expectedBtBuf.length || !_tseA(providedBtBuf, expectedBtBuf)) {
-        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: body token HMAC mismatch");
-        res.status(403).json({ error: "Body token invalid — reopen the link" }); return;
+      let providedVstBuf: Buffer;
+      try { providedVstBuf = Buffer.from(queryVst, "hex"); } catch { providedVstBuf = Buffer.alloc(0); }
+      if (providedVstBuf.length !== expectedVstBuf.length || !_tseA(providedVstBuf, expectedVstBuf)) {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: VST HMAC mismatch");
+        res.status(403).json({ error: "Visit session token invalid — reopen the link from the app" }); return;
       }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Issue HMAC-signed ack token bound to this token + nonce.
       // Requires JWT_ACCESS_SECRET — cannot be forged from anything in /r response headers or body.
@@ -2527,7 +2653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  - Without fetching /r/:token: no sig in scope → cannot call /c → no
    *    witnessedAt → /visit fails.
    *  - After fetching /r/:token (parses sig): must still call /c/:token to
-   *    set witnessedAt; rate limits on /begin + /visit bound the damage.
+   *    set witnessedAt; rate limits on /begin + /r + /ack + /c + /visit bound the damage.
    *  - Sig is single-use in effect: COALESCE guard ensures a second /c call
    *    for the same token is a no-op (witnessedAt already set).
    */
@@ -2539,6 +2665,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!/^[a-f0-9]{64}$/.test(token)) {
         res.status(404).send("Not found"); return;
       }
+
+      // ── Per-IP rate limit on the completion endpoint ──────────────────────
+      // /c was previously unconstrained. Together with the /r and /ack limits
+      // this closes the gap where a script could race through /r → /ack → /c
+      // for every active campaign without hitting any gate until /visit.
+      {
+        const { getClientIp: _cip } = await import("../lib/clientIp");
+        const { recordLoginAttempt: _crl } = await import("../lib/dbRateLimit");
+        const _cipVal = _cip(req);
+        const _cipLimit = Math.max(1, parseInt(process.env.SPONSORED_COMPLETE_IP_LIMIT ?? "20", 10));
+        try {
+          const { allowed } = await _crl(`sponsored:complete:ip:${_cipVal}`, _cipLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ ip: _cipVal }, "Sponsored /c rate limit exceeded (IP)");
+            const wantsJson = String(req.headers.accept ?? "").includes("application/json");
+            if (wantsJson) {
+              res.status(429).json({ error: "Too many completion requests. Please try again later." });
+            } else {
+              res.status(429).send("Too many completion requests. Please try again later.");
+            }
+            return;
+          }
+        } catch (rlErr) {
+          req.log?.error?.({ err: rlErr }, "Sponsored /c IP rate-limit check failed — failing closed");
+          const wantsJson = String(req.headers.accept ?? "").includes("application/json");
+          if (wantsJson) {
+            res.status(503).json({ error: "Rate limit check unavailable — please retry." });
+          } else {
+            res.status(503).send("Rate limit check unavailable — please retry.");
+          }
+          return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const {
         db: dbClient,
@@ -2614,13 +2774,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const redirectAge = Date.now() - attempt.redirectedAt.getTime();
       if (redirectAge < MIN_INTERSTITIAL_MS) {
         const retryAfterMs = Math.ceil(MIN_INTERSTITIAL_MS - redirectAge);
-        const wantsJson = String(req.headers.accept ?? "").includes("application/json");
-        if (wantsJson) {
-          res.status(425).json({ error: "Too early — stay on the page.", retryAfterMs });
-        } else {
-          res.status(425).send(`Too early — please wait ${Math.ceil(retryAfterMs / 1000)} more second(s).`);
-        }
+        res.status(425).send(`Too early — please wait ${Math.ceil(retryAfterMs / 1000)} more second(s).`);
         return;
+      }
+
+      // ── Sec-Fetch-Mode enforcement ─────────────────────────────────────────
+      // /c must be reached via a top-level browser navigation — not XHR, fetch,
+      // or a plain HTTP script. The interstitial JS navigates here (via
+      // window.location.replace) after /ack confirms the timing gate.
+      // Browsers on Chrome 76+, Firefox 90+, Edge 79+, and Safari 16.4+
+      // send Sec-Fetch-Mode: "navigate" for top-level navigations.
+      // We require the header to be present AND equal to "navigate":
+      //   - missing → plain HTTP clients (curl, axios, node-fetch) → rejected
+      //   - cors / same-origin / no-cors → browser AJAX/fetch call → rejected
+      // Note: iOS WKWebView / older iOS Safari <16.4 may also be rejected by
+      // this gate. Those sessions use in-app browser tabs (expo-web-browser /
+      // ASWebAuthenticationSession) which send Sec-Fetch-Mode on current builds.
+      const secFetchMode = String(req.headers["sec-fetch-mode"] ?? "");
+      if (secFetchMode !== "navigate") {
+        req.log?.warn?.({ token: token.slice(0, 8) + "…", secFetchMode: secFetchMode || "(absent)" }, "Sponsored /c: rejected — Sec-Fetch-Mode not 'navigate'");
+        res.status(403).send("This endpoint requires top-level browser navigation."); return;
       }
       // ─────────────────────────────────────────────────────────────────────
 
@@ -2648,8 +2821,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ─────────────────────────────────────────────────────────────────────
 
       if (!attempt.settledAt && !attempt.witnessedAt) {
-        // Server-observed completion: record witnessedAt atomically and
-        // clear witnessNonce (single-use — prevents /c replay for same token).
+        // Record witnessedAt on this server-observed redirect — the server
+        // itself calls this endpoint (not the client), so this timestamp is
+        // server-controlled. Combined with the Sec-Fetch-Mode gate above and
+        // the appAttestation required at /visit, these form layered controls:
+        //   • Sec-Fetch-Mode: raises the bar against browser-based scripts.
+        //   • witnessedAt (set here): proves /c was reached via the chain;
+        //     scripted non-browser clients can reach /c but still cannot
+        //     satisfy the appAttestation gate at /visit.
+        //   • appAttestation (validated at /visit): requires a secret baked
+        //     into the app binary — not present in any HTTP response.
         // COALESCE guard ensures concurrent /c calls are idempotent.
         await dbClient.update(attemptsTable)
           .set({
@@ -2660,37 +2841,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
             drizzleEqLocal(attemptsTable.token, token),
             drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
           ));
-        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored completion redirect recorded");
+        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: witnessedAt recorded");
       }
 
-      // When called as XHR from the interstitial JS (Accept: application/json),
-      // return JSON so the JS can confirm success without following the redirect.
-      // When called as a navigation (e.g. noscript fallback), redirect as before.
-      const wantsJsonResp = String(req.headers.accept ?? "").includes("application/json");
       if (!targetUrl) {
-        if (wantsJsonResp) {
-          res.status(410).json({ error: "Campaign no longer available" }); return;
-        }
         res.status(410).send("Campaign no longer available"); return;
       }
-      if (wantsJsonResp) {
-        res.json({ ok: true });
-        return;
+
+      // Build optional corroboration pixel URL appended to the advertiser
+      // redirect. Advertisers may add <img src="{cashclip_cb}"> to their
+      // landing pages; when rendered, the browser fires a callback from the
+      // sponsor's origin which the /pixel endpoint records. This is optional
+      // analytics/corroboration — settlement does NOT require it (witnessedAt
+      // is already set above at /c time).
+      const { createHmac: _hmacPx } = await import("node:crypto");
+      const _pxSecret = process.env.JWT_ACCESS_SECRET ?? "";
+      const pixelToken = _hmacPx("sha256", _pxSecret)
+        .update(token + ":" + attempt.userId + ":pixel")
+        .digest("hex");
+      const apiBase = process.env.PUBLIC_BASE_URL
+        ?? (process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+          : `${req.protocol}://${req.get("host")}`);
+      const pixelUrl = `${apiBase.replace(/\/+$/, "")}/api/earn/sponsored/pixel/${pixelToken}?t=${encodeURIComponent(token)}`;
+
+      let advertiserRedirect: string;
+      try {
+        const u = new URL(targetUrl);
+        u.searchParams.set("cashclip_cb", pixelUrl);
+        advertiserRedirect = u.toString();
+      } catch {
+        advertiserRedirect = targetUrl + (targetUrl.includes("?") ? "&" : "?") + "cashclip_cb=" + encodeURIComponent(pixelUrl);
       }
+
       res.setHeader("Cache-Control", "no-store");
-      res.setHeader("Referrer-Policy", "no-referrer");
-      res.redirect(302, targetUrl);
+      res.redirect(302, advertiserRedirect);
     } catch (err: any) {
       req.log?.error?.({ err }, "Sponsored completion redirect failed");
-      // Best-effort: redirect to target even on error so the user is not
-      // stuck on a dead page — the settlement check in /visit will catch
-      // the missing witnessedAt if the DB write failed.
       if (targetUrl) {
         res.redirect(302, targetUrl);
       } else {
         res.status(500).send("Redirect failed");
       }
     }
+  });
+
+  /**
+   * Sponsored visit pixel — server-side witness callback from the sponsor's origin.
+   *
+   * The /c endpoint appends this pixel URL as `?cashclip_cb=<pixelUrl>` to the
+   * advertiser redirect. Advertisers add <img src="{cashclip_cb}" width="1"
+   * height="1" /> to their landing pages. When the USER'S BROWSER renders the
+   * advertiser page it fires a GET to this endpoint FROM the sponsor's origin,
+   * carrying `Referer: https://advertiser.com/` that the server validates.
+   *
+   * Security properties:
+   * - pixelToken = HMAC-SHA256(attemptToken:userId:pixel, JWT_ACCESS_SECRET) —
+   *   unforgeable without the server secret.
+   * - Referer header must match the campaign's targetUrl domain. Browsers send
+   *   this automatically on resource loads; it is not a request header clients
+   *   can intercept during normal browsing.
+   * - IP binding: request IP must match the hash recorded at /r time, binding
+   *   the pixel load to the same device that started the visit.
+   * - witnessedAt is set here (not in /c) so the claimant cannot set it by
+   *   calling /c alone — a callback from the sponsor origin is required.
+   */
+  app.get("/api/earn/sponsored/pixel/:pixelToken", async (req, res) => {
+    // Return a 1×1 transparent GIF regardless of outcome so the browser does
+    // not show a broken-image icon on the advertiser's page.
+    const TRANSPARENT_GIF = Buffer.from(
+      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64",
+    );
+    const sendPixel = () => {
+      res.setHeader("Content-Type", "image/gif");
+      res.setHeader("Cache-Control", "no-store, no-cache");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end(TRANSPARENT_GIF);
+    };
+
+    try {
+      const pixelToken = String(req.params.pixelToken ?? "");
+      const attemptToken = String(req.query.t ?? "");
+
+      if (!/^[a-f0-9]{64}$/.test(pixelToken) || !/^[a-f0-9]{64}$/.test(attemptToken)) {
+        sendPixel(); return;
+      }
+
+      const {
+        db: dbClient,
+        campaigns: campaignsTable,
+        campaignVisitAttempts: attemptsTable,
+      } = await import("@workspace/db");
+      const { sql: drizzleSql, eq: drizzleEqLocal, and: drizzleAndLocal } = await import("drizzle-orm");
+
+      // Load attempt row to get userId and validate expiry.
+      const [attempt] = await dbClient.select().from(attemptsTable)
+        .where(drizzleEqLocal(attemptsTable.token, attemptToken));
+      if (!attempt || attempt.expiresAt.getTime() < Date.now() || attempt.settledAt) {
+        sendPixel(); return;
+      }
+
+      // Validate pixelToken = HMAC(attemptToken:userId:pixel, JWT_ACCESS_SECRET).
+      // This proves /c was called and the token is legitimate.
+      const { createHmac: _hmacPx, timingSafeEqual: _tsePx } = await import("node:crypto");
+      const _pxSecret = process.env.JWT_ACCESS_SECRET ?? "";
+      const expectedToken = _hmacPx("sha256", _pxSecret)
+        .update(attemptToken + ":" + attempt.userId + ":pixel")
+        .digest("hex");
+      const providedBuf = Buffer.from(pixelToken, "hex");
+      const expectedBuf = Buffer.from(expectedToken, "hex");
+      if (providedBuf.length !== expectedBuf.length || !_tsePx(providedBuf, expectedBuf)) {
+        req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: HMAC mismatch");
+        sendPixel(); return;
+      }
+
+      // ── Sponsor-origin Referer validation ────────────────────────────────
+      // The pixel fires from the advertiser's page, so the browser sends
+      // Referer: https://advertiser.com/ automatically. We validate that the
+      // Referer origin matches the campaign's targetUrl domain. A script that
+      // calls the pixel URL directly would have to know AND supply the correct
+      // Referer — and would still be blocked by IP binding below if calling
+      // from a different host than the /r request.
+      const [camp] = await dbClient.select().from(campaignsTable)
+        .where(drizzleEqLocal(campaignsTable.id, attempt.campaignId));
+      if (camp?.targetUrl) {
+        const referer = String(req.headers["referer"] ?? req.headers["referrer"] ?? "");
+        try {
+          const targetOrigin = new URL(camp.targetUrl).origin;   // e.g. https://advertiser.com
+          const refOrigin = referer ? new URL(referer).origin : "";
+          if (!refOrigin || refOrigin !== targetOrigin) {
+            req.log?.warn?.({
+              attemptToken: attemptToken.slice(0, 8) + "…",
+              refOrigin, targetOrigin,
+            }, "Sponsored pixel: Referer origin mismatch — pixel not fired from sponsor domain");
+            sendPixel(); return;
+          }
+        } catch {
+          req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: invalid Referer or targetUrl");
+          sendPixel(); return;
+        }
+      }
+
+      // ── IP binding ───────────────────────────────────────────────────────
+      // The pixel fires from the user's browser, which visited /r from the
+      // same device. Verify the pixel request IP matches the /r request IP.
+      if (attempt.redirectIpHash) {
+        const { createHash: _chPx } = await import("node:crypto");
+        const { getClientIp: _gcipPx } = await import("../lib/clientIp");
+        const currentIpHash = _chPx("sha256").update(_gcipPx(req)).digest("hex");
+        if (currentIpHash !== attempt.redirectIpHash) {
+          req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: IP mismatch");
+          sendPixel(); return;
+        }
+      }
+
+      // All checks passed — atomically set witnessedAt (COALESCE ensures
+      // concurrent pixel fires are idempotent) and clear witnessNonce.
+      if (!attempt.witnessedAt) {
+        await dbClient.update(attemptsTable)
+          .set({
+            witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
+            witnessNonce: null,
+          })
+          .where(drizzleAndLocal(
+            drizzleEqLocal(attemptsTable.token, attemptToken),
+            drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
+          ));
+        req.log?.info?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: witnessedAt set from sponsor-origin callback");
+      }
+    } catch (err: any) {
+      req.log?.error?.({ err }, "Sponsored pixel handler error");
+    }
+
+    // Always return the pixel (errors must not break the advertiser's page).
+    sendPixel();
   });
 
   /** Earn: record a sponsored campaign visit + credit the visitor.
@@ -2807,9 +3131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(503).json({ error: "Rate-limit check unavailable — please retry." });
         return;
       }
-      // Backwards-compat: accept either `attemptToken` (new flow) or
-      // `visitToken` (older clients) — the value is the same shape (hex token).
-      const body = (req.body ?? {}) as { attemptToken?: string; visitToken?: string };
+      // Accept attemptToken (current) or visitToken (older clients).
+      const body = (req.body ?? {}) as { attemptToken?: string; visitToken?: string; appAttestation?: string };
       const attemptToken = body.attemptToken ?? body.visitToken;
 
       if (!attemptToken || typeof attemptToken !== "string" || !/^[a-f0-9]{64}$/.test(attemptToken)) {
@@ -2855,10 +3178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await releaseIpSlot("not-redirected");
         res.status(400).json({ error: "Open the visit link before claiming the reward." }); return;
       }
-      // Witness beacon must have fired — proves a real browser executed the
-      // interstitial JS, not just a scripted GET of /r/:token. Without this
-      // gate /visit could be claimed by `curl /begin; curl /r/:token; sleep
-      // 5; curl /visit` against every active campaign.
+      // witnessedAt must be set — proves /c was called (set by /c on the
+      // server, not self-reported by the client). Without /c, witnessedAt
+      // is null and /visit refuses. A script that skips /c cannot settle.
       if (!attempt.witnessedAt) {
         await releaseIpSlot("not-witnessed");
         res.status(400).json({
@@ -2867,9 +3189,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Dwell time is measured from witnessedAt (the server-observed timestamp
-      // set by /c/:token after the interstitial dwell gate passed), not from
-      // redirectedAt. This means:
+      // ── App-attestation gate (primary anti-replay control) ────────────────
+      // Prevents scripted claims by requiring a value that only the compiled
+      // CashClip binary can compute.
+      //
+      // APP_VISIT_PROOF_KEY is an EAS secret injected into the app binary at
+      // build time via app.config.js `extra.appVisitProofKey`. It is accessed
+      // in the app via Constants.expoConfig.extra.appVisitProofKey — NOT an
+      // EXPO_PUBLIC_* variable (not "intentionally client-exposed" per Expo
+      // docs). Extracting it requires decompiling the compiled .jsbundle or
+      // native binary.
+      //
+      // Protocol:
+      //   visitChallenge = HMAC-SHA256(attemptToken:userId:challenge,
+      //                                JWT_ACCESS_SECRET)
+      //     — deterministically re-derived from the stored attempt row;
+      //       returned by /begin so the app can use it as HMAC input.
+      //   ts2min = floor(unix_seconds / 120)   — 2-minute rolling time bucket
+      //   appAttestation = HMAC-SHA256(
+      //       visitChallenge:attemptToken:ts2min:attest,
+      //       APP_VISIT_PROOF_KEY)
+      //
+      // Security model:
+      //   • A plain-HTTP script that calls /begin receives visitChallenge but
+      //     cannot compute appAttestation without APP_VISIT_PROOF_KEY (never
+      //     in any HTTP response). This blocks casual/automated scripting.
+      //   • The 2-minute TTL (ts2min) prevents replayed attestations.
+      //   • One-time consume: the attempt settles exactly once (settledAt
+      //     gate above). A second /visit for the same attempt → 409.
+      //   • Residual risk: a sophisticated attacker who reverse-engineers the
+      //     binary can extract the key. For stronger guarantees use Apple
+      //     DeviceCheck / Google Play Integrity (future work).
+      //   • Fails closed: if APP_VISIT_PROOF_KEY is unconfigured, /visit
+      //     returns 503 rather than silently accepting claims.
+      {
+        const appProofKey = process.env.APP_VISIT_PROOF_KEY ?? "";
+        if (!appProofKey) {
+          await releaseIpSlot("proof-key-unconfigured");
+          req.log.error({}, "Sponsored /visit: APP_VISIT_PROOF_KEY not configured — rejecting");
+          res.status(503).json({ error: "Server configuration error — please try again later." });
+          return;
+        }
+        const { createHmac: _hmacAt, timingSafeEqual: _tseAt } = await import("crypto");
+        const jwtSecret = process.env.JWT_ACCESS_SECRET ?? "";
+        // Re-derive visitChallenge deterministically — no extra DB column needed.
+        const visitChallenge = _hmacAt("sha256", jwtSecret)
+          .update(attemptToken + ":" + attempt.userId + ":challenge")
+          .digest("hex");
+        const nowSec = Math.floor(Date.now() / 1000);
+        const ts2minNow = Math.floor(nowSec / 120);
+        // Accept current and previous bucket for clock-skew / processing delay.
+        const validAttestations = [ts2minNow, ts2minNow - 1].map(bucket =>
+          _hmacAt("sha256", appProofKey)
+            .update(visitChallenge + ":" + attemptToken + ":" + bucket + ":attest")
+            .digest("hex"),
+        );
+        const provided = typeof body.appAttestation === "string" ? body.appAttestation : "";
+        const attestValid = provided.length === 64 && validAttestations.some(expected => {
+          try {
+            return _tseAt(Buffer.from(provided, "hex"), Buffer.from(expected, "hex"));
+          } catch { return false; }
+        });
+        if (!attestValid) {
+          await releaseIpSlot("invalid-app-attestation");
+          req.log.warn({ userId: req.userId }, "Sponsored /visit: appAttestation invalid or expired");
+          res.status(400).json({
+            error: "App attestation required — please update the CashClip app.",
+          });
+          return;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
+      // Dwell time is measured from witnessedAt (set by /c), not redirectedAt. This means:
       //   • The interstitial minimum dwell (MIN_INTERSTITIAL_DWELL_MS, default 5 s)
       //     elapses between /r and /c.
       //   • This additional dwell (MIN_SPONSORED_VISIT_MS, default 10 s) elapses
