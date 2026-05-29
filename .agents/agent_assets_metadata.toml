@@ -1,3 +1,8 @@
 uploads = []
 generated = []
-outputs = []
+
+[[outputs]]
+id = "vhgDedLKetW48QZAWA3CL"
+uri = "file://exports/CashClip_AppStore_Defense_Record.pdf"
+type = "pdf"
+title = "CashClip — App Store Defense & Compliance Record"

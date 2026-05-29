@@ -74,3 +74,8 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 - All integrations must follow the same setup pattern as CPX Research: one secret per credential (API key, app ID, webhook secret each get their own named secret). No shared or bundled secrets across integrations.
 - All domains must use registered legal domains (absustaininvest.com, cash-clip.app) — never Replit subdomains — in any production-facing configuration, links, or API references.
 - Every fix requires explicit user approval before execution. No unsolicited changes.
+
+## Footnote (agent memory — context only)
+
+- May 2026: Owner (Jorge Ballen) faced retaliatory App Store 1-star reviews on v1.0 after the platform blocked a $5,000 fraudulent withdrawal attempt and contained a few abusive accounts. We prepared a defense/compliance package: a firm-but-objective Apple "Report a Concern" note, four compliant public review replies, and an evidence summary. Exported as `exports/CashClip_AppStore_Defense_Record.pdf` for the owner's records; source screenshots purged from `attached_assets/` per his rule.
+- Key truthful talking points: per-provider signed webhook verification (CPX, BitLabs, PayPal), server-side reward clamping (PROVIDER_REWARD_RANGES), sandboxed PayPal keys + 2FA + manual payout approval, in-app fraud controls (daily cap, 3-day new-account hold, 2 withdrawals/day, activity monitoring). The old "email optional but required for recovery" red disclosure existed in a pre-transfer codebase that was wiped — NOT in current git history; treat as owner-attested, not code-proven.
