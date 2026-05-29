@@ -37,6 +37,7 @@ export interface IStorage {
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
+  factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   deleteUser(id: string): Promise<void>;
   getUserProfile(userId: string): Promise<User | undefined>;
   updateUserProfile(userId: string, data: UpdateUserProfile): Promise<User>;
@@ -214,6 +215,23 @@ export class DatabaseStorage implements IStorage {
       .returning({ tokenVersion: users.tokenVersion });
     if (!updated) {
       throw new Error(`incrementTokenVersion: no row updated for user ${id}`);
+    }
+    return { tokenVersion: updated.tokenVersion };
+  }
+
+  async factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        password: hashedPassword,
+        totpSecret: null,
+        totpEnabled: false,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
+      })
+      .where(eq(users.id, id))
+      .returning({ tokenVersion: users.tokenVersion });
+    if (!updated) {
+      throw new Error(`factoryResetUser: no row updated for user ${id}`);
     }
     return { tokenVersion: updated.tokenVersion };
   }

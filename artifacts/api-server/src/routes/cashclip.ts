@@ -1319,6 +1319,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Owner/admin account recovery: regenerate a strong password AND clear stuck
+  // 2FA in one shot, then invalidate every prior session. Works on admin
+  // accounts (unlike reset-password) because it exists to recover a locked-out
+  // operator. Gated behind the high-privilege secrets passphrase.
+  app.post("/api/admin/users/:userId/factory-reset", adminMiddleware, secretsPassphraseMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const userId = String(req.params["userId"] ?? "");
+      const target = await storage.getUser(userId);
+      if (!target) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      const crypto = await import("node:crypto");
+      const charset = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#%";
+      const bytes = crypto.randomBytes(24);
+      let newPassword = "";
+      for (let i = 0; i < bytes.length; i++) {
+        newPassword += charset[bytes[i]! % charset.length]!;
+      }
+      const bcrypt = await import("bcryptjs");
+      const hashed = await bcrypt.hash(newPassword, 10);
+      const { tokenVersion } = await storage.factoryResetUser(userId, hashed);
+      req.log?.warn(
+        { adminId: req.userId, targetUserId: userId, username: target.username, role: target.role, tokenVersion },
+        "admin FACTORY RESET account — password regenerated, 2FA cleared, all prior sessions invalidated",
+      );
+      res.json({
+        message: "Account factory reset",
+        username: target.username,
+        newPassword,
+        totpCleared: true,
+      });
+    } catch (err: any) {
+      req.log?.error({ err }, "Failed to factory reset account");
+      res.status(500).json({ error: "Failed to factory reset account" });
+    }
+  });
+
   app.post("/api/ad-events", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
       const { event, adUnitType, rewardAmount, rewardType, errorCode, errorMessage, durationMs, platform } = req.body;

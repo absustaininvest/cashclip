@@ -1442,6 +1442,11 @@ function CashClipUsersPanel({ token }: { token: string }) {
     dailyLimit: "7",
   });
   const [savingLimits, setSavingLimits] = useState(false);
+  const [factoryTarget, setFactoryTarget] = useState<CashClipUser | null>(null);
+  const [factoryPassphrase, setFactoryPassphrase] = useState("");
+  const [factoryResult, setFactoryResult] = useState<{ username: string; password: string } | null>(null);
+  const [factoryLoading, setFactoryLoading] = useState(false);
+  const [factoryError, setFactoryError] = useState("");
 
   const PAGE_SIZE = 25;
 
@@ -1567,6 +1572,39 @@ function CashClipUsersPanel({ token }: { token: string }) {
     }
   }
 
+  async function handleFactoryReset() {
+    if (!factoryTarget) return;
+    if (!factoryPassphrase) {
+      setFactoryError("Enter your master passphrase to continue.");
+      return;
+    }
+    setFactoryLoading(true);
+    setFactoryError("");
+    try {
+      const res = await fetch(
+        `/api/admin/users/${factoryTarget.id}/factory-reset`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "x-secrets-passphrase": factoryPassphrase,
+          },
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Factory reset failed");
+      setFactoryResult({ username: data.username, password: data.newPassword });
+      setFactoryTarget(null);
+      setFactoryPassphrase("");
+      fetchUsers(search, page);
+    } catch (err: any) {
+      setFactoryError(err.message);
+    } finally {
+      setFactoryLoading(false);
+    }
+  }
+
   function fmt(dateStr: string | null) {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleDateString("en-US", {
@@ -1637,6 +1675,107 @@ function CashClipUsersPanel({ token }: { token: string }) {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Factory reset — passphrase prompt */}
+      {factoryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-amber-500/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Factory Reset Account?
+            </h3>
+            <p className="text-white/50 text-sm mb-1">
+              This sets a brand-new password and{" "}
+              <span className="text-white font-semibold">switches off 2FA</span>{" "}
+              for{" "}
+              <span className="text-white font-semibold">
+                {factoryTarget.username}
+              </span>
+              , and signs out all of its active sessions.
+            </p>
+            <p className="text-amber-400 text-xs mb-4">
+              Use this to recover a locked-out account. After logging in with the
+              new password, set up a fresh authenticator for 2FA.
+            </p>
+            <input
+              type="password"
+              value={factoryPassphrase}
+              onChange={(e) => setFactoryPassphrase(e.target.value)}
+              placeholder="Master passphrase"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
+            />
+            {factoryError && (
+              <p className="text-red-400 text-xs mb-2">{factoryError}</p>
+            )}
+            <div className="flex gap-3 mt-3">
+              <button
+                onClick={() => {
+                  setFactoryTarget(null);
+                  setFactoryPassphrase("");
+                  setFactoryError("");
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFactoryReset}
+                disabled={factoryLoading}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#06060E] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+              >
+                {factoryLoading ? "Resetting…" : "Factory Reset"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Factory reset — result */}
+      {factoryResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Account Reset ✓
+            </h3>
+            <p className="text-white/50 text-sm mb-1">
+              <span className="text-white font-semibold">
+                {factoryResult.username}
+              </span>{" "}
+              can now log in with this new password. 2FA is OFF — set up a fresh
+              authenticator after logging in.
+            </p>
+            <p className="text-amber-400 text-xs mb-3">
+              Copy it now — it won't be shown again.
+            </p>
+            <div className="flex items-center gap-2 mb-5">
+              <code className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-[#00E676] text-sm font-mono break-all">
+                {factoryResult.password}
+              </code>
+              <button
+                onClick={() => {
+                  const navAny = navigator as Navigator & {
+                    clipboard?: { writeText: (s: string) => Promise<void> };
+                  };
+                  if (navAny.clipboard?.writeText) {
+                    navAny.clipboard.writeText(factoryResult.password).then(
+                      () => showToast("Password copied"),
+                      () => showToast("Copy failed", false),
+                    );
+                  }
+                }}
+                className="px-3 py-2.5 bg-white/[0.05] border border-white/10 text-white/70 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+            <button
+              onClick={() => setFactoryResult(null)}
+              className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
@@ -1968,6 +2107,19 @@ function CashClipUsersPanel({ token }: { token: string }) {
                             : "Reset Password"}
                         </button>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFactoryError("");
+                          setFactoryPassphrase("");
+                          setFactoryTarget(u);
+                        }}
+                        disabled={!!actionLoading}
+                        className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl text-xs font-medium hover:bg-amber-500/20 transition-colors disabled:opacity-40 whitespace-nowrap"
+                        title="Recover a locked-out account: new password AND clear stuck 2FA"
+                      >
+                        Factory Reset
+                      </button>
                       {u.role !== "admin" && (
                         <>
                           <button
