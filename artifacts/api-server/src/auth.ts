@@ -776,10 +776,16 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
       const { codes, hashes } = generateBackupCodes(10);
-      await db
-        .update(users)
-        .set({ totpSecret: secret, totpEnabled: true, totpBackupCodes: hashes })
-        .where(drizzleEq(users.id, req.userId!));
+      // Mutation + durable audit entry commit atomically: if the audit write
+      // fails the 2FA change is rolled back (fail-closed), so there is never a
+      // security-sensitive change without a persisted trail.
+      await db.transaction(async (tx) => {
+        await tx
+          .update(users)
+          .set({ totpSecret: secret, totpEnabled: true, totpBackupCodes: hashes })
+          .where(drizzleEq(users.id, req.userId!));
+        await storage.recordSecurityAudit({ actorUserId: user.id, event: "totp_enabled", ip: getClientIp(req) }, tx);
+      });
       logger.info({ userId: req.userId }, "Admin enabled TOTP 2FA");
       // Send a confirmation email (never containing the actual codes) so the admin
       // has a durable record that 2FA is active and how many backup codes they hold.
@@ -822,7 +828,11 @@ export function registerAuthRoutes(app: Express) {
       }
       // Regenerating invalidates every previously issued code.
       const { codes, hashes } = generateBackupCodes(10);
-      await storage.setTotpBackupCodes(user.id, hashes);
+      // Code rotation + durable audit entry commit atomically (fail-closed).
+      await db.transaction(async (tx) => {
+        await storage.setTotpBackupCodes(user.id, hashes, tx);
+        await storage.recordSecurityAudit({ actorUserId: user.id, event: "backup_codes_regenerated", ip: getClientIp(req) }, tx);
+      });
       logger.info({ userId: req.userId }, "Admin regenerated 2FA backup codes");
       // Confirmation email (never containing the actual codes) recording that the
       // codes were refreshed and how many the admin now holds.
@@ -862,7 +872,11 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Invalid code. Please try again." });
         return;
       }
-      await db.update(users).set({ totpSecret: null, totpEnabled: false, totpBackupCodes: null }).where(drizzleEq(users.id, req.userId!));
+      // 2FA teardown + durable audit entry commit atomically (fail-closed).
+      await db.transaction(async (tx) => {
+        await tx.update(users).set({ totpSecret: null, totpEnabled: false, totpBackupCodes: null }).where(drizzleEq(users.id, req.userId!));
+        await storage.recordSecurityAudit({ actorUserId: user.id, event: "totp_disabled", ip: getClientIp(req) }, tx);
+      });
       logger.info({ userId: req.userId }, "Admin disabled TOTP 2FA");
       // Security alert email (never containing secrets or codes) so the admin is
       // tipped off if someone else turned off 2FA on their account.
@@ -947,7 +961,12 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
       const hashed = await bcrypt.hash(newPassword, 10);
-      const { tokenVersion } = await storage.updateUserPassword(user.id, hashed);
+      // Password change + durable audit entry commit atomically (fail-closed).
+      const { tokenVersion } = await db.transaction(async (tx) => {
+        const result = await storage.updateUserPassword(user.id, hashed, tx);
+        await storage.recordSecurityAudit({ actorUserId: user.id, event: "password_changed", ip: getClientIp(req) }, tx);
+        return result;
+      });
       logger.info({ userId: user.id }, "User changed password");
       const newToken = generateToken(user.id, user.role, tokenVersion);
       setSessionCookie(res, newToken);
@@ -1093,7 +1112,11 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
       const hashed = await bcrypt.hash(newPassword, 10);
-      await storage.updateUserPassword(user.id, hashed);
+      // Password reset + durable audit entry commit atomically (fail-closed).
+      await db.transaction(async (tx) => {
+        await storage.updateUserPassword(user.id, hashed, tx);
+        await storage.recordSecurityAudit({ actorUserId: user.id, event: "password_reset", ip: getClientIp(req) }, tx);
+      });
       logger.info({ userId: user.id }, "Password reset via OTP");
       res.json({ message: "Password reset successfully" });
     } catch (err: unknown) {

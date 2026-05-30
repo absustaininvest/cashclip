@@ -15,11 +15,24 @@ import {
   rewardSessions,
   adEvents,
   webhookAudit,
+  securityAuditLog,
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { eq, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Either the root db handle or an in-flight transaction. Methods accept this so
+// security-sensitive mutations and their audit-log write can be committed
+// atomically (fail-closed) inside a single transaction.
+type Executor = typeof db | DbTx;
+
+export type SecurityAuditEvent =
+  | "totp_enabled"
+  | "totp_disabled"
+  | "backup_codes_regenerated"
+  | "password_changed"
+  | "password_reset";
 
 export type LedgerType =
   | "survey"
@@ -38,6 +51,7 @@ export interface IStorage {
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
+  recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; ip?: string | null }): Promise<void>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -198,8 +212,8 @@ export class DatabaseStorage implements IStorage {
     await db.update(users).set({ emailVerified: true, emailVerificationToken: null, emailVerificationExpiresAt: null }).where(eq(users.id, userId));
   }
 
-  async updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }> {
-    const [updated] = await db
+  async updateUserPassword(id: string, hashedPassword: string, executor: Executor = db): Promise<{ tokenVersion: number }> {
+    const [updated] = await executor
       .update(users)
       .set({ password: hashedPassword, tokenVersion: sql`${users.tokenVersion} + 1` })
       .where(eq(users.id, id))
@@ -222,8 +236,16 @@ export class DatabaseStorage implements IStorage {
     return { tokenVersion: updated.tokenVersion };
   }
 
-  async setTotpBackupCodes(userId: string, hashes: string[]): Promise<void> {
-    await db.update(users).set({ totpBackupCodes: hashes }).where(eq(users.id, userId));
+  async setTotpBackupCodes(userId: string, hashes: string[], executor: Executor = db): Promise<void> {
+    await executor.update(users).set({ totpBackupCodes: hashes }).where(eq(users.id, userId));
+  }
+
+  async recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; ip?: string | null }, executor: Executor = db): Promise<void> {
+    await executor.insert(securityAuditLog).values({
+      actorUserId: args.actorUserId,
+      event: args.event,
+      ip: args.ip ?? null,
+    });
   }
 
   async getTotpBackupCodesRemaining(userId: string): Promise<number> {

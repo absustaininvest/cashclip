@@ -298,6 +298,32 @@ export const webhookAudit = pgTable(
 export type WebhookAuditEntry = typeof webhookAudit.$inferSelect;
 export type InsertWebhookAuditEntry = typeof webhookAudit.$inferInsert;
 
+// Durable, attributable trail of security-sensitive admin account changes
+// (2FA enable/disable, backup-code regeneration, password changes/resets).
+// Complements the best-effort logger.info + email notifications, which can be
+// lost (ephemeral logs) or silently fail (email). NEVER stores secrets, TOTP
+// seeds, backup codes, or passwords — only who-did-what-when metadata.
+export const securityAuditLog = pgTable(
+  "security_audit_log",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    actorUserId: varchar("actor_user_id").notNull().references(() => users.id),
+    event: text("event").notNull(),
+    ip: text("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    actorIdx: index("security_audit_actor_idx").on(t.actorUserId, t.createdAt),
+    eventIdx: index("security_audit_event_idx").on(t.event, t.createdAt),
+    createdAtIdx: index("security_audit_created_at_idx").on(t.createdAt),
+  })
+);
+
+export type SecurityAuditEntry = typeof securityAuditLog.$inferSelect;
+export type InsertSecurityAuditEntry = typeof securityAuditLog.$inferInsert;
+
 export const insertAdEventSchema = createInsertSchema(adEvents).omit({ id: true, createdAt: true });
 export type InsertAdEvent = z.infer<typeof insertAdEventSchema>;
 export type AdEvent = typeof adEvents.$inferSelect;

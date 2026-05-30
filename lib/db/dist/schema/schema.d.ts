@@ -2398,6 +2398,104 @@ export declare const webhookAudit: import("drizzle-orm/pg-core").PgTableWithColu
 }>;
 export type WebhookAuditEntry = typeof webhookAudit.$inferSelect;
 export type InsertWebhookAuditEntry = typeof webhookAudit.$inferInsert;
+export declare const securityAuditLog: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "security_audit_log";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/pg-core").PgColumn<{
+            name: "id";
+            tableName: "security_audit_log";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
+        actorUserId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "actor_user_id";
+            tableName: "security_audit_log";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
+        event: import("drizzle-orm/pg-core").PgColumn<{
+            name: "event";
+            tableName: "security_audit_log";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        ip: import("drizzle-orm/pg-core").PgColumn<{
+            name: "ip";
+            tableName: "security_audit_log";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "created_at";
+            tableName: "security_audit_log";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+export type SecurityAuditEntry = typeof securityAuditLog.$inferSelect;
+export type InsertSecurityAuditEntry = typeof securityAuditLog.$inferInsert;
 export declare const insertAdEventSchema: z.ZodObject<{
     userId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     event: z.ZodString;
