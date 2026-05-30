@@ -166,6 +166,7 @@ export interface IStorage {
   }): Promise<Array<{ ip: string; provider: string; count: number; lastSeenAt: Date }>>;
   getWebhookAuditProviders(): Promise<string[]>;
   pruneWebhookAudit(before: Date): Promise<number>;
+  pruneSecurityAudit(before: Date): Promise<number>;
 }
 
 function n(value: string | number | null | undefined): number {
@@ -1241,6 +1242,14 @@ export class DatabaseStorage implements IStorage {
       .selectDistinct({ provider: webhookAudit.provider })
       .from(webhookAudit);
     return rows.map((r: (typeof rows)[number]) => r.provider).sort();
+  }
+
+  async pruneSecurityAudit(before: Date): Promise<number> {
+    const rows = await db
+      .delete(securityAuditLog)
+      .where(lt(securityAuditLog.createdAt, before))
+      .returning({ id: securityAuditLog.id });
+    return rows.length;
   }
 }
 
