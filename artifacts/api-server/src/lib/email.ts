@@ -145,6 +145,46 @@ export function sendBackupCodeUsedAlert(options: {
 }): void {
   const { to, username, remaining } = options;
   const lowThreshold = options.lowThreshold ?? 2;
+  const isExhausted = remaining <= 0;
+
+  // When the admin has run completely out of backup codes, send a distinct,
+  // high-urgency email: a lost authenticator now means a full lockout, the exact
+  // failure this feature exists to prevent.
+  if (isExhausted) {
+    const safeUsername = escapeHtml(username);
+    sendBestEffort({
+      to,
+      subject: "URGENT: You have 0 CashClip backup codes left — regenerate now",
+      text: `Hi ${username},\n\nYou just used your LAST two-factor backup code to sign in to your CashClip admin account. You now have ZERO backup codes remaining.\n\nThis is urgent: if you lose access to your authenticator app, you will be permanently locked out of your admin account.\n\nSign in now and regenerate a fresh set of backup codes immediately, then store them somewhere safe.\n\nIf this wasn't you, reset your password right away — your account may be compromised.\n\n— The CashClip Team`,
+      // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+      html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#E53935,#FF6F60);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#fff;opacity:0.9;text-transform:uppercase;letter-spacing:1px">Urgent Security Alert</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#b0b0b0;line-height:1.6">You just used your <strong style="color:#fff">last</strong> two-factor backup code to sign in to your CashClip admin account.</p>
+          <div style="text-align:center;margin:24px 0">
+            <div style="display:inline-block;background:#2a0a0a;border:2px solid #E53935;border-radius:16px;padding:16px 40px">
+              <span style="font-size:44px;font-weight:800;color:#FF6F60">0</span>
+              <span style="font-size:14px;color:#b0b0b0;display:block;margin-top:4px">backup codes remaining</span>
+            </div>
+          </div>
+          <div style="margin:20px 0 0;background:#2a0a0a;border:1px solid #E53935;border-radius:12px;padding:16px">
+            <p style="margin:0;font-size:14px;color:#ffb3ab;line-height:1.6"><strong style="color:#FF6F60">You are one lost authenticator away from a full lockout.</strong> Sign in now and regenerate a fresh set of backup codes immediately, then store them somewhere safe.</p>
+          </div>
+          <p style="margin:24px 0 0;font-size:12px;color:#555;text-align:center">If this wasn't you, reset your password right away — your account may be compromised.</p>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+    });
+    return;
+  }
+
   const isLow = remaining <= lowThreshold;
   const safeUsername = escapeHtml(username);
   const safeRemaining = escapeHtml(String(remaining));
