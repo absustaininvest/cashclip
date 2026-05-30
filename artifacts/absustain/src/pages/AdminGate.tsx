@@ -1,5 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { ShieldCheck, KeyRound } from "lucide-react";
+import {
+  ShieldCheck,
+  KeyRound,
+  RefreshCw,
+  Check,
+  FileText,
+  Download,
+} from "lucide-react";
 
 const AdminDashboard = lazy(() => import("./Admin"));
 
@@ -21,6 +28,12 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [otp, setOtp] = useState("");
   const [pendingToken, setPendingToken] = useState("");
   const [backupRemaining, setBackupRemaining] = useState<number | null>(null);
+  const [regenMode, setRegenMode] = useState(false);
+  const [regenCode, setRegenCode] = useState("");
+  const [regenLoading, setRegenLoading] = useState(false);
+  const [regenError, setRegenError] = useState("");
+  const [newBackupCodes, setNewBackupCodes] = useState<string[] | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,6 +101,61 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
     onLogin(pendingToken);
   }
 
+  async function handleRegenerate() {
+    setRegenLoading(true);
+    setRegenError("");
+    try {
+      const res = await fetch("/api/auth/totp/backup-codes/regenerate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pendingToken}`,
+        },
+        body: JSON.stringify({ code: regenCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRegenError(data.error || "Failed to regenerate backup codes");
+        return;
+      }
+      setNewBackupCodes(data.backupCodes ?? null);
+      setRegenMode(false);
+      setRegenCode("");
+    } catch (err: any) {
+      setRegenError(err.message || "Failed to regenerate backup codes");
+    } finally {
+      setRegenLoading(false);
+    }
+  }
+
+  function copyNewBackupCodes() {
+    if (!newBackupCodes) return;
+    navigator.clipboard
+      .writeText(newBackupCodes.join("\n"))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  }
+
+  function downloadNewBackupCodes() {
+    if (!newBackupCodes) return;
+    const body =
+      "CashClip admin 2FA backup codes\n" +
+      "Each code can be used once in place of your authenticator code.\n" +
+      "Keep these somewhere safe.\n\n" +
+      newBackupCodes.join("\n") +
+      "\n";
+    const blob = new Blob([body], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cashclip-2fa-backup-codes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="min-h-screen bg-[#06060E] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -130,19 +198,135 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                 </p>
                 {backupRemaining !== null && backupRemaining <= 2 && (
                   <p className="text-amber-400 text-xs mt-1.5">
-                    You're running low — regenerate a fresh set from the 2FA
-                    settings once you're in.
+                    You're running low — regenerate a fresh set now while it's
+                    top of mind.
                   </p>
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={continueAfterBackup}
-              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors"
-            >
-              Continue to dashboard
-            </button>
+
+            {newBackupCodes ? (
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <KeyRound className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white font-medium text-sm">
+                      Save your new backup codes
+                    </p>
+                    <p className="text-white/40 text-xs mt-1">
+                      Each code works once in place of your authenticator code.
+                      Store them somewhere safe — this is the only time they'll
+                      be shown. All previous codes are now invalid.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 bg-white/[0.05] border border-white/10 rounded-xl p-4">
+                  {newBackupCodes.map((c) => (
+                    <span
+                      key={c}
+                      className="font-mono text-sm text-white/80 tracking-wider text-center select-all"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={copyNewBackupCodes}
+                    className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                  >
+                    {copied ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadNewBackupCodes}
+                    className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={continueAfterBackup}
+                  className="w-full bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
+                >
+                  I've saved these — continue to dashboard
+                </button>
+              </div>
+            ) : regenMode ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-3">
+                <p className="text-white/60 text-sm">
+                  Enter a code from your authenticator app to generate a new set.
+                  This invalidates all previous backup codes.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={regenCode}
+                  onChange={(e) =>
+                    setRegenCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  placeholder="000000"
+                  autoFocus
+                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                />
+                {regenError && (
+                  <p className="text-red-400 text-sm text-center">
+                    {regenError}
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegenMode(false);
+                      setRegenCode("");
+                      setRegenError("");
+                    }}
+                    className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRegenerate}
+                    disabled={regenCode.length !== 6 || regenLoading}
+                    className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                  >
+                    {regenLoading ? "Generating..." : "Generate"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegenMode(true);
+                    setRegenCode("");
+                    setRegenError("");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-3 rounded-xl hover:bg-white/[0.08] transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Regenerate backup codes now
+                </button>
+                <button
+                  type="button"
+                  onClick={continueAfterBackup}
+                  className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors"
+                >
+                  Continue to dashboard
+                </button>
+              </>
+            )}
           </div>
         ) : step === "password" ? (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
