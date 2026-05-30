@@ -2440,6 +2440,25 @@ export declare const securityAuditLog: import("drizzle-orm/pg-core").PgTableWith
         }, {}, {
             length: number | undefined;
         }>;
+        targetUserId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "target_user_id";
+            tableName: "security_audit_log";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
         event: import("drizzle-orm/pg-core").PgColumn<{
             name: "event";
             tableName: "security_audit_log";

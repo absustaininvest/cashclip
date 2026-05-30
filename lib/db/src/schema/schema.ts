@@ -310,12 +310,17 @@ export const securityAuditLog = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     actorUserId: varchar("actor_user_id").notNull().references(() => users.id),
+    // The user affected by the action, when different from the actor (e.g. an
+    // admin resetting/factory-resetting another account). Null for self-service
+    // events where the actor is also the subject.
+    targetUserId: varchar("target_user_id").references(() => users.id),
     event: text("event").notNull(),
     ip: text("ip"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     actorIdx: index("security_audit_actor_idx").on(t.actorUserId, t.createdAt),
+    targetIdx: index("security_audit_target_idx").on(t.targetUserId, t.createdAt),
     eventIdx: index("security_audit_event_idx").on(t.event, t.createdAt),
     createdAtIdx: index("security_audit_created_at_idx").on(t.createdAt),
   })

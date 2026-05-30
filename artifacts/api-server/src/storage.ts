@@ -32,7 +32,9 @@ export type SecurityAuditEvent =
   | "totp_disabled"
   | "backup_codes_regenerated"
   | "password_changed"
-  | "password_reset";
+  | "password_reset"
+  | "admin_password_reset"
+  | "admin_factory_reset";
 
 export type LedgerType =
   | "survey"
@@ -51,7 +53,7 @@ export interface IStorage {
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
-  recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; ip?: string | null }): Promise<void>;
+  recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }): Promise<void>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -240,9 +242,10 @@ export class DatabaseStorage implements IStorage {
     await executor.update(users).set({ totpBackupCodes: hashes }).where(eq(users.id, userId));
   }
 
-  async recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; ip?: string | null }, executor: Executor = db): Promise<void> {
+  async recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }, executor: Executor = db): Promise<void> {
     await executor.insert(securityAuditLog).values({
       actorUserId: args.actorUserId,
+      targetUserId: args.targetUserId ?? null,
       event: args.event,
       ip: args.ip ?? null,
     });

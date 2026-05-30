@@ -1312,6 +1312,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bcrypt = await import("bcryptjs");
       const hashed = await bcrypt.hash(newPassword, 10);
       await storage.updateUserPassword(userId, hashed);
+      if (req.userId) {
+        const { getClientIp } = await import("../lib/clientIp");
+        await storage.recordSecurityAudit({
+          actorUserId: req.userId,
+          targetUserId: userId,
+          event: "admin_password_reset",
+          ip: getClientIp(req),
+        });
+      }
       req.log?.info({ adminId: req.userId, targetUserId: userId }, "admin reset user password — prior tokens invalidated");
       res.json({ message: "Password reset successfully", username: target.username });
     } catch (err: any) {
@@ -1341,6 +1350,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bcrypt = await import("bcryptjs");
       const hashed = await bcrypt.hash(newPassword, 10);
       const { tokenVersion } = await storage.factoryResetUser(userId, hashed);
+      if (req.userId) {
+        const { getClientIp } = await import("../lib/clientIp");
+        await storage.recordSecurityAudit({
+          actorUserId: req.userId,
+          targetUserId: userId,
+          event: "admin_factory_reset",
+          ip: getClientIp(req),
+        });
+      }
       req.log?.warn(
         { adminId: req.userId, targetUserId: userId, username: target.username, role: target.role, tokenVersion },
         "admin FACTORY RESET account — password regenerated, 2FA cleared, all prior sessions invalidated",
