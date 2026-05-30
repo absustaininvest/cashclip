@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, KeyRound } from "lucide-react";
 
 const AdminDashboard = lazy(() => import("./Admin"));
 
@@ -16,9 +16,11 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<"password" | "otp">("password");
+  const [step, setStep] = useState<"password" | "otp" | "backupUsed">("password");
   const [totpSessionToken, setTotpSessionToken] = useState("");
   const [otp, setOtp] = useState("");
+  const [pendingToken, setPendingToken] = useState("");
+  const [backupRemaining, setBackupRemaining] = useState<number | null>(null);
 
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +62,18 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Verification failed");
       if (data.user.role !== "admin") throw new Error("Admin access required");
+      if (data.usedBackupCode) {
+        // Logged in with a single-use backup code — pause to remind the admin
+        // how many remain before handing off to the dashboard.
+        setPendingToken(data.token);
+        setBackupRemaining(
+          typeof data.backupCodesRemaining === "number"
+            ? data.backupCodesRemaining
+            : null,
+        );
+        setStep("backupUsed");
+        return;
+      }
       localStorage.setItem("admin_token", data.token);
       onLogin(data.token);
     } catch (err: any) {
@@ -67,6 +81,11 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function continueAfterBackup() {
+    localStorage.setItem("admin_token", pendingToken);
+    onLogin(pendingToken);
   }
 
   return (
@@ -85,14 +104,47 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             <p className="text-white/40 text-sm mt-2">
               Sign in to manage your business
             </p>
+          ) : step === "backupUsed" ? (
+            <p className="text-white/40 text-sm mt-2">
+              Backup code accepted
+            </p>
           ) : (
             <p className="text-white/40 text-sm mt-2">
-              Enter the code from your authenticator app
+              Enter your authenticator code or a backup code
             </p>
           )}
         </div>
 
-        {step === "password" ? (
+        {step === "backupUsed" ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 bg-amber-400/5 border border-amber-400/20 rounded-xl px-4 py-3">
+              <KeyRound className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white/80 text-sm font-medium">
+                  You signed in with a backup code
+                </p>
+                <p className="text-white/50 text-xs mt-1">
+                  {backupRemaining === null
+                    ? "That code has been used up and can't be reused."
+                    : `That code is now used up. You have ${backupRemaining} backup code${backupRemaining === 1 ? "" : "s"} left.`}
+                </p>
+                {backupRemaining !== null && backupRemaining <= 2 && (
+                  <p className="text-amber-400 text-xs mt-1.5">
+                    You're running low — regenerate a fresh set from the 2FA
+                    settings once you're in.
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={continueAfterBackup}
+              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors"
+            >
+              Continue to dashboard
+            </button>
+          </div>
+        ) : step === "password" ? (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <input
               type="text"

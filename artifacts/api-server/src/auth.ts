@@ -682,8 +682,10 @@ export function registerAuthRoutes(app: Express) {
       // atomically on use.
       const codeStr = String(code);
       let authed = verifyTotp(user.totpSecret, codeStr);
+      let usedBackupCode = false;
       if (!authed) {
         authed = await storage.consumeTotpBackupCode(user.id, hashBackupCode(codeStr));
+        usedBackupCode = authed;
       }
       if (!authed) {
         const { count: failures } = await recordLoginAttempt(tokenKey, MAX_TOTP_ATTEMPTS, TOTP_TOKEN_WINDOW_MS);
@@ -700,10 +702,18 @@ export function registerAuthRoutes(app: Express) {
       const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
       setSessionCookie(res, token);
       setRefreshCookie(res, user.id, user.tokenVersion);
+      // When a single-use backup code was consumed, tell the client how many
+      // remain so it can remind the admin to regenerate before running out.
+      let backupCodesRemaining: number | undefined;
+      if (usedBackupCode) {
+        const refreshed = await storage.getUser(user.id);
+        backupCodesRemaining = refreshed?.totpBackupCodes?.length ?? 0;
+      }
       res.json({
         token,
         ...(refreshToken ? { refreshToken } : {}),
         user: { id: user.id, username: user.username, role: user.role },
+        ...(usedBackupCode ? { usedBackupCode: true, backupCodesRemaining } : {}),
       });
     } catch (err: unknown) {
       logger.error({ err }, "TOTP verify error");
