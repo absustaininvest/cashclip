@@ -113,6 +113,7 @@ function TwoFactorPanel({ token }: { token: string }) {
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [backupCount, setBackupCount] = useState<number | null>(null);
   const [regenMode, setRegenMode] = useState(false);
+  const [regenConfirmed, setRegenConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -176,6 +177,7 @@ function TwoFactorPanel({ token }: { token: string }) {
       setBackupCodes(data.backupCodes ?? null);
       setBackupCount(data.backupCodes?.length ?? 0);
       setRegenMode(false);
+      setRegenConfirmed(false);
       setCode("");
     } finally {
       setLoading(false);
@@ -386,6 +388,7 @@ function TwoFactorPanel({ token }: { token: string }) {
               <button
                 onClick={() => {
                   setRegenMode(true);
+                  setRegenConfirmed(false);
                   setCode("");
                   setError("");
                   setSuccess("");
@@ -414,10 +417,23 @@ function TwoFactorPanel({ token }: { token: string }) {
                 {error && (
                   <p className="text-red-400 text-sm text-center">{error}</p>
                 )}
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={regenConfirmed}
+                    onChange={(e) => setRegenConfirmed(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#00E676] cursor-pointer"
+                  />
+                  <span className="text-white/60 text-xs">
+                    I understand all of my current backup codes will stop working
+                    immediately.
+                  </span>
+                </label>
                 <div className="flex gap-3">
                   <button
                     onClick={() => {
                       setRegenMode(false);
+                      setRegenConfirmed(false);
                       setCode("");
                       setError("");
                     }}
@@ -427,7 +443,7 @@ function TwoFactorPanel({ token }: { token: string }) {
                   </button>
                   <button
                     onClick={handleRegenerate}
-                    disabled={code.length !== 6 || loading}
+                    disabled={code.length !== 6 || !regenConfirmed || loading}
                     className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                   >
                     {loading ? "Generating..." : "Generate"}

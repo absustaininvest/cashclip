@@ -30,6 +30,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [backupRemaining, setBackupRemaining] = useState<number | null>(null);
   const [regenMode, setRegenMode] = useState(false);
   const [regenCode, setRegenCode] = useState("");
+  const [regenConfirmed, setRegenConfirmed] = useState(false);
   const [regenLoading, setRegenLoading] = useState(false);
   const [regenError, setRegenError] = useState("");
   const [newBackupCodes, setNewBackupCodes] = useState<string[] | null>(null);
@@ -121,6 +122,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
       setNewBackupCodes(data.backupCodes ?? null);
       setRegenMode(false);
       setRegenCode("");
+      setRegenConfirmed(false);
     } catch (err: any) {
       setRegenError(err.message || "Failed to regenerate backup codes");
     } finally {
@@ -282,12 +284,25 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                     {regenError}
                   </p>
                 )}
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={regenConfirmed}
+                    onChange={(e) => setRegenConfirmed(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#00E676] cursor-pointer"
+                  />
+                  <span className="text-white/60 text-xs">
+                    I understand all of my current backup codes will stop working
+                    immediately.
+                  </span>
+                </label>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setRegenMode(false);
                       setRegenCode("");
+                      setRegenConfirmed(false);
                       setRegenError("");
                     }}
                     className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
@@ -297,7 +312,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                   <button
                     type="button"
                     onClick={handleRegenerate}
-                    disabled={regenCode.length !== 6 || regenLoading}
+                    disabled={regenCode.length !== 6 || !regenConfirmed || regenLoading}
                     className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                   >
                     {regenLoading ? "Generating..." : "Generate"}
@@ -311,6 +326,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                   onClick={() => {
                     setRegenMode(true);
                     setRegenCode("");
+                    setRegenConfirmed(false);
                     setRegenError("");
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-3 rounded-xl hover:bg-white/[0.08] transition-colors"
