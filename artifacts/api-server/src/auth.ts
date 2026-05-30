@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
-import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert } from "./lib/email";
+import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice } from "./lib/email";
 import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
@@ -781,6 +781,23 @@ export function registerAuthRoutes(app: Express) {
         .set({ totpSecret: secret, totpEnabled: true, totpBackupCodes: hashes })
         .where(drizzleEq(users.id, req.userId!));
       logger.info({ userId: req.userId }, "Admin enabled TOTP 2FA");
+      // Send a confirmation email (never containing the actual codes) so the admin
+      // has a durable record that 2FA is active and how many backup codes they hold.
+      const enableRecipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+      if (enableRecipient) {
+        try {
+          sendTwoFactorActiveNotice({
+            to: enableRecipient,
+            username: user.username,
+            backupCodesCount: codes.length,
+            context: "enabled",
+          });
+        } catch (mailErr) {
+          logger.error({ err: mailErr, userId: user.id }, "Failed to send 2FA enabled confirmation");
+        }
+      } else {
+        logger.warn({ userId: user.id }, "2FA enabled but admin has no email on file — skipping confirmation");
+      }
       // backupCodes are returned in plaintext exactly once — only hashes persist.
       res.json({ ok: true, backupCodes: codes });
     } catch (err: unknown) {
@@ -807,6 +824,23 @@ export function registerAuthRoutes(app: Express) {
       const { codes, hashes } = generateBackupCodes(10);
       await storage.setTotpBackupCodes(user.id, hashes);
       logger.info({ userId: req.userId }, "Admin regenerated 2FA backup codes");
+      // Confirmation email (never containing the actual codes) recording that the
+      // codes were refreshed and how many the admin now holds.
+      const regenRecipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+      if (regenRecipient) {
+        try {
+          sendTwoFactorActiveNotice({
+            to: regenRecipient,
+            username: user.username,
+            backupCodesCount: codes.length,
+            context: "regenerated",
+          });
+        } catch (mailErr) {
+          logger.error({ err: mailErr, userId: user.id }, "Failed to send backup codes regenerated confirmation");
+        }
+      } else {
+        logger.warn({ userId: user.id }, "Backup codes regenerated but admin has no email on file — skipping confirmation");
+      }
       res.json({ ok: true, backupCodes: codes });
     } catch (err: unknown) {
       logger.error({ err }, "TOTP backup-codes regenerate error");

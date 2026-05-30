@@ -190,6 +190,56 @@ export function sendBackupCodeUsedAlert(options: {
   });
 }
 
+export function sendTwoFactorActiveNotice(options: {
+  to: string;
+  username: string;
+  backupCodesCount: number;
+  context: "enabled" | "regenerated";
+}): void {
+  const { to, username, backupCodesCount, context } = options;
+  const safeUsername = escapeHtml(username);
+  const safeCount = escapeHtml(String(backupCodesCount));
+  const codeWord = backupCodesCount === 1 ? "code" : "codes";
+  const isEnabled = context === "enabled";
+  const headline = isEnabled ? "Two-Factor Authentication Enabled" : "Backup Codes Regenerated";
+  const subject = isEnabled
+    ? "Two-factor authentication is now active on your CashClip admin account"
+    : "Your CashClip backup codes were just regenerated";
+  const lead = isEnabled
+    ? `Two-factor authentication (2FA) is now active on your CashClip admin account. You'll be asked for a code from your authenticator app each time you sign in.`
+    : `A fresh set of two-factor backup codes was just generated for your CashClip admin account. Any backup codes from before this point no longer work.`;
+  const text = `Hi ${username},\n\n${lead}\n\nYou currently hold ${backupCodesCount} backup ${codeWord}. Keep them somewhere safe — they're your way back in if you lose your authenticator app. You can review or regenerate them anytime from the admin portal under Security settings.\n\nThis email never contains your actual codes. If you didn't make this change, reset your password immediately and contact support.\n\n— The CashClip Team`;
+  sendBestEffort({
+    to,
+    subject,
+    text,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#00C853,#00E676);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#0A0A0F;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#0A0A0F;opacity:0.75">Security Update</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#fff">${headline}</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#b0b0b0;line-height:1.6">${escapeHtml(lead)}</p>
+          <div style="text-align:center;margin:24px 0">
+            <div style="display:inline-block;background:#1a1a2e;border:2px solid #00E676;border-radius:16px;padding:16px 36px">
+              <span style="font-size:36px;font-weight:800;color:#00E676">${safeCount}</span>
+              <span style="font-size:14px;color:#b0b0b0;display:block;margin-top:4px">backup ${codeWord} on file</span>
+            </div>
+          </div>
+          <p style="margin:20px 0 0;font-size:14px;color:#b0b0b0;line-height:1.6">Keep your backup codes somewhere safe — they're your way back in if you lose your authenticator app. You can review or regenerate them anytime from the admin portal under Security settings.</p>
+          <p style="margin:20px 0 0;font-size:12px;color:#555;text-align:center">This email never contains your actual codes. If you didn't make this change, reset your password immediately and contact support.</p>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+  });
+}
+
 export async function sendContactNotification(lead: {
   name: string;
   email: string;
