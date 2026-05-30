@@ -12,6 +12,6 @@ description: Where the owner manages domains, DNS, and email. Stop asking who th
 - Email aliases/mailboxes are managed in **Zoho Mail**.
 - Legal domains in use: `absustaininvest.com`, `cash-clip.app` (never Replit subdomains in production-facing config).
 
-**Pending owner action (email delivery):** add `support@cash-clip.app` as a **Zoho alias** so that mailbox can send/receive. It already works as an admin login in the app DB; the Zoho alias is the remaining email-delivery step. (This is an owner action in Zoho — the agent cannot do it.)
+**Email delivery (DONE May 29, 2026):** `support@cash-clip.app` is added as a **Zoho alias** on the `support@absustaininvest.com` mailbox, so it can send/receive. It also works as an admin login in the app DB. (Other aliases on that mailbox include `apple-review@absustaininvest.com` and `jorge.ballen@cash-clip.app`.)
 
 **Note:** never store Zoho login credentials or any secret values here — only the fact that Zoho is the provider.
