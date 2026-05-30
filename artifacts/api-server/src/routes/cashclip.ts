@@ -29,7 +29,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
   getRecentRejections,
@@ -1363,6 +1363,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { adminId: req.userId, targetUserId: userId, username: target.username, role: target.role, tokenVersion },
         "admin FACTORY RESET account — password regenerated, 2FA cleared, all prior sessions invalidated",
       );
+      // Security alert email (never containing the new password or any secret) so the
+      // target admin is tipped off that an operator took over their credentials via
+      // factory reset. Mirrors the OTP-reset notice: admin-only, best-effort, never
+      // blocks the response, logs a warn when the target has no email on file.
+      if (target.role === "admin") {
+        const resetRecipient = target.email && target.email.trim().length > 0 ? target.email : undefined;
+        if (resetRecipient) {
+          try {
+            sendPasswordChangedNotice({ to: resetRecipient, username: target.username, context: "reset" });
+          } catch (mailErr) {
+            req.log?.error({ err: mailErr, targetUserId: userId }, "Failed to send factory-reset security alert");
+          }
+        } else {
+          req.log?.warn({ targetUserId: userId }, "Factory reset but admin has no email on file — skipping security alert");
+        }
+      }
       res.json({
         message: "Account factory reset",
         username: target.username,
