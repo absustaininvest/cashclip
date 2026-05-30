@@ -280,6 +280,42 @@ export function sendTwoFactorActiveNotice(options: {
   });
 }
 
+export function sendTwoFactorDisabledNotice(options: {
+  to: string;
+  username: string;
+}): void {
+  const { to, username } = options;
+  const safeUsername = escapeHtml(username);
+  const subject = "Two-factor authentication was turned off on your CashClip admin account";
+  const lead = `Two-factor authentication (2FA) has just been turned off on your CashClip admin account. From now on, signing in no longer requires a code from your authenticator app, and your previous backup codes have been cleared.`;
+  const text = `Hi ${username},\n\n${lead}\n\nIf this was you, no action is needed. If you did NOT turn off 2FA, your account may be compromised — reset your password immediately, re-enable 2FA from the admin portal under Security settings, and contact support right away.\n\nThis email never contains any secrets or codes.\n\n— The CashClip Team`;
+  sendBestEffort({
+    to,
+    subject,
+    text,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#FF5252,#FF1744);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#fff;opacity:0.85">Security Alert</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#fff">Two-Factor Authentication Disabled</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#b0b0b0;line-height:1.6">${escapeHtml(lead)}</p>
+          <div style="background:#1a1a2e;border:2px solid #FF1744;border-radius:16px;padding:18px 20px;margin:24px 0">
+            <p style="margin:0;font-size:14px;color:#e0e0e0;line-height:1.6"><strong style="color:#FF5252">Didn't do this?</strong> Your account may be compromised. Reset your password immediately, re-enable 2FA from the admin portal under Security settings, and contact support right away.</p>
+          </div>
+          <p style="margin:20px 0 0;font-size:12px;color:#555;text-align:center">This email never contains any secrets or codes.</p>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+  });
+}
+
 export async function sendContactNotification(lead: {
   name: string;
   email: string;

@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
-import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice } from "./lib/email";
+import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice, sendTwoFactorDisabledNotice } from "./lib/email";
 import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
@@ -864,6 +864,21 @@ export function registerAuthRoutes(app: Express) {
       }
       await db.update(users).set({ totpSecret: null, totpEnabled: false, totpBackupCodes: null }).where(drizzleEq(users.id, req.userId!));
       logger.info({ userId: req.userId }, "Admin disabled TOTP 2FA");
+      // Security alert email (never containing secrets or codes) so the admin is
+      // tipped off if someone else turned off 2FA on their account.
+      const disableRecipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+      if (disableRecipient) {
+        try {
+          sendTwoFactorDisabledNotice({
+            to: disableRecipient,
+            username: user.username,
+          });
+        } catch (mailErr) {
+          logger.error({ err: mailErr, userId: user.id }, "Failed to send 2FA disabled security alert");
+        }
+      } else {
+        logger.warn({ userId: user.id }, "2FA disabled but admin has no email on file — skipping security alert");
+      }
       res.json({ ok: true });
     } catch (err: unknown) {
       logger.error({ err }, "TOTP disable error");
