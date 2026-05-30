@@ -20,6 +20,11 @@ This single root cause explains a cluster of symptoms he reports — treat them 
 address tracking" + use a normal (non-private) window, then turn protection back ON for daily use.
 Rule of thumb for the alert emails: a flag he doesn't recognize = act on it; a flag he caused = ignore.
 
+**Other network-environment factor:** his mom's internet has a **firewall**, which can block/slow
+connections on that network (admin portal, CashClip app, or Replit may glitch or fail to load there).
+If something won't work, first rule out the network: try cellular / a personal hotspot — if it then
+works, it was the firewall/network, not an app bug.
+
 # Confirm account state BEFORE planning any recovery
 
 The owner is capable and self-resolves. In this incident we spent significant time planning a
