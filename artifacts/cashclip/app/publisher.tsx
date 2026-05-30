@@ -224,7 +224,7 @@ export default function PublisherScreen() {
   const activeCampaigns = campaigns.filter(c => c.status === "active").length;
 
   const referralLink = `https://cash-clip.app/ref/${info.username}`;
-  // nosemgrep: javascript.lang.security.html-in-template-string — info.username is validated server-side to [a-zA-Z0-9_-]; embedCode is displayed as plain text for copy-paste, never injected into DOM
+  // nosemgrep: javascript.lang.security.html-in-template-string — info.username is validated server-side to Unicode letters/numbers/underscore/hyphen (\p{L}\p{N}_-), which contains no HTML/URL metacharacters; embedCode is displayed as plain text for copy-paste, never injected into DOM
   const embedCode = `<iframe src="https://cash-clip.app/earn?pub=${info.username}" width="100%" height="600" frameborder="0"></iframe>`;
 
   return (

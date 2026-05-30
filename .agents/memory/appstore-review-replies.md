@@ -5,7 +5,7 @@ description: Owner-approved tone & exact templates for CashClip public App Store
 
 # CashClip App Store Defense — owner-approved reference
 
-**Source of truth:** `attached_assets/CashClip_AppStore_Defense_Record_1780103777348.pdf` (owner Jorge Ballen re-supplied it May 29, 2026 after the earlier export was purged). This is the APPROVED wording/tone. When asked for review replies or the Apple note, start from these — do not invent new ones.
+**Source of truth:** `attached_assets/CashClip_AppStore_Defense_Record_1780103777348.pdf` (owner-supplied). This is the APPROVED wording/tone. When asked for review replies or the Apple note, start from these — do not invent new ones.
 
 **Approved tone:** confident, factual, FIRM — never apologetic/groveling. State the security/verification design as fact. Reassure honest users; signal to bad actors that abuse is detected by design. Always route to the support email. Never attack the individual reviewer.
 

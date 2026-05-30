@@ -395,7 +395,7 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Username must be 30 characters or fewer" });
         return;
       }
-      if (!/^[a-zA-Z0-9_-]+$/.test(username.trim())) {
+      if (!/^[\p{L}\p{N}_-]+$/u.test(username.trim())) {
         res.status(400).json({ error: "Username may only contain letters, numbers, underscores, and hyphens" });
         return;
       }

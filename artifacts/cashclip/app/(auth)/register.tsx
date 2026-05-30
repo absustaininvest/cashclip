@@ -54,7 +54,7 @@ export default function RegisterScreen() {
   const webTopPad = Platform.OS === "web" ? 67 : 0;
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const usernameCharValid = username.trim().length === 0 || /^[a-zA-Z0-9_-]+$/.test(username.trim());
+  const usernameCharValid = username.trim().length === 0 || /^[\p{L}\p{N}_-]+$/u.test(username.trim());
   const isValid =
     username.trim().length >= 3 &&
     username.trim().length <= 30 &&
