@@ -24,6 +24,41 @@ function getTotpTokenKey(totpSessionToken: string): string {
   return "totp:token:" + crypto.createHash("sha256").update(totpSessionToken).digest("hex");
 }
 
+// ── ADMIN_TOKEN console-token gate brute-force throttle ───────────────────────
+// The ADMIN_TOKEN console-token path is a high-privilege operator entry point.
+// Failed attempts are counted (per IP) in the shared `login_attempts` table so
+// the limit holds across all autoscaled replicas and restarts — a memory-only
+// counter would be replica-local and bypassable in production (per the threat
+// model). Only *incorrect* tokens consume a slot; a correct token clears it.
+// Failure policy: if the DB check throws we fail closed (503) so this control
+// never degrades to "unlimited".
+const ADMIN_TOKEN_WINDOW_MS = 15 * 60 * 1000;
+
+function getAdminTokenIpLimit(): number {
+  const raw = process.env["ADMIN_TOKEN_IP_LIMIT"];
+  if (!raw) return 15;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    logger.warn({ value: raw }, "Invalid ADMIN_TOKEN_IP_LIMIT, using default 15");
+    return 15;
+  }
+  return n;
+}
+
+// Constant-time compare that tolerates length mismatches without throwing
+// (crypto.timingSafeEqual rejects differing-length buffers), so a wrong-length
+// token is rejected and throttled like any other incorrect guess.
+function adminTokenSafeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  if (ab.length !== bb.length) {
+    const pad = Buffer.alloc(Math.max(ab.length, bb.length, 1));
+    crypto.timingSafeEqual(pad, pad);
+    return false;
+  }
+  return crypto.timingSafeEqual(ab, bb);
+}
+
 // Resolved lazily so the server can start and pass the health check even when
 // JWT_ACCESS_SECRET hasn't been linked to the production environment yet.
 // JWT_ACCESS_SECRET is the primary signing key for access tokens (HS256 fallback).
@@ -254,10 +289,52 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
   // Fallback: console-token path (internal tooling / ADMIN_TOKEN secret).
   const consoleToken = process.env.ADMIN_TOKEN;
   if (consoleToken) {
+    const ip = getClientIp(req);
+    const ipKey = `admintoken:ip:${ip}`;
+
+    // Gate before evaluating the token. Read-only check so simply being at the
+    // limit does not itself burn a slot; slots are consumed only by an
+    // incorrect attempt below. Fail closed (503) if the DB check throws.
+    try {
+      const { allowed } = await checkLoginAttempts(ipKey, getAdminTokenIpLimit());
+      if (!allowed) {
+        req.log?.warn({ route: req.originalUrl, ip }, "Admin console-token attempts rate-limited");
+        res.status(429).json({
+          error: "Too many incorrect admin token attempts. Please try again later.",
+          code: "ADMIN_TOKEN_RATE_LIMITED",
+          retryAfterMs: ADMIN_TOKEN_WINDOW_MS,
+        });
+        return;
+      }
+    } catch (err) {
+      logger.error({ err, ip }, "adminMiddleware console-token rate-limit check failed — failing closed");
+      res.status(503).json({
+        error: "Admin token rate-limit check failed. Try again shortly.",
+        code: "ADMIN_TOKEN_RATE_LIMIT_UNAVAILABLE",
+      });
+      return;
+    }
+
     const provided = req.headers["x-console-token"];
-    if (typeof provided !== "string" || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(consoleToken))) {
+    if (typeof provided !== "string" || !adminTokenSafeEqual(provided, consoleToken)) {
+      // Record the failed guess against the shared key so the throttle holds
+      // across replicas. Best-effort: a DB hiccup must not fail open here.
+      try {
+        await recordLoginAttempt(ipKey, getAdminTokenIpLimit(), ADMIN_TOKEN_WINDOW_MS);
+      } catch (err) {
+        logger.error({ err, ip }, "adminMiddleware failed to record console-token attempt");
+      }
+      req.log?.warn({ route: req.originalUrl, ip }, "Admin console-token rejected");
       res.status(401).json({ error: "No token provided" });
       return;
+    }
+
+    // Correct console token: clear the counter so a legitimate operator is not
+    // penalized by earlier failed guesses.
+    try {
+      await clearLoginAttempts(ipKey);
+    } catch (err) {
+      logger.warn({ err, ip }, "adminMiddleware failed to clear console-token attempts");
     }
   }
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
