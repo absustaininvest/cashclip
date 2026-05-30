@@ -137,6 +137,59 @@ export function sendPasswordResetOTP(options: {
   });
 }
 
+export function sendBackupCodeUsedAlert(options: {
+  to: string;
+  username: string;
+  remaining: number;
+  lowThreshold?: number;
+}): void {
+  const { to, username, remaining } = options;
+  const lowThreshold = options.lowThreshold ?? 2;
+  const isLow = remaining <= lowThreshold;
+  const safeUsername = escapeHtml(username);
+  const safeRemaining = escapeHtml(String(remaining));
+  const codeWord = remaining === 1 ? "code" : "codes";
+  const lowTextLine = isLow
+    ? `\n\nYou're running low. We recommend signing in and regenerating a fresh set of backup codes so you don't get locked out.`
+    : "";
+  // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+  const lowHtmlBlock = isLow
+    ? `<div style="margin:20px 0 0;background:#2a1a00;border:1px solid #ffb300;border-radius:12px;padding:16px">
+            <p style="margin:0;font-size:14px;color:#ffd180;line-height:1.6"><strong style="color:#ffb300">You're running low.</strong> Sign in and regenerate a fresh set of backup codes so you don't get locked out.</p>
+          </div>`
+    : "";
+  sendBestEffort({
+    to,
+    subject: isLow
+      ? `Security alert: only ${remaining} CashClip backup ${codeWord} left`
+      : "Security alert: a CashClip backup code was just used",
+    text: `Hi ${username},\n\nA two-factor backup code was just used to sign in to your CashClip admin account. You have ${remaining} backup ${codeWord} remaining.${lowTextLine}\n\nIf this wasn't you, secure your account immediately by resetting your password and regenerating your backup codes.\n\n— The CashClip Team`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#00C853,#00E676);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#0A0A0F;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#0A0A0F;opacity:0.75">Security Alert</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#b0b0b0;line-height:1.6">A two-factor <strong style="color:#fff">backup code</strong> was just used to sign in to your CashClip admin account.</p>
+          <div style="text-align:center;margin:24px 0">
+            <div style="display:inline-block;background:#1a1a2e;border:2px solid #00E676;border-radius:16px;padding:16px 36px">
+              <span style="font-size:36px;font-weight:800;color:#00E676">${safeRemaining}</span>
+              <span style="font-size:14px;color:#b0b0b0;display:block;margin-top:4px">backup ${codeWord} remaining</span>
+            </div>
+          </div>
+          ${lowHtmlBlock}
+          <p style="margin:24px 0 0;font-size:12px;color:#555;text-align:center">If this wasn't you, reset your password and regenerate your backup codes immediately.</p>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+  });
+}
+
 export async function sendContactNotification(lead: {
   name: string;
   email: string;

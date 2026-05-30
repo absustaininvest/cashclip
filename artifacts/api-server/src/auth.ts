@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
-import { sendEmailVerification, sendPasswordResetOTP } from "./lib/email";
+import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert } from "./lib/email";
 import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
@@ -698,6 +698,21 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
       await clearLoginAttempts(tokenKey);
+      if (usedBackupCode) {
+        // Notify the admin a single-use backup code was consumed so an
+        // unnoticed exhaustion can't quietly lock them out again.
+        const recipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+        if (recipient) {
+          try {
+            const remaining = await storage.getTotpBackupCodesRemaining(user.id);
+            sendBackupCodeUsedAlert({ to: recipient, username: user.username, remaining });
+          } catch (mailErr) {
+            logger.error({ err: mailErr, userId: user.id }, "Failed to send backup code used alert");
+          }
+        } else {
+          logger.warn({ userId: user.id }, "Backup code used but admin has no email on file — skipping alert");
+        }
+      }
       const token = generateToken(user.id, user.role, user.tokenVersion);
       const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
       setSessionCookie(res, token);
