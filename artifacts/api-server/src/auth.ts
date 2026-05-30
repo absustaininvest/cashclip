@@ -11,7 +11,7 @@ import { validateRegistrationEmail } from "./lib/emailValidation";
 import type { InsertUser } from "@workspace/db";
 import { db, passwordResetTokens, users } from "@workspace/db";
 import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as drizzleGte, lt as drizzleLt, sql as drizzleSql } from "drizzle-orm";
-import { generateTotpSecret, verifyTotp } from "./lib/totp";
+import { generateTotpSecret, verifyTotp, generateBackupCodes, hashBackupCode } from "./lib/totp";
 
 // ── TOTP verify rate-limit constants ─────────────────────────────────────────
 // Both counters are DB-backed so they are shared across all autoscaled replicas.
@@ -600,13 +600,21 @@ export function registerAuthRoutes(app: Express) {
         res.status(401).json({ error: "Invalid or expired session. Please log in again." });
         return;
       }
-      if (!verifyTotp(user.totpSecret, String(code))) {
+      // Accept either a live TOTP code or a single-use backup recovery code so a
+      // lost authenticator never locks the admin out. Backup codes are consumed
+      // atomically on use.
+      const codeStr = String(code);
+      let authed = verifyTotp(user.totpSecret, codeStr);
+      if (!authed) {
+        authed = await storage.consumeTotpBackupCode(user.id, hashBackupCode(codeStr));
+      }
+      if (!authed) {
         const { count: failures } = await recordLoginAttempt(tokenKey, MAX_TOTP_ATTEMPTS, TOTP_TOKEN_WINDOW_MS);
         const remaining = MAX_TOTP_ATTEMPTS - failures;
         if (remaining <= 0) {
           res.status(429).json({ error: "Too many incorrect attempts. Please log in again." });
         } else {
-          res.status(400).json({ error: "Invalid code. Please check your authenticator app." });
+          res.status(400).json({ error: "Invalid code. Enter a code from your authenticator app or one of your backup codes." });
         }
         return;
       }
@@ -630,7 +638,10 @@ export function registerAuthRoutes(app: Express) {
     const user = await storage.getUser(req.userId!);
     if (!user) { res.status(401).json({ error: "User not found" }); return; }
     if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
-    res.json({ enabled: user.totpEnabled ?? false });
+    res.json({
+      enabled: user.totpEnabled ?? false,
+      backupCodesRemaining: user.totpBackupCodes?.length ?? 0,
+    });
   });
 
   app.post("/api/auth/totp/setup", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -662,12 +673,42 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Invalid code. Please try again." });
         return;
       }
-      await db.update(users).set({ totpSecret: secret, totpEnabled: true }).where(drizzleEq(users.id, req.userId!));
+      const { codes, hashes } = generateBackupCodes(10);
+      await db
+        .update(users)
+        .set({ totpSecret: secret, totpEnabled: true, totpBackupCodes: hashes })
+        .where(drizzleEq(users.id, req.userId!));
       logger.info({ userId: req.userId }, "Admin enabled TOTP 2FA");
-      res.json({ ok: true });
+      // backupCodes are returned in plaintext exactly once — only hashes persist.
+      res.json({ ok: true, backupCodes: codes });
     } catch (err: unknown) {
       logger.error({ err }, "TOTP enable error");
       res.status(500).json({ error: "Failed to enable 2FA" });
+    }
+  });
+
+  app.post("/api/auth/totp/backup-codes/regenerate", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+      if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+      if (!user.totpEnabled || !user.totpSecret) {
+        res.status(400).json({ error: "2FA is not enabled" }); return;
+      }
+      const { code } = req.body;
+      if (!code) { res.status(400).json({ error: "code is required" }); return; }
+      if (!verifyTotp(user.totpSecret, String(code))) {
+        res.status(400).json({ error: "Invalid code. Please check your authenticator app." });
+        return;
+      }
+      // Regenerating invalidates every previously issued code.
+      const { codes, hashes } = generateBackupCodes(10);
+      await storage.setTotpBackupCodes(user.id, hashes);
+      logger.info({ userId: req.userId }, "Admin regenerated 2FA backup codes");
+      res.json({ ok: true, backupCodes: codes });
+    } catch (err: unknown) {
+      logger.error({ err }, "TOTP backup-codes regenerate error");
+      res.status(500).json({ error: "Failed to regenerate backup codes" });
     }
   });
 
@@ -685,7 +726,7 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Invalid code. Please try again." });
         return;
       }
-      await db.update(users).set({ totpSecret: null, totpEnabled: false }).where(drizzleEq(users.id, req.userId!));
+      await db.update(users).set({ totpSecret: null, totpEnabled: false, totpBackupCodes: null }).where(drizzleEq(users.id, req.userId!));
       logger.info({ userId: req.userId }, "Admin disabled TOTP 2FA");
       res.json({ ok: true });
     } catch (err: unknown) {

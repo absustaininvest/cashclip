@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "crypto";
+import { createHmac, createHash, randomBytes } from "crypto";
 
 const BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -57,6 +57,36 @@ export function generateTotpSecret(
   const secret = base32Encode(randomBytes(20));
   const uri = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
   return { secret, uri };
+}
+
+// ── Backup recovery codes ────────────────────────────────────────────────────
+// Single-use codes shown once at 2FA setup so a lost authenticator never locks
+// an admin out. Plaintext is returned to the client exactly once; only SHA-256
+// hashes are persisted. Codes are high-entropy (50 bits) so an unsalted hash is
+// sufficient; lookup is by exact hash match against the stored set.
+
+// Normalize user input: uppercase and strip everything but A-Z/2-7 so that
+// dashes, spaces, and casing in what the admin types/pastes don't matter.
+export function normalizeBackupCode(input: string): string {
+  return input.toUpperCase().replace(/[^A-Z2-7]/g, "");
+}
+
+export function hashBackupCode(code: string): string {
+  return createHash("sha256").update(normalizeBackupCode(code)).digest("hex");
+}
+
+// Returns formatted plaintext codes (e.g. "ABCDE-FGHIJ") for one-time display
+// plus their hashes for storage. base32 alphabet keeps them copy/print friendly.
+export function generateBackupCodes(count = 10): { codes: string[]; hashes: string[] } {
+  const codes: string[] = [];
+  const hashes: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const raw = base32Encode(randomBytes(7)).slice(0, 10);
+    const formatted = `${raw.slice(0, 5)}-${raw.slice(5, 10)}`;
+    codes.push(formatted);
+    hashes.push(hashBackupCode(formatted));
+  }
+  return { codes, hashes };
 }
 
 export function verifyTotp(secret: string, code: string, windowSize = 1): boolean {

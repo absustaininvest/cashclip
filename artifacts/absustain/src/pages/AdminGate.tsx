@@ -3,6 +3,14 @@ import { ShieldCheck } from "lucide-react";
 
 const AdminDashboard = lazy(() => import("./Admin"));
 
+// Accept either a 6-digit authenticator code or a backup recovery code
+// (10 base32 chars, optionally formatted with a hyphen e.g. "ABCDE-FGHIJ").
+function isValidTwoFactorInput(value: string): boolean {
+  if (/^\d{6}$/.test(value)) return true;
+  const normalized = value.toUpperCase().replace(/[^A-Z2-7]/g, "");
+  return normalized.length === 10;
+}
+
 function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -125,24 +133,33 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             </div>
             <input
               type="text"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
+              inputMode="text"
+              autoCapitalize="characters"
+              maxLength={13}
               value={otp}
               onChange={(e) =>
-                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                setOtp(
+                  e.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9-]/g, "")
+                    .slice(0, 13),
+                )
               }
               placeholder="000000"
               required
               autoFocus
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.4em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.2em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
             />
+            <p className="text-white/30 text-xs text-center">
+              Enter the code from your authenticator app, or one of your backup
+              codes if you've lost it.
+            </p>
             {error && (
               <p className="text-red-400 text-sm text-center">{error}</p>
             )}
             <button
               type="submit"
-              disabled={loading || otp.length !== 6}
+              disabled={loading || !isValidTwoFactorInput(otp)}
               className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
             >
               {loading ? "Verifying..." : "Verify"}

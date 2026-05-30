@@ -37,6 +37,9 @@ export interface IStorage {
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
+  setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
+  getTotpBackupCodesRemaining(userId: string): Promise<number>;
+  consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   deleteUser(id: string): Promise<void>;
   getUserProfile(userId: string): Promise<User | undefined>;
@@ -219,6 +222,38 @@ export class DatabaseStorage implements IStorage {
     return { tokenVersion: updated.tokenVersion };
   }
 
+  async setTotpBackupCodes(userId: string, hashes: string[]): Promise<void> {
+    await db.update(users).set({ totpBackupCodes: hashes }).where(eq(users.id, userId));
+  }
+
+  async getTotpBackupCodesRemaining(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ codes: users.totpBackupCodes })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row?.codes?.length ?? 0;
+  }
+
+  // Atomically consume a single backup code. Returns true if the code matched
+  // and was removed; the row lock prevents the same code being used twice by
+  // concurrent requests across replicas.
+  async consumeTotpBackupCode(userId: string, hash: string): Promise<boolean> {
+    return await db.transaction(async (tx: DbTx) => {
+      const [row] = await tx
+        .select({ codes: users.totpBackupCodes })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+        .for("update");
+      const codes = row?.codes ?? [];
+      if (!codes.includes(hash)) return false;
+      const remaining = codes.filter((c) => c !== hash);
+      await tx.update(users).set({ totpBackupCodes: remaining }).where(eq(users.id, userId));
+      return true;
+    });
+  }
+
   async factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }> {
     const [updated] = await db
       .update(users)
@@ -226,6 +261,7 @@ export class DatabaseStorage implements IStorage {
         password: hashedPassword,
         totpSecret: null,
         totpEnabled: false,
+        totpBackupCodes: null,
         tokenVersion: sql`${users.tokenVersion} + 1`,
       })
       .where(eq(users.id, id))

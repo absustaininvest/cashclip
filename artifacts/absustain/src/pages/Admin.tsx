@@ -110,15 +110,77 @@ function TwoFactorPanel({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [backupCount, setBackupCount] = useState<number | null>(null);
+  const [regenMode, setRegenMode] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/totp/status", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
-      .then((d) => setEnabled(d.enabled ?? false))
+      .then((d) => {
+        setEnabled(d.enabled ?? false);
+        setBackupCount(d.backupCodesRemaining ?? 0);
+      })
       .catch(() => setEnabled(false));
   }, [token]);
+
+  function copyBackupCodes() {
+    if (!backupCodes) return;
+    navigator.clipboard
+      .writeText(backupCodes.join("\n"))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  }
+
+  function downloadBackupCodes() {
+    if (!backupCodes) return;
+    const body =
+      "CashClip admin 2FA backup codes\n" +
+      "Each code can be used once in place of your authenticator code.\n" +
+      "Keep these somewhere safe.\n\n" +
+      backupCodes.join("\n") +
+      "\n";
+    const blob = new Blob([body], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cashclip-2fa-backup-codes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleRegenerate() {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch("/api/auth/totp/backup-codes/regenerate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to regenerate backup codes");
+        return;
+      }
+      setBackupCodes(data.backupCodes ?? null);
+      setBackupCount(data.backupCodes?.length ?? 0);
+      setRegenMode(false);
+      setCode("");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!setupData?.uri) {
@@ -172,6 +234,8 @@ function TwoFactorPanel({ token }: { token: string }) {
       setEnabled(true);
       setSetupData(null);
       setCode("");
+      setBackupCodes(data.backupCodes ?? null);
+      setBackupCount(data.backupCodes?.length ?? 0);
       setSuccess(
         "Two-factor authentication is now enabled. You'll need your authenticator app on every login.",
       );
@@ -199,6 +263,9 @@ function TwoFactorPanel({ token }: { token: string }) {
       }
       setEnabled(false);
       setCode("");
+      setBackupCodes(null);
+      setBackupCount(0);
+      setRegenMode(false);
       setSuccess("Two-factor authentication has been disabled.");
     } finally {
       setLoading(false);
@@ -230,7 +297,60 @@ function TwoFactorPanel({ token }: { token: string }) {
 
       {enabled === null && <p className="text-white/30 text-sm">Loading...</p>}
 
-      {enabled === true && !setupData && (
+      {backupCodes && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <KeyRound className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-white font-medium text-sm">
+                Save your backup codes
+              </p>
+              <p className="text-white/40 text-xs mt-1">
+                Each code works once in place of your authenticator code. Store
+                them somewhere safe — this is the only time they'll be shown.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 bg-white/[0.05] border border-white/10 rounded-xl p-4">
+            {backupCodes.map((c) => (
+              <span
+                key={c}
+                className="font-mono text-sm text-white/80 tracking-wider text-center select-all"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={copyBackupCodes}
+              className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+            >
+              {copied ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              onClick={downloadBackupCodes}
+              className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
+          </div>
+          <button
+            onClick={() => setBackupCodes(null)}
+            className="w-full bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
+          >
+            I've saved these codes
+          </button>
+        </div>
+      )}
+
+      {enabled === true && !setupData && !backupCodes && (
         <div className="space-y-4">
           <div className="bg-[#00E676]/5 border border-[#00E676]/20 rounded-2xl p-5 flex items-center gap-3">
             <div className="p-2 rounded-xl bg-[#00E676]/10">
@@ -243,6 +363,80 @@ function TwoFactorPanel({ token }: { token: string }) {
               </p>
             </div>
           </div>
+
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <KeyRound className="w-5 h-5 text-white/40 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white font-medium text-sm">Backup codes</p>
+                <p className="text-white/40 text-xs mt-0.5">
+                  {backupCount === null
+                    ? "—"
+                    : `${backupCount} unused code${backupCount === 1 ? "" : "s"} remaining`}
+                  . Use one to log in if you lose your authenticator.
+                </p>
+                {backupCount !== null && backupCount <= 2 && (
+                  <p className="text-amber-400 text-xs mt-1">
+                    You're running low — regenerate a fresh set soon.
+                  </p>
+                )}
+              </div>
+            </div>
+            {!regenMode ? (
+              <button
+                onClick={() => {
+                  setRegenMode(true);
+                  setCode("");
+                  setError("");
+                  setSuccess("");
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Regenerate backup codes
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-white/60 text-sm">
+                  Enter a code from your authenticator app to generate a new set.
+                  This invalidates all previous backup codes.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) =>
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  placeholder="000000"
+                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                />
+                {error && (
+                  <p className="text-red-400 text-sm text-center">{error}</p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setRegenMode(false);
+                      setCode("");
+                      setError("");
+                    }}
+                    className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRegenerate}
+                    disabled={code.length !== 6 || loading}
+                    className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                  >
+                    {loading ? "Generating..." : "Generate"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
             <p className="text-white/60 text-sm">
               To disable 2FA, enter a valid code from your authenticator app:
@@ -250,19 +444,20 @@ function TwoFactorPanel({ token }: { token: string }) {
             <input
               type="text"
               inputMode="numeric"
-              value={code}
+              value={regenMode ? "" : code}
+              disabled={regenMode}
               onChange={(e) =>
                 setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
               }
               placeholder="000000"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-red-500/50 transition-colors"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-red-500/50 transition-colors disabled:opacity-40"
             />
-            {error && (
+            {error && !regenMode && (
               <p className="text-red-400 text-sm text-center">{error}</p>
             )}
             <button
               onClick={handleDisable}
-              disabled={code.length !== 6 || loading}
+              disabled={code.length !== 6 || loading || regenMode}
               className="w-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold py-2.5 rounded-xl hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
             >
               {loading ? "Disabling..." : "Disable 2FA"}
