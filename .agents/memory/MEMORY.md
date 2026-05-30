@@ -1,3 +1,4 @@
 - [App Store review replies + Apple defense](appstore-review-replies.md) — owner-approved tone & exact templates for public review replies and the Apple "Report a Concern" note; reuse verbatim, don't re-derive.
 - [Domain registrar / DNS / email](domain-registrar.md) — registrar/domain/email provider is Zoho (owner-stated); DNS + email aliases managed there. Don't ask who the registrar is.
 - [Post-merge schema drift](post-merge-schema-drift.md) — merged Drizzle schema changes don't auto-apply to dev DB; symptom "column X does not exist" on startup; post-merge.sh runs the push.
+- [Admin recovery + prod schema drift](admin-recovery-and-prod-drift.md) — factory-reset can't be agent-triggered (passphrase not in workspace env, prod ADMIN_TOKEN differs); use /sc-portal. Prod DB schema lags dev (only Publish advances it).
