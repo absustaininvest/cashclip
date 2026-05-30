@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
-import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice, sendTwoFactorDisabledNotice } from "./lib/email";
+import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice, sendTwoFactorDisabledNotice, sendPasswordChangedNotice } from "./lib/email";
 import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
@@ -968,6 +968,21 @@ export function registerAuthRoutes(app: Express) {
         return result;
       });
       logger.info({ userId: user.id }, "User changed password");
+      // Security alert email (never containing the password or any secret) so an
+      // admin is tipped off if someone else changed their password. Mirrors the
+      // 2FA notices: admin-only, best-effort, never blocks the response.
+      if (user.role === "admin") {
+        const changeRecipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+        if (changeRecipient) {
+          try {
+            sendPasswordChangedNotice({ to: changeRecipient, username: user.username, context: "changed" });
+          } catch (mailErr) {
+            logger.error({ err: mailErr, userId: user.id }, "Failed to send password changed security alert");
+          }
+        } else {
+          logger.warn({ userId: user.id }, "Password changed but admin has no email on file — skipping security alert");
+        }
+      }
       const newToken = generateToken(user.id, user.role, tokenVersion);
       setSessionCookie(res, newToken);
       setRefreshCookie(res, user.id, tokenVersion);
@@ -1118,6 +1133,21 @@ export function registerAuthRoutes(app: Express) {
         await storage.recordSecurityAudit({ actorUserId: user.id, event: "password_reset", ip: getClientIp(req) }, tx);
       });
       logger.info({ userId: user.id }, "Password reset via OTP");
+      // Security alert email (never containing the password or any secret) so an
+      // admin is tipped off if someone else reset their password via recovery.
+      // Mirrors the 2FA notices: admin-only, best-effort, never blocks the response.
+      if (user.role === "admin") {
+        const resetRecipient = user.email && user.email.trim().length > 0 ? user.email : undefined;
+        if (resetRecipient) {
+          try {
+            sendPasswordChangedNotice({ to: resetRecipient, username: user.username, context: "reset" });
+          } catch (mailErr) {
+            logger.error({ err: mailErr, userId: user.id }, "Failed to send password reset security alert");
+          }
+        } else {
+          logger.warn({ userId: user.id }, "Password reset but admin has no email on file — skipping security alert");
+        }
+      }
       res.json({ message: "Password reset successfully" });
     } catch (err: unknown) {
       logger.error({ err }, "Reset password error");
