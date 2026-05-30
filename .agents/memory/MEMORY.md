@@ -2,3 +2,4 @@
 - [Domain registrar / DNS / email](domain-registrar.md) — registrar/domain/email provider is Zoho (owner-stated); DNS + email aliases managed there. Don't ask who the registrar is.
 - [Post-merge schema drift](post-merge-schema-drift.md) — merged Drizzle schema changes don't auto-apply to dev DB; symptom "column X does not exist" on startup; post-merge.sh runs the push.
 - [Admin recovery + prod schema drift](admin-recovery-and-prod-drift.md) — factory-reset can't be agent-triggered (passphrase not in workspace env, prod ADMIN_TOKEN differs); use /sc-portal. Prod DB schema lags dev (only Publish advances it).
+- [Owner privacy → false flags](owner-privacy-symptoms.md) — Private Relay/VPN/private browsing rotates his IP → location flags, Replit ~2min refresh, app anti-fraud noise, self-triggered alert emails. Confirm account state before any recovery; he self-resolves.
