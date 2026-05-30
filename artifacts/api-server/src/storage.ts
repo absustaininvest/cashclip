@@ -36,6 +36,26 @@ export type SecurityAuditEvent =
   | "admin_password_reset"
   | "admin_factory_reset";
 
+export const SECURITY_AUDIT_EVENTS: readonly SecurityAuditEvent[] = [
+  "totp_enabled",
+  "totp_disabled",
+  "backup_codes_regenerated",
+  "password_changed",
+  "password_reset",
+] as const;
+
+// A security audit row enriched with the actor's username/email for display.
+// Never includes secrets, codes, seeds, or passwords — only who-did-what-when.
+export interface SecurityAuditEntryView {
+  id: string;
+  actorUserId: string;
+  actorUsername: string | null;
+  actorEmail: string | null;
+  event: SecurityAuditEvent;
+  ip: string | null;
+  createdAt: Date;
+}
+
 export type LedgerType =
   | "survey"
   | "offerwall"
@@ -54,6 +74,12 @@ export interface IStorage {
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
   recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }): Promise<void>;
+  getSecurityAuditEntries(opts?: {
+    actorUserId?: string;
+    event?: SecurityAuditEvent;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entries: SecurityAuditEntryView[]; total: number }>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -250,6 +276,56 @@ export class DatabaseStorage implements IStorage {
       event: args.event,
       ip: args.ip ?? null,
     });
+  }
+
+  async getSecurityAuditEntries(opts: {
+    actorUserId?: string;
+    event?: SecurityAuditEvent;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ entries: SecurityAuditEntryView[]; total: number }> {
+    const conditions = [];
+    if (opts.actorUserId) conditions.push(eq(securityAuditLog.actorUserId, opts.actorUserId));
+    if (opts.event) conditions.push(eq(securityAuditLog.event, opts.event));
+    const where = conditions.length ? and(...conditions) : undefined;
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+    const offset = Math.max(opts.offset ?? 0, 0);
+
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select({
+          id: securityAuditLog.id,
+          actorUserId: securityAuditLog.actorUserId,
+          actorUsername: users.username,
+          actorEmail: users.email,
+          event: securityAuditLog.event,
+          ip: securityAuditLog.ip,
+          createdAt: securityAuditLog.createdAt,
+        })
+        .from(securityAuditLog)
+        .leftJoin(users, eq(securityAuditLog.actorUserId, users.id))
+        .where(where)
+        .orderBy(desc(securityAuditLog.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(securityAuditLog)
+        .where(where),
+    ]);
+
+    return {
+      entries: rows.map((r: (typeof rows)[number]) => ({
+        id: r.id,
+        actorUserId: r.actorUserId,
+        actorUsername: r.actorUsername ?? null,
+        actorEmail: r.actorEmail ?? null,
+        event: r.event as SecurityAuditEvent,
+        ip: r.ip ?? null,
+        createdAt: r.createdAt,
+      })),
+      total: Number(totalRow?.total ?? 0),
+    };
   }
 
   async getTotpBackupCodesRemaining(userId: string): Promise<number> {

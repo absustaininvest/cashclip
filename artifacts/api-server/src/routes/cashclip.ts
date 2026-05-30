@@ -17,7 +17,7 @@ import {
   clearVerificationState,
 } from "../lib/integrationVerificationState";
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
-import { storage } from "../storage";
+import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
 import { db, updateUserProfileSchema } from "@workspace/db";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
@@ -1724,6 +1724,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.end();
       }
+    }
+  });
+
+  // Read-only security audit trail (2FA enable/disable, backup-code
+  // regeneration, password changes/resets). Admin-gated. The underlying table
+  // only stores who-did-what-when metadata — never secrets, codes, seeds, or
+  // passwords — so nothing sensitive is exposed here.
+  app.get("/api/admin/security-audit", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const actorUserId = typeof req.query.actorUserId === "string" && req.query.actorUserId.length > 0
+        ? req.query.actorUserId
+        : undefined;
+
+      let event: SecurityAuditEvent | undefined;
+      if (typeof req.query.event === "string" && req.query.event.length > 0) {
+        if (!SECURITY_AUDIT_EVENTS.includes(req.query.event as SecurityAuditEvent)) {
+          res.status(400).json({ error: "Invalid event filter" });
+          return;
+        }
+        event = req.query.event as SecurityAuditEvent;
+      }
+
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || "50"), 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+      const { entries, total } = await storage.getSecurityAuditEntries({
+        actorUserId,
+        event,
+        limit,
+        offset,
+      });
+
+      res.json({
+        filters: {
+          actorUserId: actorUserId ?? null,
+          event: event ?? null,
+          limit,
+          offset,
+        },
+        knownEvents: SECURITY_AUDIT_EVENTS,
+        total,
+        entries: entries.map((e) => ({
+          id: e.id,
+          actorUserId: e.actorUserId,
+          actorUsername: e.actorUsername,
+          actorEmail: e.actorEmail,
+          event: e.event,
+          ip: e.ip,
+          createdAt: e.createdAt.toISOString(),
+        })),
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to get security audit log");
+      res.status(500).json({ error: "Failed to load security audit log" });
     }
   });
 

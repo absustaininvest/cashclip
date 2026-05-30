@@ -37,6 +37,9 @@ import {
   Headphones,
   Shield,
   ShieldCheck,
+  History,
+  ChevronLeft,
+  Globe,
 } from "lucide-react";
 
 interface Lead {
@@ -2416,13 +2419,326 @@ function CashClipUsersPanel({ token }: { token: string }) {
   );
 }
 
+interface SecurityAuditEntry {
+  id: string;
+  actorUserId: string;
+  actorUsername: string | null;
+  actorEmail: string | null;
+  event: string;
+  ip: string | null;
+  createdAt: string;
+}
+
+const SECURITY_EVENT_META: Record<
+  string,
+  { label: string; color: string }
+> = {
+  totp_enabled: {
+    label: "2FA Enabled",
+    color: "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20",
+  },
+  totp_disabled: {
+    label: "2FA Disabled",
+    color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  },
+  backup_codes_regenerated: {
+    label: "Backup Codes Regenerated",
+    color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  },
+  password_changed: {
+    label: "Password Changed",
+    color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+  },
+  password_reset: {
+    label: "Password Reset",
+    color: "text-pink-400 bg-pink-500/10 border-pink-500/20",
+  },
+};
+
+const SECURITY_LOG_PAGE_SIZE = 50;
+
+function SecurityLogPanel({
+  token,
+  onLogout,
+}: {
+  token: string;
+  onLogout: () => void;
+}) {
+  const [entries, setEntries] = useState<SecurityAuditEntry[]>([]);
+  const [knownEvents, setKnownEvents] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [eventFilter, setEventFilter] = useState<string>("");
+  const [actorFilter, setActorFilter] = useState<string>("");
+  const [activeActorFilter, setActiveActorFilter] = useState<string>("");
+  const [page, setPage] = useState(0);
+
+  const fetchEntries = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", String(SECURITY_LOG_PAGE_SIZE));
+      params.set("offset", String(page * SECURITY_LOG_PAGE_SIZE));
+      if (eventFilter) params.set("event", eventFilter);
+      if (activeActorFilter) params.set("actorUserId", activeActorFilter);
+      const res = await fetch(`/api/admin/security-audit?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        onLogout();
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).error || "Failed to load security log");
+      }
+      const data = await res.json();
+      setEntries(data.entries ?? []);
+      setTotal(data.total ?? 0);
+      setKnownEvents(data.knownEvents ?? []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, onLogout, page, eventFilter, activeActorFilter]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  function formatDate(dateStr: string) {
+    return new Date(dateStr).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / SECURITY_LOG_PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : page * SECURITY_LOG_PAGE_SIZE + 1;
+  const rangeEnd = Math.min((page + 1) * SECURITY_LOG_PAGE_SIZE, total);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
+            <History className="w-5 h-5 text-[#00E676]" />
+          </div>
+          <div>
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+              Security Log
+            </h2>
+            <p className="text-white/40 text-sm mt-0.5">
+              Account security events — who changed what, when, and from where.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => fetchEntries()}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 overflow-x-auto">
+          <button
+            onClick={() => {
+              setEventFilter("");
+              setPage(0);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors ${
+              eventFilter === ""
+                ? "bg-[#00E676] text-[#06060E]"
+                : "text-white/50 hover:text-white"
+            }`}
+          >
+            All Events
+          </button>
+          {knownEvents.map((ev) => (
+            <button
+              key={ev}
+              onClick={() => {
+                setEventFilter(ev);
+                setPage(0);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors ${
+                eventFilter === ev
+                  ? "bg-[#00E676] text-[#06060E]"
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
+              {SECURITY_EVENT_META[ev]?.label ?? ev}
+            </button>
+          ))}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setActiveActorFilter(actorFilter.trim());
+            setPage(0);
+          }}
+          className="flex items-center gap-2 flex-1 min-w-[200px]"
+        >
+          <input
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+            placeholder="Filter by actor user ID…"
+            className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40"
+          />
+          {activeActorFilter && (
+            <button
+              type="button"
+              onClick={() => {
+                setActorFilter("");
+                setActiveActorFilter("");
+                setPage(0);
+              }}
+              className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+              title="Clear actor filter"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </form>
+      </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+        {loading ? (
+          <div className="text-center py-16 text-white/30">
+            Loading security events…
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="text-center py-16">
+            <Shield className="w-10 h-10 text-white/10 mx-auto mb-3" />
+            <p className="text-white/30 text-sm">No security events found</p>
+            <p className="text-white/20 text-xs mt-1">
+              2FA changes, backup-code regeneration, and password changes will
+              appear here
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {entries.map((e) => {
+              const meta = SECURITY_EVENT_META[e.event] ?? {
+                label: e.event,
+                color: "text-white/40 bg-white/5 border-white/10",
+              };
+              return (
+                <div
+                  key={e.id}
+                  className="px-5 py-4 hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${meta.color}`}
+                        >
+                          <ShieldCheck className="w-2.5 h-2.5" />
+                          {meta.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="flex items-center gap-1.5 text-white font-medium text-sm">
+                          <User className="w-3.5 h-3.5 text-white/30" />
+                          {e.actorUsername ?? "Unknown user"}
+                        </span>
+                        {e.actorEmail && (
+                          <span className="flex items-center gap-1.5 text-white/40 text-xs">
+                            <Mail className="w-3.5 h-3.5 text-white/20" />
+                            {e.actorEmail}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1.5 text-white/40 text-xs">
+                          <Globe className="w-3.5 h-3.5 text-white/20" />
+                          {e.ip ?? "IP unavailable"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setActorFilter(e.actorUserId);
+                          setActiveActorFilter(e.actorUserId);
+                          setPage(0);
+                        }}
+                        className="text-white/20 hover:text-[#00E676] text-[10px] font-mono mt-1.5 transition-colors"
+                        title="Filter by this user"
+                      >
+                        {e.actorUserId}
+                      </button>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-white/30 text-xs">
+                        {formatDate(e.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-white/30 text-xs">
+            Showing {rangeStart}–{rangeEnd} of {total} events
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Prev
+            </button>
+            <span className="text-white/40 text-xs">
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
+              disabled={page + 1 >= totalPages || loading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Next
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Tab =
   | "submissions"
   | "ventures"
   | "inbox"
   | "account"
   | "cashclip"
-  | "security";
+  | "security"
+  | "securitylog";
 
 function Dashboard({
   token,
@@ -2504,6 +2820,7 @@ function Dashboard({
     { id: "inbox", label: "Inbox", icon: Inbox },
     { id: "account", label: "Account", icon: User },
     { id: "security", label: "Security", icon: Shield },
+    { id: "securitylog", label: "Security Log", icon: History },
   ];
 
   return (
@@ -2749,6 +3066,7 @@ function Dashboard({
           </div>
         )}
         {tab === "security" && <TwoFactorPanel token={token} />}
+        {tab === "securitylog" && <SecurityLogPanel token={token} onLogout={onLogout} />}
       </main>
     </div>
   );
