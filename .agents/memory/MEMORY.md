@@ -1,1 +1,2 @@
 - [App Store review replies + Apple defense](appstore-review-replies.md) — owner-approved tone & exact templates for public review replies and the Apple "Report a Concern" note; reuse verbatim, don't re-derive.
+- [Domain registrar / DNS / email](domain-registrar.md) — registrar/domain/email provider is Zoho (owner-stated); DNS + email aliases managed there. Don't ask who the registrar is.
