@@ -56,6 +56,17 @@ vi.mock("../lib/secretsPassphrase", () => ({
   secretsPassphraseMiddleware: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
+// The admin handlers wrap their mutation + audit write in db.transaction. Run
+// the callback with a throwaway tx so the (already-mocked) storage methods are
+// exercised; real schema/drizzle exports are preserved via importOriginal.
+vi.mock("@workspace/db", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    db: { transaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({}) },
+  };
+});
+
 // Sibling route registrations are irrelevant here — stub them out.
 vi.mock("../surveys", () => ({ registerSurveyRoutes: vi.fn() }));
 vi.mock("../offerwalls", () => ({ registerOfferwallRoutes: vi.fn() }));

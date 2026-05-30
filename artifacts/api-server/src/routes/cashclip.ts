@@ -18,7 +18,7 @@ import {
 } from "../lib/integrationVerificationState";
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage } from "../storage";
-import { updateUserProfileSchema } from "@workspace/db";
+import { db, updateUserProfileSchema } from "@workspace/db";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
@@ -1311,16 +1311,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bcrypt = await import("bcryptjs");
       const hashed = await bcrypt.hash(newPassword, 10);
-      await storage.updateUserPassword(userId, hashed);
-      if (req.userId) {
-        const { getClientIp } = await import("../lib/clientIp");
-        await storage.recordSecurityAudit({
-          actorUserId: req.userId,
-          targetUserId: userId,
-          event: "admin_password_reset",
-          ip: getClientIp(req),
-        });
-      }
+      const { getClientIp } = await import("../lib/clientIp");
+      // Password reset + durable audit entry commit atomically (fail-closed): if
+      // the audit write fails the password change is rolled back, so an admin can
+      // never alter a user's credentials without a persisted audit trail.
+      await db.transaction(async (tx) => {
+        await storage.updateUserPassword(userId, hashed, tx);
+        if (req.userId) {
+          await storage.recordSecurityAudit({
+            actorUserId: req.userId,
+            targetUserId: userId,
+            event: "admin_password_reset",
+            ip: getClientIp(req),
+          }, tx);
+        }
+      });
       req.log?.info({ adminId: req.userId, targetUserId: userId }, "admin reset user password — prior tokens invalidated");
       res.json({ message: "Password reset successfully", username: target.username });
     } catch (err: any) {
@@ -1349,16 +1354,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bcrypt = await import("bcryptjs");
       const hashed = await bcrypt.hash(newPassword, 10);
-      const { tokenVersion } = await storage.factoryResetUser(userId, hashed);
-      if (req.userId) {
-        const { getClientIp } = await import("../lib/clientIp");
-        await storage.recordSecurityAudit({
-          actorUserId: req.userId,
-          targetUserId: userId,
-          event: "admin_factory_reset",
-          ip: getClientIp(req),
-        });
-      }
+      const { getClientIp } = await import("../lib/clientIp");
+      // Factory reset + durable audit entry commit atomically (fail-closed): if
+      // the audit write fails the credential regeneration is rolled back, so an
+      // operator can never take over an account without a persisted audit trail.
+      const { tokenVersion } = await db.transaction(async (tx) => {
+        const result = await storage.factoryResetUser(userId, hashed, tx);
+        if (req.userId) {
+          await storage.recordSecurityAudit({
+            actorUserId: req.userId,
+            targetUserId: userId,
+            event: "admin_factory_reset",
+            ip: getClientIp(req),
+          }, tx);
+        }
+        return result;
+      });
       req.log?.warn(
         { adminId: req.userId, targetUserId: userId, username: target.username, role: target.role, tokenVersion },
         "admin FACTORY RESET account — password regenerated, 2FA cleared, all prior sessions invalidated",

@@ -280,8 +280,8 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }> {
-    const [updated] = await db
+  async factoryResetUser(id: string, hashedPassword: string, executor: Executor = db): Promise<{ tokenVersion: number }> {
+    const [updated] = await executor
       .update(users)
       .set({
         password: hashedPassword,
