@@ -95,12 +95,9 @@ function AnnouncementBanner() {
   );
 }
 
-function EarnHighlightStrip({ router }: { router: any }) {
+function EarnHighlightStrip() {
   return (
-    <Pressable
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/earn"); }}
-      style={styles.highlightStrip}
-    >
+    <View style={styles.highlightStrip}>
       <LinearGradient
         colors={["rgba(0,230,118,0.10)", "rgba(0,230,118,0.03)"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -109,7 +106,6 @@ function EarnHighlightStrip({ router }: { router: any }) {
         <View style={styles.highlightHeader}>
           <MaterialCommunityIcons name="lightning-bolt" size={14} color={Colors.primary} />
           <Text style={styles.highlightTitle}>Today's Earn Opportunities</Text>
-          <Feather name="chevron-right" size={14} color={Colors.primary} />
         </View>
         <View style={styles.highlightRow}>
           {EARN_HIGHLIGHTS.map((h) => (
@@ -123,7 +119,7 @@ function EarnHighlightStrip({ router }: { router: any }) {
           ))}
         </View>
       </LinearGradient>
-    </Pressable>
+    </View>
   );
 }
 
@@ -272,7 +268,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Today's earn strip */}
-            <EarnHighlightStrip router={router} />
+            <EarnHighlightStrip />
 
             {/* Quick access — 4 items */}
             <View style={styles.quickRow}>

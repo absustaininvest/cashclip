@@ -329,7 +329,7 @@ export default function SurveysScreen() {
                   <View style={styles.statsDivider} />
                   <View style={styles.statsItem}>
                     <Feather name="users" size={22} color="#4ECDC4" />
-                    <Text style={styles.statsValue}>{(providersData as any)?.providers?.filter((p: any) => p.configured).length ?? 0}</Text>
+                    <Text style={styles.statsValue}>{providersList.filter((p: any) => p.configured).length}</Text>
                     <Text style={styles.statsLabel}>Partners</Text>
                   </View>
                 </View>
