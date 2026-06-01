@@ -1,23 +1,21 @@
 ---
-name: CashClip OTA delivery to the live build (29)
-description: How to make over-the-air (EAS Update) changes actually land on the live, in-distribution CashClip build, and what can/can't ride OTA.
+name: CashClip OTA delivery — build 29 is UNREACHABLE by OTA
+description: Which CashClip builds can/can't receive EAS Update OTAs, and why the live App Store build (29) can never be fixed over-the-air.
 ---
 
-# Delivering updates to the live CashClip build (build 29)
+# OTA delivery to CashClip builds — and why build 29 is a dead end
 
-**Target for OTA to reach the live app:** EAS Update published to channel **`production`** at **runtimeVersion `1.0.0`**. Live build 29 listens on exactly that combination. All production iOS builds 33–38 were compiled on runtimeVersion `1.0.0` / channel `production` (verified via `eas build:list`), and runtimeVersion is a single static string `"1.0.0"` in `app.json`, so build 29 shares the same target.
+**Hard fact (verified June 1, 2026 via Expo GraphQL build registry):** the current Expo project is `cashclip` (projectId `aac2a3d9-56b6-49ab-b254-9b80e98bab2f`, owner account `absustainabilityinvestments`). Its iOS builds are **30, 31, 32, 33, 34, 35, 36, 37, 38** (oldest build 2026-05-15). **Build 29 does NOT exist in this project.**
 
-**Pipeline is wired & working (confirmed June 1, 2026):**
-- `app.json`: `updates.url = https://u.expo.dev/<projectId>`, `runtimeVersion: "1.0.0"`, EAS projectId present.
-- `eas.json`: `production` build profile → `channel: "production"`.
-- Auth: `EXPO_TOKLAST` = the EAS token (passed as `EXPO_TOKEN`). `eas whoami` → `support@absustaininvest.com`, Owner of `absustainabilityinvestments`. Token authenticates.
+**Therefore build 29 — the live, App-Store-approved build that real users have — was created under a DIFFERENT, earlier Expo project (the pre-transfer codebase that was wiped).** Its baked-in `updates.url` points at that old/dead project, NOT at `aac2a3d9`. So **no OTA we publish to this project can ever reach build 29.** Every EAS update we ship lands only on builds 30–38.
 
-**Why "updates didn't take effect" this morning:** the Expo/EAS auth secret was not set properly, so the publish never landed. Once the token is set, publishes go through. Always confirm `eas whoami` succeeds before assuming an update will land.
+**Why this matters / consequences:**
+- The public/live app (build 29) is permanently **frozen on the JS it shipped with** — including the "tap a home ad card → flash → bridge to the Earn tab" behavior (a prior agent temporarily disabled the cards by routing them to Earn and never reverted it). No OTA can fix that on 29.
+- Real AdMob ad playback also can't be turned on for 29 via OTA.
+- Build 38 (and 30–37) DO get our OTAs (channel `production`, runtimeVersion `1.0.0`) — that's why 38 plays ads and behaves correctly while 29 doesn't.
+- **The ONLY way to fix the live public app is a new App Store build from THIS project (≥ build 39) submitted and approved by Apple.** There is no OTA shortcut. (Owner has resisted a new build and wants users kept on 29 — but 29 is technically unfixable by OTA; be honest about this.)
 
-## Hard rule: small, JS-only groups — not big packs
-**Why:** runtimeVersion `"1.0.0"` is a single static label shared across builds whose NATIVE code differs (build 29 vs the newer 33–38). OTA only carries **JS + assets**, never native code. An OTA published to `1.0.0` WILL land on build 29 — but if that JS depends on a native module/permission that only exists in a newer build, build 29 will CRASH.
+**How to verify build membership again:** query Expo GraphQL `app.byId(appId).buildsPaginated` for `appBuildVersion` + `platform`; if a build number isn't in the list, this project can't deliver updates to it. Use `EXPO_TOKLAST` as a Bearer token via `curl` to `https://api.expo.dev/graphql` (the `eas-cli` gets killed in plain bash; curl/GraphQL works).
 
-**How to apply:**
-- Ship **small, frequent, self-contained JS/content changes** that are verified compatible with build 29's older native layer. This is the owner's stated working preference.
-- NEVER bundle into an OTA anything that needs native changes: new SDK/native module, new permission, `expo-build-properties` / `newArchEnabled` / plugin changes, or a version/build bump. Those require a brand-new App Store build + Apple review — they cannot ride OTA.
-- Get explicit owner approval before any publish (no unsolicited releases).
+## For builds that ARE reachable (30–38): small, JS-only groups only
+runtimeVersion `"1.0.0"` is one static label shared across builds whose NATIVE code differs. OTA carries only JS + assets. Ship small, self-contained JS/content changes verified compatible with the OLDEST reachable native layer; never bundle native changes (new SDK/module, new permission, plugin/`expo-build-properties`/`newArchEnabled` changes, version bump) into an OTA — those need a new App Store build. Get explicit owner approval before any publish.

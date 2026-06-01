@@ -9,6 +9,8 @@ The build/version numbers in `artifacts/cashclip/app.json` are the **next workin
 
 **Confirmed June 1, 2026 (App Store Connect):** the live, approved, in-distribution version is **marketing v1.0 = build 29** (the "29" the owner kept referring to). **v1.1.0 (build 38) was REJECTED** by Apple because **the app never opened for the reviewer, who tested on an iPad** — i.e. a launch/startup freeze (Apple "app completeness" 2.1). The 38/39 build numbers in app.json never shipped. So build 29 is the real current app.
 
+**CRITICAL (verified June 1, 2026):** build 29 was built under the OLD, pre-transfer Expo project (now wiped) — it is NOT in the current Expo project `cashclip`/`aac2a3d9`, whose iOS builds start at 30. So **build 29 cannot receive any OTA we publish** and is permanently frozen on its shipped JS (e.g. the home ad cards "bridge to Earn" instead of playing ads). The only fix for the live public app is a NEW App Store build (≥39) from this project + Apple approval. See [cashclip-ota-delivery](cashclip-ota-delivery.md).
+
 **Likely root cause of the build-38 rejection:** a launch-screen handoff freeze — see [expo-splash-launch-deadlock](expo-splash-launch-deadlock.md) (splash never hides because launch is gated on a step that never resolves). Owner-stated symptom matches that pattern exactly.
 
 **To find the version truly live & approved in the App Store**, use Apple's public lookup (no auth):
