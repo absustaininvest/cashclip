@@ -141,11 +141,6 @@ export default function SurveysScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: providersData } = useQuery({
-    queryKey: ["/api/surveys/providers"],
-    staleTime: 60 * 1000,
-  });
-
   const startExternalMutation = useMutation({
     mutationFn: async (survey: ExternalSurvey) => {
       const token = await AsyncStorage_getToken();
@@ -263,7 +258,8 @@ export default function SurveysScreen() {
   const externalSurveys: ExternalSurvey[] = ((externalData as any)?.surveys || []).filter(
     (s: ExternalSurvey) => !completedExternalIds.has(s.id)
   );
-  const anyProviderConfigured = (providersData as any)?.anyConfigured ?? false;
+  const providersList: any[] = (externalData as any)?.providers || [];
+  const anyProviderConfigured = providersList.some((p) => p.configured);
   const externalTotalReward = externalSurveys.reduce((sum: number, s: ExternalSurvey) => sum + s.reward, 0);
 
   return (
