@@ -38,7 +38,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
@@ -180,7 +180,7 @@ export default function WalletScreen() {
 
   const fetchServerBalance = useCallback(async (): Promise<{ balance: number; totalEarned: number } | null> => {
     try {
-      const authToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const authToken = await secureGet("cashclip_auth_token");
       if (!authToken) return null;
       const url = new URL("/api/balance", getApiUrl());
       const res = await fetch(url.toString(), {

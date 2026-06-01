@@ -8,3 +8,4 @@
 - [Live App Store version](appstore-live-version.md) — live = v1.0/build 29 (approved); v1.1.0/build 38 rejected (app froze on splash, iPad reviewer, 2.1a); app.json build# is the NEXT build, not what's live.
 - [CashClip OTA delivery to live build](cashclip-ota-delivery.md) — OTA lands on build 29 via channel `production` + runtimeVersion `1.0.0`; ship SMALL JS-only groups (shared runtimeVersion means native-dependent JS crashes 29); native changes need a new build.
 - [Prod secrets live in Publishing, not Secrets tab](prod-secrets-location.md) — integration keys only in the workspace Secrets tab never reach the live API; must be in Publishing → Production app secrets, and only take effect after re-publishing the API.
+- [CashClip auth-token storage split](cashclip-token-storage-split.md) — read the JWT only via secureGet/secureSet (`@/lib/secure-store`); raw AsyncStorage reads of `cashclip_auth_token` return null on native → "not authenticated", works on web.

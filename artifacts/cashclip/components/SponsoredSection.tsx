@@ -28,7 +28,8 @@ export default function SponsoredSection() {
   useEffect(() => {
     (async () => {
       try {
-        const token = await (await import("@react-native-async-storage/async-storage")).default.getItem("cashclip_auth_token");
+        const { secureGet } = await import("@/lib/secure-store");
+        const token = await secureGet("cashclip_auth_token");
         if (!token) { setLoading(false); return; }
         const { getApiUrl } = await import("@/lib/query-client");
         const res = await globalThis.fetch(
@@ -46,8 +47,8 @@ export default function SponsoredSection() {
     setVisitingId(c.id);
 
     try {
-      const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
-      const token = await AsyncStorage.getItem("cashclip_auth_token");
+      const { secureGet } = await import("@/lib/secure-store");
+      const token = await secureGet("cashclip_auth_token");
       const { getApiUrl } = await import("@/lib/query-client");
       const { getDeviceId } = await import("@/lib/deviceId");
       const { getOrRegisterInstallToken } = await import("@/lib/installToken");

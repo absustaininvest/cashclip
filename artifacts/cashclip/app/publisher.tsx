@@ -23,7 +23,7 @@ import {
 } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "@/lib/secure-store";
 
 interface Campaign {
   id: string;
@@ -103,7 +103,7 @@ export default function PublisherScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("cashclip_auth_token");
+      const token = await secureGet("cashclip_auth_token");
       if (!token) return;
       const base = getApiUrl();
       const [meRes, camRes] = await Promise.all([

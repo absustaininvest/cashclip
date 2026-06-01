@@ -24,7 +24,7 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "@/lib/secure-store";
 import { getSponsorBrands, addSponsorBrand, removeSponsorBrand, SponsorBrand } from "@/lib/storage";
 
 interface WithdrawalRecord {
@@ -214,7 +214,7 @@ export default function AdminScreen() {
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) { setUsersLoading(false); return; }
       const res = await globalThis.fetch(
         new URL("/api/admin/users?limit=200", getApiUrl()).toString(),
@@ -233,7 +233,7 @@ export default function AdminScreen() {
   const handleGrantPublisher = useCallback(async (userId: string, grant: boolean) => {
     setPublisherLoadingId(userId);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       const res = await globalThis.fetch(
         new URL(`/api/admin/users/${userId}/publisher`, getApiUrl()).toString(),
         {
@@ -262,7 +262,7 @@ export default function AdminScreen() {
   const handleVerifyEmail = useCallback(async (userId: string) => {
     setVerifyEmailLoadingId(userId);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       const res = await globalThis.fetch(
         new URL(`/api/admin/users/${userId}/verify-email`, getApiUrl()).toString(),
         { method: "POST", headers: { Authorization: `Bearer ${savedToken}` } },
@@ -284,7 +284,7 @@ export default function AdminScreen() {
     if (pwd.length < 8) { Alert.alert("Error", "Password must be at least 8 characters"); return; }
     setResetLoadingId(userId);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       const res = await globalThis.fetch(
         new URL(`/api/admin/users/${userId}/reset-password`, getApiUrl()).toString(),
         {
@@ -313,7 +313,7 @@ export default function AdminScreen() {
     if (!Number.isFinite(amt) || amt <= 0 || amt > 1000) { Alert.alert("Error", "Enter a valid amount (0–$1000)"); return; }
     setAdjustLoading(true);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) {
         Alert.alert("Session Error", "No auth token found. Log out and log back in with your admin account.");
         setAdjustLoading(false);
@@ -341,7 +341,7 @@ export default function AdminScreen() {
 
   const loadWithdrawals = useCallback(async () => {
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) return;
       const baseUrl = getApiUrl();
       const statusParam = withdrawalFilter !== "all" ? `?status=${withdrawalFilter}` : "";
@@ -360,7 +360,7 @@ export default function AdminScreen() {
 
   const loadWebhookAlerts = useCallback(async () => {
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) return;
       const baseUrl = getApiUrl();
       const res = await globalThis.fetch(new URL("/api/admin/webhook-alerts?limit=10&rejectionLimit=1", baseUrl).toString(), {
@@ -378,7 +378,7 @@ export default function AdminScreen() {
   const loadWebhookAudit = useCallback(async (overrides?: { provider?: string; ip?: string; rangeMs?: number | null }) => {
     setWebhookAuditLoading(true);
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) return;
       const baseUrl = getApiUrl();
       const params = new URLSearchParams({ limit: "100" });
@@ -408,7 +408,7 @@ export default function AdminScreen() {
   const exportWebhookAuditCsv = useCallback(async () => {
     if (Platform.OS !== "web") return;
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) return;
       const baseUrl = getApiUrl();
       const params = new URLSearchParams({ limit: "10000" });
@@ -440,7 +440,7 @@ export default function AdminScreen() {
 
   const loadPaypalStatus = useCallback(async () => {
     try {
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) return;
       const baseUrl = getApiUrl();
       const res = await globalThis.fetch(new URL("/api/admin/paypal-status", baseUrl).toString(), {

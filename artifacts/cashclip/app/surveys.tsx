@@ -435,8 +435,8 @@ export default function SurveysScreen() {
 
 async function AsyncStorage_getToken(): Promise<string | null> {
   try {
-    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    return await AsyncStorage.getItem("cashclip_auth_token");
+    const { secureGet } = require("@/lib/secure-store");
+    return await secureGet("cashclip_auth_token");
   } catch {
     return null;
   }

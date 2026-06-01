@@ -25,7 +25,7 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { getApiUrl } from "@/lib/query-client";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "@/lib/secure-store";
 
 interface AdSummary {
   totalImpressions: number;
@@ -172,7 +172,7 @@ export default function AdAnalyticsScreen() {
   const fetchAnalytics = useCallback(async () => {
     try {
       setError(null);
-      const savedToken = await AsyncStorage.getItem("cashclip_auth_token");
+      const savedToken = await secureGet("cashclip_auth_token");
       if (!savedToken) {
         setError(adLabels.notAuthenticated);
         return;

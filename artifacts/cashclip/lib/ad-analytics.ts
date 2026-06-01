@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGet } from "./secure-store";
 import { getApiUrl } from "./query-client";
 
 export type AdEventType =
@@ -33,7 +34,7 @@ function getPlatformName(): string {
 }
 
 async function getAuthToken(): Promise<string | null> {
-  return AsyncStorage.getItem("cashclip_auth_token");
+  return secureGet("cashclip_auth_token");
 }
 
 async function enqueue(payload: AdEventPayload): Promise<void> {
