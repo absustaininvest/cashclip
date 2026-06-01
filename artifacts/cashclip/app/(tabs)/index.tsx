@@ -31,7 +31,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const AD_CARD_COUNT = 25;
 // OTA rollout: how many of the 25 home ad slots are live (tappable + paying).
 // Shipped in small batches — bump +3 each delivery: 3 → 6 → 9 → 12 → 15 → 18 → 21 → 25.
-const LIVE_AD_SLOTS = 6;
+const LIVE_AD_SLOTS = 12;
 const AD_DURATION_SECONDS = 15;
 
 const QUICK_ACCESS = [
