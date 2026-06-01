@@ -28,8 +28,20 @@ succeed intermittently, which is why a few routes work while login fails.
 **Key implications:**
 - This is a **server/database infrastructure** issue, NOT app code and NOT fixable by an
   expo-updates OTA. Don't ship client changes to "fix" it.
-- First recovery step: restart / re-publish the production deployment (refreshes DB
-  connections). If it persists, it's a Replit managed-Postgres service issue.
+- The outage is typically **intermittent and self-healing** — observed flickering up/down
+  over ~1hr then recovering on its own (prod `SELECT 1` went from 40s-timeout to 5s-OK with
+  no intervention; live login endpoint returned to ~0.3s HTTP 400 once DB recovered).
+  **Re-publishing/redeploy does NOT fix it** (confirmed — error continued across a redeploy).
+- **No app-side change can restore login during the outage**: user accounts/credentials live
+  in the prod DB, so while it's unreachable nobody can authenticate regardless of code.
+- Prod and dev are **separate databases**: dev stays healthy throughout (good for proving
+  "data isn't lost, just unreachable" and reassuring a panicking non-technical owner).
+- **Secrets are not the cause.** Verified via `viewEnvVars({environment})`: prod has the
+  correct current names (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`, integration
+  keys). Old obfuscated names shown in the Publishing panel (`INVECE`, `JWT_TRIDENTE`) are
+  stale leftovers, not in use. Don't chase a secret-rename theory.
+- Best non-support action: **monitor and wait** (loop prod `SELECT 1`); it usually clears in
+  minutes–hours. Owner considers Replit support a dead end, so don't over-rely on a ticket.
 
 # "Tracking is Off" gate reappearing (separate, minor)
 
