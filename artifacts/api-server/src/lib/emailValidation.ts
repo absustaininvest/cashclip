@@ -26,6 +26,15 @@ const RELAY_DOMAINS = new Set([
   "duck.com",
 ]);
 
+const RESERVED_TLDS = new Set(["test", "example", "invalid", "localhost", "local"]);
+
+const RESERVED_DOMAINS = new Set([
+  "example.com",
+  "example.net",
+  "example.org",
+  "test.com",
+]);
+
 export function validateRegistrationEmail(email: string): { valid: boolean; reason?: string } {
   const normalized = email.trim().toLowerCase();
 
@@ -45,6 +54,26 @@ export function validateRegistrationEmail(email: string): { valid: boolean; reas
       valid: false,
       reason:
         "Private relay and anonymous email addresses are not accepted. Please use a real email address.",
+    };
+  }
+
+  const labels = domain.split(".");
+  const tld = labels[labels.length - 1] ?? "";
+  const LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+  if (labels.length < 2 || !labels.every((l) => LABEL.test(l))) {
+    return { valid: false, reason: "Please enter a real email domain." };
+  }
+  if (!/^[a-z]{2,}$/.test(tld)) {
+    return { valid: false, reason: "Please enter a real email domain." };
+  }
+
+  const isReservedDomain =
+    RESERVED_DOMAINS.has(domain) ||
+    [...RESERVED_DOMAINS].some((d) => domain.endsWith(`.${d}`));
+  if (RESERVED_TLDS.has(tld) || isReservedDomain) {
+    return {
+      valid: false,
+      reason: "Please use a real, deliverable email address.",
     };
   }
 
