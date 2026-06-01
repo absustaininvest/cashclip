@@ -9,6 +9,7 @@ import {
   Platform,
   RefreshControl,
   Share,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -142,15 +143,30 @@ export default function HomeScreen() {
 
   const handleAdPress = useCallback(async () => {
     if (adLoading) return;
-    if (!isAdMobReady()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (!isAdMobReady()) {
+      Alert.alert("Ads Loading", "Ads are still getting ready. Please try again in a moment.");
+      return;
+    }
+
     setAdLoading(true);
     try {
       const result = await showRewardedAd();
       if (result.rewarded) {
         await recordAdWatch();
         getUserStats().then(setStats);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (result.timedOut) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Ad Timed Out", "The ad took too long to load. Please check your connection and try again.");
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert("Ad Not Available", "No ads available right now. Please try again later.");
       }
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Something Went Wrong", "Could not load the ad. Please try again.");
     } finally {
       setAdLoading(false);
     }
