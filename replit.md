@@ -24,6 +24,10 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `CPX_WEBHOOK_SECRET` | CPX Research webhook validation |
 | `BITLABS_API_KEY` | BitLabs survey integration |
 | `BITLABS_WEBHOOK_SECRET` | BitLabs webhook validation |
+| `TAPJOY_SDK_KEY` | Tapjoy offerwall — gates the provider, used as `X-Api-Key` for offers/verify |
+| `TAPJOY_WEBHOOK_SECRET` | Tapjoy callback verification (MD5 verifier) |
+| `TAPJOY_APP_ID` | Tapjoy app identifier — sent as `app_id` on Tapjoy offers/verify API calls |
+| `TAPJOY_REPORTING_KEY` | Tapjoy Reporting API key — stored in config for pulling Tapjoy earnings reports |
 | `LOOTABLY_API_KEY` | Lootably offerwall integration |
 | `ADJOE_SDK_KEY` | Adjoe offerwall SDK key |
 | `ADJOE_APP_ID` | Adjoe offerwall app ID |
