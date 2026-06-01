@@ -51,6 +51,19 @@ succeed intermittently, which is why a few routes work while login fails.
   **Lesson:** don't flatly tell the owner "secrets aren't it" — there is a real workspace-vs-
   published divergence, and deleting the old duplicates + republishing legitimately re-aligns
   the live app. Confirm the live state (curl the endpoint), don't just read `viewEnvVars`.
+- **Deployment secrets can drift from workspace secrets two ways:** (1) stale *values* (snapshot
+  until republish, above), and (2) a secret present in the workspace can be **entirely missing
+  from the deployment**. Real case (Jun 2026): `CPX_APP_ID` existed in workspace but was absent
+  from the production deployment secrets — CPX surveys silently report `isConfigured:false`
+  (needs both `CPX_API_KEY` && `CPX_APP_ID`) and hash verification can't run. Fix = re-add it as
+  a deployment secret + republish. When an integration "works in dev but not prod," check the
+  deployment secret *list*, not just the values.
+- **Replit deployment-secrets panel icons:** 🔗 chain = linked/synced from the workspace secret
+  store; 🌐 globe = lives on the deployment itself (Replit-provided infra like `DATABASE_URL`/
+  `PG*`/`*CONNECTORS_HOSTNAME`, OR values added directly to the deployment in the past). Globe
+  does NOT mean "website-connected" and does NOT by itself mean "delete" — but old orphaned junk
+  (e.g. `WORKAROUND_*`, typo'd `BITLABS_API_K`/`BITLABS_WEBHOOK`) tends to carry the globe because
+  it was hand-added to the deployment and never part of the real synced secrets.
 - Best non-support action: **monitor and wait** (loop prod `SELECT 1`); it usually clears in
   minutes–hours. Owner considers Replit support a dead end, so don't over-rely on a ticket.
 
