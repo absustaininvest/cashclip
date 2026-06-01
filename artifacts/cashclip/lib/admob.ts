@@ -53,6 +53,28 @@ export const isAdMobAvailable =
 
 let adMobInitialized = false;
 let nonPersonalizedOnly = true;
+let ssvUserId: string | null = null;
+
+// Identifies the logged-in user to AdMob Server-Side Verification (SSV).
+// Without this, Google's SSV callback arrives with no user_id and the server
+// cannot credit the reward to anyone — so rewarded ads never pay out.
+//
+// When the identity changes (login, logout, or user switch), any ad that was
+// preloaded under the OLD identity must be thrown away: showing it would send
+// Google's SSV callback with the wrong (or empty) user_id, causing a missed
+// credit or — worse — crediting the previous user.
+export function setAdMobUserId(userId: string | null): void {
+  const normalized = userId && userId.length > 0 ? userId : null;
+  if (normalized === ssvUserId) return;
+  ssvUserId = normalized;
+  // Bump the generation so any preload request already in flight under the old
+  // identity is ignored when it finishes loading (it would carry a stale id).
+  preloadGeneration++;
+  clearPreloadRetryTimer();
+  preloadRetryCount = 0;
+  preloadInProgress = false;
+  discardPreloadedAd();
+}
 
 function shouldUseNonPersonalizedOnly(): boolean {
   return nonPersonalizedOnly;
@@ -61,6 +83,7 @@ function shouldUseNonPersonalizedOnly(): boolean {
 function buildAdRequestConfig() {
   return {
     requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
+    ...(ssvUserId ? { serverSideVerificationOptions: { userId: ssvUserId } } : {}),
     keywords: [
       "rewards",
       "cashback",
@@ -133,6 +156,7 @@ const AD_LOAD_TIMEOUT_MS = 15_000;
 interface PreloadedAd {
   ad: RewardedAdType;
   loadedAt: number;
+  userId: string | null;
   cleanupListeners: () => void;
 }
 
@@ -140,6 +164,9 @@ let preloadedRewardedAd: PreloadedAd | null = null;
 let preloadInProgress = false;
 let preloadRetryCount = 0;
 let preloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+// Incremented whenever the SSV identity changes; lets in-flight preloads detect
+// that their identity is stale by the time they finish loading.
+let preloadGeneration = 0;
 
 const MAX_PRELOAD_RETRIES = 3;
 const PRELOAD_RETRY_BASE_DELAY_MS = 5_000;
@@ -169,6 +196,13 @@ function schedulePreloadRetry(adUnitId?: string): void {
 
 function isPreloadedAdValid(): boolean {
   if (!preloadedRewardedAd) return false;
+  // A cached ad is only usable for the user it was requested for; otherwise its
+  // SSV user_id is stale and the reward would be missed or misattributed. A null
+  // identity (not logged in / auth not settled yet) can never be credited, so an
+  // ad requested without one must never be served.
+  if (preloadedRewardedAd.userId === null || preloadedRewardedAd.userId !== ssvUserId) {
+    return false;
+  }
   return Date.now() - preloadedRewardedAd.loadedAt < AD_EXPIRY_MS;
 }
 
@@ -192,16 +226,27 @@ export function preloadRewardedAd(adUnitId?: string): void {
     const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require("react-native-google-mobile-ads");
     const unitId = adUnitId || getAdUnitId("rewarded") || TestIds.REWARDED;
 
+    // Capture the identity (and its generation) this ad is being requested for,
+    // so we never serve it to a different user later (see isPreloadedAdValid).
+    const requestUserId = ssvUserId;
+    const requestGeneration = preloadGeneration;
     const rewarded = RewardedAd.createForAdRequest(unitId, buildAdRequestConfig());
 
     const unsubscribeLoaded = rewarded.addAdEventListener(
       RewardedAdEventType.LOADED,
       () => {
         preloadInProgress = false;
+        // The user changed while this ad was loading — its SSV id is now stale,
+        // so throw it away instead of caching it.
+        if (requestGeneration !== preloadGeneration) {
+          cleanup();
+          return;
+        }
         preloadRetryCount = 0;
         preloadedRewardedAd = {
           ad: rewarded,
           loadedAt: Date.now(),
+          userId: requestUserId,
           cleanupListeners: cleanup,
         };
       }
@@ -395,6 +440,13 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
 
 export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
   if (!isAdMobReady()) {
+    return { rewarded: false };
+  }
+
+  // Rewarded ads only pay out via Google's SSV callback, which requires the
+  // user_id. If we don't yet know who the user is, showing an ad would burn an
+  // impression that can never be credited — skip it rather than mislead the user.
+  if (!ssvUserId) {
     return { rewarded: false };
   }
 

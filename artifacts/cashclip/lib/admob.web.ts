@@ -22,6 +22,10 @@ export function isAdMobReady(): boolean {
   return false;
 }
 
+export function setAdMobUserId(_userId: string | null): void {
+  // no-op on web
+}
+
 export async function requestAdsConsent(): Promise<void> {
   // no-op on web
 }

@@ -37,6 +37,7 @@ import SponsoredSection from "@/components/SponsoredSection";
 import { adVideos } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
+import { useAuth } from "@/lib/AuthContext";
 import {
   trackAdImpression,
   trackAdCompletion,
@@ -572,6 +573,7 @@ export default function EarnScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [watchingAd, setWatchingAd] = useState<(typeof adVideos)[0] | null>(
     null
@@ -622,10 +624,15 @@ export default function EarnScreen() {
 
   useEffect(() => {
     loadAll();
-    if (isAdMobReady()) {
+  }, []);
+
+  // Warm a rewarded ad once we know who the user is. The SSV identity itself is
+  // attached centrally in AuthContext, so this preload already carries it.
+  useEffect(() => {
+    if (user?.id && isAdMobReady()) {
       preloadRewardedAd();
     }
-  }, []);
+  }, [user?.id]);
 
   const handleCheckin = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

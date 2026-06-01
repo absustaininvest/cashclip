@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getApiUrl } from "./query-client";
 import { secureGet, secureSet, secureMultiDelete } from "./secure-store";
+import { setAdMobUserId } from "./admob";
 
 const AUTH_TOKEN_KEY = "cashclip_auth_token";
 const REFRESH_TOKEN_KEY = "cashclip_refresh_token";
@@ -43,6 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     restoreSession();
   }, []);
+
+  // Keep AdMob's Server-Side Verification identity in lockstep with the logged-in
+  // user so rewarded-ad rewards are credited to — and only to — the current
+  // account. Setting it here (rather than per-screen) means it is in place before
+  // any screen can request or show a rewarded ad.
+  useEffect(() => {
+    setAdMobUserId(user?.id ?? null);
+  }, [user?.id]);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
     try {
