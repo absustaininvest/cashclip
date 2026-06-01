@@ -9,6 +9,7 @@ import {
   AppStateStatus,
   ScrollView,
   Linking,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -209,7 +210,13 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
   }
 
   if (consentState === "checking") {
-    return null;
+    return (
+      <View style={styles.screen}>
+        <View style={styles.checkingWrap}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </View>
+    );
   }
 
   if (consentState === "needed") {
@@ -364,6 +371,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#0A0A0F",
+  },
+  checkingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   scrollContent: {
     paddingTop: 72,

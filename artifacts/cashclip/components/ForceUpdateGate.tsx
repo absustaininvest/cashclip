@@ -21,11 +21,14 @@ export function ForceUpdateGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     (async () => {
       try {
         const base = getApiUrl();
         const res = await fetch(new URL("/api/app/version", base).toString(), {
           headers: { "X-App-Version": APP_VERSION },
+          signal: controller.signal,
         });
         if (!cancelled) {
           if (res.status === 426) {
@@ -42,10 +45,14 @@ export function ForceUpdateGate({ children }: { children: React.ReactNode }) {
         }
       } catch {
         if (!cancelled) setState("ok");
+      } finally {
+        clearTimeout(timeoutId);
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, []);
 

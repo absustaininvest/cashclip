@@ -100,25 +100,25 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
     Outfit_600SemiBold,
     Outfit_700Bold,
   });
-  const [consentReady, setConsentReady] = React.useState(false);
+  const appReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
-    if (fontsLoaded && consentReady) {
-      SplashScreen.hideAsync();
+    if (appReady) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, consentReady]);
+  }, [appReady]);
 
   useEffect(() => {
     startAdAnalyticsFlush();
     return () => stopAdAnalyticsFlush();
   }, []);
 
-  if (!fontsLoaded) return null;
+  if (!appReady) return null;
 
   return (
     <ErrorBoundary>
@@ -132,10 +132,11 @@ export default function RootLayout() {
                   {/* TrackingConsentGate shows Apple-style pre-permission screens
                       first, fires the ATT prompt, then AdsConsent — fully
                       serialized. Only after the user taps Continue does AdMob
-                      initialize. Splash screen is held until consent resolves
-                      to prevent a blank-screen flash on launch. */}
+                      initialize. The native splash is hidden as soon as fonts are
+                      ready (see appReady above), NOT when consent resolves — the
+                      consent screen must be visible so the user can interact with
+                      it, otherwise the app would sit frozen behind the splash. */}
                   <TrackingConsentGate onConsentDone={() => {
-                    setConsentReady(true);
                     initializeAdMob().then((initialized) => {
                       if (initialized) preloadRewardedAd();
                     });
