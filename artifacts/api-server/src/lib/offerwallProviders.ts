@@ -20,6 +20,8 @@ export interface OfferwallProviderConfig {
   key: OfferwallProviderKey;
   name: string;
   apiKey: string | undefined;
+  appId?: string | undefined;
+  reportingKey?: string | undefined;
   baseUrl: string;
   isConfigured: boolean;
 }
@@ -70,6 +72,8 @@ function getProviderConfigs(): OfferwallProviderConfig[] {
       key: "tapjoy",
       name: "Tapjoy",
       apiKey: process.env.TAPJOY_SDK_KEY,
+      appId: process.env.TAPJOY_APP_ID,
+      reportingKey: process.env.TAPJOY_REPORTING_KEY,
       baseUrl: "https://app.tapjoy.com/publisher/v1",
       isConfigured: !!process.env.TAPJOY_SDK_KEY,
     },
@@ -106,7 +110,8 @@ function getProviderConfigs(): OfferwallProviderConfig[] {
 
 async function fetchTapjoyOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
   try {
-    const res = await fetch(`${config.baseUrl}/offers`, {
+    const appIdParam = config.appId ? `?app_id=${encodeURIComponent(config.appId)}` : "";
+    const res = await fetch(`${config.baseUrl}/offers${appIdParam}`, {
       headers: { "X-Api-Key": config.apiKey!, "Content-Type": "application/json" },
     });
     if (!res.ok) throw new Error(`Tapjoy API error: ${res.status}`);
@@ -306,7 +311,8 @@ export async function verifyOfferCompletion(req: OfferCompletionVerifyRequest): 
     const user = encodeURIComponent(req.userId);
 
     if (req.provider === "tapjoy") {
-      endpoint = `${config.baseUrl}/conversions/${offer}/verify?transaction_id=${txn}&user_id=${user}`;
+      const appIdQ = config.appId ? `&app_id=${encodeURIComponent(config.appId)}` : "";
+      endpoint = `${config.baseUrl}/conversions/${offer}/verify?transaction_id=${txn}&user_id=${user}${appIdQ}`;
       headers["X-Api-Key"] = config.apiKey!;
     } else if (req.provider === "adgate") {
       endpoint = `${config.baseUrl}/conversions/${offer}/verify?api_key=${config.apiKey}&transaction_id=${txn}&user_id=${user}`;
@@ -365,10 +371,19 @@ async function offerCompletionBodyOk(res: Response, transactionId: string, userI
   return true;
 }
 
-export function getOfferwallProviderStatus(): { provider: string; name: string; configured: boolean }[] {
+export function getOfferwallProviderStatus(): {
+  provider: string;
+  name: string;
+  configured: boolean;
+  appIdConfigured?: boolean;
+  reportingKeyConfigured?: boolean;
+}[] {
   return getProviderConfigs().map((c) => ({
     provider: c.key,
     name: c.name,
     configured: c.isConfigured,
+    ...(c.key === "tapjoy"
+      ? { appIdConfigured: !!c.appId, reportingKeyConfigured: !!c.reportingKey }
+      : {}),
   }));
 }
