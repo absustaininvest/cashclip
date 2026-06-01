@@ -20,13 +20,19 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
+import { recordEarnAction } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
-import NativeAdCard, { CARD_WIDTH } from "@/components/NativeAdCard";
+import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
+import RewardedAdModal from "@/components/RewardedAdModal";
 import InFeedBanner from "@/components/InFeedBanner";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const AD_CARD_COUNT = 25;
+// OTA rollout: how many of the 25 home ad slots are live (tappable + paying).
+// Shipped in small batches — bump +3 each delivery: 3 → 6 → 9 → 12 → 15 → 18 → 21 → 25.
+const LIVE_AD_SLOTS = 3;
+const AD_DURATION_SECONDS = 15;
 
 const QUICK_ACCESS = [
   { icon: "film", label: "Videos", color: "#00E676", route: "/earn" },
@@ -130,6 +136,9 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [adLoading, setAdLoading] = useState(false);
+  const [watching, setWatching] = useState<
+    null | { brand: string; description: string; color: string; reward: number; duration: number }
+  >(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -141,36 +150,62 @@ export default function HomeScreen() {
     if (isAdMobReady()) preloadRewardedAd();
   }, []);
 
-  const handleAdPress = useCallback(async () => {
+  const creditAdReward = useCallback(async () => {
+    await recordAdWatch();
+    // Server-authoritative credit (same path as the Earn screen).
+    recordEarnAction("rewarded_ad", "Watched rewarded ad");
+    getUserStats().then(setStats);
+  }, []);
+
+  const handleAdPress = useCallback(async (index: number) => {
     if (adLoading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (!isAdMobReady()) {
-      Alert.alert("Ads Loading", "Ads are still getting ready. Please try again in a moment.");
+    if (index >= LIVE_AD_SLOTS) {
+      Alert.alert("More ads coming soon", "We're rolling out new ad slots in batches. Check back shortly!");
       return;
     }
 
-    setAdLoading(true);
-    try {
-      const result = await showRewardedAd();
-      if (result.rewarded) {
-        await recordAdWatch();
-        getUserStats().then(setStats);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else if (result.timedOut) {
+    // Real rewarded ad when AdMob is ready; otherwise fall back to the in-app
+    // ad experience (same behavior as the Earn screen) so the slot always works.
+    if (isAdMobReady()) {
+      setAdLoading(true);
+      try {
+        const result = await showRewardedAd();
+        if (result.rewarded) {
+          await creditAdReward();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else if (result.timedOut) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Alert.alert("Ad Timed Out", "The ad took too long to load. Please check your connection and try again.");
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          Alert.alert("Ad Not Available", "No ads available right now. Please try again later.");
+        }
+      } catch {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Ad Timed Out", "The ad took too long to load. Please check your connection and try again.");
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert("Ad Not Available", "No ads available right now. Please try again later.");
+        Alert.alert("Something Went Wrong", "Could not load the ad. Please try again.");
+      } finally {
+        setAdLoading(false);
       }
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Something Went Wrong", "Could not load the ad. Please try again.");
-    } finally {
-      setAdLoading(false);
+      return;
     }
-  }, [adLoading]);
+
+    const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];
+    setWatching({
+      brand: card.advertiser,
+      description: card.headline,
+      color: card.color,
+      reward: adSlotReward(index),
+      duration: AD_DURATION_SECONDS,
+    });
+  }, [adLoading, creditAdReward]);
+
+  const handleAdComplete = useCallback(async () => {
+    setWatching(null);
+    await creditAdReward();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [creditAdReward]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -277,11 +312,24 @@ export default function HomeScreen() {
           <NativeAdCard
             key={item.id}
             index={item.index}
-            onPress={handleAdPress}
+            live={item.index < LIVE_AD_SLOTS}
+            onPress={() => handleAdPress(item.index)}
           />
         )}
         ItemSeparatorComponent={() => null}
       />
+      {watching && (
+        <RewardedAdModal
+          visible={!!watching}
+          brand={watching.brand}
+          description={watching.description}
+          color={watching.color}
+          reward={watching.reward}
+          duration={watching.duration}
+          onComplete={handleAdComplete}
+          onClose={() => setWatching(null)}
+        />
+      )}
     </View>
   );
 }

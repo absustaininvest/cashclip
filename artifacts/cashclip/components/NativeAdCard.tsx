@@ -6,7 +6,7 @@ import Colors from "@/constants/colors";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 export const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
-const PLACEHOLDER_CARDS = [
+export const PLACEHOLDER_CARDS = [
   { headline: "Grow Your Money with Smart Investing", body: "Start building wealth today", advertiser: "Finance Weekly", color: "#43A047" },
   { headline: "Top Gaming Deals This Week", body: "Save big on the latest games", advertiser: "GameHub Pro", color: "#1E88E5" },
   { headline: "Shop the Best Deals Near You", body: "Exclusive offers from top brands", advertiser: "ShopLocal", color: "#FB8C00" },
@@ -34,17 +34,23 @@ const PLACEHOLDER_CARDS = [
   { headline: "Work From Home — Real Jobs", body: "Remote roles at top companies", advertiser: "RemoteWork", color: "#6D4C41" },
 ];
 
+export function adSlotReward(index: number): number {
+  return parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
+}
+
 interface NativeAdCardProps {
   index: number;
+  live?: boolean;
   onPress?: () => void;
 }
 
-export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
+export default function NativeAdCard({ index, live, onPress }: NativeAdCardProps) {
   const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];
-  const reward = parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
+  const reward = adSlotReward(index);
+  const isLive = live !== false;
 
   return (
-    <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
+    <Pressable onPress={onPress} style={[{ width: CARD_WIDTH }, !isLive && { opacity: 0.5 }]}>
       <View style={styles.card}>
         <View style={[styles.thumbnail, { backgroundColor: card.color }]}>
           <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
@@ -63,7 +69,7 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
         </View>
         <View style={styles.cardFooter}>
           <View style={styles.ctaBtn}>
-            <Text style={styles.ctaText}>Learn More</Text>
+            <Text style={styles.ctaText}>{isLive ? "Watch & Earn" : "Coming soon"}</Text>
           </View>
         </View>
       </View>
