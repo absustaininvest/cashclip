@@ -31,17 +31,41 @@ succeed intermittently, which is why a few routes work while login fails.
 - The outage is typically **intermittent and self-healing** — observed flickering up/down
   over ~1hr then recovering on its own (prod `SELECT 1` went from 40s-timeout to 5s-OK with
   no intervention; live login endpoint returned to ~0.3s HTTP 400 once DB recovered).
-  **Re-publishing/redeploy does NOT fix it** (confirmed — error continued across a redeploy).
+  The transient control-plane outage itself is not "cured" by a redeploy — but **do not tell a
+  non-technical owner that re-publishing is useless.** Republishing is exactly how corrected
+  config/secrets reach the live app (see next bullet), and a fresh deploy restarts DB
+  connection pools, so a republish that coincides with recovery is not pure coincidence.
 - **No app-side change can restore login during the outage**: user accounts/credentials live
   in the prod DB, so while it's unreachable nobody can authenticate regardless of code.
 - Prod and dev are **separate databases**: dev stays healthy throughout (good for proving
   "data isn't lost, just unreachable" and reassuring a panicking non-technical owner).
-- **Secrets are not the cause.** Verified via `viewEnvVars({environment})`: prod has the
-  correct current names (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`, integration
-  keys). Old obfuscated names shown in the Publishing panel (`INVECE`, `JWT_TRIDENTE`) are
-  stale leftovers, not in use. Don't chase a secret-rename theory.
+- **Secrets vs. the live app — the subtle, important part.** `viewEnvVars({environment})` reads
+  the *workspace* secret store and showed the correct current names (`JWT_ACCESS_SECRET`,
+  `JWT_REFRESH_SECRET`, `DATABASE_URL`). BUT a Replit deployment runs on the **secret snapshot
+  captured at publish time** — workspace edits do NOT reach the live published app until you
+  **republish**. So "I checked the secrets, they're fine" can be misleading: the live app may
+  still be running an OLDER snapshot (the Publishing panel showed stale obfuscated names like
+  `INVECE`, `JWT_TRIDENTE`, `RIPRENDERE` long after the code/workspace had moved to clean names).
+  The obfuscated names were once wired into real auth/session/refresh code and have since been
+  renamed in source; only some `*.test.ts` files still reference `JWT_TRIDENTE` (harmless).
+  **Lesson:** don't flatly tell the owner "secrets aren't it" — there is a real workspace-vs-
+  published divergence, and deleting the old duplicates + republishing legitimately re-aligns
+  the live app. Confirm the live state (curl the endpoint), don't just read `viewEnvVars`.
 - Best non-support action: **monitor and wait** (loop prod `SELECT 1`); it usually clears in
   minutes–hours. Owner considers Replit support a dead end, so don't over-rely on a ticket.
+
+# AdMob: two separate "moneys" — don't conflate them
+
+The app **does** use Google AdMob (real publisher units, live in prod) **alongside** Unity Ads —
+do not say "there's no AdMob, it's only Unity." Two unrelated money paths:
+- **User-reward crediting (our system):** rewarded ads credit the user via a **server-side
+  verification (SSV) callback from Google to the API**, which **writes to the prod DB**. So a
+  prod DB outage silently drops ad-reward credits during the outage window; it recovers when the
+  DB does. This path *is* affected by the DB/deploy health discussed above.
+- **Publisher payout (NOT our system):** Google paying the owner into PayPal is governed entirely
+  by the **AdMob account → Payments** (≈$100 threshold, verified payment profile, address PIN, tax
+  forms). App secrets / server changes can't fix it. If payouts aren't arriving, point the owner
+  to the AdMob console, not the code.
 
 # "Tracking is Off" gate reappearing (separate, minor)
 
