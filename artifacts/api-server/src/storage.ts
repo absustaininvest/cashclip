@@ -12,6 +12,7 @@ import {
   users,
   withdrawals,
   earningsLedger,
+  earnTokens,
   rewardSessions,
   adEvents,
   webhookAudit,
@@ -31,6 +32,9 @@ type Executor = typeof db | DbTx;
 // Ad analytics report this fixed per-ad payout, NOT the raw rewardAmount telemetry
 // (which is the AdMob SDK reward-item count, not a dollar value).
 const REWARDED_AD_PAYOUT_USD = 0.05;
+
+// Points-to-USD conversion (matches POINTS_PER_DOLLAR in routes/earnings.ts).
+const POINTS_PER_DOLLAR = 1000;
 
 export type SecurityAuditEvent =
   | "totp_enabled"
@@ -986,6 +990,60 @@ export class DatabaseStorage implements IStorage {
       rewards: Number(r.rewards),
       totalRevenue: parseFloat((Number(r.rewards) * REWARDED_AD_PAYOUT_USD).toFixed(2)),
     }));
+  }
+
+  // Total payout per user across ALL earning sources (surveys, offerwalls, games,
+  // rewarded-ad claims, bonuses). Every credit writes a positive earnings_ledger
+  // row; withdrawals/debits are negative, so filtering amount > 0 isolates payout.
+  async getCombinedPayoutPerUser(
+    from?: Date,
+    to?: Date,
+    limit: number = 50,
+  ): Promise<
+    Array<{ userId: string; username: string; totalPayout: number; txCount: number }>
+  > {
+    const conditions = [sql`cast(${earningsLedger.amount} as numeric) > 0`];
+    if (from) conditions.push(gte(earningsLedger.createdAt, from));
+    if (to) conditions.push(sql`${earningsLedger.createdAt} <= ${to}`);
+
+    const rows = await db
+      .select({
+        userId: earningsLedger.userId,
+        username: users.username,
+        totalPayout: sql<string>`coalesce(sum(cast(${earningsLedger.amount} as numeric)), 0)`,
+        txCount: count(),
+      })
+      .from(earningsLedger)
+      .innerJoin(users, eq(earningsLedger.userId, users.id))
+      .where(and(...conditions))
+      .groupBy(earningsLedger.userId, users.username)
+      .orderBy(sql`coalesce(sum(cast(${earningsLedger.amount} as numeric)), 0) desc`)
+      .limit(limit);
+
+    return rows.map((r: (typeof rows)[number]) => ({
+      userId: r.userId!,
+      username: r.username,
+      totalPayout: n(r.totalPayout),
+      txCount: Number(r.txCount),
+    }));
+  }
+
+  // Pending (claimable-soon) USD per user, summed from unclaimed earn_tokens.
+  async getPendingByUserIds(userIds: string[]): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (userIds.length === 0) return result;
+    const rows = await db
+      .select({
+        userId: earnTokens.userId,
+        points: sql<string>`coalesce(sum(${earnTokens.points}), 0)`,
+      })
+      .from(earnTokens)
+      .where(and(eq(earnTokens.status, "pending"), inArray(earnTokens.userId, userIds)))
+      .groupBy(earnTokens.userId);
+    for (const r of rows) {
+      result.set(r.userId, parseFloat((Number(r.points) / POINTS_PER_DOLLAR).toFixed(2)));
+    }
+    return result;
   }
 
   async getAdEventTimeline(from?: Date, to?: Date): Promise<

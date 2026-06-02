@@ -1624,6 +1624,7 @@ interface CashClipUser {
   role: string;
   balance: string;
   totalEarned: string;
+  pending?: number;
   createdAt: string;
   profileComplete: boolean;
   country: string | null;
@@ -1661,6 +1662,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [factoryResult, setFactoryResult] = useState<{ username: string; password: string } | null>(null);
   const [factoryLoading, setFactoryLoading] = useState(false);
   const [factoryError, setFactoryError] = useState("");
+  const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
+  const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
+  const [payoutLoading, setPayoutLoading] = useState(true);
 
   const PAGE_SIZE = 25;
 
@@ -1698,6 +1702,34 @@ function CashClipUsersPanel({ token }: { token: string }) {
   useEffect(() => {
     fetchUsers(search, page);
   }, [search, page, fetchUsers]);
+
+  const fetchPayouts = useCallback(
+    async (range: "7d" | "30d" | "90d" | "all") => {
+      setPayoutLoading(true);
+      try {
+        const params = new URLSearchParams({ limit: "20" });
+        if (range !== "all") {
+          const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
+          params.set("from", new Date(Date.now() - days * 86400000).toISOString());
+        }
+        const res = await fetch(`/api/admin/payout-per-user?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setPayoutRows(data.perUser ?? []);
+      } catch {
+        setPayoutRows([]);
+      } finally {
+        setPayoutLoading(false);
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    fetchPayouts(payoutRange);
+  }, [payoutRange, fetchPayouts]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -2119,14 +2151,75 @@ function CashClipUsersPanel({ token }: { token: string }) {
         </div>
       )}
 
+      {/* Combined payout per user — all offers */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-white text-sm font-semibold">
+              Payout by User — All Offers Combined
+            </h3>
+            <p className="text-white/40 text-xs mt-0.5">
+              Total paid across surveys, offerwalls, games, ads &amp; bonuses
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {(["7d", "30d", "90d", "all"] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setPayoutRange(r)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  payoutRange === r
+                    ? "bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30"
+                    : "bg-white/[0.05] text-white/50 border border-white/10 hover:bg-white/[0.1]"
+                }`}
+              >
+                {r === "all" ? "All" : r}
+              </button>
+            ))}
+          </div>
+        </div>
+        {payoutLoading ? (
+          <div className="text-center py-10 text-white/30 text-sm">
+            Loading payouts…
+          </div>
+        ) : payoutRows.length === 0 ? (
+          <div className="text-center py-10 text-white/30 text-sm">
+            No payouts in this range
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {payoutRows.map((p, i) => (
+              <div
+                key={p.userId}
+                className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-5 py-3"
+              >
+                <span className="text-white/30 text-xs font-bold w-6">
+                  {i + 1}
+                </span>
+                <span className="text-white text-sm font-semibold truncate">
+                  {p.username}
+                </span>
+                <span className="text-white/40 text-xs whitespace-nowrap">
+                  {p.txCount} tx
+                </span>
+                <span className="text-[#00E676] text-sm font-bold tabular-nums">
+                  ${p.totalPayout.toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Users table */}
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
         {/* Header row */}
-        <div className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 px-5 py-3 border-b border-white/[0.06] text-white/30 text-[11px] font-semibold uppercase tracking-wider">
+        <div className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 px-5 py-3 border-b border-white/[0.06] text-white/30 text-[11px] font-semibold uppercase tracking-wider">
           <span>Username</span>
           <span>Email</span>
           <span>Balance</span>
           <span>Earned</span>
+          <span>Pending</span>
           <span>Country</span>
           <span>Joined</span>
           <span></span>
@@ -2147,7 +2240,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
             {users.map((u) => (
               <div key={u.id}>
                 <div
-                  className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                  className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors cursor-pointer"
                   onClick={() =>
                     setExpandedId(expandedId === u.id ? null : u.id)
                   }
@@ -2200,6 +2293,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
                   </span>
                   <span className="text-white/60 text-sm">
                     ${Number(u.totalEarned).toFixed(2)}
+                  </span>
+                  <span className="text-amber-300/70 text-sm">
+                    ${Number(u.pending ?? 0).toFixed(2)}
                   </span>
                   <span className="text-white/50 text-xs">
                     {u.country ?? "—"}

@@ -1235,6 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = Number(req.query["offset"] ?? 0);
       const search = typeof req.query["search"] === "string" ? req.query["search"].trim() : "";
       const { users: rows, total } = await storage.getAllUsers(limit, offset, search || undefined);
+      const pendingMap = await storage.getPendingByUserIds(rows.map((u) => u.id));
       res.json({
         users: rows.map((u) => ({
           id: u.id,
@@ -1244,6 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: u.role,
           balance: u.balance,
           totalEarned: u.totalEarned,
+          pending: pendingMap.get(u.id) ?? 0,
           createdAt: u.createdAt,
           profileComplete: u.profileComplete ?? false,
           country: u.country ?? null,
@@ -1562,6 +1564,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log.error({ err }, "Failed to get per-user ad analytics");
       res.status(500).json({ error: "Failed to load per-user ad analytics" });
+    }
+  });
+
+  app.get("/api/admin/payout-per-user", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const from = req.query.from ? new Date(req.query.from as string) : undefined;
+      const to = req.query.to ? new Date(req.query.to as string) : undefined;
+      const limit = Math.min(parseInt(String(req.query.limit || "50"), 10) || 50, 200);
+
+      const perUser = await storage.getCombinedPayoutPerUser(from, to, limit);
+      res.json({ perUser });
+    } catch (err) {
+      req.log.error({ err }, "Failed to get combined payout per user");
+      res.status(500).json({ error: "Failed to load payout per user" });
     }
   });
 
