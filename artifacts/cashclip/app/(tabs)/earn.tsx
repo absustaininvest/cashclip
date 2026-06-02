@@ -1267,6 +1267,50 @@ export default function EarnScreen() {
             <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
           </View>
         ))}
+
+        {/* LevelPlay Rewarded Ad */}
+        {isLevelPlayAvailable && (
+          <Pressable
+            onPress={handleWatchLevelPlayAd}
+            disabled={lpAdLoading || !lpAdReady}
+            style={({ pressed }) => [
+              styles.lpCard,
+              (lpAdLoading || !lpAdReady) && styles.lpCardDisabled,
+              pressed && styles.lpCardPressed,
+            ]}
+          >
+            <LinearGradient
+              colors={["#1a1a2e", "#16213e"]}
+              style={styles.lpGradient}
+            >
+              <View style={styles.lpLeft}>
+                <View style={styles.lpIconWrap}>
+                  {lpAdLoading ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <Feather name="play-circle" size={28} color={lpAdReady ? Colors.primary : Colors.textMuted} />
+                  )}
+                </View>
+                <View>
+                  <Text style={styles.lpTitle}>LevelPlay Rewarded Ad</Text>
+                  <Text style={styles.lpSub}>
+                    {lpAdLoading
+                      ? "Loading ad…"
+                      : lpAdReady
+                      ? "Ad ready — tap to watch & earn"
+                      : "Waiting for ad…"}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.lpBadge, lpAdReady && styles.lpBadgeReady]}>
+                <Text style={[styles.lpBadgeText, lpAdReady && styles.lpBadgeTextReady]}>
+                  {lpAdReady ? "▶ PLAY" : "…"}
+                </Text>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        )}
+
         <View style={{ height: 48 }} />
       </ScrollView>
 
@@ -1997,5 +2041,70 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
     fontSize: 16,
     color: Colors.text,
+  },
+  lpCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "rgba(100,120,255,0.25)",
+  },
+  lpCardDisabled: {
+    opacity: 0.6,
+  },
+  lpCardPressed: {
+    opacity: 0.85,
+  },
+  lpGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    gap: 12,
+  },
+  lpLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  lpIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(100,120,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lpTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  lpSub: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  lpBadge: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  lpBadgeReady: {
+    backgroundColor: "rgba(0,230,118,0.15)",
+    borderColor: "rgba(0,230,118,0.3)",
+  },
+  lpBadgeText: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  lpBadgeTextReady: {
+    color: Colors.primary,
   },
 });
