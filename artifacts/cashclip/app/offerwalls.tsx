@@ -24,7 +24,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type OfferType = "app_install" | "signup" | "purchase" | "survey" | "video" | "task";
-type ProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe";
+type ProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe" | "adgem" | "ayet" | "notik" | "revlum" | "monlix" | "paymentwall";
 type Difficulty = "easy" | "medium" | "hard";
 
 interface Offer {
@@ -42,11 +42,17 @@ interface Offer {
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
-  tapjoy: "#FF6B35",
-  adgate: "#00C853",
-  offertoro: "#2979FF",
-  lootably: "#9C27B0",
-  adjoe: "#F44336",
+  tapjoy:      "#FF6B35",
+  adgate:      "#00C853",
+  offertoro:   "#2979FF",
+  lootably:    "#9C27B0",
+  adjoe:       "#F44336",
+  adgem:       "#0EA5E9",
+  ayet:        "#F59E0B",
+  notik:       "#10B981",
+  revlum:      "#8B5CF6",
+  monlix:      "#EC4899",
+  paymentwall: "#1D4ED8",
 };
 
 const TYPE_ICONS: Record<OfferType, string> = {

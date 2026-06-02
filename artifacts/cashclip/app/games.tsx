@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,87 +24,68 @@ import { canPlayGame, getGamesPlayedToday } from "@/lib/storage";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - 32 - CARD_GAP) / 2;
-
 const MAX_DAILY_GAMES = 9;
 
 interface GameInfo {
   id: string;
-  nameKey: keyof typeof GAME_META;
-  descKey: keyof typeof GAME_META;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
+  nameKey: string;
+  descKey: string;
+  emoji: string;
+  gradientColors: [string, string];
   rewardRange: string;
   route: string;
+  hot?: boolean;
 }
-
-const GAME_META = {
-  scratchCard: "scratchCard",
-  scratchCardDesc: "scratchCardDesc",
-  memoryMatch: "memoryMatch",
-  memoryMatchDesc: "memoryMatchDesc",
-  triviaQuiz: "triviaQuiz",
-  triviaQuizDesc: "triviaQuizDesc",
-  coinCatcher: "coinCatcher",
-  coinCatcherDesc: "coinCatcherDesc",
-  tapFrenzy: "tapFrenzy",
-  tapFrenzyDesc: "tapFrenzyDesc",
-  solitaire: "solitaire",
-  solitaireDesc: "solitaireDesc",
-  dominoes: "dominoes",
-  dominoesDesc: "dominoesDesc",
-  tetris: "tetris",
-  tetrisDesc: "tetrisDesc",
-  blockBlitz: "blockBlitz",
-  blockBlitzDesc: "blockBlitzDesc",
-} as const;
 
 const CASUAL_GAMES: GameInfo[] = [
   {
     id: "scratch-card",
-    nameKey: "scratchCard" as any,
-    descKey: "scratchCardDesc" as any,
-    icon: "grid-outline",
-    iconColor: "#FFD600",
-    rewardRange: "$0.01 - $0.10",
+    nameKey: "scratchCard",
+    descKey: "scratchCardDesc",
+    emoji: "🎟️",
+    gradientColors: ["#F59E0B", "#D97706"],
+    rewardRange: "$0.01 – $0.10",
     route: "/game/scratch-card",
   },
   {
     id: "memory-match",
-    nameKey: "memoryMatch" as any,
-    descKey: "memoryMatchDesc" as any,
-    icon: "layers-outline",
-    iconColor: "#00E676",
-    rewardRange: "$0.01 - $0.05",
+    nameKey: "memoryMatch",
+    descKey: "memoryMatchDesc",
+    emoji: "🧠",
+    gradientColors: ["#10B981", "#059669"],
+    rewardRange: "$0.01 – $0.05",
     route: "/game/memory-match",
   },
   {
     id: "trivia",
-    nameKey: "triviaQuiz" as any,
-    descKey: "triviaQuizDesc" as any, // nosemgrep: generic.secrets.gitleaks.generic-api-key
-    icon: "help-circle-outline",
-    iconColor: "#448AFF",
-    rewardRange: "$0.01 - $0.25",
+    nameKey: "triviaQuiz",
+    descKey: "triviaQuizDesc",
+    emoji: "💡",
+    gradientColors: ["#6366F1", "#4F46E5"],
+    rewardRange: "$0.01 – $0.25",
     route: "/game/trivia",
+    hot: true,
   },
 ];
 
 const CLASSIC_GAMES: GameInfo[] = [
   {
     id: "solitaire",
-    nameKey: "solitaire" as any,
-    descKey: "solitaireDesc" as any,
-    icon: "card-outline",
-    iconColor: "#FF5252",
-    rewardRange: "$0.05 - $0.25",
+    nameKey: "solitaire",
+    descKey: "solitaireDesc",
+    emoji: "🃏",
+    gradientColors: ["#EF4444", "#DC2626"],
+    rewardRange: "$0.05 – $0.25",
     route: "/game/solitaire",
+    hot: true,
   },
   {
     id: "dominoes",
-    nameKey: "dominoes" as any,
-    descKey: "dominoesDesc" as any,
-    icon: "dice-outline",
-    iconColor: "#FFFFFF",
-    rewardRange: "$0.05 - $0.20",
+    nameKey: "dominoes",
+    descKey: "dominoesDesc",
+    emoji: "🎲",
+    gradientColors: ["#64748B", "#475569"],
+    rewardRange: "$0.05 – $0.20",
     route: "/game/dominoes",
   },
 ];
@@ -111,38 +93,39 @@ const CLASSIC_GAMES: GameInfo[] = [
 const ARCADE_GAMES: GameInfo[] = [
   {
     id: "tetris",
-    nameKey: "tetris" as any,
-    descKey: "tetrisDesc" as any,
-    icon: "apps-outline",
-    iconColor: "#00BCD4",
-    rewardRange: "$0.01 - $0.25",
+    nameKey: "tetris",
+    descKey: "tetrisDesc",
+    emoji: "🟦",
+    gradientColors: ["#06B6D4", "#0891B2"],
+    rewardRange: "$0.01 – $0.25",
     route: "/game/tetris",
   },
   {
     id: "block-blitz",
-    nameKey: "blockBlitz" as any,
-    descKey: "blockBlitzDesc" as any,
-    icon: "cube-outline",
-    iconColor: "#FF6D00",
-    rewardRange: "$0.03 - $0.25",
+    nameKey: "blockBlitz",
+    descKey: "blockBlitzDesc",
+    emoji: "🟧",
+    gradientColors: ["#F97316", "#EA580C"],
+    rewardRange: "$0.03 – $0.25",
     route: "/game/block-blitz",
+    hot: true,
   },
   {
     id: "coin-catcher",
-    nameKey: "coinCatcher" as any,
-    descKey: "coinCatcherDesc" as any,
-    icon: "arrow-down-circle-outline",
-    iconColor: "#FF9100",
-    rewardRange: "$0.01 - $0.05",
+    nameKey: "coinCatcher",
+    descKey: "coinCatcherDesc",
+    emoji: "🪙",
+    gradientColors: ["#F59E0B", "#B45309"],
+    rewardRange: "$0.01 – $0.05",
     route: "/game/coin-catcher",
   },
   {
     id: "tap-frenzy",
-    nameKey: "tapFrenzy" as any,
-    descKey: "tapFrenzyDesc" as any,
-    icon: "finger-print-outline",
-    iconColor: "#E040FB",
-    rewardRange: "$0.03 - $0.25",
+    nameKey: "tapFrenzy",
+    descKey: "tapFrenzyDesc",
+    emoji: "⚡",
+    gradientColors: ["#A855F7", "#9333EA"],
+    rewardRange: "$0.03 – $0.25",
     route: "/game/tap-frenzy",
   },
 ];
@@ -162,50 +145,40 @@ function GameCard({
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
-  const gameName = t.games[game.nameKey] || game.nameKey;
-  const gameDesc = t.games[game.descKey] || game.descKey;
+  const gameName = (t.games as any)[game.nameKey] || game.nameKey;
+  const gameDesc = (t.games as any)[game.descKey] || game.descKey;
 
   return (
     <Animated.View style={[animStyle, { width: CARD_WIDTH }]}>
       <Pressable
         testID={`game-card-${game.id}`}
-        onPressIn={() => {
-          scale.value = withSpring(0.95);
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1);
-        }}
+        onPressIn={() => { scale.value = withSpring(0.95); }}
+        onPressOut={() => { scale.value = withSpring(1); }}
         onPress={onPress}
-        style={[
-          cardStyles.card,
-          !available && cardStyles.cardDisabled,
-        ]}
+        style={[cardStyles.card, !available && cardStyles.cardDisabled]}
       >
-        <View
-          style={[
-            cardStyles.iconContainer,
-            { backgroundColor: game.iconColor + "20" },
-          ]}
-        >
-          <Ionicons name={game.icon} size={28} color={game.iconColor} />
-        </View>
-        <Text style={cardStyles.name} numberOfLines={1}>
-          {gameName}
-        </Text>
-        <Text style={cardStyles.desc} numberOfLines={2}>
-          {gameDesc}
-        </Text>
-        <View style={cardStyles.rewardRow}>
-          <Ionicons name="cash-outline" size={14} color={Colors.primary} />
-          <Text style={cardStyles.rewardText}>{game.rewardRange}</Text>
+        <LinearGradient
+          colors={[game.gradientColors[0] + "18", game.gradientColors[1] + "08", "transparent"]}
+          style={cardStyles.gradientOverlay}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        {game.hot && (
+          <View style={cardStyles.hotBadge}>
+            <Text style={cardStyles.hotText}>🔥 HOT</Text>
+          </View>
+        )}
+        <Text style={cardStyles.emoji}>{game.emoji}</Text>
+        <Text style={cardStyles.name} numberOfLines={1}>{gameName}</Text>
+        <Text style={cardStyles.desc} numberOfLines={2}>{gameDesc}</Text>
+        <View style={[cardStyles.rewardPill, { backgroundColor: game.gradientColors[0] + "22", borderColor: game.gradientColors[0] + "44" }]}>
+          <Ionicons name="cash-outline" size={11} color={game.gradientColors[0]} />
+          <Text style={[cardStyles.rewardText, { color: game.gradientColors[0] }]}>{game.rewardRange}</Text>
         </View>
         {!available && (
           <View style={cardStyles.cooldownOverlay}>
-            <Ionicons name="time-outline" size={18} color={Colors.accent} />
-            <Text style={cardStyles.cooldownText}>
-              {t.games.comeBackTomorrow}
-            </Text>
+            <Ionicons name="time-outline" size={20} color={Colors.accent} />
+            <Text style={cardStyles.cooldownText}>{t.games.comeBackTomorrow}</Text>
           </View>
         )}
       </Pressable>
@@ -223,24 +196,16 @@ export default function GamesHubScreen() {
   const loadAvailability = useCallback(async () => {
     const allGames = [...CASUAL_GAMES, ...CLASSIC_GAMES, ...ARCADE_GAMES];
     const results: Record<string, boolean> = {};
-    await Promise.all(
-      allGames.map(async (g) => {
-        results[g.id] = await canPlayGame(g.id);
-      })
-    );
+    await Promise.all(allGames.map(async (g) => { results[g.id] = await canPlayGame(g.id); }));
     setAvailability(results);
-    const played = await getGamesPlayedToday();
-    setGamesPlayedToday(played);
+    setGamesPlayedToday(await getGamesPlayedToday());
   }, []);
 
-  useEffect(() => {
-    loadAvailability();
-  }, []);
+  useEffect(() => { loadAvailability(); }, []);
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const webBottomPad = Platform.OS === "web" ? 34 : 0;
-
-  const remaining = MAX_DAILY_GAMES - gamesPlayedToday;
+  const remaining = Math.max(0, MAX_DAILY_GAMES - gamesPlayedToday);
 
   const handleGamePress = (game: GameInfo) => {
     if (remaining <= 0 || availability[game.id] === false) return;
@@ -248,20 +213,9 @@ export default function GamesHubScreen() {
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: Platform.OS === "web" ? webTopPad : insets.top,
-        },
-      ]}
-    >
+    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? webTopPad : insets.top }]}>
       <View style={styles.header}>
-        <Pressable
-          testID="games-back-button"
-          onPress={() => router.back()}
-          hitSlop={12}
-        >
+        <Pressable testID="games-back-button" onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </Pressable>
         <View style={styles.headerCenter}>
@@ -270,9 +224,7 @@ export default function GamesHubScreen() {
         </View>
         <View style={styles.dailyCounter}>
           <Ionicons name="game-controller-outline" size={16} color={Colors.primary} />
-          <Text style={styles.dailyCounterText}>
-            {remaining > 0 ? remaining : 0}
-          </Text>
+          <Text style={styles.dailyCounterText}>{remaining}</Text>
         </View>
       </View>
 
@@ -283,14 +235,36 @@ export default function GamesHubScreen() {
           paddingBottom: Platform.OS === "web" ? webBottomPad + 20 : insets.bottom + 20,
         }}
       >
+        <Pressable testID="real-games-hero" onPress={() => router.push("/offerwalls" as any)}>
+          <LinearGradient
+            colors={["#4F46E5", "#7C3AED", "#9333EA"]}
+            style={styles.heroCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.heroLeft}>
+              <Text style={styles.heroLabel}>🎮 PLAY REAL APP GAMES</Text>
+              <Text style={styles.heroTitle}>Earn up to $25/game</Text>
+              <Text style={styles.heroDesc}>Install real games, reach milestones, cash out via PayPal</Text>
+            </View>
+            <View style={styles.heroRight}>
+              <Text style={styles.heroBigReward}>$25</Text>
+              <Text style={styles.heroPerGame}>per game</Text>
+              <View style={styles.heroArrowBtn}>
+                <Ionicons name="arrow-forward" size={16} color="#FFF" />
+              </View>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
         <View style={styles.dailyInfoCard}>
-          <Ionicons name="trophy-outline" size={20} color={Colors.accent} />
+          <Ionicons name="trophy-outline" size={16} color={Colors.accent} />
           <Text style={styles.dailyInfoText}>
-            {t.games.dailyPlaysLeft}: {remaining > 0 ? remaining : 0}/{MAX_DAILY_GAMES}
+            {t.games.dailyPlaysLeft}: {remaining}/{MAX_DAILY_GAMES}
           </Text>
         </View>
 
-        <Text style={styles.sectionLabel}>{t.games.casualGames}</Text>
+        <Text style={styles.sectionLabel}>⚡ {t.games.casualGames}</Text>
         <View style={styles.grid}>
           {CASUAL_GAMES.map((game) => (
             <GameCard
@@ -303,7 +277,7 @@ export default function GamesHubScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>{t.games.classicGames}</Text>
+        <Text style={styles.sectionLabel}>🃏 {t.games.classicGames}</Text>
         <View style={styles.grid}>
           {CLASSIC_GAMES.map((game) => (
             <GameCard
@@ -316,7 +290,7 @@ export default function GamesHubScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>{t.games.arcadeGames}</Text>
+        <Text style={styles.sectionLabel}>🕹️ {t.games.arcadeGames}</Text>
         <View style={styles.grid}>
           {ARCADE_GAMES.map((game) => (
             <GameCard
@@ -345,9 +319,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  headerCenter: {
-    flex: 1,
-  },
+  headerCenter: { flex: 1 },
   headerTitle: {
     fontFamily: "Outfit_700Bold",
     fontSize: 22,
@@ -375,6 +347,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.primary,
   },
+  heroCard: {
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  heroLeft: {
+    flex: 1,
+    gap: 5,
+    paddingRight: 12,
+  },
+  heroLabel: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  heroTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 20,
+    color: "#FFF",
+    lineHeight: 24,
+  },
+  heroDesc: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 17,
+  },
+  heroRight: {
+    alignItems: "center",
+    gap: 2,
+  },
+  heroBigReward: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 32,
+    color: "#FFF",
+  },
+  heroPerGame: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.75)",
+  },
+  heroArrowBtn: {
+    marginTop: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dailyInfoCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -401,29 +428,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: CARD_GAP,
-    marginBottom: 24,
+    marginBottom: 28,
   },
 });
 
 const cardStyles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    minHeight: 160,
+    minHeight: 168,
+    overflow: "hidden",
   },
-  cardDisabled: {
-    opacity: 0.5,
+  cardDisabled: { opacity: 0.5 },
+  gradientOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
+  hotBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(239,68,68,0.15)",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.3)",
+  },
+  hotText: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 9,
+    color: "#EF4444",
+    letterSpacing: 0.5,
+  },
+  emoji: {
+    fontSize: 30,
+    marginBottom: 8,
   },
   name: {
     fontFamily: "Outfit_700Bold",
@@ -435,18 +481,22 @@ const cardStyles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
     fontSize: 11,
     color: Colors.textMuted,
-    marginBottom: 8,
+    marginBottom: 10,
     lineHeight: 15,
   },
-  rewardRow: {
+  rewardPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   rewardText: {
     fontFamily: "Outfit_600SemiBold",
-    fontSize: 12,
-    color: Colors.primary,
+    fontSize: 11,
   },
   cooldownOverlay: {
     position: "absolute",
@@ -454,16 +504,17 @@ const cardStyles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 16,
-    backgroundColor: "rgba(10, 10, 15, 0.75)",
+    borderRadius: 18,
+    backgroundColor: "rgba(10, 10, 15, 0.80)",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 6,
   },
   cooldownText: {
     fontFamily: "Outfit_600SemiBold",
     fontSize: 11,
     color: Colors.accent,
     textAlign: "center",
+    paddingHorizontal: 12,
   },
 });

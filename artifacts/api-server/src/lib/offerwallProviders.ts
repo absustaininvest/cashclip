@@ -1,4 +1,4 @@
-export type OfferwallProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe";
+export type OfferwallProviderKey = "tapjoy" | "adgate" | "offertoro" | "lootably" | "adjoe" | "adgem" | "ayet" | "notik" | "revlum" | "monlix" | "paymentwall";
 
 export interface Offer {
   id: string;
@@ -104,6 +104,50 @@ function getProviderConfigs(): OfferwallProviderConfig[] {
       apiKey: process.env.ADJOE_SDK_KEY,
       baseUrl: "https://ad-backend.adjoe.io/v1",
       isConfigured: !!process.env.ADJOE_SDK_KEY && !!process.env.ADJOE_APP_ID,
+    },
+    {
+      key: "adgem",
+      name: "AdGem",
+      apiKey: process.env.ADGEM_API_KEY,
+      appId: process.env.ADGEM_APP_ID,
+      baseUrl: "https://adgem.com/api/v1",
+      isConfigured: !!process.env.ADGEM_API_KEY,
+    },
+    {
+      key: "ayet",
+      name: "AyeT Studios",
+      apiKey: process.env.AYET_APP_ID,
+      baseUrl: "https://www.ayetstudios.com/api/v1",
+      isConfigured: !!process.env.AYET_APP_ID,
+    },
+    {
+      key: "notik",
+      name: "Notik",
+      apiKey: process.env.NOTIK_API_KEY,
+      baseUrl: "https://notik.me/api/v1",
+      isConfigured: !!process.env.NOTIK_API_KEY,
+    },
+    {
+      key: "revlum",
+      name: "Revlum",
+      apiKey: process.env.REVLUM_API_KEY,
+      baseUrl: "https://revlum.com/api/v1",
+      isConfigured: !!process.env.REVLUM_API_KEY,
+    },
+    {
+      key: "monlix",
+      name: "Monlix",
+      apiKey: process.env.MONLIX_API_KEY,
+      appId: process.env.MONLIX_APP_ID,
+      baseUrl: "https://offers.monlix.com/api/v1",
+      isConfigured: !!process.env.MONLIX_API_KEY && !!process.env.MONLIX_APP_ID,
+    },
+    {
+      key: "paymentwall",
+      name: "Paymentwall",
+      apiKey: process.env.PAYMENTWALL_APP_KEY,
+      baseUrl: "https://api.paymentwall.com/api",
+      isConfigured: !!process.env.PAYMENTWALL_APP_KEY,
     },
   ];
 }
@@ -269,6 +313,178 @@ function sanitizeOfferUrl(url: string | undefined, apiKey: string | undefined): 
   }
 }
 
+async function fetchAdGemOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const appId = config.appId || "";
+    const res = await fetch(`${config.baseUrl}/offers?api_key=${config.apiKey}&app_id=${appId}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`AdGem API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.data || []).map((o: any): Offer => {
+      const payout = parseFloat(o.payout || o.reward || "0.50");
+      return {
+        id: `adgem_${o.offer_id || o.id}`,
+        provider: "adgem",
+        providerName: "AdGem",
+        title: o.name || o.title || "AdGem Offer",
+        description: o.description || o.instructions || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.offer_type || o.type),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: !!(o.purchase_required),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || o.link, config.apiKey),
+        brand: o.advertiser || o.brand,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchAyetOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const appId = config.apiKey || "";
+    const res = await fetch(`https://www.ayetstudios.com/api/offers?app_id=${appId}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`AyeT API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.campaigns || []).map((o: any): Offer => {
+      const payout = parseFloat(o.payout || o.reward || "0.50");
+      return {
+        id: `ayet_${o.offer_id || o.id}`,
+        provider: "ayet",
+        providerName: "AyeT Studios",
+        title: o.name || o.title || "AyeT Offer",
+        description: o.description || o.instructions || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.offer_type || o.category),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: false,
+        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url, config.apiKey),
+        brand: o.advertiser || o.brand,
+        iconUrl: o.icon_url,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchNotikOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/offers?token=${config.apiKey}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Notik API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.data || []).map((o: any): Offer => {
+      const payout = parseFloat(o.payout || o.reward || "0.25");
+      return {
+        id: `notik_${o.offer_id || o.id}`,
+        provider: "notik",
+        providerName: "Notik",
+        title: o.name || o.title || "Notik Offer",
+        description: o.description || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.type || o.category),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: false,
+        offerUrl: sanitizeOfferUrl(o.link || o.click_url, config.apiKey),
+        brand: o.brand || o.advertiser,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchRevlumOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/offers?api_key=${config.apiKey}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Revlum API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.data || []).map((o: any): Offer => {
+      const payout = parseFloat(o.payout || o.reward || "0.30");
+      return {
+        id: `revlum_${o.offer_id || o.id}`,
+        provider: "revlum",
+        providerName: "Revlum",
+        title: o.name || o.title || "Revlum Offer",
+        description: o.description || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.type || o.category),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: false,
+        offerUrl: sanitizeOfferUrl(o.link || o.click_url || o.offer_url, config.apiKey),
+        brand: o.brand || o.advertiser,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchMonlixOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const appId = config.appId || "";
+    const res = await fetch(`${config.baseUrl}/offers?app=${appId}&api_key=${config.apiKey}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Monlix API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.offers || data.data || []).map((o: any): Offer => {
+      const payout = parseFloat(o.payout || o.reward || o.amount || "0.25");
+      return {
+        id: `monlix_${o.offer_id || o.id}`,
+        provider: "monlix",
+        providerName: "Monlix",
+        title: o.name || o.title || "Monlix Offer",
+        description: o.description || o.instructions || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.type || o.category),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: !!(o.requires_payment),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url, config.apiKey),
+        brand: o.brand || o.advertiser,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchPaymentwallOffers(config: OfferwallProviderConfig): Promise<Offer[]> {
+  try {
+    const res = await fetch(`${config.baseUrl}/ps/widgetlist?key=${config.apiKey}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Paymentwall API error: ${res.status}`);
+    const data = await res.json() as any;
+    return (data.products || data.items || []).map((o: any): Offer => {
+      const payout = parseFloat(o.amount || o.price || "1.00");
+      return {
+        id: `paymentwall_${o.id}`,
+        provider: "paymentwall",
+        providerName: "Paymentwall",
+        title: o.name || "Paymentwall Offer",
+        description: o.description || "Complete this offer to earn a reward.",
+        reward: payout,
+        type: normalizeOfferType(o.type),
+        difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
+        requiresPayment: false,
+        offerUrl: sanitizeOfferUrl(o.url || o.link, config.apiKey),
+        brand: o.advertiser,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchAllOffers(): Promise<OfferwallListResponse[]> {
   const configs = getProviderConfigs().filter((c) => c.isConfigured);
   if (configs.length === 0) return [];
@@ -281,6 +497,12 @@ export async function fetchAllOffers(): Promise<OfferwallListResponse[]> {
       else if (config.key === "offertoro") offers = await fetchOfferToroOffers(config);
       else if (config.key === "lootably") offers = await fetchLootablyOffers(config);
       else if (config.key === "adjoe") offers = await fetchAdjoeOffers(config);
+      else if (config.key === "adgem") offers = await fetchAdGemOffers(config);
+      else if (config.key === "ayet") offers = await fetchAyetOffers(config);
+      else if (config.key === "notik") offers = await fetchNotikOffers(config);
+      else if (config.key === "revlum") offers = await fetchRevlumOffers(config);
+      else if (config.key === "monlix") offers = await fetchMonlixOffers(config);
+      else if (config.key === "paymentwall") offers = await fetchPaymentwallOffers(config);
 
       return { offers, provider: config.key };
     })

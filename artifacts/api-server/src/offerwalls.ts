@@ -16,9 +16,17 @@ import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issu
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
 const PROVIDER_REWARD_BOUNDS: Record<string, { min: number; max: number }> = {
-  tapjoy: { min: 0.10, max: 25.00 },
-  adgate: { min: 0.10, max: 20.00 },
-  offertoro: { min: 0.10, max: 20.00 },
+  tapjoy:      { min: 0.10, max: 25.00 },
+  adgate:      { min: 0.10, max: 20.00 },
+  offertoro:   { min: 0.10, max: 20.00 },
+  lootably:    { min: 0.10, max: 20.00 },
+  adjoe:       { min: 0.10, max: 25.00 },
+  adgem:       { min: 0.10, max: 20.00 },
+  ayet:        { min: 0.10, max: 20.00 },
+  notik:       { min: 0.05, max: 10.00 },
+  revlum:      { min: 0.05, max: 15.00 },
+  monlix:      { min: 0.05, max: 15.00 },
+  paymentwall: { min: 0.10, max: 20.00 },
 };
 
 export function registerOfferwallRoutes(app: Express): void {
