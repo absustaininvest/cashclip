@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 import { initializeAdMob, preloadRewardedAd } from "@/lib/admob";
+import { initializeLevelPlay } from "@/lib/levelplay";
 import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics";
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
@@ -140,6 +141,7 @@ export default function RootLayout() {
                     initializeAdMob().then((initialized) => {
                       if (initialized) preloadRewardedAd();
                     });
+                    initializeLevelPlay().catch(() => {});
                   }}>
                     <RootLayoutNav />
                   </TrackingConsentGate>

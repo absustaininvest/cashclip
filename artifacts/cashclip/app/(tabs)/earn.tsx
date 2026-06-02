@@ -37,6 +37,7 @@ import SponsoredSection from "@/components/SponsoredSection";
 import { adVideos } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
+import { isLevelPlayAvailable, isLevelPlayReady, showLevelPlayRewardedAd, preloadLevelPlayAd } from "@/lib/levelplay";
 import { useAuth } from "@/lib/AuthContext";
 import {
   trackAdImpression,
@@ -684,11 +685,14 @@ export default function EarnScreen() {
 
   const [adLoading, setAdLoading] = useState(false);
   const [adPreloaded, setAdPreloaded] = useState(false);
+  const [lpAdReady, setLpAdReady] = useState(false);
+  const [lpAdLoading, setLpAdLoading] = useState(false);
 
   useEffect(() => {
     setAdPreloaded(isRewardedAdPreloaded());
     const interval = setInterval(() => {
       setAdPreloaded(isRewardedAdPreloaded());
+      setLpAdReady(isLevelPlayReady());
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -734,6 +738,32 @@ export default function EarnScreen() {
     setWatchingAd(ad);
     setShowModal(true);
   }, [adLoading, loadAll, t]);
+
+  const handleWatchLevelPlayAd = useCallback(async () => {
+    if (lpAdLoading || !isLevelPlayReady()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLpAdLoading(true);
+    setLpAdReady(false);
+    try {
+      const result = await showLevelPlayRewardedAd(async () => {
+        await recordEarnAction("rewarded_ad", "Watched LevelPlay rewarded ad");
+        await loadAll();
+        balancePulse.value = withSequence(
+          withSpring(1.1, { damping: 4 }),
+          withSpring(1, { damping: 8 })
+        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      });
+      if (!result.rewarded) {
+        preloadLevelPlayAd();
+      }
+    } catch {
+      preloadLevelPlayAd();
+    } finally {
+      setLpAdLoading(false);
+      setLpAdReady(isLevelPlayReady());
+    }
+  }, [lpAdLoading, loadAll]);
 
   const handleComplete = useCallback(async (reward: number) => {
     trackAdImpression("rewarded");

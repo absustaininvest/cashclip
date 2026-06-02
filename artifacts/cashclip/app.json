@@ -249,8 +249,14 @@
           },
           {
             "SKAdNetworkIdentifier": "zq492l623r.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "su67r6k2v3.skadnetwork"
           }
-        ]
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       },
       "privacyManifests": {
         "NSPrivacyTracking": true,
@@ -265,7 +271,11 @@
           "pagead2.googlesyndication.com",
           "unityads.unity3d.com",
           "unity3d.com",
-          "unity.com"
+          "unity.com",
+          "is.com",
+          "ironsrc.com",
+          "ironsource.com",
+          "supersonic.com"
         ],
         "NSPrivacyCollectedDataTypes": [
           {
