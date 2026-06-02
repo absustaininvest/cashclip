@@ -14,6 +14,7 @@ import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
 import { buildDemographicEntryUrl } from "./lib/demographicUrl";
+import { getClientIp } from "./lib/clientIp";
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
@@ -48,7 +49,10 @@ export function registerSurveyRoutes(app: Express): void {
         }); return;
       }
 
-      const results = await fetchExternalSurveys(String(req.userId!));
+      const results = await fetchExternalSurveys(String(req.userId!), {
+        ipUser: getClientIp(req),
+        userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined,
+      });
       const allSurveys: ExternalSurvey[] = results.flatMap((r) => r.surveys);
 
       const clamped = allSurveys.map((s) => {
@@ -112,19 +116,36 @@ export function registerSurveyRoutes(app: Express): void {
       // Build demographic-enriched entry URL for the provider
       let surveyEntryUrl: string | undefined;
       if (provider === "cpx") {
-        const appId = process.env.CPX_APP_ID;
-        const apiKey = process.env.CPX_API_KEY;
-        if (appId && apiKey) {
-          let cpxUsername: string | undefined;
-          let cpxEmail: string | undefined;
+        // Individual CPX survey: open its per-user signed deep link directly.
+        // CPX's `href` already embeds ext_user_id + survey_id + a signed token,
+        // so it launches that exact survey. Only accept cpx-research.com links
+        // and only for non-wall ids; otherwise fall back to the full offerwall.
+        const isCpxLink = (() => {
+          if (surveyId === "cpx_wall" || !surveyUrl || typeof surveyUrl !== "string") return false;
           try {
-            const cpxUser = await storage.getUser(req.userId!);
-            if (cpxUser) {
-              cpxUsername = cpxUser.username;
-              cpxEmail = cpxUser.email ?? undefined;
-            }
-          } catch { /* non-fatal — proceed without enrichment */ }
-          surveyEntryUrl = buildCpxWallUrl(req.userId!, appId, apiKey, cpxUsername, cpxEmail);
+            const u = new URL(surveyUrl);
+            if (u.protocol !== "https:") return false;
+            const h = u.hostname.toLowerCase();
+            return h === "cpx-research.com" || h.endsWith(".cpx-research.com");
+          } catch { return false; }
+        })();
+        if (isCpxLink) {
+          surveyEntryUrl = surveyUrl;
+        } else {
+          const appId = process.env.CPX_APP_ID;
+          const apiKey = process.env.CPX_API_KEY;
+          if (appId && apiKey) {
+            let cpxUsername: string | undefined;
+            let cpxEmail: string | undefined;
+            try {
+              const cpxUser = await storage.getUser(req.userId!);
+              if (cpxUser) {
+                cpxUsername = cpxUser.username;
+                cpxEmail = cpxUser.email ?? undefined;
+              }
+            } catch { /* non-fatal — proceed without enrichment */ }
+            surveyEntryUrl = buildCpxWallUrl(req.userId!, appId, apiKey, cpxUsername, cpxEmail);
+          }
         }
       } else if (surveyUrl && typeof surveyUrl === "string") {
         try {
@@ -254,11 +275,11 @@ export function registerSurveyRoutes(app: Express): void {
     surveyId: string,
     rewardValue: number | undefined,
     logPrefix: string,
-  ) {
+  ): Promise<boolean> {
     try {
       const session = await storage.findPendingRewardSession(userId, "survey", surveyId);
       if (!session) {
-        return;
+        return false;
       }
       const rawReward = rewardValue ?? parseFloat(session.expectedReward);
       const range = PROVIDER_REWARD_RANGES[provider] || { min: 0.10, max: 5.00 };
@@ -270,7 +291,9 @@ export function registerSurveyRoutes(app: Express): void {
         description: `Survey completed via ${provider} webhook`,
         finalReward: clampedReward,
       });
+      return true;
     } catch (err) {
+      return false;
     }
   }
 
@@ -326,13 +349,25 @@ export function registerSurveyRoutes(app: Express): void {
       // and unsigned. Use the server-committed expectedReward from the reward session
       // instead (creditSurveyViaWebhook falls back to session.expectedReward when
       // rewardValue is undefined, and clamps to PROVIDER_REWARD_RANGES in any case).
-      await creditSurveyViaWebhook(
+      const credited = await creditSurveyViaWebhook(
         "cpx",
         String(ext_user_id),
         `cpx_${survey_id}`,
         undefined,
         "[CPX Webhook]",
       );
+      // Fallback: if the user launched the whole offerwall (cpx_wall session)
+      // rather than an individual survey card, the pending session is keyed
+      // "cpx_wall" and won't match the per-survey id above. Credit that session.
+      if (!credited) {
+        await creditSurveyViaWebhook(
+          "cpx",
+          String(ext_user_id),
+          "cpx_wall",
+          undefined,
+          "[CPX Webhook wall fallback]",
+        );
+      }
     }
     res.status(200).send("OK");
   });

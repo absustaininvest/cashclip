@@ -205,23 +205,89 @@ export function buildCpxWallUrl(userId: string, appId: string, apiKey: string, u
   return `https://offers.cpx-research.com/index.php?${params.toString()}`;
 }
 
-async function fetchCpxSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {
+function cpxWallCard(userId: string, appId: string, apiKey: string): ExternalSurvey {
+  return {
+    id: "cpx_wall",
+    provider: "cpx" as SurveyProviderKey,
+    providerName: "CPX Research",
+    title: "CPX Research Surveys",
+    description: "Earn cash completing paid surveys from CPX Research. Multiple surveys available — payouts credited automatically.",
+    reward: 0.50,
+    estimatedMinutes: 5,
+    category: "Multiple Topics",
+    difficulty: "easy" as "easy" | "medium" | "hard",
+    surveyUrl: buildCpxWallUrl(userId, appId, apiKey),
+  };
+}
+
+function cpxDifficulty(minutes: number): "easy" | "medium" | "hard" {
+  if (minutes <= 6) return "easy";
+  if (minutes <= 14) return "medium";
+  return "hard";
+}
+
+interface CpxFetchOpts {
+  ipUser?: string;
+  userAgent?: string;
+}
+
+// Fetch the live list of individual CPX surveys for this user via the CPX
+// JSON survey API (output_method=api). Each survey becomes its own card on the
+// Surveys tab. CPX returns a per-user, per-survey signed deep link in `href`.
+// `payout` is the user-facing payout in USD (the CPX app is configured in USD).
+// Falls back to the single offerwall card when the API returns nothing or errors
+// so the Surveys tab is never empty.
+async function fetchCpxSurveys(config: ProviderConfig, userId: string, opts?: CpxFetchOpts): Promise<ExternalSurvey[]> {
   const appId = process.env.CPX_APP_ID;
   if (!appId || !config.apiKey || !userId) return [];
-  return [
-    {
-      id: "cpx_wall",
-      provider: "cpx" as SurveyProviderKey,
-      providerName: "CPX Research",
-      title: "CPX Research Surveys",
-      description: "Earn cash completing paid surveys from CPX Research. Multiple surveys available — payouts credited automatically.",
-      reward: 0.50,
-      estimatedMinutes: 5,
-      category: "Multiple Topics",
-      difficulty: "easy" as "easy" | "medium" | "hard",
-      surveyUrl: buildCpxWallUrl(userId, appId, config.apiKey),
-    },
-  ];
+  try {
+    const secureHash = md5hex(`${userId}-${config.apiKey}`);
+    const params = new URLSearchParams({
+      app_id: appId,
+      ext_user_id: userId,
+      secure_hash: secureHash,
+      output_method: "api",
+      limit: "20",
+    });
+    if (opts?.ipUser) params.set("ip_user", opts.ipUser);
+    if (opts?.userAgent) params.set("user_agent", opts.userAgent);
+
+    const res = await fetch(`https://live-api.cpx-research.com/api/get-surveys.php?${params.toString()}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return [cpxWallCard(userId, appId, config.apiKey)];
+
+    const data = await res.json() as any;
+    const list = Array.isArray(data?.surveys) ? data.surveys : [];
+
+    const surveys: ExternalSurvey[] = list
+      .map((s: any): ExternalSurvey | null => {
+        const id = String(s?.id ?? s?.survey_id ?? "").trim();
+        const url = String(s?.href ?? s?.href_new ?? "").trim();
+        if (!id || !url) return null;
+        const reward = parseFloat(String(s?.payout ?? s?.payout_publisher_usd ?? "0")) || 0;
+        const minutes = parseInt(String(s?.loi ?? "5"), 10) || 5;
+        const category = String(s?.category || "Survey").trim() || "Survey";
+        return {
+          id: `cpx_${id}`,
+          provider: "cpx" as SurveyProviderKey,
+          providerName: "CPX Research",
+          title: `${category} Survey`,
+          description: `Earn $${reward.toFixed(2)} for about ${minutes} min — payout credited automatically.`,
+          reward,
+          estimatedMinutes: minutes,
+          category,
+          difficulty: cpxDifficulty(minutes),
+          surveyUrl: url,
+        };
+      })
+      .filter((s: ExternalSurvey | null): s is ExternalSurvey => s !== null);
+
+    if (surveys.length === 0) return [cpxWallCard(userId, appId, config.apiKey)];
+    return surveys;
+  } catch {
+    return [cpxWallCard(userId, appId, config.apiKey)];
+  }
 }
 
 async function fetchBitlabsSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {
@@ -255,7 +321,7 @@ async function fetchBitlabsSurveys(config: ProviderConfig, userId: string): Prom
   }
 }
 
-export async function fetchExternalSurveys(userId: string): Promise<SurveyListResponse[]> {
+export async function fetchExternalSurveys(userId: string, opts?: CpxFetchOpts): Promise<SurveyListResponse[]> {
   const configs = getProviderConfigs();
   const configured = configs.filter((c) => c.isConfigured);
 
@@ -269,7 +335,7 @@ export async function fetchExternalSurveys(userId: string): Promise<SurveyListRe
       if (config.key === "pollfish") surveys = await fetchPollfishSurveys(config);
       else if (config.key === "cint") surveys = await fetchCintSurveys(config);
       else if (config.key === "lucid") surveys = await fetchLucidSurveys(config);
-      else if (config.key === "cpx") surveys = await fetchCpxSurveys(config, userId);
+      else if (config.key === "cpx") surveys = await fetchCpxSurveys(config, userId, opts);
       else if (config.key === "bitlabs") surveys = await fetchBitlabsSurveys(config, userId);
       return { surveys, provider: config.key };
     })
