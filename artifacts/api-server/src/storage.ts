@@ -27,6 +27,11 @@ type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 // atomically (fail-closed) inside a single transaction.
 type Executor = typeof db | DbTx;
 
+// Each verified rewarded ad credits a fixed 50 points = $0.05 (POINTS_PER_DOLLAR = 1000).
+// Ad analytics report this fixed per-ad payout, NOT the raw rewardAmount telemetry
+// (which is the AdMob SDK reward-item count, not a dollar value).
+const REWARDED_AD_PAYOUT_USD = 0.05;
+
 export type SecurityAuditEvent =
   | "totp_enabled"
   | "totp_disabled"
@@ -909,7 +914,6 @@ export class DatabaseStorage implements IStorage {
 
     const [rewards] = await db
       .select({
-        total: sql<string>`coalesce(sum(least(cast(${adEvents.rewardAmount} as numeric), 1.0)), 0)`,
         cnt: count(),
       })
       .from(adEvents)
@@ -927,8 +931,8 @@ export class DatabaseStorage implements IStorage {
 
     const totalImpressions = Number(impressions?.value ?? 0);
     const totalCompletions = Number(completions?.value ?? 0);
-    const totalRewards = n(rewards?.total);
     const rewardCount = Number(rewards?.cnt ?? 0);
+    const totalRewards = parseFloat((rewardCount * REWARDED_AD_PAYOUT_USD).toFixed(2));
     const totalFailures = Number(failures?.value ?? 0);
     const uniqueUsers = Number(uniqueUsersResult?.value ?? 0);
 
@@ -938,7 +942,7 @@ export class DatabaseStorage implements IStorage {
       totalRewardsEarned: totalRewards,
       totalFailures,
       completionRate: totalImpressions > 0 ? parseFloat(((totalCompletions / totalImpressions) * 100).toFixed(1)) : 0,
-      avgRewardAmount: rewardCount > 0 ? parseFloat((totalRewards / rewardCount).toFixed(4)) : 0,
+      avgRewardAmount: rewardCount > 0 ? REWARDED_AD_PAYOUT_USD : 0,
       uniqueUsers,
     };
   }
@@ -966,13 +970,12 @@ export class DatabaseStorage implements IStorage {
         impressions: sql<number>`count(*) filter (where ${adEvents.event} = 'impression')`,
         completions: sql<number>`count(*) filter (where ${adEvents.event} = 'completion')`,
         rewards: sql<number>`count(*) filter (where ${adEvents.event} = 'reward_earned')`,
-        totalRevenue: sql<number>`coalesce(sum(case when ${adEvents.event} = 'reward_earned' then least(cast(${adEvents.rewardAmount} as numeric), 1.0) else 0 end), 0)`,
       })
       .from(adEvents)
       .innerJoin(users, eq(adEvents.userId, users.id))
       .where(whereClause ?? undefined)
       .groupBy(adEvents.userId, users.username)
-      .orderBy(sql`coalesce(sum(case when ${adEvents.event} = 'reward_earned' then least(cast(${adEvents.rewardAmount} as numeric), 1.0) else 0 end), 0) desc`)
+      .orderBy(sql`count(*) filter (where ${adEvents.event} = 'reward_earned') desc`)
       .limit(limit);
 
     return rows.map((r: (typeof rows)[number]) => ({
@@ -981,7 +984,7 @@ export class DatabaseStorage implements IStorage {
       impressions: Number(r.impressions),
       completions: Number(r.completions),
       rewards: Number(r.rewards),
-      totalRevenue: n(r.totalRevenue),
+      totalRevenue: parseFloat((Number(r.rewards) * REWARDED_AD_PAYOUT_USD).toFixed(2)),
     }));
   }
 
@@ -1008,7 +1011,6 @@ export class DatabaseStorage implements IStorage {
         completions: sql<number>`count(*) filter (where ${adEvents.event} = 'completion')`,
         rewards: sql<number>`count(*) filter (where ${adEvents.event} = 'reward_earned')`,
         failures: sql<number>`count(*) filter (where ${adEvents.event} = 'load_failed')`,
-        revenue: sql<number>`coalesce(sum(case when ${adEvents.event} = 'reward_earned' then least(cast(${adEvents.rewardAmount} as numeric), 1.0) else 0 end), 0)`,
       })
       .from(adEvents)
       .where(whereClause ?? undefined)
@@ -1022,7 +1024,7 @@ export class DatabaseStorage implements IStorage {
       completions: Number(r.completions),
       rewards: Number(r.rewards),
       failures: Number(r.failures),
-      revenue: n(r.revenue),
+      revenue: parseFloat((Number(r.rewards) * REWARDED_AD_PAYOUT_USD).toFixed(2)),
     }));
   }
 
