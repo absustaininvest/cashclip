@@ -3703,6 +3703,8 @@ function Dashboard({
 
   useEffect(() => {
     fetchWebhookHealth();
+    const webhookInterval = setInterval(fetchWebhookHealth, 5 * 60 * 1000);
+    return () => clearInterval(webhookInterval);
   }, [fetchWebhookHealth]);
 
   function goToWebhookHealth() {
