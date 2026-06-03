@@ -2,7 +2,7 @@
   "expo": {
     "name": "CashClip",
     "slug": "cashclip",
-    "owner": "absustainabilityinvestmentsllc",
+    "owner": "absustainabilityinvestments",
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -444,12 +444,12 @@
     },
     "extra": {
       "eas": {
-        "projectId": "10994af8-62e3-4a9d-9e35-7f4381965a31"
+        "projectId": "aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
       }
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/10994af8-62e3-4a9d-9e35-7f4381965a31"
+      "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
     }
   }
 }
