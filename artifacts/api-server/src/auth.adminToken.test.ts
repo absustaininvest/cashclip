@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
 
@@ -57,15 +57,30 @@ vi.mock("./lib/logger", () => ({
 
 const CONSOLE_TOKEN = "super-secret-admin-console-token-value";
 
+let _app: Express;
+
 async function buildApp(): Promise<Express> {
+  return _app;
+}
+
+beforeAll(async () => {
+  process.env["ADMIN_TOKEN"] = CONSOLE_TOKEN;
+  process.env["JWT_ACCESS_SECRET"] = "test-jwt-secret-padded-to-64-chars-minimum-aabbccddeeff00112233";
+  process.env["DATABASE_URL"] ??= "postgres://test:test@127.0.0.1:5432/test";
+
+  // Default mock return values (beforeEach will override per-test as needed).
+  mockCheckLoginAttempts.mockResolvedValue({ count: 0, allowed: true });
+  mockRecordLoginAttempt.mockResolvedValue({ count: 1, allowed: true });
+  mockClearLoginAttempts.mockResolvedValue(undefined);
+  mockGetUser.mockResolvedValue(null);
+
   const { adminMiddleware } = await import("./auth");
-  const app = express();
-  app.use(express.json());
-  app.get("/admin/thing", adminMiddleware, (_req, res) => {
+  _app = express();
+  _app.use(express.json());
+  _app.get("/admin/thing", adminMiddleware, (_req, res) => {
     res.json({ ok: true });
   });
-  return app;
-}
+}, 30_000);
 
 beforeEach(() => {
   vi.clearAllMocks();
