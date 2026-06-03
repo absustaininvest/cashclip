@@ -70,10 +70,67 @@ if [ "$VITEST_CFG_EXIT" -ne 0 ]; then
   exit "$VITEST_CFG_EXIT"
 fi
 
-# --- TypeScript typecheck ---
-printf '\n[pre-push] Running TypeScript typecheck...\n'
-pnpm run typecheck
-TYPECHECK_EXIT=$?
+# --- TypeScript typecheck (scoped) ---
+# Collect all changed files across every pushed ref, then run the minimum
+# set of workspace typechecks needed.  Falls back to the full typecheck when
+# root-level files, shared lib/ files, or multiple workspaces are touched.
+
+TC_CHANGED=""
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" = "$Z40" ]; then
+    continue
+  fi
+  if [ "$remote_sha" = "$Z40" ]; then
+    TC_FILES=$(git log --name-only --format="" "$local_sha" --not --remotes 2>/dev/null)
+  else
+    TC_FILES=$(git diff --name-only "$remote_sha..$local_sha" 2>/dev/null)
+  fi
+  TC_CHANGED="$TC_CHANGED
+$TC_FILES"
+done <<INPUT
+$PUSH_INPUT
+INPUT
+
+TC_CHANGED=$(printf '%s\n' "$TC_CHANGED" | grep -v '^$' || true)
+
+# Count touches per workspace / category (grep -c exits 1 on zero matches; use || true)
+TC_API=$(printf '%s\n' "$TC_CHANGED" | grep -c '^artifacts/api-server/' || true)
+TC_CASHCLIP=$(printf '%s\n' "$TC_CHANGED" | grep -c '^artifacts/cashclip/' || true)
+TC_ABSUSTAIN=$(printf '%s\n' "$TC_CHANGED" | grep -c '^artifacts/absustain/' || true)
+TC_SCRIPTS=$(printf '%s\n' "$TC_CHANGED" | grep -c '^scripts/' || true)
+TC_LIBS=$(printf '%s\n' "$TC_CHANGED" | grep -c '^lib/' || true)
+TC_ROOT=$(printf '%s\n' "$TC_CHANGED" | grep -vE '^(artifacts/|scripts/|lib/)' | grep -c '.' || true)
+
+TC_WS_COUNT=0
+[ "${TC_API:-0}" -gt 0 ] && TC_WS_COUNT=$((TC_WS_COUNT + 1))
+[ "${TC_CASHCLIP:-0}" -gt 0 ] && TC_WS_COUNT=$((TC_WS_COUNT + 1))
+[ "${TC_ABSUSTAIN:-0}" -gt 0 ] && TC_WS_COUNT=$((TC_WS_COUNT + 1))
+[ "${TC_SCRIPTS:-0}" -gt 0 ] && TC_WS_COUNT=$((TC_WS_COUNT + 1))
+
+if [ "${TC_ROOT:-0}" -gt 0 ] || [ "${TC_LIBS:-0}" -gt 0 ] || [ "$TC_WS_COUNT" -gt 1 ]; then
+  # Shared libs, root files, or multiple workspaces changed — full typecheck.
+  printf '\n[pre-push] Multiple workspaces or shared files changed — running full TypeScript typecheck...\n'
+  pnpm run typecheck
+  TYPECHECK_EXIT=$?
+elif [ "$TC_WS_COUNT" -eq 1 ]; then
+  # Single workspace changed — run only that workspace's typecheck.
+  if [ "${TC_API:-0}" -gt 0 ]; then
+    TC_FILTER="@workspace/api-server"; TC_LABEL="api-server"
+  elif [ "${TC_CASHCLIP:-0}" -gt 0 ]; then
+    TC_FILTER="@workspace/cashclip"; TC_LABEL="cashclip"
+  elif [ "${TC_ABSUSTAIN:-0}" -gt 0 ]; then
+    TC_FILTER="@workspace/absustain"; TC_LABEL="absustain"
+  else
+    TC_FILTER="@workspace/scripts"; TC_LABEL="scripts"
+  fi
+  printf '\n[pre-push] Only %s changed — running scoped TypeScript typecheck...\n' "$TC_LABEL"
+  pnpm --filter "$TC_FILTER" run typecheck
+  TYPECHECK_EXIT=$?
+else
+  printf '\n[pre-push] No TypeScript workspace files changed — skipping typecheck.\n'
+  TYPECHECK_EXIT=0
+fi
+
 if [ "$TYPECHECK_EXIT" -ne 0 ]; then
   printf '\n[pre-push] TypeScript typecheck failed. Fix the errors above or use --no-verify to skip.\n'
   exit "$TYPECHECK_EXIT"
