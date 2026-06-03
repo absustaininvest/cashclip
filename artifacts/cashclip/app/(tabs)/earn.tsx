@@ -34,7 +34,7 @@ import {
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import SponsoredSection from "@/components/SponsoredSection";
-import { adVideos } from "@/lib/video-data";
+import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
 import { useAuth } from "@/lib/AuthContext";
@@ -684,6 +684,7 @@ export default function EarnScreen() {
 
   const [adLoading, setAdLoading] = useState(false);
   const [adPreloaded, setAdPreloaded] = useState(false);
+  const [selectedAdCategory, setSelectedAdCategory] = useState<string>("All");
 
   useEffect(() => {
     setAdPreloaded(isRewardedAdPreloaded());
@@ -1232,11 +1233,48 @@ export default function EarnScreen() {
 
         {/* Ads Section */}
         <Text style={styles.adsSectionTitle}>{t.earn.availableAds}</Text>
-        {adVideos.map((ad, i) => (
-          <View key={ad.id} style={{ marginBottom: i < adVideos.length - 1 ? 10 : 0 }}>
-            <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
-          </View>
-        ))}
+
+        {/* Category Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+          contentContainerStyle={styles.categoryScrollContent}
+        >
+          {[
+            { key: "All", emoji: "", label: t.earn.categoryAll },
+            ...AD_CATEGORIES.map((cat) => ({
+              key: cat,
+              emoji: AD_CATEGORY_EMOJI[cat],
+              label: t.earn.adCategoryLabel[cat],
+            })),
+          ].map((cat) => (
+            <Pressable
+              key={cat.key}
+              onPress={() => setSelectedAdCategory(cat.key)}
+              style={[styles.categoryChip, selectedAdCategory === cat.key && styles.categoryChipActive]}
+            >
+              <Text style={[styles.categoryChipText, selectedAdCategory === cat.key && styles.categoryChipTextActive]}>
+                {cat.emoji}{cat.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {(() => {
+          const filtered = selectedAdCategory === "All"
+            ? adVideos
+            : adVideos.filter((ad) => ad.category === selectedAdCategory);
+          return filtered.length > 0 ? (
+            filtered.map((ad, i) => (
+              <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
+                <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
+              </View>
+            ))
+          ) : (
+            <Text style={styles.categoryEmptyText}>{t.earn.categoryEmpty}</Text>
+          );
+        })()}
         <View style={{ height: 48 }} />
       </ScrollView>
 
@@ -1695,6 +1733,41 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginTop: 20,
     marginBottom: 12,
+  },
+  categoryScroll: {
+    marginBottom: 12,
+  },
+  categoryScrollContent: {
+    paddingRight: 8,
+    gap: 8,
+    flexDirection: "row",
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  categoryChipText: {
+    fontFamily: "Outfit_500Medium",
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  categoryChipTextActive: {
+    color: "#000",
+  },
+  categoryEmptyText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginVertical: 20,
   },
   sponsoredCard: {
     backgroundColor: Colors.surface,
