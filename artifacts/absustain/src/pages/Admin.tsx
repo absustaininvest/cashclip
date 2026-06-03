@@ -2153,9 +2153,17 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   }, [searchPerUserRange, fetchSearchPerUser]);
 
   useEffect(() => {
-    const id = setInterval(() => fetchSearchConfig(), 60_000);
+    const id = setInterval(() => {
+      fetchSearchConfig();
+      fetch("/api/admin/search-stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d) => setSearchStats(d))
+        .catch(() => setSearchStats(null));
+    }, 60_000);
     return () => clearInterval(id);
-  }, [fetchSearchConfig]);
+  }, [fetchSearchConfig, token]);
 
   const runPaypalPing = useCallback(async () => {
     setPaypalPing("loading");
