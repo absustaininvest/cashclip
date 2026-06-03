@@ -34,7 +34,7 @@ import {
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import SponsoredSection from "@/components/SponsoredSection";
-import { adVideos } from "@/lib/video-data";
+import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI, type AdCategory } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
 import { isLevelPlayAvailable, isLevelPlayReady, showLevelPlayRewardedAd, preloadLevelPlayAd } from "@/lib/levelplay";
@@ -89,6 +89,14 @@ const WHEEL_SEGMENTS = [
 
 // Check-in streak visual rewards (pts) — server awards 100 pts per check-in
 const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
+
+const AD_CATEGORY_I18N_KEY: Record<AdCategory, "categoryHome" | "categoryCooking" | "categoryTravel" | "categorySchool" | "categoryInvesting"> = {
+  Home: "categoryHome",
+  Cooking: "categoryCooking",
+  Travel: "categoryTravel",
+  School: "categorySchool",
+  Investing: "categoryInvesting",
+};
 
 function AdCard({
   ad,
@@ -1273,11 +1281,11 @@ export default function EarnScreen() {
         >
           {[
             { key: "All", emoji: "", label: t.earn.categoryAll },
-            { key: "Home", emoji: "🏠 ", label: t.earn.categoryHome },
-            { key: "Cooking", emoji: "🍳 ", label: t.earn.categoryCooking },
-            { key: "Travel", emoji: "✈️ ", label: t.earn.categoryTravel },
-            { key: "School", emoji: "🎓 ", label: t.earn.categorySchool },
-            { key: "Investing", emoji: "📈 ", label: t.earn.categoryInvesting },
+            ...AD_CATEGORIES.map((cat) => ({
+              key: cat,
+              emoji: AD_CATEGORY_EMOJI[cat],
+              label: t.earn[AD_CATEGORY_I18N_KEY[cat]],
+            })),
           ].map((cat) => (
             <Pressable
               key={cat.key}

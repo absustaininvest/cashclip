@@ -1463,6 +1463,23 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
         }, {}, {
             length: 64;
         }>;
+        category: import("drizzle-orm/pg-core").PgColumn<{
+            name: "category";
+            tableName: "campaigns";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "campaigns";
@@ -2568,11 +2585,11 @@ export declare const insertAdEventSchema: z.ZodObject<{
 export type InsertAdEvent = z.infer<typeof insertAdEventSchema>;
 export type AdEvent = typeof adEvents.$inferSelect;
 export declare const insertLeadSchema: z.ZodObject<{
+    message: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    type: z.ZodOptional<z.ZodString>;
     name: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     email: z.ZodString;
-    type: z.ZodOptional<z.ZodString>;
     source: z.ZodOptional<z.ZodString>;
-    message: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};
@@ -2589,14 +2606,21 @@ export declare const insertCampaignSchema: z.ZodObject<{
     rewardPerVisit: z.ZodOptional<z.ZodString>;
     totalBudget: z.ZodOptional<z.ZodString>;
     postbackSecret: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    category: z.ZodOptional<z.ZodNullable<z.ZodEnum<{
+        Home: "Home";
+        Cooking: "Cooking";
+        Travel: "Travel";
+        School: "School";
+        Investing: "Investing";
+    }>>>;
 }, {
     out: {};
     in: {};
 }>;
 export declare const insertUserSchema: z.ZodObject<{
     username: z.ZodString;
-    email: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     password: z.ZodString;
+    email: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     referredBy: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
 }, {
     out: {};

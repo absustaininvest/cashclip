@@ -19,6 +19,7 @@ import {
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
 import { db, updateUserProfileSchema } from "@workspace/db";
+import { AD_CATEGORIES } from "@workspace/api-zod";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
@@ -2124,7 +2125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /** Publisher: create campaign */
   app.post("/api/publisher/campaigns", authMiddleware, async (req: AuthRequest, res) => {
     try {
-      const { title, description, targetUrl, rewardPerVisit, totalBudget } = req.body ?? {};
+      const { title, description, targetUrl, rewardPerVisit, totalBudget, category } = req.body ?? {};
       if (
         typeof title !== "string" || title.length < 3 || title.length > 80 ||
         typeof description !== "string" || description.length < 10 || description.length > 300 ||
@@ -2132,6 +2133,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof rewardPerVisit !== "number" || rewardPerVisit < 0.01 || rewardPerVisit > 0.50 ||
         typeof totalBudget !== "number" || totalBudget < 0.50 || totalBudget > 500
       ) { res.status(400).json({ error: "Invalid campaign data" }); return; }
+
+      if (category !== undefined && !(AD_CATEGORIES as readonly string[]).includes(category)) {
+        res.status(400).json({ error: `Invalid category. Must be one of: ${AD_CATEGORIES.join(", ")}` });
+        return;
+      }
 
       const user = await storage.getUser(req.userId!);
       if (!user?.isPublisher) { res.status(403).json({ error: "Publisher access required" }); return; }
@@ -2175,6 +2181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rewardPerVisit: String(rewardPerVisit),
             status: "pending",
             postbackSecret: newPostbackSecret,
+            ...(category !== undefined ? { category: category as string } : {}),
           }).returning();
 
           return row;
@@ -2333,6 +2340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalBudget: campaignsTable.totalBudget,
           spent: campaignsTable.spent,
           clicks: campaignsTable.clicks,
+          category: campaignsTable.category,
           publisherName: usersTable.username,
         })
         .from(campaignsTable)

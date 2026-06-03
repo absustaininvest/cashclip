@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, numeric, integer, boolean, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { AD_CATEGORIES } from "@workspace/api-zod";
 
 export const users = pgTable("users", {
   id: varchar("id")
@@ -144,6 +145,7 @@ export const campaigns = pgTable(
     status: text("status").notNull().default("pending"),
     adminNote: text("admin_note"),
     postbackSecret: varchar("postback_secret", { length: 64 }),
+    category: text("category"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -154,6 +156,14 @@ export const campaigns = pgTable(
     // purchased budget or create a campaign with negative spend.
     spentNonNegative: check("campaigns_spent_non_negative", sql`${t.spent} >= 0`),
     spentWithinBudget: check("campaigns_spent_within_budget", sql`${t.spent} <= ${t.totalBudget}`),
+    // Enforce category is one of the known ad categories (or null/unset).
+    // The IN-list is generated from AD_CATEGORIES so the constraint stays in
+    // sync with the shared constant — a mismatch would require editing that
+    // constant, which TypeScript propagates to all consumers.
+    categoryValid: check(
+      "campaigns_category_valid",
+      sql.raw(`category IS NULL OR category IN (${AD_CATEGORIES.map(c => `'${c}'`).join(", ")})`),
+    ),
   })
 );
 
@@ -344,7 +354,9 @@ export type Lead = typeof leads.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
 export type CampaignClick = typeof campaignClicks.$inferSelect;
 
-export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true, updatedAt: true, spent: true, clicks: true, status: true, adminNote: true });
+export const insertCampaignSchema = createInsertSchema(campaigns)
+  .omit({ id: true, createdAt: true, updatedAt: true, spent: true, clicks: true, status: true, adminNote: true })
+  .extend({ category: z.enum(AD_CATEGORIES).nullish() });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,

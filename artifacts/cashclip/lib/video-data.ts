@@ -1,3 +1,15 @@
+import { AD_CATEGORIES, type AdCategory } from "@workspace/api-zod";
+
+export { AD_CATEGORIES, type AdCategory };
+
+export const AD_CATEGORY_EMOJI: Record<AdCategory, string> = {
+  Home: "🏠 ",
+  Cooking: "🍳 ",
+  Travel: "✈️ ",
+  School: "🎓 ",
+  Investing: "📈 ",
+};
+
 export interface VideoItem {
   id: string;
   title: string;
@@ -8,6 +20,16 @@ export interface VideoItem {
   color: string;
   icon: string;
   reward: number;
+}
+
+export interface AdVideoItem {
+  id: string;
+  brand: string;
+  duration: number;
+  reward: number;
+  color: string;
+  description: string;
+  category: AdCategory;
 }
 
 const videoPool: Array<Omit<VideoItem, "id" | "reward" | "views" | "duration">> = [
@@ -61,7 +83,7 @@ export function generateVideos(count: number): VideoItem[] {
   }));
 }
 
-export const adVideos = [
+export const adVideos: AdVideoItem[] = [
   { id: "ad_1", brand: "HomeStyle",    duration: 15, reward: 0.05, color: "#00E676", description: "Discover home improvement deals",      category: "Home" },
   { id: "ad_2", brand: "WealthPath",   duration: 20, reward: 0.07, color: "#42A5F5", description: "Smart investing strategies for 2026",  category: "Investing" },
   { id: "ad_3", brand: "WanderlustTV", duration: 25, reward: 0.08, color: "#FFD600", description: "Explore the best travel destinations",  category: "Travel" },
