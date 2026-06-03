@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   Modal,
+  KeyboardAvoidingView,
   ScrollView,
   TextInput,
   ActivityIndicator,
@@ -310,7 +311,7 @@ export default function WalletScreen() {
       setShowWithdrawModal(false);
       Alert.alert(
         t.wallet.withdrawalSuccessful,
-        `$${selectedTier.totalPayout.toFixed(2)} will be sent to ${paypalEmail.trim()} via PayPal. Please allow 3-5 business days for processing.`
+        `$${selectedTier.totalPayout.toFixed(2)} is on its way to ${paypalEmail.trim()} via PayPal — you'll receive it within minutes.`
       );
       await loadData();
     } catch (err: unknown) {
@@ -475,7 +476,7 @@ export default function WalletScreen() {
                 {[
                   { label: "Minimum", value: "$3.00" },
                   { label: "Daily Max", value: "$7.00" },
-                  { label: "Processing", value: "3–5 days" },
+                  { label: "Processing", value: "Minutes" },
                 ].map((item) => (
                   <View key={item.label} style={[styles.tierMiniItem, { minWidth: "30%" }]}>
                     <Text style={styles.tierMiniAmt}>{item.value}</Text>
@@ -501,7 +502,10 @@ export default function WalletScreen() {
 
 
       <Modal visible={showWithdrawModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
@@ -607,7 +611,7 @@ export default function WalletScreen() {
               </LinearGradient>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -394,11 +394,11 @@ const en = {
         },
         {
           q: "When can I withdraw my earnings?",
-          a: "Withdrawals unlock once your balance reaches $5.00. You can cash out to your PayPal account at any time after that threshold is met.",
+          a: "Withdrawals unlock once your balance reaches $3.00. You can cash out to your PayPal account at any time after that threshold is met.",
         },
         {
           q: "How long do withdrawals take?",
-          a: "Most withdrawals are processed within 1–3 business days. You'll receive an email confirmation from PayPal once the transfer is complete.",
+          a: "Most withdrawals are processed within minutes. You'll receive an email confirmation from PayPal once the transfer is complete.",
         },
         {
           q: "Why wasn't I credited for a survey or offer?",
@@ -909,11 +909,11 @@ const translations: Record<Language, Translations> = {
         },
         {
           q: "Cuando puedo retirar mis ganancias?",
-          a: "Los retiros se desbloquean cuando tu saldo llega a $5.00. Puedes retirar a tu cuenta de PayPal en cualquier momento despues de alcanzar ese minimo.",
+          a: "Los retiros se desbloquean cuando tu saldo llega a $3.00. Puedes retirar a tu cuenta de PayPal en cualquier momento despues de alcanzar ese minimo.",
         },
         {
           q: "Cuanto tardan los retiros?",
-          a: "La mayoria de los retiros se procesan en 1 a 3 dias habiles. Recibiras una confirmacion de PayPal cuando se complete la transferencia.",
+          a: "La mayoria de los retiros se procesan en minutos. Recibiras una confirmacion de PayPal cuando se complete la transferencia.",
         },
         {
           q: "Por que no se me acredito una encuesta u oferta?",
