@@ -11,3 +11,4 @@
 - [CashClip auth-token storage split](cashclip-token-storage-split.md) — read the JWT only via secureGet/secureSet (`@/lib/secure-store`); raw AsyncStorage reads of `cashclip_auth_token` return null on native → "not authenticated", works on web.
 - [CPX get-surveys JSON API](cpx-survey-list-api.md) — use host `live-api.cpx-research.com` + `output_method=api` (json returns HTML!); pass user ip/UA; payout is USD for this app; still clamp.
 - [cash-clip.app app-ads.txt serving](app-ads-txt-serving.md) — crawled app-ads.txt is served by cashclip serve.js, NOT the api-server route (decoy, google-only); replace list wholesale + republish web deploy.
+- [CashClip consent re-prompt root cause](cashclip-consent-reprompt.md) — "ATT accepted but keeps re-asking (toggle ON)" = phone on embedded build-29 fallback, not the OTA; the good OTA gates consent correctly; restore the good group, don't recode.
