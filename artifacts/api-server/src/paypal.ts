@@ -370,3 +370,13 @@ export async function verifyPayPalWebhook(
     return { ok: false, reason: `PayPal verification request failed: ${err.message}` };
   }
 }
+
+export async function pingPayPal(): Promise<{ ok: boolean; mode: string; error?: string }> {
+  const mode = process.env.PAYPAL_MODE === "live" ? "live" : "sandbox";
+  try {
+    await getAccessToken();
+    return { ok: true, mode };
+  } catch (err: any) {
+    return { ok: false, mode, error: err.message };
+  }
+}

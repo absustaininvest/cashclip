@@ -2079,6 +2079,8 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
   const [searchRefreshing, setSearchRefreshing] = useState(false);
   const [searchStats, setSearchStats] = useState<{ d7: { searches: number; points: number }; d30: { searches: number; points: number } } | null>(null);
+  const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("idle");
+  const [paypalPingMsg, setPaypalPingMsg] = useState("");
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2660,6 +2662,78 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* PayPal credential health check */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="w-4 h-4 text-blue-400" />
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            PayPal Credentials
+          </h3>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {paypalPing === "idle" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-white/40 text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/30 inline-block" />
+              Unchecked
+            </span>
+          )}
+          {paypalPing === "loading" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-white/40 text-xs font-semibold">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Testing…
+            </span>
+          )}
+          {paypalPing === "live-ok" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/15 border border-[#00E676]/30 text-[#00E676] text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
+              Live — credentials OK
+            </span>
+          )}
+          {paypalPing === "sandbox-ok" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              Sandbox — credentials OK
+            </span>
+          )}
+          {paypalPing === "error" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+              Auth failed
+            </span>
+          )}
+          <button
+            disabled={paypalPing === "loading"}
+            onClick={async () => {
+              setPaypalPing("loading");
+              setPaypalPingMsg("");
+              try {
+                const res = await fetch("/api/admin/paypal-ping", {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  setPaypalPing(data.mode === "live" ? "live-ok" : "sandbox-ok");
+                  setPaypalPingMsg(`Mode: ${data.mode}`);
+                } else {
+                  setPaypalPing("error");
+                  setPaypalPingMsg(data.error ?? "Unknown error");
+                }
+              } catch {
+                setPaypalPing("error");
+                setPaypalPingMsg("Request failed");
+              }
+            }}
+            className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+          >
+            Test credentials
+          </button>
+          {paypalPingMsg && (
+            <p className="text-white/30 text-xs">{paypalPingMsg}</p>
+          )}
         </div>
       </div>
 

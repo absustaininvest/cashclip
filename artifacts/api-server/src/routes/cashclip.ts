@@ -1115,6 +1115,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/paypal-ping", adminMiddleware, async (req: AuthRequest, res) => {
+    const { pingPayPal } = await import("../paypal");
+    const result = await pingPayPal();
+    res.status(result.ok ? 200 : 502).json(result);
+  });
+
   // PayPal Payouts webhook — receives payout status notifications from PayPal.
   // Public endpoint (called by PayPal, not users). Verifies the signature via
   // PayPal's /v1/notifications/verify-webhook-signature API before acting.
