@@ -1271,24 +1271,30 @@ export default function EarnScreen() {
           style={styles.categoryScroll}
           contentContainerStyle={styles.categoryScrollContent}
         >
-          {["All", "🏠 Home", "🍳 Cooking", "✈️ Travel", "🎓 School", "📈 Investing"].map((cat) => (
+          {[
+            { key: "All", emoji: "", label: t.earn.categoryAll },
+            { key: "Home", emoji: "🏠 ", label: t.earn.categoryHome },
+            { key: "Cooking", emoji: "🍳 ", label: t.earn.categoryCooking },
+            { key: "Travel", emoji: "✈️ ", label: t.earn.categoryTravel },
+            { key: "School", emoji: "🎓 ", label: t.earn.categorySchool },
+            { key: "Investing", emoji: "📈 ", label: t.earn.categoryInvesting },
+          ].map((cat) => (
             <Pressable
-              key={cat}
-              onPress={() => setSelectedAdCategory(cat)}
-              style={[styles.categoryChip, selectedAdCategory === cat && styles.categoryChipActive]}
+              key={cat.key}
+              onPress={() => setSelectedAdCategory(cat.key)}
+              style={[styles.categoryChip, selectedAdCategory === cat.key && styles.categoryChipActive]}
             >
-              <Text style={[styles.categoryChipText, selectedAdCategory === cat && styles.categoryChipTextActive]}>
-                {cat}
+              <Text style={[styles.categoryChipText, selectedAdCategory === cat.key && styles.categoryChipTextActive]}>
+                {cat.emoji}{cat.label}
               </Text>
             </Pressable>
           ))}
         </ScrollView>
 
         {(() => {
-          const label = selectedAdCategory === "All" ? "All" : selectedAdCategory.split(" ").slice(1).join(" ");
           const filtered = selectedAdCategory === "All"
             ? adVideos
-            : adVideos.filter((ad) => ad.category === label);
+            : adVideos.filter((ad) => ad.category === selectedAdCategory);
           return filtered.length > 0 ? (
             filtered.map((ad, i) => (
               <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
@@ -1296,7 +1302,7 @@ export default function EarnScreen() {
               </View>
             ))
           ) : (
-            <Text style={styles.categoryEmptyText}>No ads in this category right now.</Text>
+            <Text style={styles.categoryEmptyText}>{t.earn.categoryEmpty}</Text>
           );
         })()}
 
