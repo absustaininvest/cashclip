@@ -41,6 +41,7 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
   mission_weekly: { points: 500,  dailyCap: 4  },
   game:           { points: null, dailyCap: 10 },
   video:          { points: 5,    dailyCap: 50 },
+  search:         { points: 5,    dailyCap: 20 },
 };
 
 // Actions that may ONLY be credited by trusted server-to-server callbacks
@@ -54,6 +55,9 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
 //   only updates AsyncStorage, providing no server-verifiable proof.
 // game/video — no server-verifiable proof exists for these action types.
 //   Neither action type is currently issued by any mobile app code path.
+// search — must be initiated via POST /api/earn/search/begin (server-issued
+//   challenge token required at /api/earn/search/complete). This requires a
+//   minimum 5-second viewing window before the reward can be claimed.
 const SERVER_ONLY_ACTIONS = new Set([
   "rewarded_ad",
   "mission_daily",
@@ -64,14 +68,15 @@ const SERVER_ONLY_ACTIONS = new Set([
   // challenge token required at /api/earn/spin/complete). This closes the
   // direct-minting bypass; the spin wheel calls the begin/complete flow.
   "spin",
+  "search",
 ]);
 
 // ── SPIN CHALLENGE STORE ──────────────────────────────────────────────────────
 // Server-issued single-use challenge tokens for the spin wheel.
 // /begin issues a token; /complete requires it before crediting the earn token.
 // This ensures the client called /begin (server-observed) before earning points.
-const SPIN_CHALLENGE_TTL_MS  = 60_000;  // challenge valid for 60 s
-const SPIN_CHALLENGE_MIN_MS  = 3_000;   // must wait ≥3 s between begin→complete
+const SPIN_CHALLENGE_TTL_MS   = 60_000;  // challenge valid for 60 s
+const SPIN_CHALLENGE_MIN_MS   = 3_000;   // must wait ≥3 s between begin→complete
 interface SpinChallenge { userId: string; issuedAt: number; }
 const spinChallenges = new Map<string, SpinChallenge>();
 setInterval(() => {
@@ -80,6 +85,20 @@ setInterval(() => {
     if (v.issuedAt < cutoff) spinChallenges.delete(k);
   }
 }, 30_000);
+
+// ── SEARCH CHALLENGE STORE ────────────────────────────────────────────────────
+// Server-issued single-use challenge tokens for search rewards.
+// /begin issues a token; /complete requires it before crediting the earn token.
+const SEARCH_CHALLENGE_TTL_MS  = 5 * 60_000; // challenge valid for 5 min
+const SEARCH_CHALLENGE_MIN_MS  = 5_000;       // must view results ≥5 s
+interface SearchChallenge { userId: string; issuedAt: number; }
+const searchChallenges = new Map<string, SearchChallenge>();
+setInterval(() => {
+  const cutoff = Date.now() - SEARCH_CHALLENGE_TTL_MS;
+  for (const [k, v] of searchChallenges) {
+    if (v.issuedAt < cutoff) searchChallenges.delete(k);
+  }
+}, 60_000);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
 interface GooglePublicKey { keyId: number; pem: string; base64: string; }
@@ -133,6 +152,23 @@ async function verifySSVSignature(
     logger.warn({ err }, "AdMob SSV: ECDSA verification threw");
     return false;
   }
+}
+
+// ── SEARCH PARTNER CONFIG ─────────────────────────────────────────────────────
+// Build the monetized Yahoo OneSearch URL using the server-side secret.
+// SEARCH_PUBLISHER_CODE must be set in the deployment environment after the
+// owner enrolls in Yahoo's mobile search monetization (publisher) program and
+// receives an assigned publisher code / "from" tag.
+// Set via: Replit Deployment → Production app secrets → SEARCH_PUBLISHER_CODE
+function buildMonetizedSearchUrl(query: string): string {
+  const publisherCode = process.env.SEARCH_PUBLISHER_CODE;
+  const encoded = encodeURIComponent(query);
+  if (!publisherCode) {
+    // Unconfigured: fall back to plain Yahoo search (no rev-share attribution).
+    // Revenue tracking will not work until SEARCH_PUBLISHER_CODE is set.
+    return `https://search.yahoo.com/search?p=${encoded}`;
+  }
+  return `https://search.yahoo.com/search?p=${encoded}&fr=${publisherCode}&fr2=p%3As%2Cv%3Aweb&type=cashclip-search`;
 }
 
 // ── ROUTE REGISTRATION ────────────────────────────────────────────────────────
@@ -420,6 +456,166 @@ export function registerEarningsRoutes(app: Express): void {
       } catch (err) {
         logger.error({ err }, "earn/spin/complete error");
         res.status(500).json({ error: "Failed to complete spin" });
+      }
+    },
+  );
+
+  // ── GET /api/earn/search/config ──────────────────────────────────────────────
+  // Returns the server-configured search base URL for the WebView.
+  // Publisher/revenue-share credentials (SEARCH_PUBLISHER_CODE) are read from
+  // the server environment so they can be updated without a new native build.
+  app.get(
+    "/api/earn/search/config",
+    authMiddleware,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      const publisherCode = process.env.SEARCH_PUBLISHER_CODE;
+      const configured = Boolean(publisherCode);
+
+      // Base URL contains all fixed attribution params except the user query.
+      // Client appends &p=<encoded_query> to build the final WebView URL.
+      const searchBaseUrl = configured
+        ? `https://search.yahoo.com/search?fr=${encodeURIComponent(publisherCode!)}&fr2=p%3As%2Cv%3Aweb&type=cashclip-search`
+        : "https://search.yahoo.com/search";
+
+      // Include today's search count so the client cap state is accurate on mount
+      // (prevents silent no-reward loops after app restarts).
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const [{ todayCount }] = await db
+        .select({ todayCount: count() })
+        .from(earnTokens)
+        .where(and(
+          eq(earnTokens.userId, req.userId!),
+          eq(earnTokens.actionType, "search"),
+          gte(earnTokens.earnedAt, dayStart),
+        ));
+
+      const dailyCap = ACTION_CONFIG.search.dailyCap;
+      res.json({
+        configured,
+        searchBaseUrl,
+        dailyUsed:  Number(todayCount),
+        dailyCap,
+      });
+    },
+  );
+
+  // ── POST /api/earn/search/begin ──────────────────────────────────────────────
+  // Issues a server-side search challenge token. The client must present this
+  // token to /api/earn/search/complete after a minimum 5-second viewing window.
+  app.post(
+    "/api/earn/search/begin",
+    authMiddleware,
+    earnLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { randomBytes } = await import("node:crypto");
+        const challengeToken = randomBytes(32).toString("hex");
+        searchChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
+        logger.info({ userId: req.userId }, "search challenge issued");
+        res.status(201).json({ challengeToken });
+      } catch (err) {
+        logger.error({ err }, "earn/search/begin error");
+        res.status(500).json({ error: "Failed to begin search" });
+      }
+    },
+  );
+
+  // ── POST /api/earn/search/complete ────────────────────────────────────────────
+  // Validates the server-issued search challenge and issues an earn token.
+  // Enforced: challenge must exist, belong to this user, not be expired,
+  // and have been issued at least SEARCH_CHALLENGE_MIN_MS ago (min viewing time).
+  // Then applies the standard daily cap.
+  app.post(
+    "/api/earn/search/complete",
+    authMiddleware,
+    earnLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { challengeToken } = req.body as { challengeToken?: unknown };
+        if (!challengeToken || typeof challengeToken !== "string") {
+          res.status(400).json({ error: "challengeToken is required" }); return;
+        }
+
+        const challenge = searchChallenges.get(challengeToken);
+        if (!challenge) {
+          res.status(403).json({ error: "Invalid or expired search challenge" }); return;
+        }
+        if (challenge.userId !== req.userId) {
+          res.status(403).json({ error: "Search challenge does not belong to this user" }); return;
+        }
+        const age = Date.now() - challenge.issuedAt;
+        if (age > SEARCH_CHALLENGE_TTL_MS) {
+          searchChallenges.delete(challengeToken);
+          res.status(403).json({ error: "Search challenge expired — please search again" }); return;
+        }
+        if (age < SEARCH_CHALLENGE_MIN_MS) {
+          res.status(425).json({
+            error: "Search completed too quickly",
+            retryAfterMs: SEARCH_CHALLENGE_MIN_MS - age,
+          }); return;
+        }
+
+        // Consume challenge — single use
+        searchChallenges.delete(challengeToken);
+
+        const config = ACTION_CONFIG.search;
+
+        type SearchResult =
+          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
+          | { ok: false; status: number; error: string; cap?: number };
+
+        const result: SearchResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
+
+          const now      = new Date();
+          const dayStart = new Date(now);
+          dayStart.setUTCHours(0, 0, 0, 0);
+
+          const [{ todayCount }] = await tx
+            .select({ todayCount: count() })
+            .from(earnTokens)
+            .where(and(
+              eq(earnTokens.userId, req.userId!),
+              eq(earnTokens.actionType, "search"),
+              gte(earnTokens.earnedAt, dayStart),
+            ));
+
+          if (Number(todayCount) >= config.dailyCap) {
+            return { ok: false, status: 429, error: "Daily search limit reached", cap: config.dailyCap };
+          }
+
+          const pts = config.points!;
+          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const [token] = await tx.insert(earnTokens).values({
+            userId:      req.userId!,
+            points:      pts,
+            actionType:  "search",
+            description: "Search & Earn",
+            earnedAt:    now,
+            claimableAt,
+            status:      "pending",
+          }).returning();
+
+          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
+        });
+
+        if (!result.ok) {
+          const { status, error, ...rest } = result;
+          res.status(status).json({ error, ...rest }); return;
+        }
+
+        logger.info({ userId: req.userId, pts: result.points }, "search earn token issued via challenge");
+        res.status(201).json({
+          tokenId:     result.tokenId,
+          points:      result.points,
+          claimableAt: result.claimableAt,
+          dailyUsed:   result.dailyUsed,
+          dailyCap:    result.dailyCap,
+        });
+      } catch (err) {
+        logger.error({ err }, "earn/search/complete error");
+        res.status(500).json({ error: "Failed to complete search" });
       }
     },
   );

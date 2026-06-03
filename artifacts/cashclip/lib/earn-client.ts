@@ -87,6 +87,63 @@ export async function completeSpin(challengeToken: string): Promise<EarnToken | 
   }
 }
 
+// ── SEARCH CONFIG ─────────────────────────────────────────────────────────────
+// Fetches the server-configured monetized search URL base.
+// The publisher/revenue-share code is stored in the server environment
+// (SEARCH_PUBLISHER_CODE secret), not in the client bundle.
+// Client appends `&p=<encoded_query>` to build the final WebView URL.
+export async function getSearchConfig(): Promise<{
+  configured: boolean;
+  searchBaseUrl: string;
+  dailyUsed: number;
+  dailyCap: number;
+} | null> {
+  try {
+    const res = await apiRequest("GET", "/api/earn/search/config");
+    if (!res.ok) return null;
+    return await res.json() as { configured: boolean; searchBaseUrl: string; dailyUsed: number; dailyCap: number };
+  } catch {
+    return null;
+  }
+}
+
+// ── SEARCH CHALLENGE / COMPLETE ───────────────────────────────────────────────
+// Two-step search flow: /begin issues a server challenge, /complete consumes it
+// after a minimum 5-second viewing window.
+
+export async function beginSearch(): Promise<string | null> {
+  try {
+    const res = await apiRequest("POST", "/api/earn/search/begin", {});
+    if (!res.ok) return null;
+    const data = await res.json() as { challengeToken?: string };
+    return data.challengeToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function completeSearch(challengeToken: string): Promise<(EarnToken & { dailyUsed: number; dailyCap: number }) | null> {
+  try {
+    const res = await apiRequest("POST", "/api/earn/search/complete", { challengeToken });
+    if (!res.ok) return null;
+    const data = await res.json() as { tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number };
+    const token = {
+      id:          data.tokenId,
+      points:      data.points,
+      actionType:  "search" as const,
+      description: "Search & Earn",
+      earnedAt:    Date.now(),
+      claimableAt: new Date(data.claimableAt).getTime(),
+      dailyUsed:   data.dailyUsed,
+      dailyCap:    data.dailyCap,
+    };
+    await storeTokenLocally(token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 // ── CLAIM ALL READY TOKENS ────────────────────────────────────────────────────
 // Calls server — only tokens past the 3-hour window are credited.
 export async function claimAllReady(): Promise<{
