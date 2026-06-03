@@ -32,12 +32,21 @@ Requests last 7 days: 860 (+173%). Spike around May 31–Jun 1 = Colombia promot
 | 4 | CashClip Rewarde... | (iOS rewarded) | **iOS** | $6.62 (+1,732%) | Doing all the revenue work. 127 impressions last 7d. |
 | — | AdMob (default) | fallback | both | $0.28 | Fallback when groups don't match. |
 
-## Unity Ads status
+## Unity Ads status — FULLY MAPPED (confirmed Jun 3 2026 ~3:19 AM)
 - **Partnership: Active** ✅ (confirmed in Partnership tab)
 - Direct relationship with Unity Ads
-- Android: 1 mapping — CashClip Rewarded → Placement ID: `Rewarded_Android` → 1 mediation group, Active ✅
-- iOS banner: Bees + CashClip Banner both mapped to `Banner_iOS`, Unity Ads Active ✅ (completed Jun 3 2026)
-- Bidding sources confirmed working: AdMob Network + Unity Ads both show green Active in Banner Mediation iOS group
+- **iOS: 6 mappings — ALL green ✅** (confirmed in Ad unit mapping screenshot):
+  | AdMob ad unit | Format | Placement ID | Groups | Status |
+  |---|---|---|---|---|
+  | Bees | Banner | `Banner_iOS` | 1 | ✅ |
+  | CashClip Banner | Banner | `Banner_iOS` | 1 | ✅ |
+  | CashClip Interstitial | Interstitial | `Interstitial_iOS` | 1 | ✅ |
+  | CashClip Rewarded Video | Rewarded | `Rewarded_iOS` | 1 | ✅ |
+  | Set Paced | Interstitial | `Interstitial_iOS` | 1 | ✅ |
+  | Viewers Choice | Rewarded | `Rewarded_iOS` | 1 | ✅ |
+- **CashClip App Open is NOT mapped** — Unity Ads does not support App Open format; no mapping possible.
+- **Android: 1 mapping** — CashClip Rewarded Android → `Rewarded_Android` → 1 group ✅
+- AdMob Network: 398 authorized buyers, all On/Allowed (healthy default state)
 
 ## Unity Ads placement IDs (confirmed Jun 3 2026 from cloud.unity.com)
 | Format | iOS Placement ID | Android Placement ID |
