@@ -1679,7 +1679,11 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   function fmt(iso: string) {
     return new Date(iso).toLocaleString("en-US", {
@@ -3110,7 +3114,7 @@ function Dashboard({
         .catch(() => setHealthError(true));
     }
     fetchHealth();
-    const interval = setInterval(fetchHealth, 5 * 60 * 1000);
+    const interval = setInterval(fetchHealth, 60 * 1000);
     return () => clearInterval(interval);
   }, [token]);
 
