@@ -346,7 +346,7 @@ export async function fetchExternalSurveys(userId: string, opts?: CpxFetchOpts):
     .map((r) => r.value);
 }
 
-interface ProviderCompletionPayload {
+export interface ProviderCompletionPayload {
   status?: string;
   state?: string;
   completed?: boolean;
@@ -362,9 +362,10 @@ interface ProviderCompletionPayload {
   amount?: number | string;
   value?: number | string;
   reward_value?: number | string;
+  [key: string]: unknown;
 }
 
-function parseProviderReward(payload: ProviderCompletionPayload | null): number {
+export function parseProviderReward(payload: ProviderCompletionPayload | null): number {
   if (!payload) return 0;
   const raw = payload.reward ?? payload.payout ?? payload.amount ?? payload.value ?? payload.reward_value;
   if (raw === undefined || raw === null) return 0;

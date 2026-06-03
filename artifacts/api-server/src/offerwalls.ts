@@ -12,6 +12,7 @@ import { webhookRateLimiter } from "./lib/webhookRateLimit";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
+import { parseProviderReward, type ProviderCompletionPayload } from "./lib/surveyProviders";
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
@@ -221,15 +222,15 @@ export function registerOfferwallRoutes(app: Express): void {
     provider: OfferwallProviderKey,
     userId: string,
     offerId: string,
-    rewardValue: number | undefined,
-    logPrefix: string,
+    payload: ProviderCompletionPayload | null,
   ) {
     try {
       const session = await storage.findPendingRewardSession(userId, "offerwall", offerId);
       if (!session) {
         return;
       }
-      const rawReward = rewardValue ?? parseFloat(session.expectedReward);
+      const extracted = parseProviderReward(payload);
+      const rawReward = extracted > 0 ? extracted : parseFloat(session.expectedReward);
       const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
       const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rawReward));
       await storage.completeRewardSessionAndCredit({
@@ -250,18 +251,17 @@ export function registerOfferwallRoutes(app: Express): void {
       res.status(403).send("0"); return;
     }
     // Tapjoy sends: id (offer), snuid (user), currency (virtual pts — NOT USD), verifier (HMAC)
-    // No status param in Tapjoy callbacks — any authenticated request signals completion
+    // No status param in Tapjoy callbacks — any authenticated request signals completion.
+    // Do not pass Tapjoy's `currency` field — it is virtual currency points, not USD.
+    // creditOfferViaWebhook falls back to session.expectedReward when payload has no reward.
     const offerId = req.query.id ?? req.query.offer_id;
     const userId = req.query.snuid ?? req.query.user_id;
     if (offerId && userId) {
-      // Do not use Tapjoy's `currency` field as a USD reward — it's virtual currency points.
-      // Fall back to session.expectedReward (server-set USD value from offer listing).
       await creditOfferViaWebhook(
         "tapjoy",
         String(userId),
         `tapjoy_${String(offerId)}`,
-        undefined,
-        "[Tapjoy Webhook]",
+        null,
       );
     }
     res.status(200).send("1");
@@ -273,15 +273,13 @@ export function registerOfferwallRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "adgate", auth.reason ?? "unknown");
       res.status(403).json({ error: "Forbidden" }); return;
     }
-    const { offer_id, user_id, payout, status } = req.body;
+    const { offer_id, user_id, status } = req.body;
     if (status === "completed" && offer_id && user_id) {
-      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
       await creditOfferViaWebhook(
         "adgate",
         String(user_id),
         `adgate_${offer_id}`,
-        Number.isFinite(reward) ? reward : undefined,
-        "[AdGate Webhook]",
+        req.body as ProviderCompletionPayload,
       );
     }
     res.status(200).json({ status: "received" });
@@ -293,17 +291,51 @@ export function registerOfferwallRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "offertoro", auth.reason ?? "unknown");
       res.status(403).json({ error: "Forbidden" }); return;
     }
-    const { offer_id, user_id, payout } = req.body;
+    const { offer_id, user_id } = req.body;
     if (offer_id && user_id) {
-      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
       await creditOfferViaWebhook(
         "offertoro",
         String(user_id),
         `offertoro_${offer_id}`,
-        Number.isFinite(reward) ? reward : undefined,
-        "[OfferToro Webhook]",
+        req.body as ProviderCompletionPayload,
       );
     }
     res.status(200).json({ status: "1" });
+  });
+
+  app.post("/api/offerwalls/webhook/lootably", webhookRateLimiter, async (req: Request, res: Response) => {
+    const auth = verifyWebhook("lootably", req);
+    if (!auth.ok) {
+      logWebhookVerificationFailure(req, "lootably", auth.reason ?? "unknown");
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const { offer_id, user_id, status } = req.body;
+    if (status === "completed" && offer_id && user_id) {
+      await creditOfferViaWebhook(
+        "lootably",
+        String(user_id),
+        `lootably_${offer_id}`,
+        req.body as ProviderCompletionPayload,
+      );
+    }
+    res.status(200).json({ status: "received" });
+  });
+
+  app.post("/api/offerwalls/webhook/adjoe", webhookRateLimiter, async (req: Request, res: Response) => {
+    const auth = verifyWebhook("adjoe", req);
+    if (!auth.ok) {
+      logWebhookVerificationFailure(req, "adjoe", auth.reason ?? "unknown");
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const { offer_id, user_id, status } = req.body;
+    if (status === "completed" && offer_id && user_id) {
+      await creditOfferViaWebhook(
+        "adjoe",
+        String(user_id),
+        `adjoe_${offer_id}`,
+        req.body as ProviderCompletionPayload,
+      );
+    }
+    res.status(200).json({ status: "received" });
   });
 }
