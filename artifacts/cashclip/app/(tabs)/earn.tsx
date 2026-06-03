@@ -90,13 +90,6 @@ const WHEEL_SEGMENTS = [
 // Check-in streak visual rewards (pts) — server awards 100 pts per check-in
 const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
 
-const AD_CATEGORY_I18N_KEY: Record<AdCategory, "categoryHome" | "categoryCooking" | "categoryTravel" | "categorySchool" | "categoryInvesting"> = {
-  Home: "categoryHome",
-  Cooking: "categoryCooking",
-  Travel: "categoryTravel",
-  School: "categorySchool",
-  Investing: "categoryInvesting",
-};
 
 function AdCard({
   ad,
@@ -1284,7 +1277,7 @@ export default function EarnScreen() {
             ...AD_CATEGORIES.map((cat) => ({
               key: cat,
               emoji: AD_CATEGORY_EMOJI[cat],
-              label: t.earn[AD_CATEGORY_I18N_KEY[cat]],
+              label: t.earn.adCategoryLabel[cat],
             })),
           ].map((cat) => (
             <Pressable
