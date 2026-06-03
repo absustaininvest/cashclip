@@ -1,7 +1,7 @@
 /**
  * Integration tests: spin wheel earn endpoints.
  *
- * POST /api/earn/spin/begin    — issues a server-side challenge token.
+ * POST /api/earn/spin/begin    — issues a server-side challenge token (stored in DB).
  * POST /api/earn/spin/complete — validates challenge + credits a random point
  *                                value from SPIN_POOL.
  *
@@ -12,6 +12,8 @@
  *   4. Wrong-user challenge — /complete called by a different user → 403.
  *   5. Daily cap — todayCount ≥ 12 (spin dailyCap) → 429.
  *   6. Missing challengeToken body field → 400.
+ *   7. Concurrent-complete rejection — two /complete calls with the same token;
+ *      only the one that wins the atomic DB DELETE earns; the other gets 403.
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
@@ -30,12 +32,28 @@ let currentUserId  = USER_ID;
 let mockTodayCount = 0;
 let mockHasRecentSpin = false;  // controls the 2h cooldown select
 
+// ── Spin challenge DB state ───────────────────────────────────────────────────
+// Tracks the challenge inserted by /begin. The top-level db.select returns this
+// so /complete can look it up. The tx.delete in the transaction is the atomic
+// single-use gate — spinTxDeleteCount ensures only the first winner gets a row.
+
+let lastIssuedSpinChallenge: {
+  token: string;
+  userId: string;
+  issuedAt: Date;
+  expiresAt: Date;
+} | null = null;
+
+let spinTxDeleteCount = 0; // incremented each time tx.delete().where().returning() is called
+
 // ── @workspace/db mock ────────────────────────────────────────────────────────
-// The spin /complete transaction runs two selects:
-//   1. Daily-cap count  — tx.select().from().where()          → [{ todayCount }]
-//   2. Cooldown check   — tx.select().from().where().limit(1) → [] or [{ earnedAt }]
-// We model this by returning a thenable with an additional .limit() method so
-// the mock value is driven by mockTodayCount and mockHasRecentSpin.
+// The spin /complete flow:
+//   1. db.select().from(spinChallenges).where() → [challenge] or []
+//   2. (inside tx) tx.execute()                 → row lock
+//   3. (inside tx) tx.delete().where().returning() → [challenge] (first call) or []
+//   4. (inside tx) tx.select().from().where()   → [{ todayCount }]  (daily cap)
+//   5. (inside tx) tx.select().from().where().limit(1) → [] or [{ earnedAt }]  (cooldown)
+//   6. (inside tx) tx.insert().values().returning() → [{ id }]
 
 vi.mock("@workspace/db", async () => {
   const actual = await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
@@ -75,21 +93,58 @@ vi.mock("@workspace/db", async () => {
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockResolvedValue([]),
     })),
+    // Atomic single-use consume for spinChallenges:
+    // First call returns the challenge row; subsequent calls return [] simulating
+    // that another replica (or a replay attempt) already consumed it.
+    delete: vi.fn().mockImplementation(() => ({
+      where: vi.fn().mockImplementation(() => ({
+        returning: vi.fn().mockImplementation(() => {
+          spinTxDeleteCount++;
+          if (spinTxDeleteCount === 1 && lastIssuedSpinChallenge) {
+            return Promise.resolve([lastIssuedSpinChallenge]);
+          }
+          return Promise.resolve([]);
+        }),
+      })),
+    })),
   });
 
   const db = {
+    // Top-level select: used by /complete to look up the spin challenge from the DB.
+    // Returns the challenge issued by /begin if one exists, else [].
     select: vi.fn().mockImplementation(() => ({
       from: vi.fn().mockImplementation(() => ({
-        where: vi.fn().mockResolvedValue([]),
+        where: vi.fn().mockImplementation(() => {
+          return Promise.resolve(
+            lastIssuedSpinChallenge ? [lastIssuedSpinChallenge] : []
+          );
+        }),
       })),
     })),
+    // Top-level insert: used by /begin to persist the spin challenge.
+    // Captures the inserted values so the select mock can return them.
     insert: vi.fn().mockImplementation(() => ({
-      values: vi.fn().mockImplementation(() => ({
-        returning: vi.fn().mockResolvedValue([{ id: FAKE_TOKEN_ID }]),
-      })),
+      values: vi.fn().mockImplementation((vals: any) => {
+        if (vals && typeof vals.token === "string" && vals.expiresAt instanceof Date) {
+          lastIssuedSpinChallenge = {
+            token: vals.token,
+            userId: vals.userId ?? currentUserId,
+            issuedAt: vals.issuedAt ?? new Date(),
+            expiresAt: vals.expiresAt,
+          };
+        }
+        return {
+          returning: vi.fn().mockResolvedValue([{ id: FAKE_TOKEN_ID }]),
+        };
+      }),
     })),
     update: vi.fn().mockImplementation(() => ({
       set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue([]),
+    })),
+    // Top-level delete: used for the periodic cleanup sweep and the expired-row
+    // cleanup in /complete. Just resolves — no row tracking needed.
+    delete: vi.fn().mockImplementation(() => ({
       where: vi.fn().mockResolvedValue([]),
     })),
     execute: vi.fn().mockResolvedValue({ rows: [] }),
@@ -168,9 +223,11 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  currentUserId      = USER_ID;
-  mockTodayCount     = 0;
-  mockHasRecentSpin  = false;
+  currentUserId         = USER_ID;
+  mockTodayCount        = 0;
+  mockHasRecentSpin     = false;
+  lastIssuedSpinChallenge = null;
+  spinTxDeleteCount     = 0;
 });
 
 afterEach(() => {
@@ -461,6 +518,64 @@ describe("POST /api/earn/spin/begin + POST /api/earn/spin/complete", () => {
         .send({ challengeToken: 99999 });
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ── 7. Concurrent-complete rejection ──────────────────────────────────────
+  // Simulates the multi-replica race window: two /complete requests for the
+  // same challenge token both pass the upfront DB SELECT (as they would if they
+  // arrived before either transaction committed), but only the one that wins the
+  // atomic DELETE…RETURNING inside the transaction is awarded the earn token.
+  // The loser receives 403 because tx.delete returns no rows.
+
+  describe("concurrent-complete rejection — same token, only one winner", () => {
+    it("first /complete succeeds (201) and second /complete is rejected (403)", async () => {
+      vi.useFakeTimers();
+      const beginRes = await doBegin();
+      expect(beginRes.status).toBe(201);
+      const { challengeToken } = beginRes.body as { challengeToken: string };
+
+      vi.advanceTimersByTime(3_001);
+
+      // First complete: wins the atomic DELETE — receives the challenge row back.
+      const first = await doComplete(challengeToken);
+      expect(first.status).toBe(201);
+
+      // Second complete (same token): db.select still returns the challenge row
+      // (simulating the race window where the second replica hasn't yet seen the
+      // DELETE commit), but tx.delete returns [] — no row → 403.
+      const second = await doComplete(challengeToken);
+      expect(second.status).toBe(403);
+    });
+
+    it("the 403 response from the losing /complete includes an error field", async () => {
+      vi.useFakeTimers();
+      const beginRes = await doBegin();
+      const { challengeToken } = beginRes.body as { challengeToken: string };
+
+      vi.advanceTimersByTime(3_001);
+
+      await doComplete(challengeToken);
+      const second = await doComplete(challengeToken);
+
+      expect(second.status).toBe(403);
+      expect(second.body).toHaveProperty("error");
+    });
+
+    it("a third replay is also rejected — only one earn token is ever issued", async () => {
+      vi.useFakeTimers();
+      const beginRes = await doBegin();
+      const { challengeToken } = beginRes.body as { challengeToken: string };
+
+      vi.advanceTimersByTime(3_001);
+
+      const first  = await doComplete(challengeToken);
+      const second = await doComplete(challengeToken);
+      const third  = await doComplete(challengeToken);
+
+      expect(first.status).toBe(201);
+      expect(second.status).toBe(403);
+      expect(third.status).toBe(403);
     });
   });
 });

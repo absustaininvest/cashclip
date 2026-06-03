@@ -74,16 +74,18 @@ const SERVER_ONLY_ACTIONS = new Set([
 // ── SPIN CHALLENGE CONSTANTS ──────────────────────────────────────────────────
 // Challenges are stored in the `spin_challenges` DB table so they survive
 // server restarts and remain consistent across autoscaled replicas.
+// /complete atomically DELETE…RETURNING inside the earn transaction, enforcing
+// single-use even when two replicas race with different valid tokens.
 const SPIN_CHALLENGE_TTL_MS   = 60_000;  // challenge valid for 60 s
 const SPIN_CHALLENGE_MIN_MS   = 3_000;   // must wait ≥3 s between begin→complete
-// Periodic sweep: delete expired rows from the DB (30 s interval)
+// Periodic sweep: delete expired rows from the DB (60 s interval)
 setInterval(async () => {
   try {
     await db.delete(spinChallenges).where(lt(spinChallenges.expiresAt, new Date()));
   } catch (err) {
     logger.warn({ err }, "spin challenge cleanup error");
   }
-}, 30_000);
+}, 60_000);
 
 // ── SEARCH CHALLENGE CONSTANTS ────────────────────────────────────────────────
 // Challenges are stored in the `search_challenges` DB table so they survive
@@ -312,8 +314,9 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/spin/begin ────────────────────────────────────────────────
-  // Issues a server-side spin challenge token stored in the DB so it survives
-  // restarts. The client must present this token to /complete after ≥3 s.
+  // Issues a server-side spin challenge token stored in the DB. The client must
+  // present this token to /api/earn/spin/complete before an earn token is issued.
+  // Storing in the DB (not in-memory) ensures consistency across all replicas.
   app.post(
     "/api/earn/spin/begin",
     authMiddleware,
@@ -340,10 +343,13 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/spin/complete ─────────────────────────────────────────────
-  // Validates the server-issued spin challenge (looked up from the DB) and
-  // issues an earn token. Enforced: challenge must exist, belong to this user,
-  // not be expired, and have been issued at least SPIN_CHALLENGE_MIN_MS ago.
-  // Then applies the standard 2h server-side cooldown + daily cap.
+  // Validates the server-issued spin challenge and issues an earn token.
+  // Enforced: challenge must exist in the DB, belong to this user, not be
+  // expired, and have been issued at least SPIN_CHALLENGE_MIN_MS ago
+  // (anti-instant-replay). The challenge is atomically consumed inside the earn
+  // transaction via DELETE…RETURNING — two racing replicas each holding a
+  // valid token can both pass the upfront SELECT, but only the one that wins the
+  // DELETE gets a row back; the other receives a 403.
   app.post(
     "/api/earn/spin/complete",
     authMiddleware,
@@ -355,8 +361,8 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(400).json({ error: "challengeToken is required" }); return;
         }
 
-        // Look up the challenge first (do NOT consume yet — timing checks below
-        // may reject without consuming, so the user can retry).
+        // ── Step 1: look up the challenge from the DB ────────────────────────
+        // Do NOT consume yet — timing checks below may reject without consuming.
         const [challenge] = await db
           .select()
           .from(spinChallenges)
@@ -383,24 +389,12 @@ export function registerEarningsRoutes(app: Express): void {
           }); return;
         }
 
-        // All checks passed — atomically consume the challenge (single-use).
-        // DELETE…RETURNING is atomic: if two replicas race, only one gets a row back.
-        const [deleted] = await db
-          .delete(spinChallenges)
-          .where(eq(spinChallenges.token, challengeToken))
-          .returning();
-        if (!deleted) {
-          // Another replica consumed it between our SELECT and DELETE
-          res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
-        }
-
         const config = ACTION_CONFIG.spin;
 
-        // ── Serialize per-user spin operations via row-level lock ────────────
-        // Daily cap, 2h cooldown check, and insert are all performed inside a
-        // single transaction that locks the user row first. This prevents
-        // concurrent /complete requests (each with their own valid challenge
-        // token) from observing pre-insert state and racing past the limits.
+        // ── Step 2: transaction — atomic consume + daily cap + insert ────────
+        // Acquire a row-level lock on the user to serialise concurrent completions.
+        // Then DELETE…RETURNING the challenge (single-use across all replicas):
+        // if two replicas both passed the SELECT above, only one wins the DELETE.
         type SpinResult =
           | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
           | { ok: false; status: number; error: string; cap?: number; nextAvailableAt?: string };
@@ -409,8 +403,19 @@ export function registerEarningsRoutes(app: Express): void {
           // Acquire row-level lock — serialises concurrent spin completions for this user
           await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
 
-          const now      = new Date();
-          const dayStart = new Date(now);
+          // Atomically consume the challenge — single use across all replicas.
+          // DELETE…RETURNING: only one concurrent request wins; the loser gets [].
+          const [consumed] = await tx
+            .delete(spinChallenges)
+            .where(eq(spinChallenges.token, challengeToken))
+            .returning();
+          if (!consumed) {
+            // Another replica consumed it between our SELECT and this DELETE
+            return { ok: false, status: 403, error: "Invalid or expired spin challenge" };
+          }
+
+          const txNow    = new Date();
+          const dayStart = new Date(txNow);
           dayStart.setUTCHours(0, 0, 0, 0);
 
           // Daily cap
@@ -427,7 +432,7 @@ export function registerEarningsRoutes(app: Express): void {
           }
 
           // 2h cooldown
-          const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
+          const cooldownSince = new Date(txNow.getTime() - SPIN_COOLDOWN_MS);
           const [recentSpin] = await tx
             .select({ earnedAt: earnTokens.earnedAt })
             .from(earnTokens)
@@ -443,13 +448,13 @@ export function registerEarningsRoutes(app: Express): void {
           }
 
           const pts = pickRandom(SPIN_POOL);
-          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const claimableAt = new Date(txNow.getTime() + PENDING_WINDOW_MS);
           const [token] = await tx.insert(earnTokens).values({
             userId:      req.userId!,
             points:      pts,
             actionType:  "spin",
             description: "Spin wheel",
-            earnedAt:    now,
+            earnedAt:    txNow,
             claimableAt,
             status:      "pending",
           }).returning();

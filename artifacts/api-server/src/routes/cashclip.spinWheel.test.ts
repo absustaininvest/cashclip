@@ -84,6 +84,23 @@ vi.mock("@workspace/db", async () => {
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockResolvedValue([]),
     })),
+    // tx.delete(spinChallenges).where(cond).returning() — atomic consume inside transaction
+    delete: vi.fn().mockImplementation((table: any) => ({
+      where: vi.fn().mockImplementation((cond: any) => {
+        const isChallenge = table === actual.spinChallenges;
+        const token = isChallenge ? getTokenFromCond(cond) : undefined;
+        return {
+          returning: vi.fn().mockImplementation(async () => {
+            if (token !== undefined && challengeStore.has(token)) {
+              const c = challengeStore.get(token)!;
+              challengeStore.delete(token);
+              return [{ token, userId: c.userId, issuedAt: c.issuedAt, expiresAt: c.expiresAt }];
+            }
+            return [];
+          }),
+        };
+      }),
+    })),
   });
 
   const db = {
