@@ -2129,6 +2129,11 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
       .catch(() => setSearchStats(null));
   }, [fetchSearchConfig, token]);
 
+  useEffect(() => {
+    const id = setInterval(() => fetchSearchConfig(), 60_000);
+    return () => clearInterval(id);
+  }, [fetchSearchConfig]);
+
   const fetchWebhookHealth = useCallback(async () => {
     setWebhookHealthLoading(true);
     try {
