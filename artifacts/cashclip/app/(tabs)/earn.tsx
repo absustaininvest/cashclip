@@ -385,12 +385,20 @@ function DailyMissionCard({
   onClaim: (id: string) => void;
 }) {
   const scale = useSharedValue(1);
+  const progressAnim = useSharedValue(Math.min(mission.progress / mission.target, 1));
+
+  useEffect(() => {
+    const target = Math.min(mission.progress / mission.target, 1);
+    progressAnim.value = withTiming(target, { duration: 400 });
+  }, [mission.progress, mission.target]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const progress = Math.min(mission.progress / mission.target, 1);
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${progressAnim.value * 100}%`,
+  }));
 
   return (
     <Animated.View style={animStyle}>
@@ -427,15 +435,15 @@ function DailyMissionCard({
             <Text style={styles.missionDesc}>{mission.description}</Text>
             <View style={styles.missionProgressRow}>
               <View style={styles.missionBarBg}>
-                <View
+                <Animated.View
                   style={[
                     styles.missionBarFill,
                     {
-                      width: `${progress * 100}%`,
                       backgroundColor: mission.completed
                         ? Colors.primary
                         : Colors.accent,
                     },
+                    progressBarStyle,
                   ]}
                 />
               </View>
@@ -480,12 +488,20 @@ function WeeklyMissionCard({
   onClaim: (id: string) => void;
 }) {
   const scale = useSharedValue(1);
+  const progressAnim = useSharedValue(Math.min(mission.progress / mission.target, 1));
+
+  useEffect(() => {
+    const target = Math.min(mission.progress / mission.target, 1);
+    progressAnim.value = withTiming(target, { duration: 400 });
+  }, [mission.progress, mission.target]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const progress = Math.min(mission.progress / mission.target, 1);
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${progressAnim.value * 100}%`,
+  }));
 
   return (
     <Animated.View style={animStyle}>
@@ -522,15 +538,15 @@ function WeeklyMissionCard({
             <Text style={styles.missionDesc}>{mission.description}</Text>
             <View style={styles.missionProgressRow}>
               <View style={styles.missionBarBg}>
-                <View
+                <Animated.View
                   style={[
                     styles.missionBarFill,
                     {
-                      width: `${progress * 100}%`,
                       backgroundColor: mission.completed
                         ? Colors.accent
                         : Colors.primary,
                     },
+                    progressBarStyle,
                   ]}
                 />
               </View>
@@ -595,6 +611,7 @@ export default function EarnScreen() {
 
   const balancePulse = useSharedValue(1);
   const wheelRotation = useSharedValue(0);
+  const goalProgressAnim = useSharedValue(0);
 
   const [fontsLoaded] = useFonts({
     Outfit_400Regular,
@@ -853,6 +870,16 @@ export default function EarnScreen() {
   const wheelStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${wheelRotation.value}deg` }],
   }));
+
+  const goalProgressStyle = useAnimatedStyle(() => ({
+    width: `${goalProgressAnim.value * 100}%`,
+  }));
+
+  useEffect(() => {
+    if (!stats) return;
+    const target = Math.min(stats.dailyAdsWatched / DAILY_GOAL, 1);
+    goalProgressAnim.value = withTiming(target, { duration: 400 });
+  }, [stats?.dailyAdsWatched]);
 
   if (!fontsLoaded || !stats) return null;
 
@@ -1239,15 +1266,14 @@ export default function EarnScreen() {
             </Text>
           </View>
           <View style={styles.goalBarBg}>
-            <LinearGradient
-              colors={[Colors.primary, Colors.accent]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.goalBarFill,
-                { width: `${dailyProgress * 100}%` },
-              ]}
-            />
+            <Animated.View style={[styles.goalBarFill, goalProgressStyle]}>
+              <LinearGradient
+                colors={[Colors.primary, Colors.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </Animated.View>
           </View>
           {dailyProgress >= 1 && (
             <View style={styles.goalComplete}>
