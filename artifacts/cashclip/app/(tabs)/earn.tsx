@@ -655,11 +655,19 @@ export default function EarnScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsSpinning(true);
 
-    // Begin spin challenge BEFORE animation — challenge has 60s TTL
+    // Resolve the server result FIRST so the wheel lands on the correct segment.
+    // begin → complete immediately (no time-gap enforcement for spin).
     const challengeToken = await beginSpin();
+    const token = challengeToken ? await completeSpin(challengeToken) : null;
+    const pts = token?.points ?? WHEEL_SEGMENTS[Math.floor(Math.random() * WHEEL_SEGMENTS.length)].value;
 
-    // Spin animation — visual only, reward is server-determined
-    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
+    // Find the segment index whose value matches the server result.
+    // Falls back to a random index only if the server returns an unexpected value.
+    const matchIdx = WHEEL_SEGMENTS.findIndex(s => s.value === pts);
+    const segmentIndex = matchIdx !== -1
+      ? matchIdx
+      : Math.floor(Math.random() * WHEEL_SEGMENTS.length);
+
     const segmentAngle = (segmentIndex * 360) / WHEEL_SEGMENTS.length;
     const targetRotation = 360 * 5 + (360 - segmentAngle);
 
@@ -669,13 +677,9 @@ export default function EarnScreen() {
     );
 
     setTimeout(async () => {
-      // Lock spin timer client-side immediately
       await recordSpinTimestamp();
       setSpinAvailable(false);
       setNextSpinTime(Date.now() + 2 * 60 * 60 * 1000);
-      // Complete spin with the server-issued challenge token
-      const token = challengeToken ? await completeSpin(challengeToken) : null;
-      const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
       setSpinReward(pts);
       setIsSpinning(false);
       setShowSpinReward(true);
