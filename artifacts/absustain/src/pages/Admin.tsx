@@ -1895,6 +1895,8 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
+  const [healthCount, setHealthCount] = useState<number | null>(null);
+  const [healthError, setHealthError] = useState(false);
 
   const PAGE_SIZE = 25;
 
@@ -1960,6 +1962,15 @@ function CashClipUsersPanel({ token }: { token: string }) {
   useEffect(() => {
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
+
+  useEffect(() => {
+    fetch("/api/admin/health/sponsored-visits", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
+      .catch(() => setHealthError(true));
+  }, [token]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -2260,6 +2271,11 @@ function CashClipUsersPanel({ token }: { token: string }) {
         <div>
           <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-[#00E676]" /> CashClip Users
+            {!healthError && healthCount !== null && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${healthCount > 0 ? "bg-[#00E676]/15 text-[#00E676]" : "bg-red-500/15 text-red-400"}`}>
+                {healthCount > 0 ? `✓ ${healthCount} settled (24 h)` : "⚠ 0 settled"}
+              </span>
+            )}
           </h2>
           <p className="text-white/40 text-sm mt-1">
             {total} total registered users
