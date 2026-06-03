@@ -246,7 +246,7 @@ export default function WalletScreen() {
     setRefreshing(false);
   }, []);
 
-  const openWithdrawModal = useCallback(async () => {
+  const openWithdrawModal = useCallback(async (preselectedAmount?: number) => {
     const [integrity, srv] = await Promise.all([
       checkDeviceIntegrity(),
       fetchServerBalance(),
@@ -275,9 +275,15 @@ export default function WalletScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setTiers(getWithdrawalTiers(effective));
-    setSelectedTier(null);
+    const freshTiers = getWithdrawalTiers(effective);
+    setTiers(freshTiers);
     setPaypalEmail("");
+    if (preselectedAmount != null) {
+      const match = freshTiers.find((tier) => tier.amount === preselectedAmount) ?? null;
+      setSelectedTier(match);
+    } else {
+      setSelectedTier(null);
+    }
     setShowWithdrawModal(true);
   }, [fetchServerBalance, t]);
 
@@ -450,7 +456,7 @@ export default function WalletScreen() {
             </View>
 
             <Pressable
-              onPress={openWithdrawModal}
+              onPress={() => openWithdrawModal()}
               style={({ pressed }) => [
                 styles.withdrawButton,
                 serverBalance < 1 && styles.withdrawButtonDisabled,
@@ -487,19 +493,31 @@ export default function WalletScreen() {
               <View style={styles.tierMiniGrid}>
                 {[1, 3, 5, 7].map((amt) => {
                   const unlocked = tiers.some((t) => t.amount === amt);
-                  return (
-                    <View key={amt} style={[styles.tierMiniItem, unlocked && styles.tierMiniItemUnlocked]}>
-                      {unlocked ? (
+                  if (unlocked) {
+                    return (
+                      <Pressable
+                        key={amt}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          openWithdrawModal(amt);
+                        }}
+                        style={({ pressed }) => [
+                          styles.tierMiniItem,
+                          styles.tierMiniItemUnlocked,
+                          { opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+                        ]}
+                      >
                         <Feather name="check-circle" size={13} color={Colors.primary} style={{ marginBottom: 3 }} />
-                      ) : (
-                        <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
-                      )}
-                      <Text style={[styles.tierMiniAmt, !unlocked && { color: Colors.textMuted }]}>
-                        ${amt.toFixed(2)}
-                      </Text>
-                      <Text style={[styles.tierMiniPct, { color: unlocked ? Colors.primary : Colors.textMuted }]}>
-                        {unlocked ? "Available" : "Locked"}
-                      </Text>
+                        <Text style={styles.tierMiniAmt}>${amt.toFixed(2)}</Text>
+                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>Available</Text>
+                      </Pressable>
+                    );
+                  }
+                  return (
+                    <View key={amt} style={styles.tierMiniItem}>
+                      <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
+                      <Text style={[styles.tierMiniAmt, { color: Colors.textMuted }]}>${amt.toFixed(2)}</Text>
+                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>Locked</Text>
                     </View>
                   );
                 })}
