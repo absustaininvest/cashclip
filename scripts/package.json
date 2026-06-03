@@ -17,6 +17,7 @@
     "reset-build-number": "tsx ./src/reset-build-number.ts",
     "check-public-archives": "tsx ./src/check-public-archives.ts",
     "check-signing-md-sync": "tsx ./src/check-signing-md-sync.ts",
+    "check-vitest-configs": "tsx ./src/check-vitest-configs.ts",
     "test": "node --import tsx/esm --test src/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
