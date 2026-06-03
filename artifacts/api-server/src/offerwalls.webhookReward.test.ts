@@ -112,6 +112,8 @@ beforeAll(async () => {
   process.env.CPX_WEBHOOK_SECRET ??= "cpx-test-secret";
   process.env.BITLABS_WEBHOOK_SECRET ??= "bitlabs-test-secret";
   process.env.ADGATE_WEBHOOK_SECRET ??= "adgate-test-secret";
+  process.env.OFFERTORO_WEBHOOK_SECRET ??= "offertoro-test-secret";
+  process.env.TAPJOY_WEBHOOK_SECRET ??= "tapjoy-test-secret";
   process.env.WEBHOOK_RATE_LIMIT_RPM ??= "10000";
 
   const { registerSurveyRoutes } = await import("./surveys");
@@ -375,5 +377,141 @@ describe("AdGate offerwall webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OfferToro offerwall webhook — reward-present and reward-absent
+// ---------------------------------------------------------------------------
+// OfferToro sends `payout` like AdGate but has NO status gate — any
+// authenticated callback with offer_id and user_id triggers crediting.
+
+describe("OfferToro offerwall webhook — reward propagation", () => {
+  it("uses the payout field from the body when present (reward-present)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "offertoro",
+      externalId: "offertoro_ot77",
+      expectedReward: "0.40",
+      userId: "u-3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/offertoro")
+      .send({ offer_id: "ot77", user_id: "u-3", payout: 3.00 });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // payout=3.00 is within offertoro range [0.10, 20.00]
+    expect(finalReward).toBeCloseTo(3.00, 5);
+  });
+
+  it("falls back to session.expectedReward when payout is absent (reward-absent)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "offertoro",
+      externalId: "offertoro_ot78",
+      expectedReward: "0.65",
+      userId: "u-3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/offertoro")
+      .send({ offer_id: "ot78", user_id: "u-3" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // No payout → falls back to 0.65; within offertoro range [0.10, 20.00]
+    expect(finalReward).toBeCloseTo(0.65, 5);
+  });
+
+  it("credits without a status field — no status gate unlike AdGate", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "offertoro",
+      externalId: "offertoro_ot79",
+      expectedReward: "0.50",
+      userId: "u-3",
+    }));
+
+    // No `status` key at all — OfferToro handler does not require one
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/offertoro")
+      .send({ offer_id: "ot79", user_id: "u-3", payout: 1.00 });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tapjoy offerwall webhook — currency field is ignored, always uses session
+// ---------------------------------------------------------------------------
+// Tapjoy sends `currency` as virtual points (not USD). The handler explicitly
+// passes null as the payload so parseProviderReward returns undefined and
+// creditOfferViaWebhook always falls back to session.expectedReward.
+
+describe("Tapjoy offerwall webhook — currency field ignored, uses session.expectedReward", () => {
+  it("ignores the currency field and credits using session.expectedReward", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "tapjoy",
+      externalId: "tapjoy_tj55",
+      expectedReward: "1.00",
+      userId: "u-4",
+    }));
+
+    // currency=5000 is virtual points — must NOT be used as a USD reward
+    const res = await request(app)
+      .get("/api/offerwalls/webhook/tapjoy")
+      .query({ id: "tj55", snuid: "u-4", currency: "5000" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // currency is ignored; falls back to session.expectedReward=1.00
+    expect(finalReward).toBeCloseTo(1.00, 5);
+    // Confirm it did NOT use the raw currency value
+    expect(finalReward).not.toBeCloseTo(5000, 0);
+  });
+
+  it("credits using session.expectedReward even when no currency field is present", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "tapjoy",
+      externalId: "tapjoy_tj56",
+      expectedReward: "0.75",
+      userId: "u-4",
+    }));
+
+    const res = await request(app)
+      .get("/api/offerwalls/webhook/tapjoy")
+      .query({ id: "tj56", snuid: "u-4" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // No currency field; falls back to session.expectedReward=0.75
+    expect(finalReward).toBeCloseTo(0.75, 5);
+  });
+
+  it("credits on any authenticated callback — no status gate", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "tapjoy",
+      externalId: "tapjoy_tj57",
+      expectedReward: "0.50",
+      userId: "u-4",
+    }));
+
+    const res = await request(app)
+      .get("/api/offerwalls/webhook/tapjoy")
+      .query({ id: "tj57", snuid: "u-4" });
+
+    expect(res.status).toBe(200);
+    // creditOfferViaWebhook was called — no status check required
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
   });
 });

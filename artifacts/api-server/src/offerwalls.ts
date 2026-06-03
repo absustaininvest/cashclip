@@ -212,7 +212,9 @@ export function registerOfferwallRoutes(app: Express): void {
       if (!session) {
         return;
       }
-      const rawReward = parseProviderReward(payload) ?? parseFloat(session.expectedReward);
+      const rawReward = parseProviderReward(
+        payload?.payout ?? payload?.amount ?? payload?.reward ?? payload?.value ?? payload?.reward_value
+      ) ?? parseFloat(session.expectedReward);
       const range = PROVIDER_REWARD_RANGES[provider] ?? { min: 0.10, max: 25.00 };
       const clampedReward = Math.max(range.min, Math.min(range.max, rawReward));
       await storage.completeRewardSessionAndCredit({
