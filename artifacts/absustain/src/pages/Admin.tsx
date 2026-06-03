@@ -2062,7 +2062,7 @@ function formatLastChecked(date: Date): string {
   return `${diffMin} min ago`;
 }
 
-function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null }) {
+function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked, webhookHealth, webhookHealthLoading, webhookHealthChecking, recheckWebhookHealth }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null; webhookHealth: PayPalWebhookHealth | null; webhookHealthLoading: boolean; webhookHealthChecking: boolean; recheckWebhookHealth: () => void }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -2097,9 +2097,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [searchPerUserLoading, setSearchPerUserLoading] = useState(true);
   const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("loading");
   const [paypalPingMsg, setPaypalPingMsg] = useState("");
-  const [webhookHealth, setWebhookHealth] = useState<PayPalWebhookHealth | null>(null);
-  const [webhookHealthLoading, setWebhookHealthLoading] = useState(true);
-  const [webhookHealthChecking, setWebhookHealthChecking] = useState(false);
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2160,41 +2157,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     return () => clearInterval(id);
   }, [fetchSearchConfig]);
 
-  const fetchWebhookHealth = useCallback(async () => {
-    setWebhookHealthLoading(true);
-    try {
-      const res = await fetch("/api/admin/paypal/webhook-health", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setWebhookHealth(await res.json());
-    } catch {
-      setWebhookHealth({ checked: false, message: "Failed to load webhook health" });
-    } finally {
-      setWebhookHealthLoading(false);
-    }
-  }, [token]);
-
-  async function recheckWebhookHealth() {
-    setWebhookHealthChecking(true);
-    try {
-      const res = await fetch("/api/admin/paypal/webhook-health/refresh", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setWebhookHealth(await res.json());
-    } catch {
-      showToast("Re-check failed", false);
-    } finally {
-      setWebhookHealthChecking(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchWebhookHealth();
-  }, [fetchWebhookHealth]);
-
   const runPaypalPing = useCallback(async () => {
     setPaypalPing("loading");
     setPaypalPingMsg("");
@@ -2220,6 +2182,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   useEffect(() => {
     runPaypalPing();
   }, [runPaypalPing]);
+
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2871,7 +2834,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
       </div>
 
       {/* PayPal Webhook Health */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div id="paypal-webhook-health" className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-4 h-4 text-blue-400" />
           <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
@@ -3674,6 +3637,9 @@ function Dashboard({
   const [healthCount, setHealthCount] = useState<number | null>(null);
   const [healthError, setHealthError] = useState(false);
   const [healthLastChecked, setHealthLastChecked] = useState<Date | null>(null);
+  const [webhookHealth, setWebhookHealth] = useState<PayPalWebhookHealth | null>(null);
+  const [webhookHealthLoading, setWebhookHealthLoading] = useState(true);
+  const [webhookHealthChecking, setWebhookHealthChecking] = useState(false);
 
   useEffect(() => {
     function fetchHealth() {
@@ -3691,6 +3657,54 @@ function Dashboard({
     const interval = setInterval(fetchHealth, 60 * 1000);
     return () => clearInterval(interval);
   }, [token]);
+
+  const fetchWebhookHealth = useCallback(async () => {
+    setWebhookHealthLoading(true);
+    try {
+      const res = await fetch("/api/admin/paypal/webhook-health", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setWebhookHealth(await res.json());
+    } catch {
+      setWebhookHealth({ checked: false, message: "Failed to load webhook health" });
+    } finally {
+      setWebhookHealthLoading(false);
+    }
+  }, [token]);
+
+  async function recheckWebhookHealth() {
+    setWebhookHealthChecking(true);
+    try {
+      const res = await fetch("/api/admin/paypal/webhook-health/refresh", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setWebhookHealth(await res.json());
+    } catch {
+      // silently ignore — panel inside CashClip Users tab shows errors
+    } finally {
+      setWebhookHealthChecking(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchWebhookHealth();
+  }, [fetchWebhookHealth]);
+
+  function goToWebhookHealth() {
+    setTab("cashclip");
+    setTimeout(() => {
+      document.getElementById("paypal-webhook-health")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+  }
+
+  const webhookBadgeStatus: "ok" | "warning" | "loading" = webhookHealthLoading
+    ? "loading"
+    : webhookHealth?.checked && webhookHealth?.ok
+    ? "ok"
+    : "warning";
 
   const loggedInAs = (() => {
     try {
@@ -3807,6 +3821,7 @@ function Dashboard({
         <div className="max-w-7xl mx-auto mt-4 flex items-center gap-1">
           {tabs.map((t) => {
             const showAlert = t.id === "earnhealth" && !healthError && healthCount === 0;
+            const showWebhookAlert = t.id === "cashclip" && !webhookHealthLoading && webhookBadgeStatus === "warning";
             return (
               <button
                 key={t.id}
@@ -3821,6 +3836,9 @@ function Dashboard({
                 {t.label}
                 {showAlert && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#06060E]" />
+                )}
+                {showWebhookAlert && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#06060E]" />
                 )}
               </button>
             );
@@ -3979,6 +3997,42 @@ function Dashboard({
               </div>
               <div className="space-y-4">
                 <MiniCalendar />
+                {/* PayPal Webhook Health badge */}
+                <button
+                  onClick={goToWebhookHealth}
+                  className="w-full text-left bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.14] hover:bg-white/[0.05] transition-colors group"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                    <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm flex-1">
+                      PayPal Webhook
+                    </h3>
+                    <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
+                  </div>
+                  {webhookHealthLoading ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white/20 inline-block animate-pulse" />
+                      <span className="text-white/30 text-xs">Checking…</span>
+                    </div>
+                  ) : webhookBadgeStatus === "ok" ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
+                      <span className="text-[#00E676] text-xs font-semibold">Webhook OK</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                      <span className="text-amber-400 text-xs font-semibold">
+                        {webhookHealth?.message ?? "Issues found"}
+                      </span>
+                    </div>
+                  )}
+                  {webhookHealth?.checkedAt && (
+                    <p className="text-white/20 text-[10px] mt-1.5">
+                      Checked {new Date(webhookHealth.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  )}
+                </button>
                 <RemindersPanel />
                 <QuickActions />
               </div>
@@ -3986,7 +4040,7 @@ function Dashboard({
           </>
         )}
 
-        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} webhookHealth={webhookHealth} webhookHealthLoading={webhookHealthLoading} webhookHealthChecking={webhookHealthChecking} recheckWebhookHealth={recheckWebhookHealth} />}
         {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
