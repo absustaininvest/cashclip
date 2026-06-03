@@ -2092,7 +2092,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
   const [searchRefreshing, setSearchRefreshing] = useState(false);
   const [searchStats, setSearchStats] = useState<{ d7: { searches: number; points: number }; d30: { searches: number; points: number } } | null>(null);
-  const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("idle");
+  const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("loading");
   const [paypalPingMsg, setPaypalPingMsg] = useState("");
   const [webhookHealth, setWebhookHealth] = useState<PayPalWebhookHealth | null>(null);
   const [webhookHealthLoading, setWebhookHealthLoading] = useState(true);
@@ -2168,6 +2168,32 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   useEffect(() => {
     fetchWebhookHealth();
   }, [fetchWebhookHealth]);
+
+  const runPaypalPing = useCallback(async () => {
+    setPaypalPing("loading");
+    setPaypalPingMsg("");
+    try {
+      const res = await fetch("/api/admin/paypal-ping", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPaypalPing(data.mode === "live" ? "live-ok" : "sandbox-ok");
+        setPaypalPingMsg(`Mode: ${data.mode}`);
+      } else {
+        setPaypalPing("error");
+        setPaypalPingMsg(data.error ?? "Unknown error");
+      }
+    } catch {
+      setPaypalPing("error");
+      setPaypalPingMsg("Request failed");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    runPaypalPing();
+  }, [runPaypalPing]);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2739,7 +2765,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
           {paypalPing === "loading" && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-white/40 text-xs font-semibold">
               <RefreshCw className="w-3 h-3 animate-spin" />
-              Testing…
+              Checking…
             </span>
           )}
           {paypalPing === "live-ok" && (
@@ -2762,27 +2788,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
           )}
           <button
             disabled={paypalPing === "loading"}
-            onClick={async () => {
-              setPaypalPing("loading");
-              setPaypalPingMsg("");
-              try {
-                const res = await fetch("/api/admin/paypal-ping", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-                const data = await res.json();
-                if (data.ok) {
-                  setPaypalPing(data.mode === "live" ? "live-ok" : "sandbox-ok");
-                  setPaypalPingMsg(`Mode: ${data.mode}`);
-                } else {
-                  setPaypalPing("error");
-                  setPaypalPingMsg(data.error ?? "Unknown error");
-                }
-              } catch {
-                setPaypalPing("error");
-                setPaypalPingMsg("Request failed");
-              }
-            }}
+            onClick={runPaypalPing}
             className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
           >
             Test credentials
