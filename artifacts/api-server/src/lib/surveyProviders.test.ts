@@ -286,6 +286,230 @@ describe("verifyProviderCompletion — CPX HMAC path", () => {
   });
 });
 
+describe("verifyProviderCompletion — Cint path", () => {
+  it("returns verified=true when Cint upstream confirms completion with matching transactionId", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "cint-txn-1",
+            respondent_id: "user-cint-1",
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cint_survey-1",
+      provider: "cint",
+      userId: "user-cint-1",
+      transactionId: "cint-txn-1",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it("returns verified=false when Cint upstream returns HTTP 4xx", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: async () => "",
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cint_survey-1",
+      provider: "cint",
+      userId: "user-cint-1",
+      transactionId: "cint-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+
+  it("returns verified=false when Cint upstream returns a mismatched transactionId", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "WRONG-TXN",
+            respondent_id: "user-cint-1",
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cint_survey-1",
+      provider: "cint",
+      userId: "user-cint-1",
+      transactionId: "cint-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+
+  it("returns verified=false when fetch throws a network error for Cint", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("Network unavailable"))
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cint_survey-1",
+      provider: "cint",
+      userId: "user-cint-1",
+      transactionId: "cint-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+});
+
+describe("verifyProviderCompletion — Lucid path", () => {
+  it("returns verified=true when Lucid upstream confirms completion with matching transactionId", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "lucid-txn-1",
+            respondent_id: "user-lucid-1",
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "lucid_survey-1",
+      provider: "lucid",
+      userId: "user-lucid-1",
+      transactionId: "lucid-txn-1",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it("returns verified=false when Lucid upstream returns HTTP 4xx", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => "",
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "lucid_survey-1",
+      provider: "lucid",
+      userId: "user-lucid-1",
+      transactionId: "lucid-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+
+  it("returns verified=false when Lucid upstream returns a mismatched transactionId", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "WRONG-TXN",
+            respondent_id: "user-lucid-1",
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "lucid_survey-1",
+      provider: "lucid",
+      userId: "user-lucid-1",
+      transactionId: "lucid-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+
+  it("returns verified=false when fetch throws a network error for Lucid", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("Network unavailable"))
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "lucid_survey-1",
+      provider: "lucid",
+      userId: "user-lucid-1",
+      transactionId: "lucid-txn-1",
+    });
+
+    expect(result.verified).toBe(false);
+  });
+});
+
+describe("verifyProviderCompletion — BitLabs X-Api-Token header", () => {
+  it("sends the BITLABS_API_KEY as the X-Api-Token header value", async () => {
+    vi.stubEnv("BITLABS_API_KEY", "secret-bitlabs-key-abc");
+
+    let capturedHeaders: Record<string, string> = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        capturedHeaders = Object.fromEntries(
+          Object.entries((init?.headers as Record<string, string>) ?? {})
+        );
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "bl-header-txn",
+              user_id: "bl-header-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "bitlabs_s99",
+      provider: "bitlabs",
+      userId: "bl-header-user",
+      transactionId: "bl-header-txn",
+    });
+
+    expect(capturedHeaders["X-Api-Token"]).toBe("secret-bitlabs-key-abc");
+  });
+});
+
 describe("buildCpxWallUrl — HMAC signature in wall URL", () => {
   it("embeds app_id, ext_user_id, and secure_hash in the wall URL", () => {
     const url = buildCpxWallUrl("user-1", "app-99", "mykey");
