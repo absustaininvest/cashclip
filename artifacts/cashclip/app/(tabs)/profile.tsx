@@ -117,10 +117,10 @@ export default function ProfileScreen() {
     {
       icon: "globe",
       label: t.profile.language,
-      languageBadge: lang === "en" ? "EN" : "ES",
+      languageBadge: lang === "en" ? "EN" : lang === "es" ? "ES" : "PT",
       action: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLang(lang === "en" ? "es" : "en");
+        setLang(lang === "en" ? "es" : lang === "es" ? "pt" : "en");
       },
     },
     ...(isAdmin ? [{ icon: "settings", label: t.admin.title, action: () => router.push("/admin") }] : []),
