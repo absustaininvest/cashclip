@@ -16,6 +16,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 - **Mobile/Web client to API** — all client input is attacker-controlled. The server must authenticate, authorize, validate, and enforce business rules independently of frontend behavior.
 - **CashClip web app/admin browser surface** — `artifacts/cashclip` also ships a browser-served web build with operator pages such as admin and setup flows. Browser-only attacks like clickjacking, token theft via same-origin script execution, and UI redressing matter here independently of the API's Helmet protections, because the Expo static server is a separate trust boundary from the Express API.
+- **Public CashClip product pages vs operator setup hints** — browser-served reward pages such as surveys and offerwalls are part of the public client surface. Any fallback UI that embeds provider lists, secret names, dashboard URLs, or setup guidance in shipped frontend code must be treated as public operator-metadata disclosure even if the backing API route is admin-gated.
 - **Public to authenticated to admin API surfaces** — routes in `artifacts/api-server/src` cross distinct trust levels; admin functionality must never rely on hidden UI routes alone.
 - **Autoscaled replicas vs shared abuse controls** — production runs on an autoscaled fleet, so any abuse-control state kept only in process memory or the default in-memory Express rate-limit store is replica-local and must not be treated as a global guard for auth or money-moving routes.
 - **API to PostgreSQL** — the API has direct authority to mutate balances, sessions, users, and operational data. Any injection or authorization flaw here can fully compromise application integrity.
@@ -27,7 +28,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 ## Scan Anchors
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
-- **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`, and browser-served CashClip admin/setup routes under `artifacts/cashclip/app`.
+- **Highest-risk areas:** auth/session handling, JWT key-rotation fallback logic, account-recovery/password-reset flows, resend-verification abuse controls, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`, and browser-served CashClip admin/setup routes under `artifacts/cashclip/app`.
 - **Production abuse-control anchor:** prioritize DB-backed or otherwise shared enforcement on login/TOTP, password reset, sponsored visits, withdrawals, and webhook-related throttles; memory-only counters do not hold across replicas.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
@@ -40,7 +41,7 @@ CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party
 
 ### Tampering
 
-The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, payout eligibility, and sponsored-visit completion must be derived from trusted server-side records and verified provider callbacks or reliable proof of delivery, not from optimistic client claims or replayable browser choreography alone.
+The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, payout eligibility, and sponsored-visit completion must be derived from trusted server-side records and verified provider callbacks or reliable proof of delivery, not from optimistic client claims, spoofable browser headers, replayable cookies, or replayable browser choreography alone.
 
 ### Repudiation
 
@@ -48,11 +49,11 @@ Administrative actions such as balance credits, withdrawal approval/payout, user
 
 ### Information Disclosure
 
-The API stores PII, payout addresses, operational analytics, and integration health information. Responses and logs must not expose secrets, provider credentials, sensitive admin data, or cross-user records. The public website must not introduce same-origin script injection that can steal admin tokens from browser storage, and admin setup flows must not disclose long-lived TOTP seeds to third-party services or browser-visible cross-origin requests. Operator-only business metadata that is hardcoded into the admin SPA should be treated as public if it ships in the website bundle.
+The API stores PII, payout addresses, operational analytics, and integration health information. Responses and logs must not expose secrets, provider credentials, sensitive admin data, or cross-user records. The public website must not introduce same-origin script injection that can steal admin tokens from browser storage, and admin setup flows must not disclose long-lived TOTP seeds to third-party services or browser-visible cross-origin requests. Operator-only business metadata that is hardcoded into the admin SPA or into public CashClip pages should be treated as public if it ships in the website bundle.
 
 ### Denial of Service
 
-Public endpoints such as login, password reset, webhooks, lead capture, and any expensive provider-backed routes can be abused to exhaust application or third-party resources. The system must bound unauthenticated request rates, reject malformed requests early, and avoid fail-open behavior when upstream providers are unavailable.
+Public endpoints such as login, password reset, resend-verification, webhooks, lead capture, and any expensive provider-backed routes can be abused to exhaust application or third-party resources. The system must bound unauthenticated request rates with shared enforcement where production is autoscaled, reject malformed requests early, and avoid fail-open behavior when upstream providers are unavailable.
 
 ### Elevation of Privilege
 
