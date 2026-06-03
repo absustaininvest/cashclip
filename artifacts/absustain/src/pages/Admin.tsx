@@ -41,6 +41,8 @@ import {
   ChevronLeft,
   Globe,
   Power,
+  BellOff,
+  RotateCcw,
 } from "lucide-react";
 
 interface Lead {
@@ -1650,6 +1652,7 @@ interface CashClipUser {
 
 interface SponsoredVisitHealth {
   generatedAt: string;
+  alertLastSent: string | null;
   window24h: { successCount: number; totalRewardUsd: string };
   window7d: { successCount: number; totalRewardUsd: string };
   activeCampaigns: number;
@@ -1675,6 +1678,8 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   const [monitorRunning, setMonitorRunning] = useState<boolean | null>(null);
   const [monitorToggling, setMonitorToggling] = useState(false);
   const [monitorError, setMonitorError] = useState("");
+  const [alertResetting, setAlertResetting] = useState(false);
+  const [alertResetMsg, setAlertResetMsg] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1722,6 +1727,25 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
       setMonitorError(e.message ?? "Failed to toggle monitor");
     } finally {
       setMonitorToggling(false);
+    }
+  }
+
+  async function resetAlertDebounce() {
+    if (alertResetting) return;
+    setAlertResetting(true);
+    setAlertResetMsg("");
+    try {
+      const res = await fetch("/api/admin/health/sponsored-visits/reset-alert", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setAlertResetMsg("Debounce cleared — next check can send a fresh alert.");
+      await load();
+    } catch (e: any) {
+      setAlertResetMsg(`Failed: ${e.message ?? "unknown error"}`);
+    } finally {
+      setAlertResetting(false);
     }
   }
 
@@ -1810,6 +1834,42 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {monitorError}
+        </div>
+      )}
+
+      {/* Alert debounce reset */}
+      <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-amber-500/10 flex-shrink-0">
+            <BellOff className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Settlement alert debounce</p>
+            <p className="text-xs text-white/40 mt-0.5">
+              {data?.alertLastSent
+                ? `Last alert sent ${fmt(data.alertLastSent)} — silenced for 4 h`
+                : "No alert sent yet — debounce is clear"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={resetAlertDebounce}
+          disabled={alertResetting || !data?.alertLastSent}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 ${alertResetting ? "animate-spin" : ""}`} />
+          Reset debounce
+        </button>
+      </div>
+
+      {alertResetMsg && (
+        <div className={`flex items-center gap-2 text-sm rounded-xl px-4 py-3 ${
+          alertResetMsg.startsWith("Failed")
+            ? "text-red-400 bg-red-500/10 border border-red-500/20"
+            : "text-[#00E676] bg-[#00E676]/10 border border-[#00E676]/20"
+        }`}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {alertResetMsg}
         </div>
       )}
 

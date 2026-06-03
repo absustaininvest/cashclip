@@ -98,6 +98,18 @@ let monitorHandle: ReturnType<typeof setInterval> | null = null;
 
 export { runCheck as _runCheckForTests };
 
+export async function readSponsoredVisitAlertLastSent(): Promise<Date | null> {
+  return readLastAlerted();
+}
+
+export async function clearSponsoredVisitAlertDebounce(): Promise<void> {
+  const { db } = await import("@workspace/db");
+  const { sql } = await import("drizzle-orm");
+  await db.execute(sql`
+    DELETE FROM system_kv WHERE key = ${KV_KEY}
+  `);
+}
+
 export function isSponsoredVisitAlertMonitorRunning(): boolean {
   return monitorHandle !== null;
 }

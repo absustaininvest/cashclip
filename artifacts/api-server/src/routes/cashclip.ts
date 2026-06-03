@@ -1605,8 +1605,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         witnessed_not_settled: number;
       };
 
+      const { readSponsoredVisitAlertLastSent } = await import("../lib/sponsoredVisitMonitor");
+      const alertLastSent = await readSponsoredVisitAlertLastSent();
+
       res.json({
         generatedAt: new Date().toISOString(),
+        alertLastSent: alertLastSent ? alertLastSent.toISOString() : null,
         window24h: {
           successCount: s24.success_count,
           totalRewardUsd: parseFloat(s24.total_reward).toFixed(2),
@@ -1635,6 +1639,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log.error({ err }, "Failed to get sponsored visit health");
       res.status(500).json({ error: "Failed to load health data" });
+    }
+  });
+
+  app.post("/api/admin/health/sponsored-visits/reset-alert", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const { clearSponsoredVisitAlertDebounce } = await import("../lib/sponsoredVisitMonitor");
+      await clearSponsoredVisitAlertDebounce();
+      req.log.info({ adminId: req.userId }, "Sponsored-visit alert debounce cleared by admin");
+      res.json({ cleared: true });
+    } catch (err) {
+      req.log.error({ err }, "Failed to clear sponsored-visit alert debounce");
+      res.status(500).json({ error: "Failed to clear alert debounce" });
     }
   });
 
