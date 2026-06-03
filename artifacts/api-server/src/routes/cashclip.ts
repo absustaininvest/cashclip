@@ -1540,6 +1540,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Admin: sponsored-visit settlement health check.
+   *  Returns success/failure counts drawn from campaign_clicks and
+   *  campaign_visit_attempts so the owner can spot settlement regressions
+   *  without reading raw logs.
+   */
+  app.get("/api/admin/health/sponsored-visits", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { db: dbClient } = await import("@workspace/db");
+      const { sql: rawSql } = await import("drizzle-orm");
+
+      const [stats24h, stats7d, activeCampaigns, recentSettlements, expiredAttempts] = await Promise.all([
+        dbClient.execute(rawSql`
+          SELECT
+            COUNT(*)::int AS success_count,
+            COALESCE(SUM(reward_granted), 0)::text AS total_reward
+          FROM campaign_clicks
+          WHERE created_at >= NOW() - INTERVAL '24 hours'
+        `),
+        dbClient.execute(rawSql`
+          SELECT
+            COUNT(*)::int AS success_count,
+            COALESCE(SUM(reward_granted), 0)::text AS total_reward
+          FROM campaign_clicks
+          WHERE created_at >= NOW() - INTERVAL '7 days'
+        `),
+        dbClient.execute(rawSql`
+          SELECT COUNT(*)::int AS active_count FROM campaigns WHERE status = 'active'
+        `),
+        dbClient.execute(rawSql`
+          SELECT
+            cc.id,
+            cc.campaign_id,
+            c.title AS campaign_title,
+            cc.reward_granted::text,
+            cc.created_at
+          FROM campaign_clicks cc
+          LEFT JOIN campaigns c ON c.id = cc.campaign_id
+          ORDER BY cc.created_at DESC
+          LIMIT 20
+        `),
+        dbClient.execute(rawSql`
+          SELECT
+            COUNT(*)::int AS total_expired,
+            COUNT(*) FILTER (WHERE redirected_at IS NULL)::int AS not_redirected,
+            COUNT(*) FILTER (WHERE redirected_at IS NOT NULL AND witnessed_at IS NULL)::int AS redirected_not_witnessed,
+            COUNT(*) FILTER (WHERE witnessed_at IS NOT NULL AND settled_at IS NULL)::int AS witnessed_not_settled
+          FROM campaign_visit_attempts
+          WHERE expires_at < NOW()
+            AND settled_at IS NULL
+            AND created_at >= NOW() - INTERVAL '24 hours'
+        `),
+      ]);
+
+      const s24 = stats24h.rows[0] as { success_count: number; total_reward: string };
+      const s7  = stats7d.rows[0]  as { success_count: number; total_reward: string };
+      const actC = activeCampaigns.rows[0] as { active_count: number };
+      const exp  = expiredAttempts.rows[0] as {
+        total_expired: number;
+        not_redirected: number;
+        redirected_not_witnessed: number;
+        witnessed_not_settled: number;
+      };
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        window24h: {
+          successCount: s24.success_count,
+          totalRewardUsd: parseFloat(s24.total_reward).toFixed(2),
+        },
+        window7d: {
+          successCount: s7.success_count,
+          totalRewardUsd: parseFloat(s7.total_reward).toFixed(2),
+        },
+        activeCampaigns: actC.active_count,
+        expiredAttempts24h: {
+          total: exp.total_expired,
+          notRedirected: exp.not_redirected,
+          redirectedNotWitnessed: exp.redirected_not_witnessed,
+          witnessedNotSettled: exp.witnessed_not_settled,
+        },
+        recentSettlements: recentSettlements.rows.map((r: any) => ({
+          id: r.id as string,
+          campaignId: r.campaign_id as string,
+          campaignTitle: (r.campaign_title as string | null) ?? "Unknown",
+          rewardGranted: r.reward_granted as string,
+          createdAt: r.created_at instanceof Date
+            ? r.created_at.toISOString()
+            : String(r.created_at),
+        })),
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to get sponsored visit health");
+      res.status(500).json({ error: "Failed to load health data" });
+    }
+  });
+
   app.get("/api/admin/ad-analytics/fill-rate", adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const windowMinutes = Math.min(
