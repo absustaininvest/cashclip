@@ -56,6 +56,12 @@ const FALLBACK_CARDS = [
   { headline: "Work From Home — Real Jobs", body: "Remote roles at top companies", advertiser: "RemoteWork", color: "#6D4C41" },
 ];
 
+export const PLACEHOLDER_CARDS = FALLBACK_CARDS;
+
+export function adSlotReward(index: number): number {
+  return parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
+}
+
 interface AdData {
   headline: string;
   body: string;
