@@ -2585,11 +2585,11 @@ export declare const insertAdEventSchema: z.ZodObject<{
 export type InsertAdEvent = z.infer<typeof insertAdEventSchema>;
 export type AdEvent = typeof adEvents.$inferSelect;
 export declare const insertLeadSchema: z.ZodObject<{
-    message: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    type: z.ZodOptional<z.ZodString>;
     name: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     email: z.ZodString;
+    type: z.ZodOptional<z.ZodString>;
     source: z.ZodOptional<z.ZodString>;
+    message: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};
@@ -2619,8 +2619,8 @@ export declare const insertCampaignSchema: z.ZodObject<{
 }>;
 export declare const insertUserSchema: z.ZodObject<{
     username: z.ZodString;
-    password: z.ZodString;
     email: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+    password: z.ZodString;
     referredBy: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
 }, {
     out: {};
@@ -2795,6 +2795,83 @@ export declare const deviceInstalls: import("drizzle-orm/pg-core").PgTableWithCo
     dialect: "pg";
 }>;
 export type DeviceInstall = typeof deviceInstalls.$inferSelect;
+export declare const searchChallenges: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "search_challenges";
+    schema: undefined;
+    columns: {
+        token: import("drizzle-orm/pg-core").PgColumn<{
+            name: "token";
+            tableName: "search_challenges";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        userId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "user_id";
+            tableName: "search_challenges";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: number | undefined;
+        }>;
+        issuedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "issued_at";
+            tableName: "search_challenges";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        expiresAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "expires_at";
+            tableName: "search_challenges";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
 export declare const earnTokens: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "earn_tokens";
     schema: undefined;

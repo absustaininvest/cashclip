@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
 import { authMiddleware, type AuthRequest } from "../auth";
-import { db, earnTokens, users, earningsLedger } from "@workspace/db";
+import { db, earnTokens, users, earningsLedger, searchChallenges } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
@@ -86,17 +86,17 @@ setInterval(() => {
   }
 }, 30_000);
 
-// ── SEARCH CHALLENGE STORE ────────────────────────────────────────────────────
-// Server-issued single-use challenge tokens for search rewards.
-// /begin issues a token; /complete requires it before crediting the earn token.
+// ── SEARCH CHALLENGE CONSTANTS ────────────────────────────────────────────────
+// Challenges are stored in the `search_challenges` DB table so they survive
+// server restarts and remain consistent across autoscaled replicas.
 const SEARCH_CHALLENGE_TTL_MS  = 5 * 60_000; // challenge valid for 5 min
 const SEARCH_CHALLENGE_MIN_MS  = 5_000;       // must view results ≥5 s
-interface SearchChallenge { userId: string; issuedAt: number; }
-const searchChallenges = new Map<string, SearchChallenge>();
-setInterval(() => {
-  const cutoff = Date.now() - SEARCH_CHALLENGE_TTL_MS;
-  for (const [k, v] of searchChallenges) {
-    if (v.issuedAt < cutoff) searchChallenges.delete(k);
+// Periodic sweep: delete expired rows from the DB (60 s interval)
+setInterval(async () => {
+  try {
+    await db.delete(searchChallenges).where(lt(searchChallenges.expiresAt, new Date()));
+  } catch (err) {
+    logger.warn({ err }, "search challenge cleanup error");
   }
 }, 60_000);
 
@@ -497,8 +497,8 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/search/begin ──────────────────────────────────────────────
-  // Issues a server-side search challenge token. The client must present this
-  // token to /api/earn/search/complete after a minimum 5-second viewing window.
+  // Issues a server-side search challenge token stored in the DB so it survives
+  // restarts. The client must present this token to /complete after ≥5 s.
   app.post(
     "/api/earn/search/begin",
     authMiddleware,
@@ -507,7 +507,14 @@ export function registerEarningsRoutes(app: Express): void {
       try {
         const { randomBytes } = await import("node:crypto");
         const challengeToken = randomBytes(32).toString("hex");
-        searchChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + SEARCH_CHALLENGE_TTL_MS);
+        await db.insert(searchChallenges).values({
+          token: challengeToken,
+          userId: req.userId!,
+          issuedAt: now,
+          expiresAt,
+        });
         logger.info({ userId: req.userId }, "search challenge issued");
         res.status(201).json({ challengeToken });
       } catch (err) {
@@ -518,9 +525,9 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/search/complete ────────────────────────────────────────────
-  // Validates the server-issued search challenge and issues an earn token.
-  // Enforced: challenge must exist, belong to this user, not be expired,
-  // and have been issued at least SEARCH_CHALLENGE_MIN_MS ago (min viewing time).
+  // Validates the server-issued search challenge (looked up from the DB) and
+  // issues an earn token. Enforced: challenge must exist, belong to this user,
+  // not be expired, and have been issued at least SEARCH_CHALLENGE_MIN_MS ago.
   // Then applies the standard daily cap.
   app.post(
     "/api/earn/search/complete",
@@ -533,27 +540,44 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(400).json({ error: "challengeToken is required" }); return;
         }
 
-        const challenge = searchChallenges.get(challengeToken);
+        // Look up the challenge first (do NOT consume yet — timing checks below
+        // may reject without consuming, so the user can retry).
+        const [challenge] = await db
+          .select()
+          .from(searchChallenges)
+          .where(eq(searchChallenges.token, challengeToken));
+
         if (!challenge) {
           res.status(403).json({ error: "Invalid or expired search challenge" }); return;
         }
         if (challenge.userId !== req.userId) {
           res.status(403).json({ error: "Search challenge does not belong to this user" }); return;
         }
-        const age = Date.now() - challenge.issuedAt;
-        if (age > SEARCH_CHALLENGE_TTL_MS) {
-          searchChallenges.delete(challengeToken);
+        const now = Date.now();
+        if (now > challenge.expiresAt.getTime()) {
+          // Expired — clean up the stale row and reject
+          await db.delete(searchChallenges).where(eq(searchChallenges.token, challengeToken));
           res.status(403).json({ error: "Search challenge expired — please search again" }); return;
         }
+        const age = now - challenge.issuedAt.getTime();
         if (age < SEARCH_CHALLENGE_MIN_MS) {
+          // Too fast — do NOT consume so the user can retry after the minimum wait
           res.status(425).json({
             error: "Search completed too quickly",
             retryAfterMs: SEARCH_CHALLENGE_MIN_MS - age,
           }); return;
         }
 
-        // Consume challenge — single use
-        searchChallenges.delete(challengeToken);
+        // All checks passed — atomically consume the challenge (single-use).
+        // DELETE…RETURNING is atomic: if two replicas race, only one gets a row back.
+        const [deleted] = await db
+          .delete(searchChallenges)
+          .where(eq(searchChallenges.token, challengeToken))
+          .returning();
+        if (!deleted) {
+          // Another replica consumed it between our SELECT and DELETE
+          res.status(403).json({ error: "Invalid or expired search challenge" }); return;
+        }
 
         const config = ACTION_CONFIG.search;
 

@@ -27,12 +27,22 @@ const USER_ID        = "user-search-test-1";
 vi.mock("@workspace/db", async () => {
   const actual = await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
   const db = {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ todayCount: 3 }]),
+    // select().from(table).where() — return [] for search_challenges (no challenges
+    // are issued in these tests), todayCount for everything else (earnTokens cap check).
+    select: vi.fn().mockImplementation(() => ({
+      from: vi.fn().mockImplementation((table: any) => ({
+        where: vi.fn().mockImplementation(async () => {
+          if (table === actual.searchChallenges) return [];
+          return [{ todayCount: 3 }];
+        }),
+      })),
+    })),
+    insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue([]) }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([]),
       }),
     }),
-    insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue([]) }),
     update: vi.fn(),
     transaction: vi.fn(),
     execute: vi.fn().mockResolvedValue({ rows: [] }),

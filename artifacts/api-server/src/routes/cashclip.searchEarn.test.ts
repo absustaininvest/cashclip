@@ -27,6 +27,26 @@ const FAKE_TOKEN_ID   = "earn-token-uuid-search-1";
 let currentUserId = USER_ID;
 let mockTodayCount = 0;
 
+// ── Stateful search challenge store for the mock DB ───────────────────────────
+// Mirrors what the real search_challenges table does: insert on /begin,
+// select on /complete pre-validation, delete (with returning) on consumption.
+//
+// Token extraction: Drizzle's eq(col, val) produces an SQL object whose
+// queryChunks contain [StringChunk, Column, StringChunk(" = "), Param(val), StringChunk].
+// The Param chunk has `value` as a plain (non-array) string — we scan for it.
+interface MockChallenge { userId: string; issuedAt: Date; expiresAt: Date; }
+const challengeStore = new Map<string, MockChallenge>();
+const getTokenFromCond = (cond: any): string | undefined => {
+  const chunks = cond?.queryChunks;
+  if (!Array.isArray(chunks)) return undefined;
+  for (const chunk of chunks) {
+    if (chunk != null && typeof chunk.value === "string" && !Array.isArray(chunk.value)) {
+      return chunk.value as string;
+    }
+  }
+  return undefined;
+};
+
 // ── @workspace/db mock ────────────────────────────────────────────────────────
 
 vi.mock("@workspace/db", async () => {
@@ -53,16 +73,69 @@ vi.mock("@workspace/db", async () => {
   });
 
   const db = {
+    // select().from(table).where(cond):
+    //   - search_challenges table (by reference) → look up from challengeStore
+    //   - anything else (earnTokens count etc.) → todayCount
     select: vi.fn().mockImplementation(() => ({
-      from: vi.fn().mockImplementation(() => ({
-        where: vi.fn().mockResolvedValue([]),
+      from: vi.fn().mockImplementation((table: any) => ({
+        where: vi.fn().mockImplementation(async (cond: any) => {
+          if (table === actual.searchChallenges) {
+            const token = getTokenFromCond(cond);
+            if (token !== undefined && challengeStore.has(token)) {
+              const c = challengeStore.get(token)!;
+              return [{ token, userId: c.userId, issuedAt: c.issuedAt, expiresAt: c.expiresAt }];
+            }
+            return [];
+          }
+          return [{ todayCount: mockTodayCount }];
+        }),
       })),
     })),
+
+    // insert().values(data):
+    //   - search_challenges insert (data has token field) → store in challengeStore
+    //   - anything else → return fake token id
     insert: vi.fn().mockImplementation(() => ({
-      values: vi.fn().mockImplementation(() => ({
-        returning: vi.fn().mockResolvedValue([{ id: FAKE_TOKEN_ID }]),
-      })),
+      values: vi.fn().mockImplementation(async (data: any) => {
+        if (data?.token) {
+          challengeStore.set(data.token, {
+            userId: data.userId,
+            issuedAt: data.issuedAt instanceof Date ? data.issuedAt : new Date(data.issuedAt),
+            expiresAt: data.expiresAt instanceof Date ? data.expiresAt : new Date(data.expiresAt),
+          });
+          return [];
+        }
+        return [{ id: FAKE_TOKEN_ID }];
+      }),
     })),
+
+    // delete(table).where(cond) — returns a thenable (for plain await) that also
+    // has .returning() for the atomic-consume path.
+    delete: vi.fn().mockImplementation((table: any) => ({
+      where: vi.fn().mockImplementation((cond: any) => {
+        const isChallenge = table === actual.searchChallenges;
+        const token = isChallenge ? getTokenFromCond(cond) : undefined;
+
+        const doDelete = () => {
+          if (token !== undefined && challengeStore.has(token)) {
+            const c = challengeStore.get(token)!;
+            challengeStore.delete(token);
+            return [{ token, userId: c.userId, issuedAt: c.issuedAt, expiresAt: c.expiresAt }];
+          }
+          return [];
+        };
+
+        // Make the where-result directly awaitable (plain `await db.delete().where()`)
+        // AND provide a .returning() method for the consumption path.
+        const result: any = {
+          returning: vi.fn().mockImplementation(async () => doDelete()),
+        };
+        result.then = (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+          Promise.resolve(doDelete()).then(resolve, reject);
+        return result;
+      }),
+    })),
+
     update: vi.fn().mockImplementation(() => ({
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockResolvedValue([]),
@@ -145,6 +218,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   currentUserId  = USER_ID;
   mockTodayCount = 0;
+  challengeStore.clear();
 });
 
 afterEach(() => {
