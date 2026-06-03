@@ -85,6 +85,7 @@ vi.mock("./lib/surveyProviders", async (importOriginal) => {
 });
 
 let app: Express;
+let RANGES: Record<string, { min: number; max: number }>;
 
 function makeSession(overrides: {
   source?: "survey" | "offerwall";
@@ -117,6 +118,9 @@ beforeAll(async () => {
   process.env.LOOTABLY_WEBHOOK_SECRET ??= "lootably-test-secret";
   process.env.ADJOE_WEBHOOK_SECRET ??= "adjoe-test-secret";
   process.env.WEBHOOK_RATE_LIMIT_RPM ??= "10000";
+
+  const actual = await vi.importActual<typeof import("./lib/surveyProviders")>("./lib/surveyProviders");
+  RANGES = actual.PROVIDER_REWARD_RANGES;
 
   const { registerSurveyRoutes } = await import("./surveys");
   const { registerOfferwallRoutes } = await import("./offerwalls");
@@ -267,8 +271,8 @@ describe("BitLabs survey webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
-    // Clamped to max of bitlabs range = 2.50
-    expect(finalReward).toBeCloseTo(2.50, 5);
+    // Clamped to bitlabs max — derived from authoritative PROVIDER_REWARD_RANGES
+    expect(finalReward).toBeCloseTo(RANGES.bitlabs.max, 5);
   });
 
   it("falls back to session.expectedReward when val is absent (reward-absent)", async () => {
@@ -368,8 +372,8 @@ describe("AdGate offerwall webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
-    // Clamped to adgate max = 20.00
-    expect(finalReward).toBeCloseTo(20.00, 5);
+    // Clamped to adgate max — derived from authoritative PROVIDER_REWARD_RANGES
+    expect(finalReward).toBeCloseTo(RANGES.adgate.max, 5);
   });
 
   it("ignores the webhook body and returns 200 when status is not 'completed'", async () => {
@@ -580,8 +584,8 @@ describe("Lootably offerwall webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
-    // Clamped to lootably max = 20.00
-    expect(finalReward).toBeCloseTo(20.00, 5);
+    // Clamped to lootably max — derived from authoritative PROVIDER_REWARD_RANGES
+    expect(finalReward).toBeCloseTo(RANGES.lootably.max, 5);
   });
 
   it("ignores the webhook and returns 200 when status is not 'completed' (status-gate)", async () => {
@@ -667,8 +671,8 @@ describe("Adjoe offerwall webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
-    // Clamped to adjoe max = 25.00
-    expect(finalReward).toBeCloseTo(25.00, 5);
+    // Clamped to adjoe max — derived from authoritative PROVIDER_REWARD_RANGES
+    expect(finalReward).toBeCloseTo(RANGES.adjoe.max, 5);
   });
 
   it("ignores the webhook and returns 200 when status is not 'completed' (status-gate)", async () => {

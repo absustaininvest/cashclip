@@ -51,6 +51,11 @@ vi.mock("./lib/offerwallProviders", () => ({
   getOfferwallProviderStatus: vi.fn().mockReturnValue([]),
 }));
 
+vi.mock("./lib/surveyProviders", async (importActual) => {
+  const real = await importActual<typeof import("./lib/surveyProviders")>();
+  return { ...real };
+});
+
 vi.mock("./issuedOffers", () => ({
   recordIssuedOffers: vi.fn(),
   getIssuedOffer: vi.fn().mockReturnValue(null),
@@ -77,8 +82,12 @@ beforeAll(() => {
 });
 
 let app: Express;
+let RANGES: Record<string, { min: number; max: number }>;
 
 beforeAll(async () => {
+  const actual = await vi.importActual<typeof import("./lib/surveyProviders")>("./lib/surveyProviders");
+  RANGES = actual.PROVIDER_REWARD_RANGES;
+
   const { reloadWebhookSecrets } = await import("./lib/webhookAuth");
   reloadWebhookSecrets();
 
@@ -194,7 +203,7 @@ describe("AdGate webhook — reward propagation", () => {
     expect(call.finalReward).toBe(2.00);
   });
 
-  it("clamps a provider-reported reward that exceeds the AdGate max (20.00)", async () => {
+  it("clamps a provider-reported reward that exceeds the AdGate max", async () => {
     storageMocks.findPendingRewardSession.mockResolvedValue(makePendingSession("1.00"));
 
     const body = adgateBody("offer-3", "user-3", "99.99");
@@ -205,7 +214,7 @@ describe("AdGate webhook — reward propagation", () => {
     expect(res.status).toBe(200);
     expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
     const call = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
-    expect(call.finalReward).toBe(20.00);
+    expect(call.finalReward).toBe(RANGES.adgate.max);
   });
 
   it("extracts reward from the `reward` field (alternate field name)", async () => {
@@ -284,7 +293,7 @@ describe("Lootably webhook — reward propagation", () => {
     expect(call.finalReward).toBe(3.00);
   });
 
-  it("clamps a reward exceeding the Lootably max (20.00)", async () => {
+  it("clamps a reward exceeding the Lootably max", async () => {
     const session = { ...makePendingSession("1.00"), provider: "lootably", externalId: "lootably_loot-3" };
     storageMocks.findPendingRewardSession.mockResolvedValue(session);
 
@@ -295,7 +304,7 @@ describe("Lootably webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const call = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
-    expect(call.finalReward).toBe(20.00);
+    expect(call.finalReward).toBe(RANGES.lootably.max);
   });
 
   it("extracts reward from the `reward` field (alternate field name)", async () => {
@@ -356,7 +365,7 @@ describe("Adjoe webhook — reward propagation", () => {
     expect(call.finalReward).toBe(4.00);
   });
 
-  it("clamps a reward exceeding the Adjoe max (25.00)", async () => {
+  it("clamps a reward exceeding the Adjoe max", async () => {
     const session = { ...makePendingSession("1.00"), provider: "adjoe", externalId: "adjoe_adj-3" };
     storageMocks.findPendingRewardSession.mockResolvedValue(session);
 
@@ -367,7 +376,7 @@ describe("Adjoe webhook — reward propagation", () => {
 
     expect(res.status).toBe(200);
     const call = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
-    expect(call.finalReward).toBe(25.00);
+    expect(call.finalReward).toBe(RANGES.adjoe.max);
   });
 });
 
