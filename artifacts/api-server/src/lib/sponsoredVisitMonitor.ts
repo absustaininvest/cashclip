@@ -98,6 +98,10 @@ let monitorHandle: ReturnType<typeof setInterval> | null = null;
 
 export { runCheck as _runCheckForTests };
 
+export function isSponsoredVisitAlertMonitorRunning(): boolean {
+  return monitorHandle !== null;
+}
+
 export function stopSponsoredVisitAlertMonitor(): void {
   if (monitorHandle !== null) {
     clearInterval(monitorHandle);

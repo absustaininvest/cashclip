@@ -40,6 +40,7 @@ import {
   History,
   ChevronLeft,
   Globe,
+  Power,
 } from "lucide-react";
 
 interface Lead {
@@ -1668,6 +1669,9 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   const [data, setData] = useState<SponsoredVisitHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [monitorRunning, setMonitorRunning] = useState<boolean | null>(null);
+  const [monitorToggling, setMonitorToggling] = useState(false);
+  const [monitorError, setMonitorError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1685,8 +1689,42 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
     }
   }
 
+  async function loadMonitorStatus() {
+    try {
+      const res = await fetch("/api/admin/monitor/sponsored-visit", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      setMonitorRunning(json.running);
+    } catch {
+    }
+  }
+
+  async function toggleMonitor() {
+    if (monitorRunning === null || monitorToggling) return;
+    setMonitorToggling(true);
+    setMonitorError("");
+    const action = monitorRunning ? "stop" : "start";
+    try {
+      const res = await fetch("/api/admin/monitor/sponsored-visit", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json();
+      setMonitorRunning(json.running);
+    } catch (e: any) {
+      setMonitorError(e.message ?? "Failed to toggle monitor");
+    } finally {
+      setMonitorToggling(false);
+    }
+  }
+
   useEffect(() => {
     load();
+    loadMonitorStatus();
     const interval = setInterval(load, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -1739,6 +1777,38 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
           Refresh
         </button>
       </div>
+
+      {/* Monitor toggle */}
+      <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${monitorRunning === null ? "bg-white/20" : monitorRunning ? "bg-[#00E676] animate-pulse" : "bg-white/20"}`} />
+          <div>
+            <p className="text-sm font-medium text-white">Settlement alert monitor</p>
+            <p className="text-xs text-white/40 mt-0.5">
+              {monitorRunning === null ? "Checking…" : monitorRunning ? "Running — checks every 30 min" : "Stopped"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={toggleMonitor}
+          disabled={monitorRunning === null || monitorToggling}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 ${
+            monitorRunning
+              ? "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20"
+              : "bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] hover:bg-[#00E676]/20"
+          }`}
+        >
+          <Power className={`w-3.5 h-3.5 ${monitorToggling ? "animate-pulse" : ""}`} />
+          {monitorRunning ? "Stop" : "Start"}
+        </button>
+      </div>
+
+      {monitorError && (
+        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {monitorError}
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">

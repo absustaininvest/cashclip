@@ -1636,6 +1636,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/monitor/sponsored-visit", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    const { action } = req.body as { action?: string };
+    if (action !== "start" && action !== "stop") {
+      res.status(400).json({ error: 'action must be "start" or "stop"' });
+      return;
+    }
+    const {
+      startSponsoredVisitAlertMonitor,
+      stopSponsoredVisitAlertMonitor,
+      isSponsoredVisitAlertMonitorRunning,
+    } = await import("../lib/sponsoredVisitMonitor");
+    if (action === "stop") {
+      stopSponsoredVisitAlertMonitor();
+      req.log.info({ adminId: req.userId }, "Sponsored-visit alert monitor stopped by admin");
+      res.json({ running: false });
+    } else {
+      await startSponsoredVisitAlertMonitor();
+      req.log.info({ adminId: req.userId }, "Sponsored-visit alert monitor started by admin");
+      res.json({ running: isSponsoredVisitAlertMonitorRunning() });
+    }
+  });
+
+  app.get("/api/admin/monitor/sponsored-visit", adminMiddleware, async (_req: AuthRequest, res): Promise<void> => {
+    const { isSponsoredVisitAlertMonitorRunning } = await import("../lib/sponsoredVisitMonitor");
+    res.json({ running: isSponsoredVisitAlertMonitorRunning() });
+  });
+
   app.get("/api/admin/ad-analytics/fill-rate", adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const windowMinutes = Math.min(
