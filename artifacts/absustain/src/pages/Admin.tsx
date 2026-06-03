@@ -2047,6 +2047,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
+  const [searchRefreshing, setSearchRefreshing] = useState(false);
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2055,14 +2056,23 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     return () => clearInterval(id);
   }, []);
 
+  const fetchSearchConfig = useCallback(
+    (showSpinner = false) => {
+      if (showSpinner) setSearchRefreshing(true);
+      fetch("/api/earn/search/config", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d) => setSearchConfigured(Boolean(d.configured)))
+        .catch(() => setSearchConfigured(false))
+        .finally(() => setSearchRefreshing(false));
+    },
+    [token],
+  );
+
   useEffect(() => {
-    fetch("/api/earn/search/config", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setSearchConfigured(Boolean(d.configured)))
-      .catch(() => setSearchConfigured(false));
-  }, [token]);
+    fetchSearchConfig();
+  }, [fetchSearchConfig]);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2558,6 +2568,14 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
           <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
             Search &amp; Earn
           </h3>
+          <button
+            onClick={() => fetchSearchConfig(true)}
+            disabled={searchRefreshing}
+            title="Refresh status"
+            className="ml-auto p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${searchRefreshing ? "animate-spin" : ""}`} />
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {searchConfigured === null ? (
