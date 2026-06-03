@@ -136,6 +136,13 @@ if [ "${TC_ROOT:-0}" -gt 0 ] || [ "${TC_LIBS:-0}" -gt 0 ] || [ "$TC_WS_COUNT" -g
   [ "${TC_CHECK_ABSUSTAIN:-0}" -gt 0 ] && { pnpm --filter @workspace/absustain run typecheck >/tmp/tc-absustain.log 2>&1 & PID_ABSUSTAIN=$!; }
   [ "${TC_CHECK_SCRIPTS:-0}"   -gt 0 ] && { pnpm --filter @workspace/scripts   run typecheck >/tmp/tc-scripts.log   2>&1 & PID_SCRIPTS=$!; }
 
+  _tc_names=
+  [ -n "$PID_API"       ] && _tc_names="${_tc_names:+$_tc_names, }api-server"
+  [ -n "$PID_CASHCLIP"  ] && _tc_names="${_tc_names:+$_tc_names, }cashclip"
+  [ -n "$PID_ABSUSTAIN" ] && _tc_names="${_tc_names:+$_tc_names, }absustain"
+  [ -n "$PID_SCRIPTS"   ] && _tc_names="${_tc_names:+$_tc_names, }scripts"
+  printf '[pre-push] Checking: %s\n' "$_tc_names"
+
   # Background ticker: prints a heartbeat every 5 s so the terminal doesn't
   # look frozen while workers are running.  Killed once all workers finish,
   # before per-workspace result lines are printed.
