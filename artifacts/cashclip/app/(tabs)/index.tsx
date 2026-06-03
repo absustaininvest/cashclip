@@ -21,6 +21,8 @@ import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
 import { recordEarnAction } from "@/lib/earn-client";
+import { getApiUrl } from "@/lib/query-client";
+import { secureGet } from "@/lib/secure-store";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
@@ -129,6 +131,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [serverBalance, setServerBalance] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [adLoading, setAdLoading] = useState(false);
@@ -140,18 +143,39 @@ export default function HomeScreen() {
 
   const adIndices = Array.from({ length: AD_CARD_COUNT }, (_, i) => ({ id: `ad_${i}`, index: i }));
 
-  useEffect(() => {
-    getUserStats().then(setStats);
-    getUnreadNotificationCount().then(setUnreadCount);
-    if (isAdMobReady()) preloadRewardedAd();
+  const fetchServerBalance = useCallback(async (): Promise<number | null> => {
+    try {
+      const authToken = await secureGet("cashclip_auth_token");
+      if (!authToken) return null;
+      const url = new URL("/api/balance", getApiUrl());
+      const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${authToken}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return Number(data.balance) || 0;
+    } catch {
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+    Promise.all([getUserStats(), getUnreadNotificationCount(), fetchServerBalance()]).then(
+      ([s, unread, srv]) => {
+        setStats(s);
+        setUnreadCount(unread);
+        if (srv !== null) setServerBalance(srv);
+      }
+    );
+    if (isAdMobReady()) preloadRewardedAd();
+  }, [fetchServerBalance]);
 
   const creditAdReward = useCallback(async () => {
     await recordAdWatch();
     // Server-authoritative credit (same path as the Earn screen).
     recordEarnAction("rewarded_ad", "Watched rewarded ad");
-    getUserStats().then(setStats);
-  }, []);
+    const [s, srv] = await Promise.all([getUserStats(), fetchServerBalance()]);
+    setStats(s);
+    if (srv !== null) setServerBalance(srv);
+  }, [fetchServerBalance]);
 
   const handleAdPress = useCallback(async (index: number) => {
     if (adLoading) return;
@@ -205,11 +229,12 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const [s, unread] = await Promise.all([getUserStats(), getUnreadNotificationCount()]);
+    const [s, unread, srv] = await Promise.all([getUserStats(), getUnreadNotificationCount(), fetchServerBalance()]);
     setStats(s);
     setUnreadCount(unread);
+    if (srv !== null) setServerBalance(srv);
     setRefreshing(false);
-  }, []);
+  }, [fetchServerBalance]);
 
   const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -261,7 +286,9 @@ export default function HomeScreen() {
                 {stats && (
                   <View style={styles.balanceChip}>
                     <MaterialCommunityIcons name="cash" size={15} color={Colors.primary} />
-                    <Text style={styles.balanceChipText}>${stats.balance.toFixed(2)}</Text>
+                    <Text style={styles.balanceChipText}>
+                      ${(serverBalance !== null ? serverBalance : stats.balance).toFixed(2)}
+                    </Text>
                   </View>
                 )}
               </View>
