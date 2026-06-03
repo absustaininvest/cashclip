@@ -1501,9 +1501,10 @@ function InboxPanel({ token }: { token: string }) {
                 {filtered.map((msg) => (
                   <button
                     key={msg.uid}
-                    onClick={() =>
-                      setSelected(selected?.uid === msg.uid ? null : msg)
-                    }
+                    onClick={() => {
+                      setSelected(selected?.uid === msg.uid ? null : msg);
+                      setTick(t => t + 1);
+                    }}
                     className={`w-full text-left flex items-start gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors ${
                       selected?.uid === msg.uid ? "bg-white/[0.06]" : ""
                     }`}
