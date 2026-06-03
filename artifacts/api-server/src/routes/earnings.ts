@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger, searchChallenges, spinChallenges } from "@workspace/db";
-import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
+import { eq, and, lte, gte, lt, sql, count, inArray, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
 import { maybeSendThresholdPush } from "../lib/push";
@@ -1083,6 +1083,50 @@ export function registerEarningsRoutes(app: Express): void {
       runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: interval run failed"));
     }, AUTO_CONVERT_INTERVAL_MS);
   }, 5 * 60 * 1000);
+
+  // ── GET /api/admin/search-stats-per-user ──────────────────────────────────────
+  // Returns top N users by search count for a given window (7d or 30d).
+  app.get(
+    "/api/admin/search-stats-per-user",
+    adminMiddleware,
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const range  = req.query.range === "7d" ? 7 : 30;
+        const limit  = Math.min(parseInt(String(req.query.limit || "20"), 10) || 20, 100);
+        const since  = new Date(Date.now() - range * 24 * 60 * 60 * 1000);
+
+        const rows = await db
+          .select({
+            userId:   earnTokens.userId,
+            username: users.username,
+            searches: count(),
+            points:   sql<string>`COALESCE(SUM(${earnTokens.points}), 0)`,
+          })
+          .from(earnTokens)
+          .innerJoin(users, eq(users.id, earnTokens.userId))
+          .where(and(
+            eq(earnTokens.actionType, "search"),
+            gte(earnTokens.earnedAt, since),
+          ))
+          .groupBy(earnTokens.userId, users.username)
+          .orderBy(desc(count()))
+          .limit(limit);
+
+        res.json({
+          range: `${range}d`,
+          users: rows.map((r) => ({
+            userId:   r.userId,
+            username: r.username,
+            searches: Number(r.searches),
+            points:   Number(r.points),
+          })),
+        });
+      } catch (err) {
+        logger.error({ err }, "admin/search-stats-per-user error");
+        res.status(500).json({ error: "Failed to load per-user search stats" });
+      }
+    },
+  );
 
   // ── GET /api/admin/search-stats ───────────────────────────────────────────────
   // Returns aggregate search-earn totals for the last 7d and 30d.

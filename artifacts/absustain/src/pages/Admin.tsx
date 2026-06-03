@@ -2092,6 +2092,9 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
   const [searchRefreshing, setSearchRefreshing] = useState(false);
   const [searchStats, setSearchStats] = useState<{ d7: { searches: number; points: number }; d30: { searches: number; points: number } } | null>(null);
+  const [searchPerUserRange, setSearchPerUserRange] = useState<"7d" | "30d">("7d");
+  const [searchPerUserRows, setSearchPerUserRows] = useState<{ userId: string; username: string; searches: number; points: number }[]>([]);
+  const [searchPerUserLoading, setSearchPerUserLoading] = useState(true);
   const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("loading");
   const [paypalPingMsg, setPaypalPingMsg] = useState("");
   const [webhookHealth, setWebhookHealth] = useState<PayPalWebhookHealth | null>(null);
@@ -2119,6 +2122,25 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     [token],
   );
 
+  const fetchSearchPerUser = useCallback(
+    async (range: "7d" | "30d") => {
+      setSearchPerUserLoading(true);
+      try {
+        const res = await fetch(`/api/admin/search-stats-per-user?range=${range}&limit=20`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setSearchPerUserRows(data.users ?? []);
+      } catch {
+        setSearchPerUserRows([]);
+      } finally {
+        setSearchPerUserLoading(false);
+      }
+    },
+    [token],
+  );
+
   useEffect(() => {
     fetchSearchConfig();
     fetch("/api/admin/search-stats", {
@@ -2128,6 +2150,10 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
       .then((d) => setSearchStats(d))
       .catch(() => setSearchStats(null));
   }, [fetchSearchConfig, token]);
+
+  useEffect(() => {
+    fetchSearchPerUser(searchPerUserRange);
+  }, [searchPerUserRange, fetchSearchPerUser]);
 
   useEffect(() => {
     const id = setInterval(() => fetchSearchConfig(), 60_000);
@@ -2719,7 +2745,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
           </p>
         </div>
         {/* Search earnings totals */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           {(["d7", "d30"] as const).map((key) => {
             const label    = key === "d7" ? "Last 7 days" : "Last 30 days";
             const searches = searchStats?.[key].searches ?? null;
@@ -2744,6 +2770,51 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
               </div>
             );
           })}
+        </div>
+
+        {/* Per-user search breakdown */}
+        <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
+            <span className="text-white/60 text-xs font-semibold">Top Searchers</span>
+            <div className="flex items-center gap-1">
+              {(["7d", "30d"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setSearchPerUserRange(r)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    searchPerUserRange === r
+                      ? "bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30"
+                      : "bg-white/[0.05] text-white/50 border border-white/10 hover:bg-white/[0.1]"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+          {searchPerUserLoading ? (
+            <div className="text-center py-8 text-white/30 text-xs">Loading…</div>
+          ) : searchPerUserRows.length === 0 ? (
+            <div className="text-center py-8 text-white/30 text-xs">No searches in this range</div>
+          ) : (
+            <div className="divide-y divide-white/[0.04]">
+              {searchPerUserRows.map((u, i) => (
+                <div
+                  key={u.userId}
+                  className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-4 py-2.5"
+                >
+                  <span className="text-white/30 text-xs font-bold w-5">{i + 1}</span>
+                  <span className="text-white text-xs font-semibold truncate">{u.username}</span>
+                  <span className="text-white/40 text-xs whitespace-nowrap tabular-nums">
+                    {u.searches.toLocaleString()} searches
+                  </span>
+                  <span className="text-[#00E676] text-xs font-bold tabular-nums">
+                    {u.points.toLocaleString()} pts
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
