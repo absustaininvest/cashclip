@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
+import crypto from "node:crypto";
 
 let verifyProviderCompletion: typeof import("./surveyProviders").verifyProviderCompletion;
 let buildCpxWallUrl: typeof import("./surveyProviders").buildCpxWallUrl;
@@ -1015,5 +1016,72 @@ describe("parseProviderReward", () => {
 
   it("returns undefined for an array", () => {
     expect(parseProviderReward([1.5])).toBeUndefined();
+  });
+});
+
+describe("buildCpxWallUrl", () => {
+  it("URL starts with the correct CPX Research base", () => {
+    const url = buildCpxWallUrl("uid-1", "app-42", "secret");
+    expect(url.startsWith("https://offers.cpx-research.com/index.php")).toBe(true);
+  });
+
+  it("embeds the correct app_id in the URL", () => {
+    const url = buildCpxWallUrl("uid-1", "app-42", "secret");
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("app_id")).toBe("app-42");
+  });
+
+  it("embeds the correct ext_user_id in the URL", () => {
+    const url = buildCpxWallUrl("uid-1", "app-42", "secret");
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("ext_user_id")).toBe("uid-1");
+  });
+
+  it("secure_hash matches MD5 of userId + '-' + apiKey (cryptographically verified)", () => {
+    const userId = "uid-crypto-test";
+    const apiKey = "key-crypto-test";
+    const expected = crypto.createHash("md5").update(`${userId}-${apiKey}`).digest("hex");
+    const url = buildCpxWallUrl(userId, "any-app", apiKey);
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("secure_hash")).toBe(expected);
+  });
+
+  it("secure_hash changes when userId changes (hash covers userId)", () => {
+    const apiKey = "shared-key";
+    const url1 = buildCpxWallUrl("user-A", "app-1", apiKey);
+    const url2 = buildCpxWallUrl("user-B", "app-1", apiKey);
+    const hash1 = new URL(url1).searchParams.get("secure_hash");
+    const hash2 = new URL(url2).searchParams.get("secure_hash");
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it("secure_hash changes when apiKey changes (hash covers apiKey)", () => {
+    const userId = "same-user";
+    const url1 = buildCpxWallUrl(userId, "app-1", "key-alpha");
+    const url2 = buildCpxWallUrl(userId, "app-1", "key-beta");
+    const hash1 = new URL(url1).searchParams.get("secure_hash");
+    const hash2 = new URL(url2).searchParams.get("secure_hash");
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it("includes username param only when provided", () => {
+    const withUsername = buildCpxWallUrl("u1", "app1", "key1", "bob");
+    const withoutUsername = buildCpxWallUrl("u1", "app1", "key1");
+    expect(new URL(withUsername).searchParams.get("username")).toBe("bob");
+    expect(new URL(withoutUsername).searchParams.has("username")).toBe(false);
+  });
+
+  it("includes email param only when provided", () => {
+    const withEmail = buildCpxWallUrl("u1", "app1", "key1", undefined, "bob@example.com");
+    const withoutEmail = buildCpxWallUrl("u1", "app1", "key1");
+    expect(new URL(withEmail).searchParams.get("email")).toBe("bob@example.com");
+    expect(new URL(withoutEmail).searchParams.has("email")).toBe(false);
+  });
+
+  it("includes both username and email when both are provided", () => {
+    const url = buildCpxWallUrl("u1", "app1", "key1", "carol", "carol@example.com");
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("username")).toBe("carol");
+    expect(parsed.searchParams.get("email")).toBe("carol@example.com");
   });
 });
