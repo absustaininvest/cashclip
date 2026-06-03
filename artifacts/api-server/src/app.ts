@@ -14,8 +14,6 @@ import { getClientIp } from "./lib/clientIp";
 
 const ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
-  /\.replit\.dev$/,
-  /\.replit\.app$/,
   /^https:\/\/cash-clip\.app$/,
   /^https:\/\/www\.cash-clip\.app$/,
   /^https:\/\/absustaininvest\.com$/,

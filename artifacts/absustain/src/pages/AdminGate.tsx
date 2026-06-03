@@ -454,8 +454,14 @@ export default function AdminGate() {
   }, []);
 
   function handleLogout() {
+    const stored = localStorage.getItem("admin_token");
     localStorage.removeItem("admin_token");
     setToken(null);
+    fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      headers: stored ? { Authorization: `Bearer ${stored}` } : {},
+    }).catch(() => {});
   }
 
   if (validating) {
