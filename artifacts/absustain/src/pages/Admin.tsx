@@ -2194,6 +2194,8 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
 
   useEffect(() => {
     runPaypalPing();
+    const id = setInterval(runPaypalPing, 60_000);
+    return () => clearInterval(id);
   }, [runPaypalPing]);
 
 
