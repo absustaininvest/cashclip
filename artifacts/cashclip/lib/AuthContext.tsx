@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { getApiUrl } from "./query-client";
 import { secureGet, secureSet, secureMultiDelete } from "./secure-store";
 import { setAdMobUserId } from "./admob";
-import { setLevelPlayUserId } from "./levelplay";
 
 const AUTH_TOKEN_KEY = "cashclip_auth_token";
 const REFRESH_TOKEN_KEY = "cashclip_refresh_token";
@@ -52,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // any screen can request or show a rewarded ad.
   useEffect(() => {
     setAdMobUserId(user?.id ?? null);
-    setLevelPlayUserId(user?.id ?? null);
   }, [user?.id]);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {

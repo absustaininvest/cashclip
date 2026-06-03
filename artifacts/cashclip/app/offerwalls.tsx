@@ -302,11 +302,24 @@ export default function OfferwallsScreen() {
               </LinearGradient>
             </View>
 
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="storefront-outline" size={40} color={Colors.textMuted} />
-              <Text style={styles.emptyStateTitle}>No Offers Available</Text>
-              <Text style={styles.emptyStateText}>Check back soon — new offers are added regularly.</Text>
-            </View>
+            <Text style={styles.sectionTitle}>Connect a Provider</Text>
+            {[
+              { key: "tapjoy", name: "Tapjoy", color: "#FF6B35", env: "TAPJOY_SDK_KEY", desc: "Leading offerwall — app installs & sign-ups", url: "dev.tapjoy.com" },
+              { key: "adgate", name: "AdGate Media", color: "#00C853", env: "ADGATE_API_KEY", desc: "Diverse offers: apps, videos, quizzes & more", url: "wall.adgaterewards.com" },
+              { key: "offertoro", name: "OfferToro", color: "#2979FF", env: "OFFERTORO_API_KEY", desc: "Global offers from 200+ advertisers", url: "offertoro.com/publishers" },
+              { key: "lootably", name: "Lootably", color: "#9C27B0", env: "LOOTABLY_API_KEY", desc: "Self-serve offerwall — instant approval, strong US iOS fill", url: "lootably.com" },
+              { key: "adjoe", name: "Adjoe", color: "#F44336", env: "ADJOE_SDK_KEY + ADJOE_APP_ID", desc: "Playtime-based offers — highest eCPM offerwall", url: "adjoe.io" },
+            ].map((p) => (
+              <View key={p.key} style={[styles.setupCard, { borderColor: p.color + "30" }]}>
+                <View style={[styles.setupDot, { backgroundColor: p.color }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.setupName}>{p.name}</Text>
+                  <Text style={styles.setupDesc}>{p.desc}</Text>
+                  <Text style={styles.setupEnv}>Set {p.env} secret → {p.url}</Text>
+                </View>
+                <Feather name="external-link" size={14} color={Colors.textMuted} />
+              </View>
+            ))}
           </>
         ) : isLoading ? (
           <View style={styles.loadingCard}>
@@ -519,9 +532,15 @@ const styles = StyleSheet.create({
   heroTitle: { fontFamily: "Outfit_700Bold", fontSize: 22, color: Colors.text, textAlign: "center" },
   heroSubtitle: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
   sectionTitle: { fontFamily: "Outfit_700Bold", fontSize: 17, color: Colors.text, marginBottom: 10 },
-  emptyState: { alignItems: "center", paddingVertical: 32, gap: 10 },
-  emptyStateTitle: { fontFamily: "Outfit_700Bold", fontSize: 17, color: Colors.text, textAlign: "center" },
-  emptyStateText: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
+  setupCard: {
+    flexDirection: "row", alignItems: "flex-start", gap: 12,
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 10,
+    borderWidth: 1,
+  },
+  setupDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  setupName: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.text },
+  setupDesc: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  setupEnv: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, marginTop: 4 },
   statsCard: { borderRadius: 16, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: Colors.border },
   statsRow: { flexDirection: "row", alignItems: "center" },
   statsItem: { flex: 1, alignItems: "center", gap: 4 },

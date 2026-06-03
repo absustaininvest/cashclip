@@ -1638,236 +1638,6 @@ interface CashClipUser {
   referredBy: string | null;
 }
 
-interface SponsoredVisitHealth {
-  generatedAt: string;
-  window24h: { successCount: number; totalRewardUsd: string };
-  window7d: { successCount: number; totalRewardUsd: string };
-  activeCampaigns: number;
-  expiredAttempts24h: {
-    total: number;
-    notRedirected: number;
-    redirectedNotWitnessed: number;
-    witnessedNotSettled: number;
-  };
-  recentSettlements: {
-    id: string;
-    campaignId: string;
-    campaignTitle: string;
-    rewardGranted: string;
-    createdAt: string;
-  }[];
-}
-
-function SponsoredVisitHealthPanel({ token }: { token: string }) {
-  const [data, setData] = useState<SponsoredVisitHealth | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/health/sponsored-visits", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setData(await res.json());
-    } catch (e: any) {
-      setError(e.message ?? "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
-
-  function fmt(iso: string) {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit",
-    });
-  }
-
-  const statusColor = !data
-    ? "text-white/30"
-    : data.window24h.successCount > 0
-      ? "text-[#00E676]"
-      : data.activeCampaigns === 0
-        ? "text-amber-400"
-        : "text-red-400";
-
-  const statusLabel = !data
-    ? "Unknown"
-    : data.window24h.successCount > 0
-      ? "Settling normally"
-      : data.activeCampaigns === 0
-        ? "No active campaigns"
-        : "No settlements in 24 h";
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <ShieldCheck className="w-5 h-5 text-[#00E676]" />
-          </div>
-          <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
-              Sponsored Visit Health
-            </h2>
-            <p className="text-white/40 text-sm">
-              Settlement outcomes drawn from the ledger — no synthetic traffic
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors disabled:opacity-40"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {loading && !data && (
-        <div className="text-white/30 text-sm py-8 text-center">Loading…</div>
-      )}
-
-      {data && (
-        <>
-          {/* Status banner */}
-          <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
-            <div className={`w-2.5 h-2.5 rounded-full ${
-              statusColor === "text-[#00E676]"
-                ? "bg-[#00E676]"
-                : statusColor === "text-amber-400"
-                  ? "bg-amber-400"
-                  : statusColor === "text-red-400"
-                    ? "bg-red-400"
-                    : "bg-white/20"
-            } flex-shrink-0`} />
-            <span className={`font-medium text-sm ${statusColor}`}>{statusLabel}</span>
-            <span className="text-white/20 text-xs ml-auto">
-              as of {fmt(data.generatedAt)}
-            </span>
-          </div>
-
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-[#00E676]/10 w-fit mb-3">
-                <TrendingUp className="w-5 h-5 text-[#00E676]" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.window24h.successCount}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Settled (24 h)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 w-fit mb-3">
-                <BarChart3 className="w-5 h-5 text-emerald-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                ${data.window24h.totalRewardUsd}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Paid out (24 h)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-blue-500/10 w-fit mb-3">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.window7d.successCount}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Settled (7 d)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 w-fit mb-3">
-                <Globe className="w-5 h-5 text-amber-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.activeCampaigns}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Active campaigns</p>
-            </div>
-          </div>
-
-          {/* Expired attempts breakdown */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-base mb-1">
-              Abandoned attempts (last 24 h)
-            </h3>
-            <p className="text-white/30 text-xs mb-4">
-              Visit flows that started but expired without settling — normal attrition or a regression signal
-            </p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { label: "Total expired", value: data.expiredAttempts24h.total, color: "text-white" },
-                { label: "Never opened link", value: data.expiredAttempts24h.notRedirected, color: "text-white/60" },
-                { label: "Opened, no JS beacon", value: data.expiredAttempts24h.redirectedNotWitnessed, color: "text-amber-400" },
-                { label: "Witnessed, not claimed", value: data.expiredAttempts24h.witnessedNotSettled, color: "text-red-400" },
-              ].map((s) => (
-                <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
-                  <p className={`font-['Space_Grotesk'] text-2xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-white/30 text-xs mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-            {data.expiredAttempts24h.witnessedNotSettled > 0 && (
-              <div className="flex items-start gap-2 mt-4 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  {data.expiredAttempts24h.witnessedNotSettled} attempt
-                  {data.expiredAttempts24h.witnessedNotSettled !== 1 ? "s" : ""} completed
-                  the JS witness step but never reached /visit — may indicate a client bug or a
-                  settlement-breaking regression.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Recent settlements table */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.06]">
-              <h3 className="font-['Space_Grotesk'] font-bold text-white text-base">
-                Recent settlements
-              </h3>
-              <p className="text-white/30 text-xs mt-0.5">Last 20 successful visit payouts</p>
-            </div>
-            {data.recentSettlements.length === 0 ? (
-              <div className="px-5 py-8 text-white/30 text-sm text-center">
-                No settlements recorded yet
-              </div>
-            ) : (
-              <div className="divide-y divide-white/[0.04]">
-                {data.recentSettlements.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors">
-                    <div className="flex-1 min-w-0 mr-4">
-                      <p className="text-white text-sm font-medium truncate">{s.campaignTitle}</p>
-                      <p className="text-white/30 text-xs mt-0.5">{fmt(s.createdAt)}</p>
-                    </div>
-                    <span className="text-[#00E676] text-sm font-bold tabular-nums">
-                      +${s.rewardGranted}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function CashClipUsersPanel({ token }: { token: string }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -3063,7 +2833,6 @@ type Tab =
   | "inbox"
   | "account"
   | "cashclip"
-  | "earnhealth"
   | "security"
   | "securitylog";
 
@@ -3143,7 +2912,6 @@ function Dashboard({
   const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "submissions", label: "Submissions", icon: MessageSquare },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
-    { id: "earnhealth", label: "Earn Health", icon: ShieldCheck },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
     { id: "account", label: "Account", icon: User },
@@ -3365,7 +3133,6 @@ function Dashboard({
         )}
 
         {tab === "cashclip" && <CashClipUsersPanel token={token} />}
-        {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
         {tab === "account" && (

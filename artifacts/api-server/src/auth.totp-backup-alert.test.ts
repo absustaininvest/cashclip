@@ -29,9 +29,9 @@ vi.mock("./storage", () => ({
     getUser: (...args: unknown[]) => mockGetUser(...args),
     consumeTotpBackupCode: (...args: unknown[]) => mockConsumeTotpBackupCode(...args),
     getTotpBackupCodesRemaining: (...args: unknown[]) => mockGetTotpBackupCodesRemaining(...args),
-    getUserByUsername: vi.fn().mockResolvedValue(null),
-    createUser: vi.fn().mockResolvedValue(undefined),
-    setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
+    getUserByUsername: vi.fn(),
+    createUser: vi.fn(),
+    setEmailVerificationToken: vi.fn(),
   },
 }));
 

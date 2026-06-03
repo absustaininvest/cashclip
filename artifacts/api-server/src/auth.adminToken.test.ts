@@ -30,9 +30,9 @@ const mockClearLoginAttempts = vi.fn();
 vi.mock("./storage", () => ({
   storage: {
     getUser: (...args: unknown[]) => mockGetUser(...args),
-    getUserByUsername: vi.fn().mockResolvedValue(null),
-    createUser: vi.fn().mockResolvedValue(undefined),
-    setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
+    getUserByUsername: vi.fn(),
+    createUser: vi.fn(),
+    setEmailVerificationToken: vi.fn(),
   },
 }));
 

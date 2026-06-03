@@ -69,7 +69,30 @@ function getJwtSecret(): string {
   return s;
 }
 
+// ── HS256 rotation fallback ───────────────────────────────────────────────────
+// Only used to verify tokens signed by the old HS256 secret during the 2h
+// transition window after a keyswitch.
+// Both JWT_ACCESS_SECRET_PREV and JWT_ACCESS_SECRET_PREV_CUTOFF (Unix seconds)
+// must be set for the fallback to activate. The cutoff is the time at which the
+// key was rotated; only tokens issued at or before that time are accepted.
+function getPrevJwtSecretAndCutoff(): { secret: string; cutoff: number } | null {
+  const s = process.env.JWT_ACCESS_SECRET_PREV;
+  const c = process.env.JWT_ACCESS_SECRET_PREV_CUTOFF;
+  if (!s || !c) return null;
+  const cutoff = parseInt(c, 10);
+  if (!Number.isFinite(cutoff) || cutoff <= 0) return null;
+  // Hard server-time sunset: once the maximum token lifetime (2h) has elapsed
+  // since the rotation cutoff, stop accepting the old key entirely. This
+  // prevents an attacker who backdates `iat` to a value ≤ cutoff from keeping
+  // a forged token alive indefinitely — after this window the old key is gone
+  // from the server's perspective regardless of what the token claims.
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec > cutoff + TOKEN_EXPIRY_SECONDS) return null;
+  return { secret: s, cutoff };
+}
+
 const TOKEN_EXPIRY = "2h";
+const TOKEN_EXPIRY_SECONDS = 2 * 60 * 60; // numeric equivalent of TOKEN_EXPIRY, used for sunset window
 
 // ── JWT_REFRESH_SECRET — refresh token layer ──────────────────────────────────
 // Signs long-lived refresh tokens (30d) stored in the rid httpOnly cookie.
@@ -160,21 +183,25 @@ function verifyToken(token: string): { userId: string; role: string; tokenVersio
     }
   } catch { /* try fallback */ }
 
-  // No fallback to the previous signing secret for bearer-token verification.
-  //
-  // JWT_ACCESS_SECRET_PREV / JWT_ACCESS_SECRET_PREV_CUTOFF are intentionally
-  // NOT consulted here. Because JWTs are self-signed, any party who possesses
-  // the retired secret can craft a token with arbitrary iat/exp values that
-  // satisfy any claim-level check the server could apply. There is no way for
-  // the server to distinguish a token genuinely issued before rotation from one
-  // forged afterward using only the token's own claims.
-  //
-  // Removing the fallback is the only approach that actually cuts off forgery
-  // immediately when JWT_ACCESS_SECRET is rotated. Session continuity is
-  // handled by the refresh-token layer: clients with a valid rid cookie
-  // exchange it for a new access token at POST /api/auth/refresh without
-  // requiring re-login. Clients without a refresh token must log in again —
-  // the correct and expected behavior during emergency key rotation.
+  // Try previous signing secret only when both the secret and a rotation
+  // cutoff timestamp are explicitly configured. Only tokens whose iat is at
+  // or before the cutoff are accepted — this prevents an attacker who knows
+  // the old secret from minting fresh tokens with arbitrary future iat values.
+  const prev = getPrevJwtSecretAndCutoff();
+  if (prev) {
+    try {
+      const decoded = jwt.verify(token, prev.secret);
+      if (
+        typeof decoded === "object" && decoded !== null &&
+        "userId" in decoded && "role" in decoded && "tokenVersion" in decoded
+      ) {
+        const iat = (decoded as Record<string, unknown>).iat;
+        if (typeof iat === "number" && iat <= prev.cutoff) {
+          return decoded as { userId: string; role: string; tokenVersion: number };
+        }
+      }
+    } catch { /* invalid token */ }
+  }
 
   return null;
 }
@@ -442,16 +469,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.post("/api/auth/resend-verification", async (req: Request, res: Response): Promise<void> => {
-    const ALWAYS_OK = { message: "If the account exists and is unverified, a new email has been sent." };
     try {
-      // DB-backed per-IP limit: 5 requests per 15 min (shared across replicas).
-      const ip = getClientIp(req);
-      const { allowed: ipAllowed } = await recordLoginAttempt(`resendverify:${ip}`, 5, 15 * 60 * 1000);
-      if (!ipAllowed) {
-        res.status(429).json({ error: "Too many attempts. Please try again later." });
-        return;
-      }
-
       const { username } = req.body;
       if (!username || typeof username !== "string") {
         res.status(400).json({ error: "Username is required" });
@@ -459,28 +477,20 @@ export function registerAuthRoutes(app: Express) {
       }
       const user = await storage.getUserByUsername(username.toLowerCase().trim());
       if (!user || user.emailVerified) {
-        res.status(200).json(ALWAYS_OK);
+        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
         return;
       }
-
-      // DB-backed per-account limit: 3 emails per 5 min (prevents inbox flooding).
-      const { allowed: userAllowed } = await recordLoginAttempt(`resendverify:uid:${user.id}`, 3, 5 * 60 * 1000);
-      if (!userAllowed) {
-        res.status(200).json(ALWAYS_OK);
-        return;
-      }
-
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await storage.setEmailVerificationToken(user.id, verifyToken, expiresAt);
       const domain = process.env["EXPO_PUBLIC_DOMAIN"] ?? "cash-clip.app";
       const verifyUrl = `https://${domain}/api/auth/verify-email?token=${verifyToken}`;
       if (!user.email) {
-        res.status(200).json(ALWAYS_OK);
+        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
         return;
       }
       sendEmailVerification({ to: user.email, username: user.username, verifyUrl });
-      res.status(200).json(ALWAYS_OK);
+      res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
     } catch (err) {
       logger.error({ err }, "resend-verification error");
       res.status(500).json({ error: "Failed to resend verification email" });

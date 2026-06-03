@@ -278,11 +278,27 @@ export default function SurveysScreen() {
       >
         {!anyProviderConfigured ? (
             <View style={styles.noProviderCard}>
-              <MaterialCommunityIcons name="text-box-search-outline" size={44} color={Colors.textMuted} />
-              <Text style={styles.noProviderTitle}>No Surveys Available</Text>
+              <MaterialCommunityIcons name="connection" size={44} color={Colors.textMuted} />
+              <Text style={styles.noProviderTitle}>No Survey Partners Connected</Text>
               <Text style={styles.noProviderText}>
-                Check back soon — new surveys are added regularly.
+                Connect your survey providers to access higher-paying external surveys ($0.30–$5.00 each). Add your API key to get started.
               </Text>
+              <View style={styles.providerList}>
+                {[
+                  { name: "Pollfish", color: "#FF6B35", env: "POLLFISH_API_KEY", url: "pollfish.com/publisher" },
+                  { name: "Cint", color: "#4A90D9", env: "CINT_API_KEY", url: "cint.com/for-publishers" },
+                  { name: "Lucid", color: "#7B61FF", env: "LUCID_API_KEY", url: "luc.id/for-suppliers" },
+                ].map((p) => (
+                  <View key={p.name} style={[styles.providerSetupCard, { borderColor: p.color + "30" }]}>
+                    <View style={[styles.providerSetupDot, { backgroundColor: p.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.providerSetupName}>{p.name}</Text>
+                      <Text style={styles.providerSetupEnv}>Set {p.env} secret</Text>
+                    </View>
+                    <Feather name="external-link" size={14} color={Colors.textMuted} />
+                  </View>
+                ))}
+              </View>
             </View>
           ) : externalLoading ? (
             <View style={styles.loadingCard}>
@@ -550,6 +566,15 @@ const styles = StyleSheet.create({
   },
   noProviderTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text, textAlign: "center" },
   noProviderText: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
+  providerList: { width: "100%", gap: 8, marginTop: 8 },
+  providerSetupCard: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
+    borderWidth: 1,
+  },
+  providerSetupDot: { width: 10, height: 10, borderRadius: 5 },
+  providerSetupName: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.text },
+  providerSetupEnv: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   loadingCard: { alignItems: "center", paddingVertical: 60, gap: 16 },
   loadingText: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textMuted },
   externalInfoBox: {
