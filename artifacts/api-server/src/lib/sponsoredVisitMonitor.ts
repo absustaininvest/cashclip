@@ -94,6 +94,8 @@ async function runCheck(): Promise<void> {
   });
 }
 
+export { runCheck as _runCheckForTests };
+
 export async function startSponsoredVisitAlertMonitor(): Promise<void> {
   try {
     await ensureSystemKvTable();
