@@ -392,15 +392,21 @@ export function registerSurveyRoutes(app: Express): void {
     const isReceiptComplete = reasonStr === "RECEIPT_COMPLETE" || cashbackStateStr === "RECEIPT_COMPLETE";
 
     if ((isSurveyComplete || isCashbackComplete || isReceiptComplete) && resolvedUserId && resolvedRefId) {
-      const prefix = isReceiptComplete ? "bitlabs_receipt_" : isCashbackComplete ? "bitlabs_cashback_" : "bitlabs_";
-      const label = isReceiptComplete ? "[BitLabs Receipt]" : isCashbackComplete ? "[BitLabs Cashback]" : "[BitLabs Survey]";
-      await creditSurveyViaWebhook(
-        "bitlabs",
-        String(resolvedUserId),
-        `${prefix}${resolvedRefId}`,
-        parseProviderReward(val),
-        label,
-      );
+      const parsedVal = parseProviderReward(val);
+      // If val was explicitly sent but is not a valid positive number, reject without crediting.
+      // Do not fall back to expectedReward on a poisoned/invalid val field.
+      const valFieldPresent = val !== undefined && val !== null;
+      if (!valFieldPresent || parsedVal !== undefined) {
+        const prefix = isReceiptComplete ? "bitlabs_receipt_" : isCashbackComplete ? "bitlabs_cashback_" : "bitlabs_";
+        const label = isReceiptComplete ? "[BitLabs Receipt]" : isCashbackComplete ? "[BitLabs Cashback]" : "[BitLabs Survey]";
+        await creditSurveyViaWebhook(
+          "bitlabs",
+          String(resolvedUserId),
+          `${prefix}${resolvedRefId}`,
+          parsedVal,
+          label,
+        );
+      }
     }
     res.status(200).json({ status: "received" });
   });

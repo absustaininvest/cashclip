@@ -691,3 +691,288 @@ describe("Adjoe offerwall webhook — reward propagation", () => {
     expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// CPX — amount_local is always ignored regardless of value
+// ---------------------------------------------------------------------------
+// CPX's amount_local is unsigned and attacker-controlled, so the handler
+// explicitly never reads it. Any value — including negative, Infinity, or
+// garbage strings — is irrelevant: credit always uses session.expectedReward
+// (the server-committed amount) clamped to the CPX range [0.20, 3.00].
+// This is the documented policy for CPX (not a fallback-on-error path).
+
+describe("CPX webhook — amount_local is always ignored; credit uses server-committed expectedReward", () => {
+  const AMOUNT_LOCAL_VALUES = ["-99", "-0.01", "Infinity", "-Infinity", "NaN", "0", "abc", ""];
+
+  for (const amountLocal of AMOUNT_LOCAL_VALUES) {
+    it(`credits with expectedReward regardless of amount_local="${amountLocal}"`, async () => {
+      mockFindPendingRewardSession.mockResolvedValue(makeSession({
+        source: "survey",
+        provider: "cpx",
+        externalId: "cpx_poison1",
+        expectedReward: "0.60",
+        userId: "u-p1",
+      }));
+
+      const res = await request(app)
+        .get("/api/surveys/webhook/cpx")
+        .query({ status: "1", trans_id: "tx-poison1", survey_id: "poison1", ext_user_id: "u-p1", amount_local: amountLocal });
+
+      expect(res.status).toBe(200);
+      // amount_local is not read by the handler — credit always uses session.expectedReward
+      expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+      const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+      // expectedReward=0.60 clamped to cpx range [0.20, 3.00]
+      expect(finalReward).toBeCloseTo(0.60, 5);
+      // The amount_local value must never appear as the finalReward
+      const amountLocalNum = parseFloat(amountLocal);
+      if (Number.isFinite(amountLocalNum) && amountLocalNum !== 0.60) {
+        expect(finalReward).not.toBeCloseTo(amountLocalNum, 2);
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Poisoned reward fields — end-to-end rejection (BitLabs)
+// ---------------------------------------------------------------------------
+// BitLabs sends `val` as the USD payout. When it carries a poisoned value,
+// parseProviderReward must reject it and creditSurveyViaWebhook falls back to
+// session.expectedReward. The finalReward reaching the ledger must never be
+// the poisoned amount.
+
+describe("BitLabs webhook — poisoned val field is rejected end-to-end", () => {
+  it("rejects val=\"-99\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "survey",
+      provider: "bitlabs",
+      externalId: "bitlabs_sp1",
+      expectedReward: "0.55",
+      userId: "u-p2",
+    }));
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "sp1", user_id: "u-p2", val: "-99" });
+
+    expect(res.status).toBe(200);
+    // val=-99 is invalid — handler must not call credit at all
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects val=\"Infinity\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "survey",
+      provider: "bitlabs",
+      externalId: "bitlabs_sp2",
+      expectedReward: "0.40",
+      userId: "u-p2",
+    }));
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "sp2", user_id: "u-p2", val: "Infinity" });
+
+    expect(res.status).toBe(200);
+    // val=Infinity is not a finite positive number — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects val=\"0\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "survey",
+      provider: "bitlabs",
+      externalId: "bitlabs_sp3",
+      expectedReward: "0.70",
+      userId: "u-p2",
+    }));
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "sp3", user_id: "u-p2", val: "0" });
+
+    expect(res.status).toBe(200);
+    // val=0 is not positive — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects val=\"not-a-number\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "survey",
+      provider: "bitlabs",
+      externalId: "bitlabs_sp4",
+      expectedReward: "0.35",
+      userId: "u-p2",
+    }));
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "sp4", user_id: "u-p2", val: "not-a-number" });
+
+    expect(res.status).toBe(200);
+    // val is non-numeric — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Poisoned reward fields — end-to-end rejection (Lootably)
+// ---------------------------------------------------------------------------
+// Lootably sends `payout` in the body. When it carries a poisoned value,
+// parseProviderReward must reject it and creditOfferViaWebhook falls back to
+// session.expectedReward. The finalReward must never be the poisoned amount.
+
+describe("Lootably webhook — poisoned payout field is rejected end-to-end", () => {
+  it("rejects payout=-99: returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lp1",
+      expectedReward: "0.80",
+      userId: "u-p3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lp1", user_id: "u-p3", payout: -99, status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout=-99 is invalid — handler must not credit at all
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=\"Infinity\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lp2",
+      expectedReward: "0.50",
+      userId: "u-p3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lp2", user_id: "u-p3", payout: "Infinity", status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout="Infinity" is not a finite positive number — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=\"\" (empty string): returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lp3",
+      expectedReward: "1.00",
+      userId: "u-p3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lp3", user_id: "u-p3", payout: "", status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout="" is present but not a valid number — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=0: returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lp4",
+      expectedReward: "0.65",
+      userId: "u-p3",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lp4", user_id: "u-p3", payout: 0, status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout=0 is not a positive number — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Poisoned reward fields — end-to-end rejection (Adjoe)
+// ---------------------------------------------------------------------------
+// Adjoe sends `payout` in the body. When it carries a poisoned value,
+// parseProviderReward must reject it and creditOfferViaWebhook falls back to
+// session.expectedReward. The finalReward must never be the poisoned amount.
+
+describe("Adjoe webhook — poisoned payout field is rejected end-to-end", () => {
+  it("rejects payout=-99: returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_ap1",
+      expectedReward: "1.20",
+      userId: "u-p4",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "ap1", user_id: "u-p4", payout: -99, status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout=-99 is invalid — handler must not credit at all
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=\"-Infinity\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_ap2",
+      expectedReward: "0.75",
+      userId: "u-p4",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "ap2", user_id: "u-p4", payout: "-Infinity", status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout="-Infinity" is not finite — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=\"\" (empty string): returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_ap3",
+      expectedReward: "2.00",
+      userId: "u-p4",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "ap3", user_id: "u-p4", payout: "", status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout="" is present but not a valid number — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("rejects payout=\"not-a-number\": returns 200 but applies no credit", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_ap4",
+      expectedReward: "0.90",
+      userId: "u-p4",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "ap4", user_id: "u-p4", payout: "not-a-number", status: "completed" });
+
+    expect(res.status).toBe(200);
+    // payout is non-numeric — handler must not credit
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});

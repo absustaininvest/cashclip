@@ -212,9 +212,14 @@ export function registerOfferwallRoutes(app: Express): void {
       if (!session) {
         return;
       }
-      const rawReward = parseProviderReward(
-        payload?.payout ?? payload?.amount ?? payload?.reward ?? payload?.value ?? payload?.reward_value
-      ) ?? parseFloat(session.expectedReward);
+      const rawField = payload?.payout ?? payload?.amount ?? payload?.reward ?? payload?.value ?? payload?.reward_value;
+      const parsedReward = parseProviderReward(rawField);
+      // If a reward field was explicitly provided but is not a valid positive number,
+      // reject without crediting — do not fall back to expectedReward on a poisoned field.
+      if (rawField !== undefined && rawField !== null && parsedReward === undefined) {
+        return;
+      }
+      const rawReward = parsedReward ?? parseFloat(session.expectedReward);
       const range = PROVIDER_REWARD_RANGES[provider] ?? { min: 0.10, max: 25.00 };
       const clampedReward = Math.max(range.min, Math.min(range.max, rawReward));
       await storage.completeRewardSessionAndCredit({
