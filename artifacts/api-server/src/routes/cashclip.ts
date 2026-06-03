@@ -3453,6 +3453,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //   - Minimum dwell time (enforced above)
       //   - Campaign budget limit (atomic in the transaction below)
       let deviceHash = attempt.deviceHash ?? "";   // kept for campaign_clicks logging only
+      // Declared here (outside the inner try) so it remains in scope for
+      // the in-transaction visit-count recheck below.
+      const acctVisitMax = Math.max(
+        1,
+        parseInt(process.env.SPONSORED_VISIT_ACCOUNT_DAILY_MAX ?? "10", 10),
+      );
       try {
         const { db: dbInstall, deviceInstalls: diTable } = await import("@workspace/db");
         const { eq: eqInstall } = await import("drizzle-orm");
@@ -3499,13 +3505,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // SPONSORED_VISIT_ACCOUNT_DAILY_MAX (default 10).
         // Complements: per-IP cap (cross-account same-IP), per-campaign dedup
         // (atomic), per-account earnings cap, witnessedAt, dwell time, budget.
-        // NOTE: acctVisitMax is read again inside the settlement transaction
-        // (step 0b) for the in-lock recheck. It must remain in the outer
-        // try-block scope so the transaction closure can reference it.
-        acctVisitMax = Math.max(
-          1,
-          parseInt(process.env.SPONSORED_VISIT_ACCOUNT_DAILY_MAX ?? "10", 10),
-        );
         const { sql: sqlAcct } = await import("drizzle-orm");
         const acctRows = await dbInstall.execute(sqlAcct`
           SELECT COUNT(*)::int AS n
