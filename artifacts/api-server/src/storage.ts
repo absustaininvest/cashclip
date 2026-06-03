@@ -17,6 +17,7 @@ import {
   adEvents,
   webhookAudit,
   securityAuditLog,
+  spinChallenges,
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { maybeSendThresholdPush } from "./lib/push";
@@ -205,6 +206,7 @@ export interface IStorage {
   getWebhookAuditProviders(): Promise<string[]>;
   pruneWebhookAudit(before: Date): Promise<number>;
   pruneSecurityAudit(before: Date): Promise<number>;
+  pruneSpinChallenges(before: Date): Promise<number>;
 }
 
 function n(value: string | number | null | undefined): number {
@@ -1398,6 +1400,14 @@ export class DatabaseStorage implements IStorage {
       .delete(securityAuditLog)
       .where(lt(securityAuditLog.createdAt, before))
       .returning({ id: securityAuditLog.id });
+    return rows.length;
+  }
+
+  async pruneSpinChallenges(before: Date): Promise<number> {
+    const rows = await db
+      .delete(spinChallenges)
+      .where(lt(spinChallenges.expiresAt, before))
+      .returning({ token: spinChallenges.token });
     return rows.length;
   }
 }
