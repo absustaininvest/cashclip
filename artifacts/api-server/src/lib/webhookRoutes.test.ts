@@ -8,32 +8,31 @@ import crypto from "node:crypto";
 // transform, so these factories run before storage.ts or paypal.ts are ever
 // evaluated. vi.hoisted() makes the mock-function values available inside the
 // factory closures even though they are textually defined before the factory.
-//
-// Only the methods actively exercised by this test file are individually
-// hoisted.  createStorageMock() pre-wires every other IStorage method to a
-// Promise-returning vi.fn() so the route bundle never throws when it awaits
-// a storage call on an incidentally-touched route.
 // ---------------------------------------------------------------------------
-const mockGetUser = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-const mockGetWebhookAudits = vi.hoisted(() => vi.fn().mockResolvedValue([]));
-const mockGetWebhookAuditOffenders = vi.hoisted(() => vi.fn().mockResolvedValue([]));
-const mockGetWebhookAuditProviders = vi.hoisted(() => vi.fn().mockResolvedValue([]));
-const mockInsertWebhookAudit = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-const mockCountWebhookAuditByIp = vi.hoisted(() => vi.fn().mockResolvedValue(0));
+const storageMocks = vi.hoisted(() => ({
+  getUser: vi.fn().mockResolvedValue(undefined),
+  getWebhookAudits: vi.fn().mockResolvedValue([]),
+  getWebhookAuditOffenders: vi.fn().mockResolvedValue([]),
+  getWebhookAuditProviders: vi.fn().mockResolvedValue([]),
+  insertWebhookAudit: vi.fn().mockResolvedValue(undefined),
+  countWebhookAuditByIp: vi.fn().mockResolvedValue(0),
+  // Stubs for additional storage methods referenced by the route bundle at
+  // registration time. Pre-set to mockResolvedValue(undefined) so that if any
+  // route is accidentally exercised, awaiting the result does not throw an
+  // unhandled rejection (calling .catch()/.then() on undefined would throw).
+  updateUserBalance: vi.fn().mockResolvedValue(undefined),
+  createEarningsLedgerEntry: vi.fn().mockResolvedValue(undefined),
+  createRewardSession: vi.fn().mockResolvedValue(undefined),
+  getRewardSession: vi.fn().mockResolvedValue(undefined),
+  createWithdrawal: vi.fn().mockResolvedValue(undefined),
+  getWithdrawals: vi.fn().mockResolvedValue(undefined),
+  getBalance: vi.fn().mockResolvedValue(undefined),
+  getTransactions: vi.fn().mockResolvedValue(undefined),
+  getUserByUsername: vi.fn().mockResolvedValue(undefined),
+  insertWebhookAuditBatch: vi.fn().mockResolvedValue(undefined),
+}));
 
-vi.mock("../storage", async () => {
-  const { createStorageMock } = await import("../testHelpers/mockStorage");
-  return {
-    storage: createStorageMock({
-      getUser: mockGetUser,
-      getWebhookAudits: mockGetWebhookAudits,
-      getWebhookAuditOffenders: mockGetWebhookAuditOffenders,
-      getWebhookAuditProviders: mockGetWebhookAuditProviders,
-      insertWebhookAudit: mockInsertWebhookAudit,
-      countWebhookAuditByIp: mockCountWebhookAuditByIp,
-    }),
-  };
-});
+vi.mock("../storage", () => ({ storage: storageMocks }));
 
 vi.mock("../paypal", () => ({
   sendPayPalPayout: vi.fn(),
@@ -60,7 +59,7 @@ vi.mock("../auth", async () => {
       res.status(401).json({ error: "Invalid or expired token" });
       return;
     }
-    const user = await mockGetUser(payload.userId);
+    const user = await storageMocks.getUser(payload.userId);
     if (!user) {
       res.status(401).json({ error: "User not found" });
       return;
@@ -387,12 +386,12 @@ describe("admin webhook-audit route", () => {
     },
   ];
 
-  // Mock function references — the hoisted individual mocks are used directly
-  // here as aliases so the describe block's assertion code stays readable.
-  const getUserMock = mockGetUser;
-  const getWebhookAuditsMock = mockGetWebhookAudits;
-  const getWebhookAuditOffendersMock = mockGetWebhookAuditOffenders;
-  const getWebhookAuditProvidersMock = mockGetWebhookAuditProviders;
+  // Mock function references — resolved from the hoisted storageMocks object
+  // so we never need vi.doMock / vi.resetModules in this describe block.
+  const getUserMock = storageMocks.getUser;
+  const getWebhookAuditsMock = storageMocks.getWebhookAudits;
+  const getWebhookAuditOffendersMock = storageMocks.getWebhookAuditOffenders;
+  const getWebhookAuditProvidersMock = storageMocks.getWebhookAuditProviders;
 
   beforeAll(async () => {
     // adminMiddleware is mocked (see vi.mock("../auth") at the top of this

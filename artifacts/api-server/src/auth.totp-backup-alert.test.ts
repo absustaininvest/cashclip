@@ -18,25 +18,22 @@ const TEST_SECRET = "test-jwt-secret-for-auth-tests-padded-to-64-chars-minimum-a
 const ADMIN_USER_ID = "admin-1";
 const TOTP_SECRET = "JBSWY3DPEHPK3PXP";
 
-const mockGetUser = vi.hoisted(() => vi.fn());
-const mockConsumeTotpBackupCode = vi.hoisted(() => vi.fn());
-const mockGetTotpBackupCodesRemaining = vi.hoisted(() => vi.fn());
+const mockGetUser = vi.fn();
+const mockConsumeTotpBackupCode = vi.fn();
+const mockGetTotpBackupCodesRemaining = vi.fn();
 const mockVerifyTotp = vi.fn();
 const mockSendBackupCodeUsedAlert = vi.fn();
 
-vi.mock("./storage", async () => {
-  const { createStorageMock } = await import("./testHelpers/mockStorage");
-  return {
-    storage: {
-      ...createStorageMock({
-        getUser: mockGetUser,
-        consumeTotpBackupCode: mockConsumeTotpBackupCode,
-        getTotpBackupCodesRemaining: mockGetTotpBackupCodesRemaining,
-      }),
-      setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
-    },
-  };
-});
+vi.mock("./storage", () => ({
+  storage: {
+    getUser: (...args: unknown[]) => mockGetUser(...args),
+    consumeTotpBackupCode: (...args: unknown[]) => mockConsumeTotpBackupCode(...args),
+    getTotpBackupCodesRemaining: (...args: unknown[]) => mockGetTotpBackupCodesRemaining(...args),
+    getUserByUsername: vi.fn().mockResolvedValue(null),
+    createUser: vi.fn().mockResolvedValue(undefined),
+    setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 vi.mock("./lib/dbRateLimit", () => ({
   recordLoginAttempt: vi.fn().mockResolvedValue({ count: 1, allowed: true }),

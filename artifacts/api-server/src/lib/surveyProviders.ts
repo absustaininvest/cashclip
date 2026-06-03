@@ -346,7 +346,7 @@ export async function fetchExternalSurveys(userId: string, opts?: CpxFetchOpts):
     .map((r) => r.value);
 }
 
-export interface ProviderCompletionPayload {
+interface ProviderCompletionPayload {
   status?: string;
   state?: string;
   completed?: boolean;
@@ -357,20 +357,6 @@ export interface ProviderCompletionPayload {
   userId?: string;
   respondent_id?: string;
   respondentId?: string;
-  reward?: number | string;
-  payout?: number | string;
-  amount?: number | string;
-  value?: number | string;
-  reward_value?: number | string;
-  [key: string]: unknown;
-}
-
-function extractRewardFromPayload(payload: ProviderCompletionPayload | null): number {
-  if (!payload) return 0;
-  const raw = payload.reward ?? payload.payout ?? payload.amount ?? payload.value ?? payload.reward_value;
-  if (raw === undefined || raw === null) return 0;
-  const n = typeof raw === "number" ? raw : parseFloat(String(raw));
-  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function isCompletionPayloadValid(payload: ProviderCompletionPayload | null, transactionId: string, userId?: string): boolean {
@@ -398,45 +384,42 @@ async function safeJson(res: Response): Promise<ProviderCompletionPayload | null
   }
 }
 
-async function verifyPollfishCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<{ verified: boolean; reward: number }> {
+async function verifyPollfishCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
   try {
     const rawId = surveyId.replace("pollfish_", "");
     const res = await fetch(`https://api.pollfish.com/v2/surveys/${rawId}/completions/${transactionId}?user_id=${encodeURIComponent(userId)}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
-    if (!res.ok) return { verified: false, reward: 0 };
-    const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
-    return { verified: false, reward: 0 };
+    return false;
   }
 }
 
-async function verifyCintCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<{ verified: boolean; reward: number }> {
+async function verifyCintCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
   try {
     const rawId = surveyId.replace("cint_", "");
     const res = await fetch(`https://api.cint.com/v1/surveys/${rawId}/completions/${transactionId}?respondent_id=${encodeURIComponent(userId)}`, {
       headers: { "X-Api-Key": apiKey },
     });
-    if (!res.ok) return { verified: false, reward: 0 };
-    const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
-    return { verified: false, reward: 0 };
+    return false;
   }
 }
 
-async function verifyLucidCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<{ verified: boolean; reward: number }> {
+async function verifyLucidCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
   try {
     const rawId = surveyId.replace("lucid_", "");
     const res = await fetch(`https://api.samplicio.us/supply/v1/surveys/${rawId}/completions/${transactionId}?respondent_id=${encodeURIComponent(userId)}`, {
       headers: { Authorization: apiKey },
     });
-    if (!res.ok) return { verified: false, reward: 0 };
-    const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
+    if (!res.ok) return false;
+    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
-    return { verified: false, reward: 0 };
+    return false;
   }
 }
 
@@ -448,48 +431,36 @@ function isStrictCompletionPayloadValid(payload: ProviderCompletionPayload | nul
   return txn === transactionId && payloadUser === userId;
 }
 
-async function verifyCpxCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<{ verified: boolean; reward: number }> {
+async function verifyCpxCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
   try {
     const appId = process.env.CPX_APP_ID;
-    if (!appId) return { verified: false, reward: 0 };
+    if (!appId) return false;
     const rawId = surveyId.replace("cpx_", "");
     // CPX transaction verification hash = MD5(ext_user_id + "-" + hash_key)
     const secureHash = md5hex(`${userId}-${apiKey}`);
     const res = await fetch(`https://live.cpx-research.com/api/get-transactions.php?app_id=${encodeURIComponent(appId)}&secure_hash=${encodeURIComponent(secureHash)}&ext_user_id=${encodeURIComponent(userId)}&trans_id=${encodeURIComponent(transactionId)}&survey_id=${encodeURIComponent(rawId)}`, {
       headers: { "Content-Type": "application/json" },
     });
-    if (!res.ok) return { verified: false, reward: 0 };
-    const payload = await safeJson(res);
-    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
+    if (!res.ok) return false;
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
-    return { verified: false, reward: 0 };
+    return false;
   }
 }
 
-async function verifyBitlabsCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<{ verified: boolean; reward: number }> {
+async function verifyBitlabsCompletion(surveyId: string, apiKey: string, transactionId: string, userId: string): Promise<boolean> {
   try {
     const rawId = surveyId.replace("bitlabs_", "");
     const res = await fetch(`https://api.bitlabs.ai/v1/client/transactions?survey_id=${encodeURIComponent(rawId)}&transaction_id=${encodeURIComponent(transactionId)}&user_id=${encodeURIComponent(userId)}`, {
       headers: { "X-Api-Token": apiKey },
     });
-    if (!res.ok) return { verified: false, reward: 0 };
-    const payload = await safeJson(res);
-    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
+    if (!res.ok) return false;
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
-    return { verified: false, reward: 0 };
+    return false;
   }
 }
 
-/**
- * Verify that a survey completion event is genuine with the upstream provider.
- *
- * **Reward amount**: `response.reward` is the payout figure parsed from the
- * provider's verification response body (0 when the provider does not include
- * one). The caller in `surveys.ts` falls back to `session.expectedReward` when
- * `reward` is 0, and always clamps the final amount against
- * `PROVIDER_REWARD_RANGES` regardless of the source. Any non-zero reward
- * returned here is still subject to that clamping step.
- */
 export async function verifyProviderCompletion(req: CompletionVerifyRequest): Promise<CompletionVerifyResponse> {
   const transactionId = (req.transactionId || "").trim();
   if (transactionId.length === 0) {
@@ -503,24 +474,20 @@ export async function verifyProviderCompletion(req: CompletionVerifyRequest): Pr
     return { verified: false, reward: 0, error: `Provider ${req.provider} not configured` };
   }
 
-  let result: { verified: boolean; reward: number } = { verified: false, reward: 0 };
+  let verified = false;
   if (req.provider === "pollfish") {
-    result = await verifyPollfishCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+    verified = await verifyPollfishCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
   } else if (req.provider === "cint") {
-    result = await verifyCintCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+    verified = await verifyCintCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
   } else if (req.provider === "lucid") {
-    result = await verifyLucidCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+    verified = await verifyLucidCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
   } else if (req.provider === "cpx") {
-    result = await verifyCpxCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+    verified = await verifyCpxCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
   } else if (req.provider === "bitlabs") {
-    result = await verifyBitlabsCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
+    verified = await verifyBitlabsCompletion(req.surveyId, config.apiKey!, transactionId, req.userId);
   }
 
-  return {
-    verified: result.verified,
-    reward: result.reward,
-    error: result.verified ? undefined : "Provider did not confirm completion",
-  };
+  return { verified, reward: 0, error: verified ? undefined : "Provider did not confirm completion" };
 }
 
 export function getConfiguredProviders(): ProviderConfig[] {
@@ -533,52 +500,4 @@ export function getProviderStatus(): { provider: string; name: string; configure
     name: c.name,
     configured: c.isConfigured,
   }));
-}
-
-/**
- * Reward clamp ranges for every provider (survey and offerwall).
- * Exported so both surveys.ts and offerwalls.ts use the same bounds —
- * a single source of truth makes accidental divergence impossible.
- */
-export const PROVIDER_REWARD_RANGES: Record<string, { min: number; max: number }> = {
-  // Survey providers
-  pollfish:    { min: 0.30, max: 1.50 },
-  cint:        { min: 1.00, max: 5.00 },
-  lucid:       { min: 0.80, max: 4.00 },
-  cpx:         { min: 0.20, max: 3.00 },
-  bitlabs:     { min: 0.20, max: 2.50 },
-  internal:    { min: 0.15, max: 0.75 },
-  // Offerwall providers
-  tapjoy:      { min: 0.10, max: 25.00 },
-  adgate:      { min: 0.10, max: 20.00 },
-  offertoro:   { min: 0.10, max: 20.00 },
-  lootably:    { min: 0.10, max: 20.00 },
-  adjoe:       { min: 0.10, max: 25.00 },
-  adgem:       { min: 0.10, max: 20.00 },
-  ayet:        { min: 0.10, max: 20.00 },
-  notik:       { min: 0.05, max: 10.00 },
-  revlum:      { min: 0.05, max: 15.00 },
-  monlix:      { min: 0.05, max: 15.00 },
-  paymentwall: { min: 0.10, max: 20.00 },
-};
-
-/**
- * Parse a numeric USD reward amount from a raw webhook field.
- *
- * Returns `undefined` when the value is absent, non-numeric, non-finite,
- * or not positive — callers fall back to the server-committed
- * `session.expectedReward` in that case.
- *
- * Intentionally does NOT clamp; callers apply `PROVIDER_REWARD_RANGES`
- * after extraction so the clamping logic stays in one place.
- */
-export function parseProviderReward(raw: unknown): number | undefined {
-  if (typeof raw === "number") {
-    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
-  }
-  if (typeof raw === "string") {
-    const n = parseFloat(raw);
-    return Number.isFinite(n) && n > 0 ? n : undefined;
-  }
-  return undefined;
 }

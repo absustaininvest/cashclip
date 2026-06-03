@@ -12,9 +12,22 @@ import { webhookRateLimiter } from "./lib/webhookRateLimit";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
-import { PROVIDER_REWARD_RANGES, parseProviderReward, type ProviderCompletionPayload } from "./lib/surveyProviders";
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
+
+const PROVIDER_REWARD_BOUNDS: Record<string, { min: number; max: number }> = {
+  tapjoy:      { min: 0.10, max: 25.00 },
+  adgate:      { min: 0.10, max: 20.00 },
+  offertoro:   { min: 0.10, max: 20.00 },
+  lootably:    { min: 0.10, max: 20.00 },
+  adjoe:       { min: 0.10, max: 25.00 },
+  adgem:       { min: 0.10, max: 20.00 },
+  ayet:        { min: 0.10, max: 20.00 },
+  notik:       { min: 0.05, max: 10.00 },
+  revlum:      { min: 0.05, max: 15.00 },
+  monlix:      { min: 0.05, max: 15.00 },
+  paymentwall: { min: 0.10, max: 20.00 },
+};
 
 export function registerOfferwallRoutes(app: Express): void {
   app.get("/api/offerwalls/providers", adminMiddleware, (_req: Request, res: Response) => {
@@ -42,8 +55,8 @@ export function registerOfferwallRoutes(app: Express): void {
       const allOffers: Offer[] = results.flatMap((r) => r.offers);
 
       const clamped = allOffers.map((o) => {
-        const range = PROVIDER_REWARD_RANGES[o.provider] ?? { min: 0.10, max: 25.00 };
-        const safe = Math.max(range.min, Math.min(range.max, o.reward));
+        const bounds = PROVIDER_REWARD_BOUNDS[o.provider] || { min: 0.10, max: 25.00 };
+        const safe = Math.max(bounds.min, Math.min(bounds.max, o.reward));
         return { ...o, reward: parseFloat(safe.toFixed(2)) };
       });
 
@@ -167,9 +180,12 @@ export function registerOfferwallRoutes(app: Express): void {
         }); return;
       }
 
-      const providerRange = PROVIDER_REWARD_RANGES[session.provider] ?? { min: 0.10, max: 25.00 };
-      const rawFinal = parseProviderReward(verifyResult.reward) ?? parseFloat(session.expectedReward);
-      const finalReward = Math.max(providerRange.min, Math.min(providerRange.max, rawFinal));
+      const providerBounds = PROVIDER_REWARD_BOUNDS[session.provider] ?? { min: 0.10, max: 25.00 };
+      const rawFinal =
+        Number.isFinite(verifyResult.reward) && verifyResult.reward > 0
+          ? verifyResult.reward
+          : parseFloat(session.expectedReward);
+      const finalReward = Math.max(providerBounds.min, Math.min(providerBounds.max, rawFinal));
 
       const outcome = await storage.completeRewardSessionAndCredit({
         sessionToken,
@@ -205,18 +221,17 @@ export function registerOfferwallRoutes(app: Express): void {
     provider: OfferwallProviderKey,
     userId: string,
     offerId: string,
-    payload: ProviderCompletionPayload | null,
+    rewardValue: number | undefined,
+    logPrefix: string,
   ) {
     try {
       const session = await storage.findPendingRewardSession(userId, "offerwall", offerId);
       if (!session) {
         return;
       }
-      const rawReward = parseProviderReward(
-        payload?.payout ?? payload?.amount ?? payload?.reward ?? payload?.value ?? payload?.reward_value
-      ) ?? parseFloat(session.expectedReward);
-      const range = PROVIDER_REWARD_RANGES[provider] ?? { min: 0.10, max: 25.00 };
-      const clampedReward = Math.max(range.min, Math.min(range.max, rawReward));
+      const rawReward = rewardValue ?? parseFloat(session.expectedReward);
+      const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
+      const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rawReward));
       await storage.completeRewardSessionAndCredit({
         sessionToken: session.sessionToken,
         userId,
@@ -235,17 +250,18 @@ export function registerOfferwallRoutes(app: Express): void {
       res.status(403).send("0"); return;
     }
     // Tapjoy sends: id (offer), snuid (user), currency (virtual pts — NOT USD), verifier (HMAC)
-    // No status param in Tapjoy callbacks — any authenticated request signals completion.
-    // Do not pass Tapjoy's `currency` field — it is virtual currency points, not USD.
-    // creditOfferViaWebhook falls back to session.expectedReward when payload has no reward.
+    // No status param in Tapjoy callbacks — any authenticated request signals completion
     const offerId = req.query.id ?? req.query.offer_id;
     const userId = req.query.snuid ?? req.query.user_id;
     if (offerId && userId) {
+      // Do not use Tapjoy's `currency` field as a USD reward — it's virtual currency points.
+      // Fall back to session.expectedReward (server-set USD value from offer listing).
       await creditOfferViaWebhook(
         "tapjoy",
         String(userId),
         `tapjoy_${String(offerId)}`,
-        null,
+        undefined,
+        "[Tapjoy Webhook]",
       );
     }
     res.status(200).send("1");
@@ -257,13 +273,15 @@ export function registerOfferwallRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "adgate", auth.reason ?? "unknown");
       res.status(403).json({ error: "Forbidden" }); return;
     }
-    const { offer_id, user_id, status } = req.body;
+    const { offer_id, user_id, payout, status } = req.body;
     if (status === "completed" && offer_id && user_id) {
+      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
       await creditOfferViaWebhook(
         "adgate",
         String(user_id),
         `adgate_${offer_id}`,
-        req.body as ProviderCompletionPayload,
+        Number.isFinite(reward) ? reward : undefined,
+        "[AdGate Webhook]",
       );
     }
     res.status(200).json({ status: "received" });
@@ -275,51 +293,17 @@ export function registerOfferwallRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "offertoro", auth.reason ?? "unknown");
       res.status(403).json({ error: "Forbidden" }); return;
     }
-    const { offer_id, user_id } = req.body;
+    const { offer_id, user_id, payout } = req.body;
     if (offer_id && user_id) {
+      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
       await creditOfferViaWebhook(
         "offertoro",
         String(user_id),
         `offertoro_${offer_id}`,
-        req.body as ProviderCompletionPayload,
+        Number.isFinite(reward) ? reward : undefined,
+        "[OfferToro Webhook]",
       );
     }
     res.status(200).json({ status: "1" });
-  });
-
-  app.post("/api/offerwalls/webhook/lootably", webhookRateLimiter, async (req: Request, res: Response) => {
-    const auth = verifyWebhook("lootably", req);
-    if (!auth.ok) {
-      logWebhookVerificationFailure(req, "lootably", auth.reason ?? "unknown");
-      res.status(403).json({ error: "Forbidden" }); return;
-    }
-    const { offer_id, user_id, status } = req.body;
-    if (status === "completed" && offer_id && user_id) {
-      await creditOfferViaWebhook(
-        "lootably",
-        String(user_id),
-        `lootably_${offer_id}`,
-        req.body as ProviderCompletionPayload,
-      );
-    }
-    res.status(200).json({ status: "received" });
-  });
-
-  app.post("/api/offerwalls/webhook/adjoe", webhookRateLimiter, async (req: Request, res: Response) => {
-    const auth = verifyWebhook("adjoe", req);
-    if (!auth.ok) {
-      logWebhookVerificationFailure(req, "adjoe", auth.reason ?? "unknown");
-      res.status(403).json({ error: "Forbidden" }); return;
-    }
-    const { offer_id, user_id, status } = req.body;
-    if (status === "completed" && offer_id && user_id) {
-      await creditOfferViaWebhook(
-        "adjoe",
-        String(user_id),
-        `adjoe_${offer_id}`,
-        req.body as ProviderCompletionPayload,
-      );
-    }
-    res.status(200).json({ status: "received" });
   });
 }
