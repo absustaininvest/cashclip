@@ -53,4 +53,6 @@ Requests last 7 days: 860 (+173%). Spike around May 31–Jun 1 = Colombia promot
 ## Key action items (for owner to do in AdMob)
 1. Create mediation groups for iOS Banner + Interstitial ad units and add Unity Ads as bidding source
 2. Once Android goes public (promote Play Store build 38 from internal → production), Priority 1 group will start earning
-3. Unity Ads mediation SDK is baked into build 38 (app code) but NOT in live build 29 — need new approved App Store build to activate Unity on iOS
+
+## Important correction (owner-confirmed Jun 3 2026)
+Unity Ads SDK (GoogleMobileAdsMediationUnity plugin) IS compiled into build 29 (the live App Store build). Unity Ads is already serving through AdMob mediation for live iOS users right now. No new App Store build is required to activate Unity. Earlier agent notes saying "Unity only in build 38" were wrong.
