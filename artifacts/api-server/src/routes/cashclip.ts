@@ -632,6 +632,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? "Removed from the encrypted server store and the running process."
         : "Cleared from the running process. If a value is also set in project Secrets, it will return on restart — remove it there too.",
     });
+
+    if (integration.envKey === "PAYPAL_WEBHOOK_ID") {
+      verifyWebhookRegistration()
+        .then((result) => {
+          req.log.info(
+            { webhookId: result.webhookId, ok: result.ok },
+            "PayPal webhook registration re-checked after PAYPAL_WEBHOOK_ID deletion",
+          );
+        })
+        .catch((err: unknown) => {
+          req.log.error({ err }, "PayPal webhook re-check failed after PAYPAL_WEBHOOK_ID deletion");
+        });
+    }
   });
 
   /**
