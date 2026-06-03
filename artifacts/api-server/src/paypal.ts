@@ -114,12 +114,31 @@ export async function sendPayPalPayout(
       // match the machine-readable `name` field rather than doing a fragile
       // substring search on the raw body.
       let paypalErrorName: string | undefined;
+      let detailReason: string | undefined;
       try {
-        const errorBody = JSON.parse(text) as { name?: string; message?: string };
+        const errorBody = JSON.parse(text) as {
+          name?: string;
+          message?: string;
+          details?: Array<{ issue?: string; description?: string }>;
+        };
         paypalErrorName = errorBody.name;
+        const parts: string[] = [];
+        if (errorBody.name) parts.push(errorBody.name);
+        if (errorBody.message) parts.push(errorBody.message);
+        if (Array.isArray(errorBody.details)) {
+          for (const d of errorBody.details) {
+            const piece = [d?.issue, d?.description].filter(Boolean).join(": ");
+            if (piece) parts.push(piece);
+          }
+        }
+        detailReason = parts.filter(Boolean).join(" — ");
       } catch {
         // Non-JSON body — fall through to raw status check
       }
+
+      // Log the full PayPal error server-side for diagnosis. The payouts error
+      // body contains no secrets (just the rejection reason + receiver/amount).
+      console.error(`[paypal] payout rejected: HTTP ${res.status} ${text}`);
 
       // PayPal uses SENDER_BATCH_ID_ALREADY_IN_USE when the same batch was
       // already accepted. This means the original request went through — treat
@@ -136,7 +155,10 @@ export async function sendPayPalPayout(
         };
       }
 
-      return { success: false, error: `PayPal API error: ${res.status}` };
+      return {
+        success: false,
+        error: `PayPal error ${res.status}: ${detailReason || text.slice(0, 300) || "no detail returned"}`,
+      };
     }
 
     const data = (await res.json()) as PayPalPayoutResponse;
