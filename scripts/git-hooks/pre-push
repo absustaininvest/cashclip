@@ -136,12 +136,27 @@ if [ "${TC_ROOT:-0}" -gt 0 ] || [ "${TC_LIBS:-0}" -gt 0 ] || [ "$TC_WS_COUNT" -g
   [ "${TC_CHECK_ABSUSTAIN:-0}" -gt 0 ] && { pnpm --filter @workspace/absustain run typecheck >/tmp/tc-absustain.log 2>&1 & PID_ABSUSTAIN=$!; }
   [ "${TC_CHECK_SCRIPTS:-0}"   -gt 0 ] && { pnpm --filter @workspace/scripts   run typecheck >/tmp/tc-scripts.log   2>&1 & PID_SCRIPTS=$!; }
 
-  # Collect exit codes; print each workspace's output so errors are visible.
+  # Background ticker: prints a heartbeat every 5 s so the terminal doesn't
+  # look frozen while workers are running.  Killed once all workers finish,
+  # before per-workspace result lines are printed.
+  ( _tc_elapsed=0; while true; do sleep 5; _tc_elapsed=$((_tc_elapsed + 5)); printf '[pre-push] ... still type-checking (%ds)\n' "$_tc_elapsed"; done ) &
+  TICKER_PID=$!
+
+  # Wait for every spawned worker and record its exit code.
+  EXIT_API=0;       [ -n "$PID_API"       ] && { wait "$PID_API";       EXIT_API=$?;       }
+  EXIT_CASHCLIP=0;  [ -n "$PID_CASHCLIP"  ] && { wait "$PID_CASHCLIP";  EXIT_CASHCLIP=$?;  }
+  EXIT_ABSUSTAIN=0; [ -n "$PID_ABSUSTAIN" ] && { wait "$PID_ABSUSTAIN"; EXIT_ABSUSTAIN=$?; }
+  EXIT_SCRIPTS=0;   [ -n "$PID_SCRIPTS"   ] && { wait "$PID_SCRIPTS";   EXIT_SCRIPTS=$?;   }
+
+  # All workers done — stop the ticker before printing results.
+  kill "$TICKER_PID" 2>/dev/null
+  wait "$TICKER_PID" 2>/dev/null
+
+  # Print per-workspace results; show buffered output for any failures.
   TYPECHECK_EXIT=0
-  for _pair in "api-server:$PID_API" "cashclip:$PID_CASHCLIP" "absustain:$PID_ABSUSTAIN" "scripts:$PID_SCRIPTS"; do
-    _label="${_pair%%:*}"; _pid="${_pair##*:}"
+  for _pair in "api-server:$PID_API:$EXIT_API" "cashclip:$PID_CASHCLIP:$EXIT_CASHCLIP" "absustain:$PID_ABSUSTAIN:$EXIT_ABSUSTAIN" "scripts:$PID_SCRIPTS:$EXIT_SCRIPTS"; do
+    _label="${_pair%%:*}"; _rest="${_pair#*:}"; _pid="${_rest%%:*}"; _code="${_rest##*:}"
     [ -z "$_pid" ] && continue
-    wait "$_pid"; _code=$?
     printf '\n[pre-push] typecheck:%s — %s\n' "$_label" "$([ "$_code" -eq 0 ] && printf 'OK' || printf 'FAILED')"
     if [ "$_code" -ne 0 ]; then
       cat "/tmp/tc-${_label}.log"
