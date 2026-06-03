@@ -62,8 +62,14 @@ export function generateVideos(count: number): VideoItem[] {
 }
 
 export const adVideos = [
-  { id: "ad_1", brand: "CashClip", duration: 15, reward: 0.05, color: "#00E676", description: "Complete this featured earning opportunity" },
-  { id: "ad_2", brand: "CashClip", duration: 20, reward: 0.07, color: "#42A5F5", description: "Unlock a new reward challenge" },
-  { id: "ad_3", brand: "CashClip", duration: 25, reward: 0.08, color: "#FFD600", description: "Check today's recommended task" },
-  { id: "ad_4", brand: "CashClip", duration: 30, reward: 0.10, color: "#FF7043", description: "Finish a limited-time offer" },
+  { id: "ad_1", brand: "HomeStyle",    duration: 15, reward: 0.05, color: "#00E676", description: "Discover home improvement deals",      category: "Home" },
+  { id: "ad_2", brand: "WealthPath",   duration: 20, reward: 0.07, color: "#42A5F5", description: "Smart investing strategies for 2026",  category: "Investing" },
+  { id: "ad_3", brand: "WanderlustTV", duration: 25, reward: 0.08, color: "#FFD600", description: "Explore the best travel destinations",  category: "Travel" },
+  { id: "ad_4", brand: "ChefMate",     duration: 30, reward: 0.10, color: "#FF7043", description: "Learn to cook amazing meals at home",   category: "Cooking" },
+  { id: "ad_5", brand: "EduPro",       duration: 20, reward: 0.06, color: "#AB47BC", description: "Top-rated online courses for 2026",    category: "School" },
+  { id: "ad_6", brand: "HomeStyle",    duration: 15, reward: 0.05, color: "#26C6DA", description: "Renovation ideas on any budget",       category: "Home" },
+  { id: "ad_7", brand: "MarketEdge",   duration: 25, reward: 0.08, color: "#66BB6A", description: "Grow your portfolio with expert tips", category: "Investing" },
+  { id: "ad_8", brand: "TravelHacks",  duration: 20, reward: 0.06, color: "#FFA726", description: "Find cheap flights & hidden gems",     category: "Travel" },
+  { id: "ad_9", brand: "RecipeBox",    duration: 15, reward: 0.05, color: "#EF5350", description: "Quick & easy weeknight recipes",       category: "Cooking" },
+  { id: "ad_10", brand: "LearnFast",   duration: 30, reward: 0.10, color: "#7E57C2", description: "Certifications that boost your career", category: "School" },
 ];

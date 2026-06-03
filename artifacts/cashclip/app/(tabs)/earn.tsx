@@ -685,6 +685,7 @@ export default function EarnScreen() {
 
   const [adLoading, setAdLoading] = useState(false);
   const [adPreloaded, setAdPreloaded] = useState(false);
+  const [selectedAdCategory, setSelectedAdCategory] = useState("All");
   const [lpAdReady, setLpAdReady] = useState(false);
   const [lpAdLoading, setLpAdLoading] = useState(false);
 
@@ -1262,11 +1263,42 @@ export default function EarnScreen() {
 
         {/* Ads Section */}
         <Text style={styles.adsSectionTitle}>{t.earn.availableAds}</Text>
-        {adVideos.map((ad, i) => (
-          <View key={ad.id} style={{ marginBottom: i < adVideos.length - 1 ? 10 : 0 }}>
-            <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
-          </View>
-        ))}
+
+        {/* Category Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+          contentContainerStyle={styles.categoryScrollContent}
+        >
+          {["All", "🏠 Home", "🍳 Cooking", "✈️ Travel", "🎓 School", "📈 Investing"].map((cat) => (
+            <Pressable
+              key={cat}
+              onPress={() => setSelectedAdCategory(cat)}
+              style={[styles.categoryChip, selectedAdCategory === cat && styles.categoryChipActive]}
+            >
+              <Text style={[styles.categoryChipText, selectedAdCategory === cat && styles.categoryChipTextActive]}>
+                {cat}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {(() => {
+          const label = selectedAdCategory === "All" ? "All" : selectedAdCategory.split(" ").slice(1).join(" ");
+          const filtered = selectedAdCategory === "All"
+            ? adVideos
+            : adVideos.filter((ad) => ad.category === label);
+          return filtered.length > 0 ? (
+            filtered.map((ad, i) => (
+              <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
+                <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
+              </View>
+            ))
+          ) : (
+            <Text style={styles.categoryEmptyText}>No ads in this category right now.</Text>
+          );
+        })()}
 
         {/* LevelPlay Rewarded Ad */}
         {isLevelPlayAvailable && (
@@ -1768,7 +1800,42 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.text,
     marginTop: 20,
+    marginBottom: 10,
+  },
+  categoryScroll: {
     marginBottom: 12,
+  },
+  categoryScrollContent: {
+    paddingRight: 8,
+    gap: 8,
+    flexDirection: "row",
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  categoryChipText: {
+    fontFamily: "Outfit_500Medium",
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  categoryChipTextActive: {
+    color: "#000",
+  },
+  categoryEmptyText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginVertical: 20,
   },
   sponsoredCard: {
     backgroundColor: Colors.surface,
