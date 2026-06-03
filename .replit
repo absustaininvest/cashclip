@@ -105,7 +105,7 @@ externalPort = 3003
 [deployment]
 deploymentTarget = "autoscale"
 run = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
-build = ["pnpm", "run", "build"]
+build = ["bash", "-c", "pnpm run build && pnpm --filter @workspace/db run push-force"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
