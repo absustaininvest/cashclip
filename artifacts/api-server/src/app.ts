@@ -13,7 +13,7 @@ import { appVersionMiddleware } from "./lib/versionCheck";
 import { getClientIp } from "./lib/clientIp";
 import { startSponsoredVisitAlertMonitor } from "./lib/sponsoredVisitMonitor";
 import { verifyWebhookRegistration } from "./paypal";
-import { db, spinChallenges } from "@workspace/db";
+import { db, spinChallenges, searchChallenges } from "@workspace/db";
 import { lt } from "drizzle-orm";
 
 const ALLOWED_ORIGINS = [
@@ -290,6 +290,19 @@ db.delete(spinChallenges)
   })
   .catch((err) => {
     logger.warn({ err }, "spin challenge startup sweep failed");
+  });
+
+// ── SEARCH CHALLENGE STARTUP SWEEP ───────────────────────────────────────────
+// The periodic in-process cleanup (every 60 s) won't run during restarts or
+// idle autoscale periods. Delete any already-expired rows immediately on boot
+// so stale challenges never accumulate across server restarts.
+db.delete(searchChallenges)
+  .where(lt(searchChallenges.expiresAt, new Date()))
+  .then((result) => {
+    logger.info({ deleted: result.rowCount ?? 0 }, "search challenge startup sweep complete");
+  })
+  .catch((err) => {
+    logger.warn({ err }, "search challenge startup sweep failed");
   });
 
 // ── PAYPAL WEBHOOK REGISTRATION CHECK ────────────────────────────────────────
