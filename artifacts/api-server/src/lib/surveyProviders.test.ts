@@ -55,8 +55,8 @@ describe("verifyProviderCompletion — guard clauses", () => {
   });
 });
 
-describe("verifyProviderCompletion — reward contract", () => {
-  it("always returns reward=0 even when the upstream provider responds successfully (caller must use DB session expectedReward)", async () => {
+describe("verifyProviderCompletion — reward propagation", () => {
+  it("propagates the reward field from the upstream provider response body (CPX)", async () => {
     vi.stubEnv("CPX_API_KEY", "key-reward-contract");
     vi.stubEnv("CPX_APP_ID", "app-reward-contract");
 
@@ -70,8 +70,6 @@ describe("verifyProviderCompletion — reward contract", () => {
             transaction_id: "txn-reward-contract",
             user_id: "u-reward-contract",
             reward: 9.99,
-            payout: 9.99,
-            amount: 9.99,
           }),
       })
     );
@@ -84,11 +82,198 @@ describe("verifyProviderCompletion — reward contract", () => {
     });
 
     expect(result.verified).toBe(true);
-    // The provider-reported reward fields are NOT parsed — reward is always 0.
-    // The authoritative amount lives in the DB session record (expectedReward).
-    // If this assertion fails it means someone changed verifyProviderCompletion
-    // to return a provider amount; the caller in surveys.ts already handles
-    // reward>0 via clamping, but the change must be intentional and reviewed.
+    expect(result.reward).toBe(9.99);
+  });
+
+  it("returns reward=0 when the upstream body has no reward field (CPX)", async () => {
+    vi.stubEnv("CPX_API_KEY", "key-reward-zero");
+    vi.stubEnv("CPX_APP_ID", "app-reward-zero");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "txn-reward-zero",
+            user_id: "u-reward-zero",
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cpx_reward-zero",
+      provider: "cpx",
+      userId: "u-reward-zero",
+      transactionId: "txn-reward-zero",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.reward).toBe(0);
+  });
+
+  it("propagates a payout field from Pollfish when upstream returns one", async () => {
+    vi.stubEnv("POLLFISH_API_KEY", "test-pollfish-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "poll-reward-txn",
+            user_id: "poll-reward-user",
+            payout: 1.25,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "pollfish_s1",
+      provider: "pollfish",
+      userId: "poll-reward-user",
+      transactionId: "poll-reward-txn",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.reward).toBe(1.25);
+  });
+
+  it("propagates a reward field from BitLabs when upstream returns one", async () => {
+    vi.stubEnv("BITLABS_API_KEY", "test-bitlabs-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "bl-reward-txn",
+            user_id: "bl-reward-user",
+            reward: 0.75,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "bitlabs_s1",
+      provider: "bitlabs",
+      userId: "bl-reward-user",
+      transactionId: "bl-reward-txn",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.reward).toBe(0.75);
+  });
+
+  it("propagates a reward field from Cint when upstream returns one", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "cint-reward-txn",
+            respondent_id: "cint-reward-user",
+            reward: 2.00,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cint_s1",
+      provider: "cint",
+      userId: "cint-reward-user",
+      transactionId: "cint-reward-txn",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.reward).toBe(2.00);
+  });
+
+  it("propagates a reward field from Lucid when upstream returns one", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "lucid-reward-txn",
+            respondent_id: "lucid-reward-user",
+            reward: 1.50,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "lucid_s1",
+      provider: "lucid",
+      userId: "lucid-reward-user",
+      transactionId: "lucid-reward-txn",
+    });
+
+    expect(result.verified).toBe(true);
+    expect(result.reward).toBe(1.50);
+  });
+
+  it("returns reward=0 when the upstream body is empty (network/parse error path)", async () => {
+    vi.stubEnv("POLLFISH_API_KEY", "test-pollfish-key");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: async () => "",
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "pollfish_s1",
+      provider: "pollfish",
+      userId: "u1",
+      transactionId: "txn-empty",
+    });
+
+    expect(result.verified).toBe(false);
+    expect(result.reward).toBe(0);
+  });
+
+  it("falls back to 0 when the upstream reward field is a non-positive number", async () => {
+    vi.stubEnv("CPX_API_KEY", "key-reward-neg");
+    vi.stubEnv("CPX_APP_ID", "app-reward-neg");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "txn-reward-neg",
+            user_id: "u-reward-neg",
+            reward: -5,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cpx_reward-neg",
+      provider: "cpx",
+      userId: "u-reward-neg",
+      transactionId: "txn-reward-neg",
+    });
+
+    expect(result.verified).toBe(true);
     expect(result.reward).toBe(0);
   });
 });
