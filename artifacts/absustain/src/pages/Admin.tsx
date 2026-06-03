@@ -2138,15 +2138,19 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     [token],
   );
 
-  useEffect(() => {
-    fetchSearchConfig();
+  const fetchSearchStats = useCallback(() => {
     fetch("/api/admin/search-stats", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => setSearchStats(d))
       .catch(() => setSearchStats(null));
-  }, [fetchSearchConfig, token]);
+  }, [token]);
+
+  useEffect(() => {
+    fetchSearchConfig();
+    fetchSearchStats();
+  }, [fetchSearchConfig, fetchSearchStats]);
 
   useEffect(() => {
     fetchSearchPerUser(searchPerUserRange);
@@ -2687,7 +2691,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
             Search &amp; Earn
           </h3>
           <button
-            onClick={() => fetchSearchConfig(true)}
+            onClick={() => { fetchSearchConfig(true); fetchSearchStats(); }}
             disabled={searchRefreshing}
             title="Refresh status"
             className="ml-auto p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
