@@ -158,8 +158,8 @@ beforeAll(async () => {
   // The reset-alert handler calls req.log.info/error without optional chaining.
   // In production pino-http adds req.log; stub it here so the handler doesn't
   // throw a TypeError before it can reach the audit write or res.json call.
-  app.use((req: Request & { log?: Record<string, unknown> }, _res, next) => {
-    req.log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as Record<string, unknown>;
+  app.use((req, _res, next) => {
+    (req as any).log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
     next();
   });
 

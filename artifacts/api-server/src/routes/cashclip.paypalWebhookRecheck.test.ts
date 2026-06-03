@@ -282,7 +282,7 @@ describe("POST /api/admin/integrations/paypal-webhook-id/key — auto re-check",
 
     // Replace verifyWebhookRegistration with a promise we control manually so
     // we can confirm the response arrives while verification is still pending.
-    let resolveVerify!: (result: typeof paypalModule.WebhookRegistrationResult) => void;
+    let resolveVerify!: (result: Awaited<ReturnType<typeof paypalModule.verifyWebhookRegistration>>) => void;
     vi.spyOn(paypalModule, "verifyWebhookRegistration").mockImplementation(
       () =>
         new Promise<Awaited<ReturnType<typeof paypalModule.verifyWebhookRegistration>>>(
