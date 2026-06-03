@@ -3271,6 +3271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // outer catch. ipKey is set once computed inside the try.
     let ipSlotConsumed = false;
     let ipKey = "";
+    let acctVisitMax = 0;
     const releaseIpSlot = async (reason: string) => {
       if (!ipSlotConsumed) return;
       ipSlotConsumed = false;
@@ -3498,7 +3499,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // SPONSORED_VISIT_ACCOUNT_DAILY_MAX (default 10).
         // Complements: per-IP cap (cross-account same-IP), per-campaign dedup
         // (atomic), per-account earnings cap, witnessedAt, dwell time, budget.
-        const acctVisitMax = Math.max(
+        // NOTE: acctVisitMax is read again inside the settlement transaction
+        // (step 0b) for the in-lock recheck. It must remain in the outer
+        // try-block scope so the transaction closure can reference it.
+        acctVisitMax = Math.max(
           1,
           parseInt(process.env.SPONSORED_VISIT_ACCOUNT_DAILY_MAX ?? "10", 10),
         );
