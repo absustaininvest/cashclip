@@ -17,7 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
 import { recordEarnAction } from "@/lib/earn-client";
@@ -157,16 +157,28 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    Promise.all([getUserStats(), getUnreadNotificationCount(), fetchServerBalance()]).then(
-      ([s, unread, srv]) => {
-        setStats(s);
-        setUnreadCount(unread);
-        if (srv !== null) setServerBalance(srv);
-      }
-    );
-    if (isAdMobReady()) preloadRewardedAd();
+  const loadData = useCallback(async () => {
+    const [s, unread, srv] = await Promise.all([
+      getUserStats(),
+      getUnreadNotificationCount(),
+      fetchServerBalance(),
+    ]);
+    setStats(s);
+    setUnreadCount(unread);
+    if (srv !== null) setServerBalance(srv);
   }, [fetchServerBalance]);
+
+  useEffect(() => {
+    if (isAdMobReady()) preloadRewardedAd();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+      const intervalId = setInterval(loadData, 75_000);
+      return () => clearInterval(intervalId);
+    }, [loadData])
+  );
 
   const creditAdReward = useCallback(async () => {
     await recordAdWatch();
