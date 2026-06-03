@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
-import { authMiddleware, type AuthRequest } from "../auth";
+import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger, searchChallenges } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -1057,4 +1057,48 @@ export function registerEarningsRoutes(app: Express): void {
       runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: interval run failed"));
     }, AUTO_CONVERT_INTERVAL_MS);
   }, 5 * 60 * 1000);
+
+  // ── GET /api/admin/search-stats ───────────────────────────────────────────────
+  // Returns aggregate search-earn totals for the last 7d and 30d.
+  app.get(
+    "/api/admin/search-stats",
+    adminMiddleware,
+    async (_req: Request, res: Response): Promise<void> => {
+      try {
+        const now   = new Date();
+        const ago7d = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
+        const ago30d= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const [row7d] = await db
+          .select({
+            searches: count(),
+            points:   sql<string>`COALESCE(SUM(points), 0)`,
+          })
+          .from(earnTokens)
+          .where(and(
+            eq(earnTokens.actionType, "search"),
+            gte(earnTokens.earnedAt, ago7d),
+          ));
+
+        const [row30d] = await db
+          .select({
+            searches: count(),
+            points:   sql<string>`COALESCE(SUM(points), 0)`,
+          })
+          .from(earnTokens)
+          .where(and(
+            eq(earnTokens.actionType, "search"),
+            gte(earnTokens.earnedAt, ago30d),
+          ));
+
+        res.json({
+          d7:  { searches: Number(row7d?.searches  ?? 0), points: Number(row7d?.points  ?? 0) },
+          d30: { searches: Number(row30d?.searches ?? 0), points: Number(row30d?.points ?? 0) },
+        });
+      } catch (err) {
+        logger.error({ err }, "admin/search-stats error");
+        res.status(500).json({ error: "Failed to load search stats" });
+      }
+    },
+  );
 }

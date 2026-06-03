@@ -2048,6 +2048,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutLoading, setPayoutLoading] = useState(true);
   const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
   const [searchRefreshing, setSearchRefreshing] = useState(false);
+  const [searchStats, setSearchStats] = useState<{ d7: { searches: number; points: number }; d30: { searches: number; points: number } } | null>(null);
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2072,7 +2073,13 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
 
   useEffect(() => {
     fetchSearchConfig();
-  }, [fetchSearchConfig]);
+    fetch("/api/admin/search-stats", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setSearchStats(d))
+      .catch(() => setSearchStats(null));
+  }, [fetchSearchConfig, token]);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2577,7 +2584,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
             <RefreshCw className={`w-3.5 h-3.5 ${searchRefreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-4">
           {searchConfigured === null ? (
             <span className="text-white/30 text-xs">Checking…</span>
           ) : searchConfigured ? (
@@ -2596,6 +2603,33 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
               ? "SEARCH_PUBLISHER_CODE is configured — Yahoo search revenue sharing is active."
               : "Set SEARCH_PUBLISHER_CODE in Production app secrets to enable Yahoo revenue sharing."}
           </p>
+        </div>
+        {/* Search earnings totals */}
+        <div className="grid grid-cols-2 gap-3">
+          {(["d7", "d30"] as const).map((key) => {
+            const label    = key === "d7" ? "Last 7 days" : "Last 30 days";
+            const searches = searchStats?.[key].searches ?? null;
+            const points   = searchStats?.[key].points   ?? null;
+            return (
+              <div key={key} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3">
+                <p className="text-white/40 text-xs mb-2">{label}</p>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-white/50 text-xs">Searches</span>
+                    <span className="text-white text-sm font-semibold tabular-nums">
+                      {searches === null ? "—" : searches.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-white/50 text-xs">Points awarded</span>
+                    <span className="text-[#00E676] text-sm font-semibold tabular-nums">
+                      {points === null ? "—" : points.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
