@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -175,6 +176,9 @@ export default function WalletScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [lockedNudgeMsg, setLockedNudgeMsg] = useState<string | null>(null);
+  const nudgeOpacity = useRef(new Animated.Value(0)).current;
+  const nudgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -235,6 +239,23 @@ export default function WalletScreen() {
       setIsConverting(false);
     }
   }, [isConverting, pendingState, t, loadData]);
+
+  const showLockedNudge = useCallback((amt: number) => {
+    const needed = Math.max(0, amt - serverBalance);
+    const msg = tFn(t, "wallet.keepEarningNudge", {
+      needed: needed.toFixed(2),
+      tier: amt.toFixed(2),
+    });
+    if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
+    setLockedNudgeMsg(msg);
+    nudgeOpacity.setValue(0);
+    Animated.timing(nudgeOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    nudgeTimer.current = setTimeout(() => {
+      Animated.timing(nudgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+        setLockedNudgeMsg(null);
+      });
+    }, 2500);
+  }, [serverBalance, t, nudgeOpacity]);
 
   useEffect(() => {
     loadData();
@@ -514,14 +535,30 @@ export default function WalletScreen() {
                     );
                   }
                   return (
-                    <View key={amt} style={styles.tierMiniItem}>
+                    <Pressable
+                      key={amt}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        showLockedNudge(amt);
+                      }}
+                      style={({ pressed }) => [
+                        styles.tierMiniItem,
+                        { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+                      ]}
+                    >
                       <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
                       <Text style={[styles.tierMiniAmt, { color: Colors.textMuted }]}>${amt.toFixed(2)}</Text>
                       <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>Locked</Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
+              {lockedNudgeMsg && (
+                <Animated.View style={[styles.lockedNudge, { opacity: nudgeOpacity }]}>
+                  <Feather name="trending-up" size={13} color={Colors.primary} />
+                  <Text style={styles.lockedNudgeText}>{lockedNudgeMsg}</Text>
+                </Animated.View>
+              )}
             </View>
 
             <Text style={styles.sectionTitle}>{t.wallet.transactionHistory}</Text>
@@ -742,7 +779,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
   },
   readyBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 11, color: Colors.background },
-  tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 0 },
+  lockedNudge: {
+    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10,
+    backgroundColor: "rgba(0,230,118,0.10)", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderWidth: 1, borderColor: "rgba(0,230,118,0.25)",
+  },
+  lockedNudgeText: {
+    fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary, flexShrink: 1,
+  },
   tierMiniItem: {
     width: "20%" as any, flexGrow: 1, backgroundColor: Colors.surfaceHighlight,
     borderRadius: 10, paddingVertical: 10, alignItems: "center",

@@ -104,6 +104,7 @@ const en = {
       pointsConvertedMsg: "{{pts}} pts → ${{usd}} added to balance",
       noPendingPoints: "No pending points yet",
       holdFor3h: "Held 3h before converting",
+      keepEarningNudge: "Earn ${{needed}} more to unlock the ${{tier}} tier",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -610,6 +611,7 @@ const translations: Record<Language, Translations> = {
       pointsConvertedMsg: "{{pts}} pts → ${{usd}} añadido al saldo",
       noPendingPoints: "Sin puntos pendientes aún",
       holdFor3h: "Retenidos 3h antes de convertir",
+      keepEarningNudge: "Gana ${{needed}} mas para desbloquear el nivel de ${{tier}}",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
