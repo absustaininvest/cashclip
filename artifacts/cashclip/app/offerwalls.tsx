@@ -225,7 +225,17 @@ export default function OfferwallsScreen() {
     try {
       const result = await startMutation.mutateAsync(pendingOffer);
       setSessionToken(result.sessionToken);
-      await WebBrowser.openBrowserAsync(pendingOffer.offerUrl, {
+      let safeOfferUrl: string;
+      try {
+        const parsed = new URL(pendingOffer.offerUrl);
+        if (parsed.protocol !== "https:") throw new Error("unsafe scheme");
+        safeOfferUrl = pendingOffer.offerUrl;
+      } catch {
+        Alert.alert("Error", "This offer cannot be opened because the URL is invalid or unsafe. Please try again.");
+        setIsLaunching(false);
+        return;
+      }
+      await WebBrowser.openBrowserAsync(safeOfferUrl, {
         toolbarColor: "#0D1B2A",
         controlsColor: "#00C6A0",
         dismissButtonStyle: "done",

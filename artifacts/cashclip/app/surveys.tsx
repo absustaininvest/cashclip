@@ -207,7 +207,17 @@ export default function SurveysScreen() {
       const result = await startExternalMutation.mutateAsync(pendingExternalSurvey);
       const sessionTok = result.sessionToken;
       setExternalSessionToken(sessionTok);
-      const entryUrl = result.surveyEntryUrl || pendingExternalSurvey.surveyUrl;
+      const rawEntryUrl: string = result.surveyEntryUrl || pendingExternalSurvey.surveyUrl;
+      let entryUrl: string;
+      try {
+        const parsed = new URL(rawEntryUrl);
+        if (parsed.protocol !== "https:") throw new Error("unsafe scheme");
+        entryUrl = rawEntryUrl;
+      } catch {
+        setIsLaunchingExternal(false);
+        Alert.alert("Error", "This survey cannot be opened because the URL is invalid or unsafe. Please try again.");
+        return;
+      }
       await WebBrowser.openBrowserAsync(entryUrl, {
         toolbarColor: "#0D1B2A",
         controlsColor: "#00C6A0",

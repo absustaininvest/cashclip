@@ -5,6 +5,7 @@ interface IssuedOfferRecord {
   provider: string;
   expectedReward: number;
   expiresAt: number;
+  surveyUrl?: string;
 }
 
 const ISSUED_TTL_MS = 30 * 60 * 1000;
@@ -34,7 +35,7 @@ function pruneUser(userId: string) {
 export function recordIssuedOffers(
   userId: string,
   source: OfferSource,
-  offers: { id: string; provider: string; reward: number }[]
+  offers: { id: string; provider: string; reward: number; surveyUrl?: string }[]
 ): void {
   if (!offers.length) return;
   let userMap = issued.get(userId);
@@ -49,6 +50,7 @@ export function recordIssuedOffers(
       provider: o.provider,
       expectedReward: o.reward,
       expiresAt,
+      surveyUrl: o.surveyUrl,
     });
   }
   pruneUser(userId);

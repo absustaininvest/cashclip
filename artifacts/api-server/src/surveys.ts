@@ -64,7 +64,7 @@ export function registerSurveyRoutes(app: Express): void {
       recordIssuedOffers(
         req.userId!,
         "survey",
-        clamped.map((s) => ({ id: s.id, provider: s.provider, reward: s.reward }))
+        clamped.map((s) => ({ id: s.id, provider: s.provider, reward: s.reward, surveyUrl: s.surveyUrl }))
       );
 
       res.json({
@@ -79,7 +79,7 @@ export function registerSurveyRoutes(app: Express): void {
 
   app.post("/api/surveys/start", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { surveyId, provider, surveyUrl } = req.body;
+      const { surveyId, provider } = req.body;
       if (!surveyId || !provider) {
         res.status(400).json({ error: "surveyId and provider are required" }); return;
       }
@@ -93,6 +93,8 @@ export function registerSurveyRoutes(app: Express): void {
       if (issued.provider !== provider) {
         res.status(400).json({ error: "Provider mismatch for this survey" }); return;
       }
+
+      const surveyUrl: string | undefined = issued.surveyUrl;
 
       const alreadyClaimed = await storage.findCompletedRewardSession(req.userId!, "survey", surveyId);
       if (alreadyClaimed) {

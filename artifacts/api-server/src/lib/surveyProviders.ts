@@ -87,11 +87,33 @@ function getProviderConfigs(): ProviderConfig[] {
   ];
 }
 
-function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined): string {
+const SURVEY_PROVIDER_TRUSTED_HOSTS: Record<string, string[]> = {
+  pollfish: ["pollfish.com", "wss.pollfish.com"],
+  cint: ["cint.com", "survey.cint.com"],
+  lucid: ["samplicio.us", "luc.id"],
+  cpx: ["cpx-research.com", "offers.cpx-research.com", "live.cpx-research.com", "live-api.cpx-research.com"],
+  bitlabs: ["bitlabs.ai", "api.bitlabs.ai"],
+};
+
+function isTrustedSurveyHost(hostname: string, provider: string): boolean {
+  const allowed = SURVEY_PROVIDER_TRUSTED_HOSTS[provider];
+  if (!allowed) return false;
+  const h = hostname.toLowerCase();
+  return allowed.some((domain) => h === domain || h.endsWith(`.${domain}`));
+}
+
+function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined, provider?: string): string {
   if (!url) return "";
-  if (!apiKey || !url.includes(apiKey)) return url;
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
+    parsed = new URL(url);
+  } catch {
+    return "";
+  }
+  if (parsed.protocol !== "https:") return "";
+  if (provider && !isTrustedSurveyHost(parsed.hostname, provider)) return "";
+  if (!apiKey || !url.includes(apiKey)) return parsed.toString();
+  try {
     const toRemove: string[] = [];
     parsed.searchParams.forEach((value, key) => {
       if (value === apiKey) toRemove.push(key);
@@ -105,7 +127,7 @@ function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined):
     }
     return parsed.toString();
   } catch {
-    return url.split("?")[0] || "";
+    return "";
   }
 }
 
@@ -129,7 +151,7 @@ async function fetchPollfishSurveys(config: ProviderConfig): Promise<ExternalSur
       estimatedMinutes: s.loi || s.estimated_minutes || 5,
       category: s.category || "General",
       difficulty: (s.loi && s.loi <= 5 ? "easy" : s.loi <= 10 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.survey_url || `https://wss.pollfish.com/link/survey?survey_id=${s.survey_id || s.id}`, config.apiKey),
+      surveyUrl: sanitizeSurveyUrl(s.survey_url || `https://wss.pollfish.com/link/survey?survey_id=${s.survey_id || s.id}`, config.apiKey, "pollfish"),
     }));
     return surveys;
   } catch (err) {
@@ -157,7 +179,7 @@ async function fetchCintSurveys(config: ProviderConfig): Promise<ExternalSurvey[
       estimatedMinutes: s.loi || s.length_of_interview || 8,
       category: s.category || "Market Research",
       difficulty: (s.loi && s.loi <= 6 ? "easy" : s.loi <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.link || s.survey_url || `https://survey.cint.com/${s.id || s.surveyId}`, config.apiKey),
+      surveyUrl: sanitizeSurveyUrl(s.link || s.survey_url || `https://survey.cint.com/${s.id || s.surveyId}`, config.apiKey, "cint"),
     }));
     return surveys;
   } catch (err) {
@@ -185,7 +207,7 @@ async function fetchLucidSurveys(config: ProviderConfig): Promise<ExternalSurvey
       estimatedMinutes: s.LOI || s.loi || 10,
       category: s.SurveyGroup || s.category || "Research",
       difficulty: (s.LOI && s.LOI <= 6 ? "easy" : s.LOI <= 15 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.SurveyURL || s.survey_url || `https://www.samplicio.us/s/${s.SurveyNumber || s.id}`, config.apiKey),
+      surveyUrl: sanitizeSurveyUrl(s.SurveyURL || s.survey_url || `https://www.samplicio.us/s/${s.SurveyNumber || s.id}`, config.apiKey, "lucid"),
     }));
     return surveys;
   } catch (err) {
@@ -263,7 +285,8 @@ async function fetchCpxSurveys(config: ProviderConfig, userId: string, opts?: Cp
     const surveys: ExternalSurvey[] = list
       .map((s: any): ExternalSurvey | null => {
         const id = String(s?.id ?? s?.survey_id ?? "").trim();
-        const url = String(s?.href ?? s?.href_new ?? "").trim();
+        const rawUrl = String(s?.href ?? s?.href_new ?? "").trim();
+        const url = sanitizeSurveyUrl(rawUrl, config.apiKey, "cpx");
         if (!id || !url) return null;
         const reward = parseFloat(String(s?.payout ?? s?.payout_publisher_usd ?? "0")) || 0;
         const minutes = parseInt(String(s?.loi ?? "5"), 10) || 5;
@@ -313,7 +336,7 @@ async function fetchBitlabsSurveys(config: ProviderConfig, userId: string): Prom
       estimatedMinutes: parseInt(s.loi || s.length || "6", 10),
       category: s.category?.name || "General",
       difficulty: (parseInt(s.loi || "6", 10) <= 5 ? "easy" : parseInt(s.loi || "10", 10) <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.link || s.click_url, config.apiKey),
+      surveyUrl: sanitizeSurveyUrl(s.link || s.click_url, config.apiKey, "bitlabs"),
     }));
     return surveys;
   } catch (err) {

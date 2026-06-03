@@ -1,5 +1,20 @@
 import type { User } from "@workspace/db";
 
+const DEMOGRAPHIC_TRUSTED_HOSTS: Record<string, string[]> = {
+  cint:     ["cint.com", "survey.cint.com"],
+  lucid:    ["samplicio.us", "luc.id"],
+  cpx:      ["cpx-research.com", "offers.cpx-research.com"],
+  bitlabs:  ["bitlabs.ai"],
+  pollfish: ["pollfish.com", "wss.pollfish.com"],
+};
+
+function isTrustedDemographicHost(hostname: string, provider: string): boolean {
+  const allowed = DEMOGRAPHIC_TRUSTED_HOSTS[provider];
+  if (!allowed) return false;
+  const h = hostname.toLowerCase();
+  return allowed.some((domain) => h === domain || h.endsWith(`.${domain}`));
+}
+
 function ageFromDob(dob: string | null | undefined): number | null {
   if (!dob) return null;
   const birth = new Date(dob);
@@ -32,6 +47,9 @@ export function buildDemographicEntryUrl(
   } catch {
     return baseUrl;
   }
+
+  if (url.protocol !== "https:") return baseUrl;
+  if (!isTrustedDemographicHost(url.hostname, provider)) return baseUrl;
 
   const age = ageFromDob(profile.dateOfBirth);
   const country = profile.country || "US";

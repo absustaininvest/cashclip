@@ -170,7 +170,7 @@ async function fetchTapjoyOffers(config: OfferwallProviderConfig): Promise<Offer
       type: normalizeOfferType(o.offer_type || o.type),
       difficulty: (o.payout >= 2 ? "hard" : o.payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
       requiresPayment: o.requires_payment ?? false,
-      offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || `https://app.tapjoy.com/offer/${o.offer_id || o.id}`, config.apiKey),
+      offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || `https://app.tapjoy.com/offer/${o.offer_id || o.id}`, config.apiKey, "tapjoy"),
       brand: o.advertiser_name || o.brand,
       expiresAt: o.expiry_date ? new Date(o.expiry_date).getTime() : undefined,
     }));
@@ -196,7 +196,7 @@ async function fetchAdGateOffers(config: OfferwallProviderConfig): Promise<Offer
       type: normalizeOfferType(o.category || o.type),
       difficulty: (o.payout >= 2 ? "hard" : o.payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
       requiresPayment: !!(o.purchase_required),
-      offerUrl: sanitizeOfferUrl(o.link || o.offer_url || `https://wall.adgaterewards.com/offer/${o.id}`, config.apiKey),
+      offerUrl: sanitizeOfferUrl(o.link || o.offer_url || `https://wall.adgaterewards.com/offer/${o.id}`, config.apiKey, "adgate"),
       brand: o.advertiser || o.brand,
     }));
   } catch (err) {
@@ -221,7 +221,7 @@ async function fetchOfferToroOffers(config: OfferwallProviderConfig): Promise<Of
       type: normalizeOfferType(o.offer_type || o.type),
       difficulty: (o.payout >= 2 ? "hard" : o.payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
       requiresPayment: !!(o.requires_credit_card),
-      offerUrl: sanitizeOfferUrl(o.offer_url || o.tracking_url || `https://www.offertoro.com/offer/${o.offer_id || o.id}`, config.apiKey),
+      offerUrl: sanitizeOfferUrl(o.offer_url || o.tracking_url || `https://www.offertoro.com/offer/${o.offer_id || o.id}`, config.apiKey, "offertoro"),
       brand: o.advertiser || o.brand,
     }));
   } catch (err) {
@@ -248,7 +248,7 @@ async function fetchLootablyOffers(config: OfferwallProviderConfig): Promise<Off
         type: normalizeOfferType(o.offer_type || o.category || o.type),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: !!(o.purchase_required || o.requires_payment),
-        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || `https://lootably.com/offer/${o.offer_id || o.id}`, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || `https://lootably.com/offer/${o.offer_id || o.id}`, config.apiKey, "lootably"),
         brand: o.advertiser || o.brand,
         expiresAt: o.expiry ? new Date(o.expiry).getTime() : undefined,
       };
@@ -280,7 +280,7 @@ async function fetchAdjoeOffers(config: OfferwallProviderConfig): Promise<Offer[
         type: normalizeOfferType(o.offer_type || "app_install"),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: false,
-        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url || `https://adjoe.io/offer/${o.offer_id || o.id}`, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url || `https://adjoe.io/offer/${o.offer_id || o.id}`, config.apiKey, "adjoe"),
         brand: o.advertiser || o.developer || o.brand,
         iconUrl: o.icon_url || o.app_icon,
         expiresAt: o.end_date ? new Date(o.end_date).getTime() : undefined,
@@ -291,11 +291,39 @@ async function fetchAdjoeOffers(config: OfferwallProviderConfig): Promise<Offer[
   }
 }
 
-function sanitizeOfferUrl(url: string | undefined, apiKey: string | undefined): string {
+const OFFER_PROVIDER_TRUSTED_HOSTS: Record<string, string[]> = {
+  tapjoy:      ["tapjoy.com", "app.tapjoy.com"],
+  adgate:      ["adgaterewards.com", "wall.adgaterewards.com"],
+  offertoro:   ["offertoro.com", "www.offertoro.com"],
+  lootably:    ["lootably.com", "www.lootably.com"],
+  adjoe:       ["adjoe.io", "ad-backend.adjoe.io"],
+  adgem:       ["adgem.com", "www.adgem.com"],
+  ayet:        ["ayetstudios.com", "www.ayetstudios.com"],
+  notik:       ["notik.me", "www.notik.me"],
+  revlum:      ["revlum.com", "www.revlum.com"],
+  monlix:      ["monlix.com", "offers.monlix.com"],
+  paymentwall: ["paymentwall.com", "api.paymentwall.com"],
+};
+
+function isTrustedOfferHost(hostname: string, provider: string): boolean {
+  const allowed = OFFER_PROVIDER_TRUSTED_HOSTS[provider];
+  if (!allowed) return false;
+  const h = hostname.toLowerCase();
+  return allowed.some((domain) => h === domain || h.endsWith(`.${domain}`));
+}
+
+function sanitizeOfferUrl(url: string | undefined, apiKey: string | undefined, provider?: string): string {
   if (!url) return "";
-  if (!apiKey || !url.includes(apiKey)) return url;
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
+    parsed = new URL(url);
+  } catch {
+    return "";
+  }
+  if (parsed.protocol !== "https:") return "";
+  if (provider && !isTrustedOfferHost(parsed.hostname, provider)) return "";
+  if (!apiKey || !url.includes(apiKey)) return parsed.toString();
+  try {
     const toRemove: string[] = [];
     parsed.searchParams.forEach((value, key) => {
       if (value === apiKey) toRemove.push(key);
@@ -309,7 +337,7 @@ function sanitizeOfferUrl(url: string | undefined, apiKey: string | undefined): 
     }
     return parsed.toString();
   } catch {
-    return url.split("?")[0] || "";
+    return "";
   }
 }
 
@@ -333,7 +361,7 @@ async function fetchAdGemOffers(config: OfferwallProviderConfig): Promise<Offer[
         type: normalizeOfferType(o.offer_type || o.type),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: !!(o.purchase_required),
-        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || o.link, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url || o.link, config.apiKey, "adgem"),
         brand: o.advertiser || o.brand,
       };
     });
@@ -362,7 +390,7 @@ async function fetchAyetOffers(config: OfferwallProviderConfig): Promise<Offer[]
         type: normalizeOfferType(o.offer_type || o.category),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: false,
-        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.tracking_url || o.url, config.apiKey, "ayet"),
         brand: o.advertiser || o.brand,
         iconUrl: o.icon_url,
       };
@@ -391,7 +419,7 @@ async function fetchNotikOffers(config: OfferwallProviderConfig): Promise<Offer[
         type: normalizeOfferType(o.type || o.category),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: false,
-        offerUrl: sanitizeOfferUrl(o.link || o.click_url, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.link || o.click_url, config.apiKey, "notik"),
         brand: o.brand || o.advertiser,
       };
     });
@@ -419,7 +447,7 @@ async function fetchRevlumOffers(config: OfferwallProviderConfig): Promise<Offer
         type: normalizeOfferType(o.type || o.category),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: false,
-        offerUrl: sanitizeOfferUrl(o.link || o.click_url || o.offer_url, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.link || o.click_url || o.offer_url, config.apiKey, "revlum"),
         brand: o.brand || o.advertiser,
       };
     });
@@ -448,7 +476,7 @@ async function fetchMonlixOffers(config: OfferwallProviderConfig): Promise<Offer
         type: normalizeOfferType(o.type || o.category),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: !!(o.requires_payment),
-        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.click_url || o.offer_url, config.apiKey, "monlix"),
         brand: o.brand || o.advertiser,
       };
     });
@@ -476,7 +504,7 @@ async function fetchPaymentwallOffers(config: OfferwallProviderConfig): Promise<
         type: normalizeOfferType(o.type),
         difficulty: (payout >= 2 ? "hard" : payout >= 0.75 ? "medium" : "easy") as Offer["difficulty"],
         requiresPayment: false,
-        offerUrl: sanitizeOfferUrl(o.url || o.link, config.apiKey),
+        offerUrl: sanitizeOfferUrl(o.url || o.link, config.apiKey, "paymentwall"),
         brand: o.advertiser,
       };
     });
