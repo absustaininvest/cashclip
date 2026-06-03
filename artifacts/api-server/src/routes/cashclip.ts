@@ -1965,7 +1965,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(campaignsTable)
         .where(drizzleEqLocal(campaignsTable.userId, req.userId!))
         .orderBy(drizzleDescLocal(campaignsTable.createdAt));
-      res.json({ campaigns: rows });
+
+      // Augment each campaign with its callbackKey so the publisher can
+      // configure their server-side postback. The key is campaign-specific and
+      // is never included in any response visible to campaign visitors.
+      const { createHmac: _hmacList } = await import("node:crypto");
+      const _cbSecretList = process.env.JWT_ACCESS_SECRET ?? "";
+      const campaignsWithKey = rows.map((c) => ({
+        ...c,
+        callbackKey: _hmacList("sha256", _cbSecretList)
+          .update(c.id + ":cbk-v1")
+          .digest("hex"),
+      }));
+      res.json({ campaigns: campaignsWithKey });
     } catch (err) {
       req.log.error({ err }, "Publisher list campaigns failed");
       res.status(500).json({ error: "Failed to load campaigns" });
@@ -2034,8 +2046,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw txErr;
       }
 
+      // Derive the campaign's callbackKey and include it in the creation
+      // response so the publisher can configure their server-side postback.
+      // This is the only time it's safe to return the key — the owner just
+      // created the campaign and should save it immediately.
+      const { createHmac: _hmacCreate } = await import("node:crypto");
+      const _cbSecretCreate = process.env.JWT_ACCESS_SECRET ?? "";
+      const callbackKey = _hmacCreate("sha256", _cbSecretCreate)
+        .update(campaign.id + ":cbk-v1")
+        .digest("hex");
+
       req.log.info({ userId: req.userId, campaignId: campaign.id, totalBudget }, "Campaign created");
-      res.status(201).json({ campaign });
+      res.status(201).json({ campaign: { ...campaign, callbackKey } });
     } catch (err) {
       req.log.error({ err }, "Create campaign failed");
       res.status(500).json({ error: "Failed to create campaign" });
@@ -2383,7 +2405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const redirectUrl = `${base.replace(/\/+$/, "")}/api/earn/sponsored/r/${token}?vst=${visitSessionToken}`;
 
-      res.json({ attemptToken: token, redirectUrl, visitSessionToken });
+      res.json({ attemptToken: token, redirectUrl });
     } catch (err: any) {
       req.log.error({ err }, "Sponsored visit begin failed");
       res.status(500).json({ error: "Failed to begin visit" });
@@ -2510,9 +2532,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipHash = createHash("sha256").update(ip).digest("hex");
       const uaHash = createHash("sha256").update(ua).digest("hex");
 
-      // Generate a single-use witness nonce, stored in the DB.
-      // Set as an HttpOnly cookie — the browser sends it automatically on same-site
-      // requests. /ack validates it matches the DB-stored nonce as a binding check.
+      // Generate a single-use witness nonce stored only in the DB.
+      // The nonce is NEVER returned to the client — it lives server-side only.
+      // /ack re-derives the ackToken from the DB-stored nonce; /c validates it.
+      // This prevents a script from extracting the nonce via Set-Cookie response
+      // headers (HttpOnly only stops browser JS; any HTTP client can read headers).
       const { randomBytes: _rnd } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
       res.setHeader("Set-Cookie",
@@ -2792,13 +2816,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(403).json({ error: "Witness nonce missing — reopen the link" }); return;
       }
 
-      // Validate cc_w cookie against DB-stored nonce
-      const ccwCookie = (req.headers.cookie ?? "").split(";")
-        .map((s: string) => s.trim()).find((s: string) => s.startsWith("cc_w="))?.slice("cc_w=".length) ?? "";
-      if (!ccwCookie || ccwCookie !== attempt.witnessNonce) {
-        req.log?.warn?.({ token: token.slice(0, 8) + "…" }, "Sponsored ack: cookie/nonce mismatch");
-        res.status(403).json({ error: "Witness validation failed" }); return;
-      }
+      // The witnessNonce is stored server-side only — it is never sent to the
+      // client (no Set-Cookie header in /r). The ackToken is derived from it:
+      // ackToken = HMAC(token:witnessNonce, secret). /c validates the ackToken
+      // by re-deriving from the stored nonce, so the nonce never leaves the DB.
 
       // IP+UA binding — same client that opened /r must call /ack
       if (attempt.redirectIpHash || attempt.redirectUaHash) {
@@ -3026,21 +3047,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // ── Sec-Fetch-Mode enforcement ─────────────────────────────────────────
+      // ── Fetch-Metadata enforcement ────────────────────────────────────────
       // /c must be reached via a top-level browser navigation — not XHR, fetch,
       // or a plain HTTP script. The interstitial JS navigates here (via
       // window.location.replace) after /ack confirms the timing gate.
-      // Browsers on Chrome 76+, Firefox 90+, Edge 79+, and Safari 16.4+
-      // send Sec-Fetch-Mode: "navigate" for top-level navigations.
-      // We require the header to be present AND equal to "navigate":
-      //   - missing → plain HTTP clients (curl, axios, node-fetch) → rejected
-      //   - cors / same-origin / no-cors → browser AJAX/fetch call → rejected
-      // Note: iOS WKWebView / older iOS Safari <16.4 may also be rejected by
-      // this gate. Those sessions use in-app browser tabs (expo-web-browser /
-      // ASWebAuthenticationSession) which send Sec-Fetch-Mode on current builds.
+      //
+      // We require BOTH Fetch-Metadata headers to match the expected values for
+      // a top-level browser navigation. Browsers set these headers automatically
+      // and correctly; an attacker must spoof both simultaneously to pass this
+      // gate, which raises the bar compared to checking only one header.
+      //
+      //   Sec-Fetch-Mode: navigate   — present on Chrome 76+, Firefox 90+,
+      //                                Edge 79+, Safari 16.4+; absent from
+      //                                curl, axios, node-fetch, etc.
+      //   Sec-Fetch-Dest: document   — always "document" for top-level
+      //                                navigations; "empty" for XHR/fetch;
+      //                                absent from plain HTTP scripts.
+      //
+      // Browsers set both; scripts that spoof one often miss the other.
+      // Note: iOS WKWebView / in-app browser (expo-web-browser /
+      // ASWebAuthenticationSession) sends both headers on current builds.
       const secFetchMode = String(req.headers["sec-fetch-mode"] ?? "");
-      if (secFetchMode !== "navigate") {
-        req.log?.warn?.({ token: token.slice(0, 8) + "…", secFetchMode: secFetchMode || "(absent)" }, "Sponsored /c: rejected — Sec-Fetch-Mode not 'navigate'");
+      const secFetchDest = String(req.headers["sec-fetch-dest"] ?? "");
+      if (secFetchMode !== "navigate" || secFetchDest !== "document") {
+        req.log?.warn?.({
+          token: token.slice(0, 8) + "…",
+          secFetchMode: secFetchMode || "(absent)",
+          secFetchDest: secFetchDest || "(absent)",
+        }, "Sponsored /c: rejected — Fetch-Metadata not consistent with browser navigation");
         res.status(403).send("This endpoint requires top-level browser navigation."); return;
       }
       // ─────────────────────────────────────────────────────────────────────
@@ -3069,54 +3103,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ─────────────────────────────────────────────────────────────────────
 
       if (!attempt.settledAt && !attempt.witnessedAt) {
-        // Record witnessedAt on this server-observed redirect — the server
-        // itself calls this endpoint (not the client), so this timestamp is
-        // server-controlled. Combined with the Sec-Fetch-Mode gate above and
-        // the VST binding, these form layered controls:
-        //   • Sec-Fetch-Mode: raises the bar against browser-based scripts.
-        //   • witnessedAt (set here): proves /c was reached via the chain.
-        //   • VST binding: ties the chain to the originating session.
-        // COALESCE guard ensures concurrent /c calls are idempotent.
+        // Burn the witness nonce so the ackToken cannot be replayed.
+        // witnessedAt is NOT set here — it is set ONLY by the advertiser-origin
+        // pixel callback at /api/earn/sponsored/pixel/:pixelToken, which fires
+        // when the user's real browser renders the <img> pixel on the advertiser's
+        // landing page. Settlement at /visit requires witnessedAt; without the
+        // pixel firing from the advertiser's domain, that column stays null and
+        // /visit rejects with 400. This means the claimant cannot settle just by
+        // completing the /c redirect — they must also produce an advertiser-origin
+        // callback that the server validates independently.
         await dbClient.update(attemptsTable)
-          .set({
-            witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
-            witnessNonce: null,
-          })
+          .set({ witnessNonce: null })
           .where(drizzleAndLocal(
             drizzleEqLocal(attemptsTable.token, token),
-            drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
+            drizzleSql`${attemptsTable.witnessNonce} IS NOT NULL`,
           ));
-        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: witnessedAt recorded");
+        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: nonce burned; awaiting advertiser pixel");
       }
 
       if (!targetUrl) {
         res.status(410).send("Campaign no longer available"); return;
       }
 
-      // Build optional corroboration pixel URL appended to the advertiser
-      // redirect. Advertisers may add <img src="{cashclip_cb}"> to their
-      // landing pages; when rendered, the browser fires a callback from the
-      // sponsor's origin which the /pixel endpoint records. This is optional
-      // analytics/corroboration — settlement does NOT require it (witnessedAt
-      // is already set above at /c time).
-      const { createHmac: _hmacPx } = await import("node:crypto");
-      const _pxSecret = process.env.JWT_ACCESS_SECRET ?? "";
-      const pixelToken = _hmacPx("sha256", _pxSecret)
-        .update(token + ":" + attempt.userId + ":pixel")
-        .digest("hex");
-      const apiBase = process.env.PUBLIC_BASE_URL
-        ?? (process.env.REPLIT_DOMAINS
-          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
-          : `${req.protocol}://${req.get("host")}`);
-      const pixelUrl = `${apiBase.replace(/\/+$/, "")}/api/earn/sponsored/pixel/${pixelToken}?t=${encodeURIComponent(token)}`;
-
+      // Redirect to the advertiser page. We append `cashclip_t=<attemptToken>`
+      // as a parameter so the advertiser's SERVER can read it and call our
+      // server-to-server postback at POST /api/earn/sponsored/postback.
+      //
+      // Security design — why not a browser pixel any more:
+      //   The old browser-pixel approach embedded the pixelToken in the Location
+      //   header of this response. A script could read that header, extract the
+      //   token, and call the pixel endpoint directly with a spoofed Referer.
+      //   That made witnessedAt reachable through purely claimant-controlled data.
+      //
+      //   The postback model breaks this: the callbackKey (HMAC of campaignId
+      //   with JWT_ACCESS_SECRET) is shown only to the campaign owner in the
+      //   publisher dashboard. It is NEVER included in any response the claimant
+      //   sees. A script completing this chain still cannot call /postback because
+      //   it doesn't have callbackKey — settlement therefore stays null until the
+      //   advertiser's server makes the authenticated postback call.
       let advertiserRedirect: string;
       try {
         const u = new URL(targetUrl);
-        u.searchParams.set("cashclip_cb", pixelUrl);
+        u.searchParams.set("cashclip_t", token);
         advertiserRedirect = u.toString();
       } catch {
-        advertiserRedirect = targetUrl + (targetUrl.includes("?") ? "&" : "?") + "cashclip_cb=" + encodeURIComponent(pixelUrl);
+        advertiserRedirect = targetUrl + (targetUrl.includes("?") ? "&" : "?") + "cashclip_t=" + encodeURIComponent(token);
       }
 
       res.setHeader("Cache-Control", "no-store");
@@ -3131,46 +3162,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  /**
-   * Sponsored visit pixel — server-side witness callback from the sponsor's origin.
+  /** DEPRECATED — replaced by POST /api/earn/sponsored/postback.
    *
-   * The /c endpoint appends this pixel URL as `?cashclip_cb=<pixelUrl>` to the
-   * advertiser redirect. Advertisers add <img src="{cashclip_cb}" width="1"
-   * height="1" /> to their landing pages. When the USER'S BROWSER renders the
-   * advertiser page it fires a GET to this endpoint FROM the sponsor's origin,
-   * carrying `Referer: https://advertiser.com/` that the server validates.
-   *
-   * Security properties:
-   * - pixelToken = HMAC-SHA256(attemptToken:userId:pixel, JWT_ACCESS_SECRET) —
-   *   unforgeable without the server secret.
-   * - Referer header must match the campaign's targetUrl domain. Browsers send
-   *   this automatically on resource loads; it is not a request header clients
-   *   can intercept during normal browsing.
-   * - IP binding: request IP must match the hash recorded at /r time, binding
-   *   the pixel load to the same device that started the visit.
-   * - witnessedAt is set here (not in /c) so the claimant cannot set it by
-   *   calling /c alone — a callback from the sponsor origin is required.
+   *  The browser-pixel approach embedded the pixelToken in the /c redirect URL.
+   *  A script reading the Location header could extract the token and call this
+   *  endpoint directly with a spoofed Referer, bypassing the witness requirement.
+   *  Returns 410 Gone so any cached links fail explicitly.
    */
-  app.get("/api/earn/sponsored/pixel/:pixelToken", async (req, res) => {
-    // Return a 1×1 transparent GIF regardless of outcome so the browser does
-    // not show a broken-image icon on the advertiser's page.
-    const TRANSPARENT_GIF = Buffer.from(
-      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64",
-    );
-    const sendPixel = () => {
-      res.setHeader("Content-Type", "image/gif");
-      res.setHeader("Cache-Control", "no-store, no-cache");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.end(TRANSPARENT_GIF);
-    };
+  app.get("/api/earn/sponsored/pixel/:pixelToken", (_req, res) => {
+    res.status(410).json({
+      error: "This endpoint has been replaced by the server-to-server postback. See POST /api/earn/sponsored/postback.",
+    });
+  });
 
+  /**
+   * Server-to-server advertiser postback — the ONLY path that sets witnessedAt.
+   *
+   * The advertiser's backend reads `?cashclip_t=<attemptToken>` from the /c
+   * redirect URL, then calls this endpoint with their campaign's callbackKey.
+   * The callbackKey is shown only to the campaign owner in the publisher
+   * dashboard and is never included in any response the visiting user sees.
+   *
+   * Security design:
+   *   callbackKey = HMAC-SHA256(campaignId + ":cbk-v1", JWT_ACCESS_SECRET)
+   *   The key is server-derivable but unknown to the claimant because it is
+   *   never returned in any API response the visitor is entitled to call.
+   *   A script that completes the full /begin → /r → /ack → /c chain gets
+   *   only `cashclip_t=<attemptToken>` in the redirect URL — not callbackKey.
+   *   Without callbackKey it cannot call this endpoint, so witnessedAt stays
+   *   null and /visit refuses settlement.
+   *
+   * Rate-limited at the IP level (fail-closed).
+   */
+  app.post("/api/earn/sponsored/postback", async (req, res) => {
     try {
-      const pixelToken = String(req.params.pixelToken ?? "");
-      const attemptToken = String(req.query.t ?? "");
+      const { attemptToken, callbackKey } = (req.body ?? {}) as {
+        attemptToken?: string;
+        callbackKey?: string;
+      };
 
-      if (!/^[a-f0-9]{64}$/.test(pixelToken) || !/^[a-f0-9]{64}$/.test(attemptToken)) {
-        sendPixel(); return;
+      if (
+        typeof attemptToken !== "string" || !/^[a-f0-9]{64}$/.test(attemptToken) ||
+        typeof callbackKey  !== "string" || !/^[a-f0-9]{64}$/.test(callbackKey)
+      ) {
+        res.status(400).json({ error: "attemptToken (64 hex) and callbackKey (64 hex) are required." });
+        return;
       }
+
+      // ── Per-IP rate limit ──────────────────────────────────────────────────
+      {
+        const { getClientIp: _pbip } = await import("../lib/clientIp");
+        const { recordLoginAttempt: _pbrl } = await import("../lib/dbRateLimit");
+        const _pbipVal = _pbip(req);
+        const _pbLimit = Math.max(1, parseInt(process.env.SPONSORED_POSTBACK_IP_LIMIT ?? "60", 10));
+        try {
+          const { allowed } = await _pbrl(`sponsored:postback:ip:${_pbipVal}`, _pbLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ ip: _pbipVal }, "Sponsored postback rate limit exceeded (IP)");
+            res.status(429).json({ error: "Too many postback requests. Please try again later." }); return;
+          }
+        } catch (rlErr) {
+          req.log?.error?.({ err: rlErr }, "Sponsored postback IP rate-limit check failed — failing closed");
+          res.status(503).json({ error: "Rate limit check unavailable — please retry." }); return;
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
 
       const {
         db: dbClient,
@@ -3178,88 +3234,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         campaignVisitAttempts: attemptsTable,
       } = await import("@workspace/db");
       const { sql: drizzleSql, eq: drizzleEqLocal, and: drizzleAndLocal } = await import("drizzle-orm");
+      const { createHmac: _hmacPb, timingSafeEqual: _tsePb } = await import("node:crypto");
 
-      // Load attempt row to get userId and validate expiry.
       const [attempt] = await dbClient.select().from(attemptsTable)
         .where(drizzleEqLocal(attemptsTable.token, attemptToken));
-      if (!attempt || attempt.expiresAt.getTime() < Date.now() || attempt.settledAt) {
-        sendPixel(); return;
+      if (!attempt) {
+        res.status(404).json({ error: "Attempt not found." }); return;
+      }
+      if (attempt.expiresAt.getTime() < Date.now()) {
+        res.status(410).json({ error: "Attempt expired." }); return;
+      }
+      if (attempt.settledAt) {
+        res.status(409).json({ error: "Already settled." }); return;
       }
 
-      // Validate pixelToken = HMAC(attemptToken:userId:pixel, JWT_ACCESS_SECRET).
-      // This proves /c was called and the token is legitimate.
-      const { createHmac: _hmacPx, timingSafeEqual: _tsePx } = await import("node:crypto");
-      const _pxSecret = process.env.JWT_ACCESS_SECRET ?? "";
-      const expectedToken = _hmacPx("sha256", _pxSecret)
-        .update(attemptToken + ":" + attempt.userId + ":pixel")
-        .digest("hex");
-      const providedBuf = Buffer.from(pixelToken, "hex");
-      const expectedBuf = Buffer.from(expectedToken, "hex");
-      if (providedBuf.length !== expectedBuf.length || !_tsePx(providedBuf, expectedBuf)) {
-        req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: HMAC mismatch");
-        sendPixel(); return;
-      }
-
-      // ── Sponsor-origin Referer validation ────────────────────────────────
-      // The pixel fires from the advertiser's page, so the browser sends
-      // Referer: https://advertiser.com/ automatically. We validate that the
-      // Referer origin matches the campaign's targetUrl domain. A script that
-      // calls the pixel URL directly would have to know AND supply the correct
-      // Referer — and would still be blocked by IP binding below if calling
-      // from a different host than the /r request.
-      const [camp] = await dbClient.select().from(campaignsTable)
+      const [campaign] = await dbClient.select().from(campaignsTable)
         .where(drizzleEqLocal(campaignsTable.id, attempt.campaignId));
-      if (camp?.targetUrl) {
-        const referer = String(req.headers["referer"] ?? req.headers["referrer"] ?? "");
-        try {
-          const targetOrigin = new URL(camp.targetUrl).origin;   // e.g. https://advertiser.com
-          const refOrigin = referer ? new URL(referer).origin : "";
-          if (!refOrigin || refOrigin !== targetOrigin) {
-            req.log?.warn?.({
-              attemptToken: attemptToken.slice(0, 8) + "…",
-              refOrigin, targetOrigin,
-            }, "Sponsored pixel: Referer origin mismatch — pixel not fired from sponsor domain");
-            sendPixel(); return;
-          }
-        } catch {
-          req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: invalid Referer or targetUrl");
-          sendPixel(); return;
-        }
+      if (!campaign) {
+        res.status(404).json({ error: "Campaign not found." }); return;
       }
 
-      // ── IP binding ───────────────────────────────────────────────────────
-      // The pixel fires from the user's browser, which visited /r from the
-      // same device. Verify the pixel request IP matches the /r request IP.
-      if (attempt.redirectIpHash) {
-        const { createHash: _chPx } = await import("node:crypto");
-        const { getClientIp: _gcipPx } = await import("../lib/clientIp");
-        const currentIpHash = _chPx("sha256").update(_gcipPx(req)).digest("hex");
-        if (currentIpHash !== attempt.redirectIpHash) {
-          req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: IP mismatch");
-          sendPixel(); return;
-        }
+      // Validate callbackKey = HMAC-SHA256(campaignId + ":cbk-v1", JWT_ACCESS_SECRET).
+      // This key is returned only to the campaign owner (publisher) in the
+      // dashboard — never in any response the visiting claimant can receive.
+      const _cbSecret = process.env.JWT_ACCESS_SECRET;
+      if (!_cbSecret) {
+        req.log?.error?.({}, "Sponsored postback: JWT_ACCESS_SECRET not configured");
+        res.status(500).json({ error: "Server configuration error" }); return;
+      }
+      const expectedKey = _hmacPb("sha256", _cbSecret)
+        .update(campaign.id + ":cbk-v1")
+        .digest();
+      let providedKeyBuf: Buffer;
+      try { providedKeyBuf = Buffer.from(callbackKey, "hex"); } catch { providedKeyBuf = Buffer.alloc(0); }
+      if (providedKeyBuf.length !== expectedKey.length || !_tsePb(providedKeyBuf, expectedKey)) {
+        req.log?.warn?.({ campaignId: campaign.id }, "Sponsored postback: callbackKey mismatch — rejected");
+        res.status(403).json({ error: "Invalid callback key." }); return;
       }
 
-      // All checks passed — atomically set witnessedAt (COALESCE ensures
-      // concurrent pixel fires are idempotent) and clear witnessNonce.
+      // All checks passed — set witnessedAt atomically.
       if (!attempt.witnessedAt) {
         await dbClient.update(attemptsTable)
-          .set({
-            witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
-            witnessNonce: null,
-          })
+          .set({ witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())` })
           .where(drizzleAndLocal(
             drizzleEqLocal(attemptsTable.token, attemptToken),
             drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
           ));
-        req.log?.info?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: witnessedAt set from sponsor-origin callback");
+        req.log?.info?.({ attemptToken: attemptToken.slice(0, 8) + "…", campaignId: campaign.id },
+          "Sponsored postback: witnessedAt set by advertiser server callback");
       }
-    } catch (err: any) {
-      req.log?.error?.({ err }, "Sponsored pixel handler error");
-    }
 
-    // Always return the pixel (errors must not break the advertiser's page).
-    sendPixel();
+      res.json({ ok: true });
+    } catch (err: any) {
+      req.log?.error?.({ err }, "Sponsored postback handler error");
+      res.status(500).json({ error: "Postback failed" });
+    }
   });
 
   /** Earn: record a sponsored campaign visit + credit the visitor.
@@ -3390,9 +3419,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await releaseIpSlot("not-redirected");
         res.status(400).json({ error: "Open the visit link before claiming the reward." }); return;
       }
-      // witnessedAt must be set — proves /c was called (set by /c on the
-      // server, not self-reported by the client). Without /c, witnessedAt
-      // is null and /visit refuses. A script that skips /c cannot settle.
+      // witnessedAt must be set — proves the advertiser-origin pixel fired.
+      // witnessedAt is set ONLY by /api/earn/sponsored/pixel/:pixelToken when the
+      // user's browser renders the tracking pixel on the advertiser's landing page.
+      // /c does NOT set witnessedAt; it only burns the witness nonce. A script can
+      // complete the full /begin → /r → /ack → /c chain and still cannot settle
+      // here because the pixel requires a browser request from the advertiser's
+      // domain with a matching Referer origin, which a non-browser script cannot
+      // produce without also knowing JWT_ACCESS_SECRET (needed to derive pixelToken).
       if (!attempt.witnessedAt) {
         await releaseIpSlot("not-witnessed");
         res.status(400).json({
@@ -3401,12 +3435,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-
-      // Dwell time is measured from witnessedAt (set by /c), not redirectedAt. This means:
+      // Dwell time is measured from witnessedAt (set by the advertiser pixel),
+      // not redirectedAt. This means:
       //   • The interstitial minimum dwell (MIN_INTERSTITIAL_DWELL_MS, default 5 s)
       //     elapses between /r and /c.
       //   • This additional dwell (MIN_SPONSORED_VISIT_MS, default 10 s) elapses
-      //     between /c and /visit.
+      //     between the pixel firing (witnessedAt) and /visit.
       //   • Total minimum time: ~15 s per claim, fully server-enforced.
       const MIN_VISIT_MS = parseInt(process.env.MIN_SPONSORED_VISIT_MS ?? "10000", 10);
       const elapsed = Date.now() - attempt.witnessedAt!.getTime();
