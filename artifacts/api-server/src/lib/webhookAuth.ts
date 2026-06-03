@@ -52,6 +52,16 @@ const WEBHOOK_CONFIGS: Record<string, WebhookSecretConfig> = {
     secretEnvVar: "BITLABS_WEBHOOK_SECRET",
     secret: process.env.BITLABS_WEBHOOK_SECRET,
   },
+  lootably: {
+    provider: "lootably",
+    secretEnvVar: "LOOTABLY_WEBHOOK_SECRET",
+    secret: process.env.LOOTABLY_WEBHOOK_SECRET,
+  },
+  adjoe: {
+    provider: "adjoe",
+    secretEnvVar: "ADJOE_WEBHOOK_SECRET",
+    secret: process.env.ADJOE_WEBHOOK_SECRET,
+  },
 };
 
 export function reloadWebhookSecrets(): void {

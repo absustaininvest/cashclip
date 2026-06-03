@@ -12,3 +12,5 @@
 - [CashClip App Store identity](cashclip-appstore-identity.md) — Apple ID 6759931285; URL https://apps.apple.com/us/apps/cashclip/id6759931285/; name "CashClip: Earn Real Money".
 - [CPX get-surveys JSON API](cpx-survey-list-api.md) — use host `live-api.cpx-research.com` + `output_method=api` (json returns HTML!); pass user ip/UA; payout is USD for this app; still clamp.
 - [cash-clip.app app-ads.txt serving](app-ads-txt-serving.md) — crawled app-ads.txt is served by cashclip serve.js, NOT the api-server route (decoy, google-only); replace list wholesale + republish web deploy.
+- [Attached assets purge log](attached-assets-purge-log.md) — June 3 2026: 104 images/IPA deleted on owner request; 10 .txt/.pdf kept; includes credential screenshots (EXPO_TOKLAST, SECRETS_PASSPHRASE, etc.) now gone.
+- [AdMob mediation state](admob-mediation-state.md) — Jun 3 2026 snapshot: iOS only, last month $46.72; Priority 1 mediation group has ZERO traffic (broken); Priority 2 doing all work ($6.62/7d); Unity Ads not yet live (only in rejected build 38).

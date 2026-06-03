@@ -1427,6 +1427,25 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        postbackSecret: import("drizzle-orm/pg-core").PgColumn<{
+            name: "postback_secret";
+            tableName: "campaigns";
+            dataType: "string";
+            columnType: "PgVarchar";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            length: 64;
+        }>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "campaigns";
@@ -2552,6 +2571,7 @@ export declare const insertCampaignSchema: z.ZodObject<{
     targetUrl: z.ZodString;
     rewardPerVisit: z.ZodOptional<z.ZodString>;
     totalBudget: z.ZodOptional<z.ZodString>;
+    postbackSecret: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};

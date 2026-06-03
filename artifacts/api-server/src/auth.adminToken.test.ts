@@ -22,19 +22,20 @@ import request from "supertest";
  * All external dependencies are mocked so tests run without a real DB.
  */
 
-const mockGetUser = vi.fn();
+const mockGetUser = vi.hoisted(() => vi.fn());
 const mockRecordLoginAttempt = vi.fn();
 const mockCheckLoginAttempts = vi.fn();
 const mockClearLoginAttempts = vi.fn();
 
-vi.mock("./storage", () => ({
-  storage: {
-    getUser: (...args: unknown[]) => mockGetUser(...args),
-    getUserByUsername: vi.fn(),
-    createUser: vi.fn(),
-    setEmailVerificationToken: vi.fn(),
-  },
-}));
+vi.mock("./storage", async () => {
+  const { createStorageMock } = await import("./testHelpers/mockStorage");
+  return {
+    storage: {
+      ...createStorageMock({ getUser: mockGetUser }),
+      setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 vi.mock("./lib/dbRateLimit", () => ({
   recordLoginAttempt: (...args: unknown[]) => mockRecordLoginAttempt(...args),

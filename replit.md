@@ -29,8 +29,10 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `TAPJOY_APP_ID` | Tapjoy app identifier — sent as `app_id` on Tapjoy offers/verify API calls |
 | `TAPJOY_REPORTING_KEY` | Tapjoy Reporting API key — stored in config for pulling Tapjoy earnings reports |
 | `LOOTABLY_API_KEY` | Lootably offerwall integration |
+| `LOOTABLY_WEBHOOK_SECRET` | Lootably webhook validation — secret from Lootably dashboard, used to verify inbound completion callbacks at `/api/offerwalls/webhook/lootably` |
 | `ADJOE_SDK_KEY` | Adjoe offerwall SDK key |
 | `ADJOE_APP_ID` | Adjoe offerwall app ID |
+| `ADJOE_WEBHOOK_SECRET` | Adjoe webhook validation — secret from Adjoe dashboard, used to verify inbound completion callbacks at `/api/offerwalls/webhook/adjoe` |
 | `APP_VISIT_PROOF_KEY` | Sponsored-visit app attestation key. Must be a 32-byte random hex string. Set as an EAS secret (not `EXPO_PUBLIC_APP_VISIT_PROOF_KEY` — it must NOT be EXPO_PUBLIC so it is not intentionally client-exposed). app.config.js reads this and embeds it in `extra.appVisitProofKey`; the app reads it via `Constants.expoConfig.extra.appVisitProofKey`. The server reads it from this env var to validate HMAC-SHA256 attestations at `/api/earn/sponsored/:id/visit`. Must match on both sides. |
 
 ## Apps / Artifacts

@@ -142,6 +142,7 @@ export const campaigns = pgTable(
     clicks: integer("clicks").notNull().default(0),
     status: text("status").notNull().default("pending"),
     adminNote: text("admin_note"),
+    postbackSecret: varchar("postback_secret", { length: 64 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

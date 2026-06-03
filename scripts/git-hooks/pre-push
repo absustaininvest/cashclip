@@ -58,4 +58,16 @@ if [ "$NEEDS_CHECK" -eq 1 ]; then
   fi
 fi
 
+# --- Vitest config guardrail check ---
+# Ensures every vitest.config.ts in the repo either imports vitest.config.base
+# or explicitly sets passWithNoTests: false.  A missing guardrail lets empty
+# test suites silently pass in CI.
+printf '\n[pre-push] Checking vitest configs enforce no-empty-suite rule...\n'
+pnpm --filter @workspace/scripts run check-vitest-configs
+VITEST_CFG_EXIT=$?
+if [ "$VITEST_CFG_EXIT" -ne 0 ]; then
+  printf '\n[pre-push] vitest config check failed. Fix the config(s) above or use --no-verify to skip.\n'
+  exit "$VITEST_CFG_EXIT"
+fi
+
 exit 0
