@@ -1,12 +1,6 @@
 ---
 name: Attached Assets Purge Log
-description: Running log of attached_assets/ purges. Images deleted on request; .txt/.pdf kept.
----
-
-# Attached Assets — Purge Record (June 3, 2026 — second purge)
-
-4 app screenshots deleted (IMG_0176, IMG_0177, IMG_0661, IMG_0662): wallet/home balance inconsistency + withdrawal modal screenshots from two user accounts. Purge command run directly in bash (script vaulted, not written to disk).
-
+description: Summary of what was in attached_assets/ before the June 3 2026 purge. Images and binaries deleted; .txt/.pdf kept.
 ---
 
 # Attached Assets — Purge Record (June 3, 2026)

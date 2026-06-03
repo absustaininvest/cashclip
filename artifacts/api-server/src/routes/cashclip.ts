@@ -19,17 +19,15 @@ import {
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
 import { db, updateUserProfileSchema } from "@workspace/db";
-import { AD_CATEGORIES, adCategorySchema } from "@workspace/api-zod";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
-import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook, verifyWebhookRegistration } from "../paypal";
+import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
 import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
-import { maybeSendThresholdPush } from "../lib/push";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
@@ -578,26 +576,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? "Saved to encrypted server store and will survive restarts."
         : "Stored in the running server process only. Set JWT_SECRET to enable durable storage, or add the value to project Secrets.",
     });
-
-    if (integration.envKey === "PAYPAL_WEBHOOK_ID") {
-      verifyWebhookRegistration()
-        .then((result) => {
-          if (result.ok) {
-            req.log.info(
-              { webhookId: result.webhookId },
-              "PayPal webhook registration re-checked after key update: OK",
-            );
-          } else {
-            req.log.warn(
-              { webhookId: result.webhookId, warnings: result.warnings, error: result.error },
-              "PayPal webhook registration re-checked after key update: issues found",
-            );
-          }
-        })
-        .catch((err: unknown) => {
-          req.log.error({ err }, "PayPal webhook re-check failed after PAYPAL_WEBHOOK_ID update");
-        });
-    }
   });
 
   app.delete("/api/admin/integrations/:id/key", adminMiddleware, secretsPassphraseMiddleware, async (req: AuthRequest, res) => {
@@ -632,19 +610,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? "Removed from the encrypted server store and the running process."
         : "Cleared from the running process. If a value is also set in project Secrets, it will return on restart — remove it there too.",
     });
-
-    if (integration.envKey === "PAYPAL_WEBHOOK_ID") {
-      verifyWebhookRegistration()
-        .then((result) => {
-          req.log.info(
-            { webhookId: result.webhookId, ok: result.ok },
-            "PayPal webhook registration re-checked after PAYPAL_WEBHOOK_ID deletion",
-          );
-        })
-        .catch((err: unknown) => {
-          req.log.error({ err }, "PayPal webhook re-check failed after PAYPAL_WEBHOOK_ID deletion");
-        });
-    }
   });
 
   /**
@@ -1113,47 +1078,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  /**
-   * GET /api/admin/paypal/webhook-health
-   *
-   * Returns the most-recent result of the startup PayPal webhook registration
-   * check (ID validity, URL match, required event subscriptions). The check
-   * runs once at startup; this endpoint surfaces the cached result so the
-   * admin dashboard can display it without re-calling PayPal. Call
-   * POST /api/admin/paypal/webhook-health/refresh to force a live re-check.
-   */
-  app.get("/api/admin/paypal/webhook-health", adminMiddleware, async (_req: AuthRequest, res) => {
-    const { getCachedWebhookRegistrationResult } = await import("../paypal");
-    const cached = getCachedWebhookRegistrationResult();
-    if (!cached) {
-      res.json({ checked: false, message: "Startup check has not run yet or PayPal is not configured" });
-      return;
-    }
-    res.json({ checked: true, ...cached });
-  });
-
-  app.post("/api/admin/paypal/webhook-health/refresh", adminMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const { verifyWebhookRegistration } = await import("../paypal");
-      const result = await verifyWebhookRegistration();
-      if (!result.ok) {
-        req.log.warn({ warnings: result.warnings, error: result.error }, "PayPal webhook registration re-check: issues found");
-      } else {
-        req.log.info({ webhookId: result.webhookId }, "PayPal webhook registration re-check: OK");
-      }
-      res.json({ checked: true, ...result });
-    } catch (err: any) {
-      req.log.error({ err }, "Failed to re-check PayPal webhook registration");
-      res.status(500).json({ error: "Failed to re-check PayPal webhook registration" });
-    }
-  });
-
-  app.post("/api/admin/paypal-ping", adminMiddleware, async (req: AuthRequest, res) => {
-    const { pingPayPal } = await import("../paypal");
-    const result = await pingPayPal();
-    res.status(result.ok ? 200 : 502).json(result);
-  });
-
   // PayPal Payouts webhook — receives payout status notifications from PayPal.
   // Public endpoint (called by PayPal, not users). Verifies the signature via
   // PayPal's /v1/notifications/verify-webhook-signature API before acting.
@@ -1186,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       if (!verification.ok) {
         logWebhookVerificationFailure(req, "paypal", verification.reason ?? "unknown");
-        res.status(400).json({ error: "Webhook verification failed" }); return;
+        res.status(401).json({ error: "Webhook verification failed" }); return;
       }
 
       const event = req.body as {
@@ -1222,12 +1146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(200).json({ status: "ignored", reason: "withdrawal not found" }); return;
       }
 
-      const SUCCESS_EVENTS = new Set([
-        "PAYMENT.PAYOUTS-ITEM.SUCCEEDED",
-        "PAYMENT.PAYOUTSBATCH.SUCCESS",
-      ]);
-
-      if (SUCCESS_EVENTS.has(eventType)) {
+      if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
         await storage.updateWithdrawalStatusIfStatus(
           withdrawal.id,
           ["paying"],
@@ -1684,12 +1603,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         witnessed_not_settled: number;
       };
 
-      const { readSponsoredVisitAlertLastSent } = await import("../lib/sponsoredVisitMonitor");
-      const alertLastSent = await readSponsoredVisitAlertLastSent();
-
       res.json({
         generatedAt: new Date().toISOString(),
-        alertLastSent: alertLastSent ? alertLastSent.toISOString() : null,
         window24h: {
           successCount: s24.success_count,
           totalRewardUsd: parseFloat(s24.total_reward).toFixed(2),
@@ -1718,28 +1633,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log.error({ err }, "Failed to get sponsored visit health");
       res.status(500).json({ error: "Failed to load health data" });
-    }
-  });
-
-  app.post("/api/admin/health/sponsored-visits/reset-alert", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
-    try {
-      const { clearSponsoredVisitAlertDebounce } = await import("../lib/sponsoredVisitMonitor");
-      await clearSponsoredVisitAlertDebounce();
-      req.log.info({ adminId: req.userId }, "Sponsored-visit alert debounce cleared by admin");
-      if (req.userId) {
-        const { getClientIp } = await import("../lib/clientIp");
-        storage.recordSecurityAudit({
-          actorUserId: req.userId,
-          event: "sponsored_visit_alert_reset",
-          ip: getClientIp(req),
-        }).catch((auditErr) => {
-          req.log.error({ err: auditErr }, "Failed to write audit log for sponsored-visit alert reset");
-        });
-      }
-      res.json({ cleared: true });
-    } catch (err) {
-      req.log.error({ err }, "Failed to clear sponsored-visit alert debounce");
-      res.status(500).json({ error: "Failed to clear alert debounce" });
     }
   });
 
@@ -2230,7 +2123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /** Publisher: create campaign */
   app.post("/api/publisher/campaigns", authMiddleware, async (req: AuthRequest, res) => {
     try {
-      const { title, description, targetUrl, rewardPerVisit, totalBudget, category } = req.body ?? {};
+      const { title, description, targetUrl, rewardPerVisit, totalBudget } = req.body ?? {};
       if (
         typeof title !== "string" || title.length < 3 || title.length > 80 ||
         typeof description !== "string" || description.length < 10 || description.length > 300 ||
@@ -2238,14 +2131,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof rewardPerVisit !== "number" || rewardPerVisit < 0.01 || rewardPerVisit > 0.50 ||
         typeof totalBudget !== "number" || totalBudget < 0.50 || totalBudget > 500
       ) { res.status(400).json({ error: "Invalid campaign data" }); return; }
-
-      if (category !== undefined) {
-        const categoryParse = adCategorySchema.safeParse(category);
-        if (!categoryParse.success) {
-          res.status(400).json({ error: `Invalid category. Must be one of: ${AD_CATEGORIES.join(", ")}` });
-          return;
-        }
-      }
 
       const user = await storage.getUser(req.userId!);
       if (!user?.isPublisher) { res.status(403).json({ error: "Publisher access required" }); return; }
@@ -2289,7 +2174,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rewardPerVisit: String(rewardPerVisit),
             status: "pending",
             postbackSecret: newPostbackSecret,
-            ...(category !== undefined ? { category: category as string } : {}),
           }).returning();
 
           return row;
@@ -2448,7 +2332,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalBudget: campaignsTable.totalBudget,
           spent: campaignsTable.spent,
           clicks: campaignsTable.clicks,
-          category: campaignsTable.category,
           publisherName: usersTable.username,
         })
         .from(campaignsTable)
@@ -4097,8 +3980,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dailyCap = dailyCapRaw === undefined ? 1.0 : parseFloat(dailyCapRaw);
       const dailyCapEnabled = Number.isFinite(dailyCap) && dailyCap > 0;
 
-      let settledBalance: number | undefined;
-
       try {
         await dbClient.transaction(async (tx: Parameters<Parameters<typeof dbClient.transaction>[0]>[0]) => {
           // ── SECURITY: parallel daily-count race fix ───────────────────────
@@ -4196,15 +4077,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalEarned: drizzleSql`${usersTable.totalEarned} + ${rewardStr}`,
             })
             .where(drizzleEqLocal(usersTable.id, req.userId!))
-            .returning({ id: usersTable.id, balance: usersTable.balance });
+            .returning({ id: usersTable.id });
 
           if (credited.length === 0) {
             const err = new Error("USER_MISSING") as Error & { settlement?: SettlementError };
             err.settlement = "USER_MISSING";
             throw err;
           }
-
-          settledBalance = parseFloat(credited[0].balance);
 
           await tx.insert(ledgerTable).values({
             userId: req.userId!,
@@ -4266,11 +4145,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Settlement succeeded — IP slot is legitimately consumed. Clear the
       // flag so the outer catch does not double-decrement on an unrelated error.
       ipSlotConsumed = false;
-
-      // Fire-and-forget: notify the user if their balance just crossed $1
-      if (settledBalance !== undefined) {
-        maybeSendThresholdPush(req.userId!, settledBalance - reward, settledBalance);
-      }
 
       req.log.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
       res.json({ ok: true, reward, message: `You earned $${reward.toFixed(2)}!` });

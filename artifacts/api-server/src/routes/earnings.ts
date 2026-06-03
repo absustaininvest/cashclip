@@ -1,11 +1,10 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
-import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
-import { db, earnTokens, users, earningsLedger, searchChallenges, spinChallenges } from "@workspace/db";
-import { eq, and, lte, gte, lt, sql, count, inArray, desc } from "drizzle-orm";
+import { authMiddleware, type AuthRequest } from "../auth";
+import { db, earnTokens, users, earningsLedger } from "@workspace/db";
+import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
-import { maybeSendThresholdPush } from "../lib/push";
 
 // ── CONVERSION & LIMITS ───────────────────────────────────────────────────────
 const POINTS_PER_DOLLAR       = 1000;
@@ -41,7 +40,6 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
   mission_weekly: { points: 500,  dailyCap: 4  },
   game:           { points: null, dailyCap: 10 },
   video:          { points: 5,    dailyCap: 50 },
-  search:         { points: 5,    dailyCap: 20 },
 };
 
 // Actions that may ONLY be credited by trusted server-to-server callbacks
@@ -55,9 +53,6 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
 //   only updates AsyncStorage, providing no server-verifiable proof.
 // game/video — no server-verifiable proof exists for these action types.
 //   Neither action type is currently issued by any mobile app code path.
-// search — must be initiated via POST /api/earn/search/begin (server-issued
-//   challenge token required at /api/earn/search/complete). This requires a
-//   minimum 5-second viewing window before the reward can be claimed.
 const SERVER_ONLY_ACTIONS = new Set([
   "rewarded_ad",
   "mission_daily",
@@ -68,38 +63,22 @@ const SERVER_ONLY_ACTIONS = new Set([
   // challenge token required at /api/earn/spin/complete). This closes the
   // direct-minting bypass; the spin wheel calls the begin/complete flow.
   "spin",
-  "search",
 ]);
 
-// ── SPIN CHALLENGE CONSTANTS ──────────────────────────────────────────────────
-// Challenges are stored in the `spin_challenges` DB table so they survive
-// server restarts and remain consistent across autoscaled replicas.
-// /complete atomically DELETE…RETURNING inside the earn transaction, enforcing
-// single-use even when two replicas race with different valid tokens.
-const SPIN_CHALLENGE_TTL_MS   = 60_000;  // challenge valid for 60 s
-const SPIN_CHALLENGE_MIN_MS   = 3_000;   // must wait ≥3 s between begin→complete
-// Periodic sweep: delete expired rows from the DB (60 s interval)
-setInterval(async () => {
-  try {
-    await db.delete(spinChallenges).where(lt(spinChallenges.expiresAt, new Date()));
-  } catch (err) {
-    logger.warn({ err }, "spin challenge cleanup error");
+// ── SPIN CHALLENGE STORE ──────────────────────────────────────────────────────
+// Server-issued single-use challenge tokens for the spin wheel.
+// /begin issues a token; /complete requires it before crediting the earn token.
+// This ensures the client called /begin (server-observed) before earning points.
+const SPIN_CHALLENGE_TTL_MS  = 60_000;  // challenge valid for 60 s
+const SPIN_CHALLENGE_MIN_MS  = 3_000;   // must wait ≥3 s between begin→complete
+interface SpinChallenge { userId: string; issuedAt: number; }
+const spinChallenges = new Map<string, SpinChallenge>();
+setInterval(() => {
+  const cutoff = Date.now() - SPIN_CHALLENGE_TTL_MS;
+  for (const [k, v] of spinChallenges) {
+    if (v.issuedAt < cutoff) spinChallenges.delete(k);
   }
-}, 60_000);
-
-// ── SEARCH CHALLENGE CONSTANTS ────────────────────────────────────────────────
-// Challenges are stored in the `search_challenges` DB table so they survive
-// server restarts and remain consistent across autoscaled replicas.
-const SEARCH_CHALLENGE_TTL_MS  = 5 * 60_000; // challenge valid for 5 min
-const SEARCH_CHALLENGE_MIN_MS  = 5_000;       // must view results ≥5 s
-// Periodic sweep: delete expired rows from the DB (60 s interval)
-setInterval(async () => {
-  try {
-    await db.delete(searchChallenges).where(lt(searchChallenges.expiresAt, new Date()));
-  } catch (err) {
-    logger.warn({ err }, "search challenge cleanup error");
-  }
-}, 60_000);
+}, 30_000);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
 interface GooglePublicKey { keyId: number; pem: string; base64: string; }
@@ -155,21 +134,8 @@ async function verifySSVSignature(
   }
 }
 
-
 // ── ROUTE REGISTRATION ────────────────────────────────────────────────────────
 export function registerEarningsRoutes(app: Express): void {
-
-  // ── Search & Earn monetization startup check ──────────────────────────────
-  // Revenue attribution requires SEARCH_PUBLISHER_CODE to be set in the
-  // deployment environment (Replit → Publishing → Production app secrets).
-  // Without it, searches fall back to plain Yahoo with no rev-share.
-  // Enroll at https://developer.yahoo.com/boss/search/ or the OneSearch
-  // publisher portal to receive a publisher code.
-  if (!process.env.SEARCH_PUBLISHER_CODE) {
-    logger.warn("SEARCH_PUBLISHER_CODE is not set — Search & Earn revenue attribution inactive (falling back to plain Yahoo search)");
-  } else {
-    logger.info({ code: process.env.SEARCH_PUBLISHER_CODE.slice(0, 4) + "…" }, "Search & Earn: Yahoo OneSearch monetization active");
-  }
 
   // 60 record requests per minute per user (UX burst tolerance)
   const earnLimit = rateLimit({
@@ -314,9 +280,10 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/spin/begin ────────────────────────────────────────────────
-  // Issues a server-side spin challenge token stored in the DB. The client must
-  // present this token to /api/earn/spin/complete before an earn token is issued.
-  // Storing in the DB (not in-memory) ensures consistency across all replicas.
+  // Issues a server-side spin challenge token. The client must present this
+  // token to /api/earn/spin/complete before an earn token is issued.
+  // This enforces a server-observed "begin" step — /complete is rejected
+  // without a valid, unexpired, same-user challenge.
   app.post(
     "/api/earn/spin/begin",
     authMiddleware,
@@ -325,14 +292,7 @@ export function registerEarningsRoutes(app: Express): void {
       try {
         const { randomBytes } = await import("node:crypto");
         const challengeToken = randomBytes(32).toString("hex");
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + SPIN_CHALLENGE_TTL_MS);
-        await db.insert(spinChallenges).values({
-          token: challengeToken,
-          userId: req.userId!,
-          issuedAt: now,
-          expiresAt,
-        });
+        spinChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
         logger.info({ userId: req.userId }, "spin challenge issued");
         res.status(201).json({ challengeToken });
       } catch (err) {
@@ -344,12 +304,9 @@ export function registerEarningsRoutes(app: Express): void {
 
   // ── POST /api/earn/spin/complete ─────────────────────────────────────────────
   // Validates the server-issued spin challenge and issues an earn token.
-  // Enforced: challenge must exist in the DB, belong to this user, not be
-  // expired, and have been issued at least SPIN_CHALLENGE_MIN_MS ago
-  // (anti-instant-replay). The challenge is atomically consumed inside the earn
-  // transaction via DELETE…RETURNING — two racing replicas each holding a
-  // valid token can both pass the upfront SELECT, but only the one that wins the
-  // DELETE gets a row back; the other receives a 403.
+  // Enforced: challenge must exist, belong to this user, not be expired,
+  // and have been issued at least SPIN_CHALLENGE_MIN_MS ago (anti-instant-replay).
+  // Then applies the standard 2h server-side cooldown + daily cap.
   app.post(
     "/api/earn/spin/complete",
     authMiddleware,
@@ -361,40 +318,35 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(400).json({ error: "challengeToken is required" }); return;
         }
 
-        // ── Step 1: look up the challenge from the DB ────────────────────────
-        // Do NOT consume yet — timing checks below may reject without consuming.
-        const [challenge] = await db
-          .select()
-          .from(spinChallenges)
-          .where(eq(spinChallenges.token, challengeToken));
-
+        const challenge = spinChallenges.get(challengeToken);
         if (!challenge) {
           res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
         }
         if (challenge.userId !== req.userId) {
           res.status(403).json({ error: "Spin challenge does not belong to this user" }); return;
         }
-        const now = Date.now();
-        if (now > challenge.expiresAt.getTime()) {
-          // Expired — clean up the stale row and reject
-          await db.delete(spinChallenges).where(eq(spinChallenges.token, challengeToken));
+        const age = Date.now() - challenge.issuedAt;
+        if (age > SPIN_CHALLENGE_TTL_MS) {
+          spinChallenges.delete(challengeToken);
           res.status(403).json({ error: "Spin challenge expired — please spin again" }); return;
         }
-        const age = now - challenge.issuedAt.getTime();
         if (age < SPIN_CHALLENGE_MIN_MS) {
-          // Too fast — do NOT consume so the user can retry after the minimum wait
           res.status(425).json({
             error: "Spin completed too quickly",
             retryAfterMs: SPIN_CHALLENGE_MIN_MS - age,
           }); return;
         }
 
+        // Consume challenge — single use (in-memory, done before the transaction)
+        spinChallenges.delete(challengeToken);
+
         const config = ACTION_CONFIG.spin;
 
-        // ── Step 2: transaction — atomic consume + daily cap + insert ────────
-        // Acquire a row-level lock on the user to serialise concurrent completions.
-        // Then DELETE…RETURNING the challenge (single-use across all replicas):
-        // if two replicas both passed the SELECT above, only one wins the DELETE.
+        // ── Serialize per-user spin operations via row-level lock ────────────
+        // Daily cap, 2h cooldown check, and insert are all performed inside a
+        // single transaction that locks the user row first. This prevents
+        // concurrent /complete requests (each with their own valid challenge
+        // token) from observing pre-insert state and racing past the limits.
         type SpinResult =
           | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
           | { ok: false; status: number; error: string; cap?: number; nextAvailableAt?: string };
@@ -403,19 +355,8 @@ export function registerEarningsRoutes(app: Express): void {
           // Acquire row-level lock — serialises concurrent spin completions for this user
           await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
 
-          // Atomically consume the challenge — single use across all replicas.
-          // DELETE…RETURNING: only one concurrent request wins; the loser gets [].
-          const [consumed] = await tx
-            .delete(spinChallenges)
-            .where(eq(spinChallenges.token, challengeToken))
-            .returning();
-          if (!consumed) {
-            // Another replica consumed it between our SELECT and this DELETE
-            return { ok: false, status: 403, error: "Invalid or expired spin challenge" };
-          }
-
-          const txNow    = new Date();
-          const dayStart = new Date(txNow);
+          const now      = new Date();
+          const dayStart = new Date(now);
           dayStart.setUTCHours(0, 0, 0, 0);
 
           // Daily cap
@@ -432,7 +373,7 @@ export function registerEarningsRoutes(app: Express): void {
           }
 
           // 2h cooldown
-          const cooldownSince = new Date(txNow.getTime() - SPIN_COOLDOWN_MS);
+          const cooldownSince = new Date(now.getTime() - SPIN_COOLDOWN_MS);
           const [recentSpin] = await tx
             .select({ earnedAt: earnTokens.earnedAt })
             .from(earnTokens)
@@ -448,13 +389,13 @@ export function registerEarningsRoutes(app: Express): void {
           }
 
           const pts = pickRandom(SPIN_POOL);
-          const claimableAt = new Date(txNow.getTime() + PENDING_WINDOW_MS);
+          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
           const [token] = await tx.insert(earnTokens).values({
             userId:      req.userId!,
             points:      pts,
             actionType:  "spin",
             description: "Spin wheel",
-            earnedAt:    txNow,
+            earnedAt:    now,
             claimableAt,
             status:      "pending",
           }).returning();
@@ -478,190 +419,6 @@ export function registerEarningsRoutes(app: Express): void {
       } catch (err) {
         logger.error({ err }, "earn/spin/complete error");
         res.status(500).json({ error: "Failed to complete spin" });
-      }
-    },
-  );
-
-  // ── GET /api/earn/search/config ──────────────────────────────────────────────
-  // Returns the server-configured search base URL for the WebView.
-  // Publisher/revenue-share credentials (SEARCH_PUBLISHER_CODE) are read from
-  // the server environment so they can be updated without a new native build.
-  app.get(
-    "/api/earn/search/config",
-    authMiddleware,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      const publisherCode = process.env.SEARCH_PUBLISHER_CODE;
-      const configured = Boolean(publisherCode);
-
-      // Base URL contains all fixed attribution params except the user query.
-      // Client appends &p=<encoded_query> to build the final WebView URL.
-      const searchBaseUrl = configured
-        ? `https://search.yahoo.com/search?fr=${encodeURIComponent(publisherCode!)}&fr2=p%3As%2Cv%3Aweb&type=cashclip-search`
-        : "https://search.yahoo.com/search";
-
-      // Include today's search count so the client cap state is accurate on mount
-      // (prevents silent no-reward loops after app restarts).
-      const dayStart = new Date();
-      dayStart.setUTCHours(0, 0, 0, 0);
-      const [{ todayCount }] = await db
-        .select({ todayCount: count() })
-        .from(earnTokens)
-        .where(and(
-          eq(earnTokens.userId, req.userId!),
-          eq(earnTokens.actionType, "search"),
-          gte(earnTokens.earnedAt, dayStart),
-        ));
-
-      const dailyCap = ACTION_CONFIG.search.dailyCap;
-      res.json({
-        configured,
-        searchBaseUrl,
-        dailyUsed:  Number(todayCount),
-        dailyCap,
-      });
-    },
-  );
-
-  // ── POST /api/earn/search/begin ──────────────────────────────────────────────
-  // Issues a server-side search challenge token stored in the DB so it survives
-  // restarts. The client must present this token to /complete after ≥5 s.
-  app.post(
-    "/api/earn/search/begin",
-    authMiddleware,
-    earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { randomBytes } = await import("node:crypto");
-        const challengeToken = randomBytes(32).toString("hex");
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + SEARCH_CHALLENGE_TTL_MS);
-        await db.insert(searchChallenges).values({
-          token: challengeToken,
-          userId: req.userId!,
-          issuedAt: now,
-          expiresAt,
-        });
-        logger.info({ userId: req.userId }, "search challenge issued");
-        res.status(201).json({ challengeToken });
-      } catch (err) {
-        logger.error({ err }, "earn/search/begin error");
-        res.status(500).json({ error: "Failed to begin search" });
-      }
-    },
-  );
-
-  // ── POST /api/earn/search/complete ────────────────────────────────────────────
-  // Validates the server-issued search challenge (looked up from the DB) and
-  // issues an earn token. Enforced: challenge must exist, belong to this user,
-  // not be expired, and have been issued at least SEARCH_CHALLENGE_MIN_MS ago.
-  // Then applies the standard daily cap.
-  app.post(
-    "/api/earn/search/complete",
-    authMiddleware,
-    earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { challengeToken } = req.body as { challengeToken?: unknown };
-        if (!challengeToken || typeof challengeToken !== "string") {
-          res.status(400).json({ error: "challengeToken is required" }); return;
-        }
-
-        // Look up the challenge first (do NOT consume yet — timing checks below
-        // may reject without consuming, so the user can retry).
-        const [challenge] = await db
-          .select()
-          .from(searchChallenges)
-          .where(eq(searchChallenges.token, challengeToken));
-
-        if (!challenge) {
-          res.status(403).json({ error: "Invalid or expired search challenge" }); return;
-        }
-        if (challenge.userId !== req.userId) {
-          res.status(403).json({ error: "Search challenge does not belong to this user" }); return;
-        }
-        const now = Date.now();
-        if (now > challenge.expiresAt.getTime()) {
-          // Expired — clean up the stale row and reject
-          await db.delete(searchChallenges).where(eq(searchChallenges.token, challengeToken));
-          res.status(403).json({ error: "Search challenge expired — please search again" }); return;
-        }
-        const age = now - challenge.issuedAt.getTime();
-        if (age < SEARCH_CHALLENGE_MIN_MS) {
-          // Too fast — do NOT consume so the user can retry after the minimum wait
-          res.status(425).json({
-            error: "Search completed too quickly",
-            retryAfterMs: SEARCH_CHALLENGE_MIN_MS - age,
-          }); return;
-        }
-
-        // All checks passed — atomically consume the challenge (single-use).
-        // DELETE…RETURNING is atomic: if two replicas race, only one gets a row back.
-        const [deleted] = await db
-          .delete(searchChallenges)
-          .where(eq(searchChallenges.token, challengeToken))
-          .returning();
-        if (!deleted) {
-          // Another replica consumed it between our SELECT and DELETE
-          res.status(403).json({ error: "Invalid or expired search challenge" }); return;
-        }
-
-        const config = ACTION_CONFIG.search;
-
-        type SearchResult =
-          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
-          | { ok: false; status: number; error: string; cap?: number };
-
-        const result: SearchResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
-          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
-
-          const now      = new Date();
-          const dayStart = new Date(now);
-          dayStart.setUTCHours(0, 0, 0, 0);
-
-          const [{ todayCount }] = await tx
-            .select({ todayCount: count() })
-            .from(earnTokens)
-            .where(and(
-              eq(earnTokens.userId, req.userId!),
-              eq(earnTokens.actionType, "search"),
-              gte(earnTokens.earnedAt, dayStart),
-            ));
-
-          if (Number(todayCount) >= config.dailyCap) {
-            return { ok: false, status: 429, error: "Daily search limit reached", cap: config.dailyCap };
-          }
-
-          const pts = config.points!;
-          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
-          const [token] = await tx.insert(earnTokens).values({
-            userId:      req.userId!,
-            points:      pts,
-            actionType:  "search",
-            description: "Search & Earn",
-            earnedAt:    now,
-            claimableAt,
-            status:      "pending",
-          }).returning();
-
-          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
-        });
-
-        if (!result.ok) {
-          const { status, error, ...rest } = result;
-          res.status(status).json({ error, ...rest }); return;
-        }
-
-        logger.info({ userId: req.userId, pts: result.points }, "search earn token issued via challenge");
-        res.status(201).json({
-          tokenId:     result.tokenId,
-          points:      result.points,
-          claimableAt: result.claimableAt,
-          dailyUsed:   result.dailyUsed,
-          dailyCap:    result.dailyCap,
-        });
-      } catch (err) {
-        logger.error({ err }, "earn/search/complete error");
-        res.status(500).json({ error: "Failed to complete search" });
       }
     },
   );
@@ -792,11 +549,6 @@ export function registerEarningsRoutes(app: Express): void {
         if (!result.ok) {
           res.status(429).json({ error: "Daily earning cap reached ($5.00). Resets at midnight UTC." });
           return;
-        }
-
-        // Fire-and-forget: notify the user if their balance just crossed $1
-        if (result.creditedUsd > 0) {
-          maybeSendThresholdPush(req.userId!, result.newBalance - result.creditedUsd, result.newBalance);
         }
 
         res.json(result);
@@ -990,7 +742,7 @@ export function registerEarningsRoutes(app: Express): void {
 
       for (const { userId } of usersWithTokens) {
         try {
-          const creditResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+          await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
             await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
 
             await tx.update(earnTokens)
@@ -1042,13 +794,12 @@ export function registerEarningsRoutes(app: Express): void {
               .set({ status: "claimed", claimedAt: now })
               .where(inArray(earnTokens.id, tokenIds));
 
-            const [autoUpdated] = await tx.update(users)
+            await tx.update(users)
               .set({
                 balance:     sql`${users.balance} + ${creditStr}`,
                 totalEarned: sql`${users.totalEarned} + ${creditStr}`,
               })
-              .where(eq(users.id, userId))
-              .returning({ balance: users.balance });
+              .where(eq(users.id, userId));
 
             await tx.insert(earningsLedger).values({
               userId,
@@ -1058,13 +809,7 @@ export function registerEarningsRoutes(app: Express): void {
             });
 
             logger.info({ userId, tokensClaimed: tokenIds.length, totalPts, creditUsd }, "auto-convert: credited user");
-            return { newBalance: parseFloat(autoUpdated.balance), creditUsd };
           });
-
-          // Fire-and-forget: notify the user if their balance just crossed $1
-          if (creditResult) {
-            maybeSendThresholdPush(userId, creditResult.newBalance - creditResult.creditUsd, creditResult.newBalance);
-          }
         } catch (userErr) {
           logger.error({ err: userErr, userId }, "auto-convert: user transaction failed, skipping");
         }
@@ -1083,92 +828,4 @@ export function registerEarningsRoutes(app: Express): void {
       runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: interval run failed"));
     }, AUTO_CONVERT_INTERVAL_MS);
   }, 5 * 60 * 1000);
-
-  // ── GET /api/admin/search-stats-per-user ──────────────────────────────────────
-  // Returns top N users by search count for a given window (7d or 30d).
-  app.get(
-    "/api/admin/search-stats-per-user",
-    adminMiddleware,
-    async (req: Request, res: Response): Promise<void> => {
-      try {
-        const range  = req.query.range === "7d" ? 7 : 30;
-        const limit  = Math.min(parseInt(String(req.query.limit || "20"), 10) || 20, 100);
-        const since  = new Date(Date.now() - range * 24 * 60 * 60 * 1000);
-
-        const rows = await db
-          .select({
-            userId:   earnTokens.userId,
-            username: users.username,
-            searches: count(),
-            points:   sql<string>`COALESCE(SUM(${earnTokens.points}), 0)`,
-          })
-          .from(earnTokens)
-          .innerJoin(users, eq(users.id, earnTokens.userId))
-          .where(and(
-            eq(earnTokens.actionType, "search"),
-            gte(earnTokens.earnedAt, since),
-          ))
-          .groupBy(earnTokens.userId, users.username)
-          .orderBy(desc(count()))
-          .limit(limit);
-
-        res.json({
-          range: `${range}d`,
-          users: rows.map((r) => ({
-            userId:   r.userId,
-            username: r.username,
-            searches: Number(r.searches),
-            points:   Number(r.points),
-          })),
-        });
-      } catch (err) {
-        logger.error({ err }, "admin/search-stats-per-user error");
-        res.status(500).json({ error: "Failed to load per-user search stats" });
-      }
-    },
-  );
-
-  // ── GET /api/admin/search-stats ───────────────────────────────────────────────
-  // Returns aggregate search-earn totals for the last 7d and 30d.
-  app.get(
-    "/api/admin/search-stats",
-    adminMiddleware,
-    async (_req: Request, res: Response): Promise<void> => {
-      try {
-        const now   = new Date();
-        const ago7d = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
-        const ago30d= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-        const [row7d] = await db
-          .select({
-            searches: count(),
-            points:   sql<string>`COALESCE(SUM(points), 0)`,
-          })
-          .from(earnTokens)
-          .where(and(
-            eq(earnTokens.actionType, "search"),
-            gte(earnTokens.earnedAt, ago7d),
-          ));
-
-        const [row30d] = await db
-          .select({
-            searches: count(),
-            points:   sql<string>`COALESCE(SUM(points), 0)`,
-          })
-          .from(earnTokens)
-          .where(and(
-            eq(earnTokens.actionType, "search"),
-            gte(earnTokens.earnedAt, ago30d),
-          ));
-
-        res.json({
-          d7:  { searches: Number(row7d?.searches  ?? 0), points: Number(row7d?.points  ?? 0) },
-          d30: { searches: Number(row30d?.searches ?? 0), points: Number(row30d?.points ?? 0) },
-        });
-      } catch (err) {
-        logger.error({ err }, "admin/search-stats error");
-        res.status(500).json({ error: "Failed to load search stats" });
-      }
-    },
-  );
 }

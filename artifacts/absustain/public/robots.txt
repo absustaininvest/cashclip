@@ -1,3 +1,0 @@
-User-agent: *
-Disallow: /sc-portal
-Disallow: /sc-portal/

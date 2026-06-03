@@ -89,7 +89,6 @@ export function createStorageMock(overrides: Partial<StorageMock> = {}): Storage
     getWebhookAuditProviders:            vi.fn().mockResolvedValue([]),
     pruneWebhookAudit:                    vi.fn().mockResolvedValue(0),
     pruneSecurityAudit:                   vi.fn().mockResolvedValue(0),
-    pruneSpinChallenges:                  vi.fn().mockResolvedValue(0),
   };
 
   return { ...base, ...overrides };

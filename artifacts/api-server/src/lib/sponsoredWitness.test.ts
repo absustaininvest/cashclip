@@ -167,7 +167,7 @@ beforeAll(async () => {
     next();
   });
   registerRoutes(app);
-}, 30_000);
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

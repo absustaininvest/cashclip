@@ -41,8 +41,6 @@ import {
   ChevronLeft,
   Globe,
   Power,
-  BellOff,
-  RotateCcw,
 } from "lucide-react";
 
 interface Lead {
@@ -1650,22 +1648,8 @@ interface CashClipUser {
   referredBy: string | null;
 }
 
-interface PayPalWebhookHealth {
-  checked: boolean;
-  message?: string;
-  ok?: boolean;
-  checkedAt?: string;
-  webhookId?: string | null;
-  urlMatch?: boolean | null;
-  registeredUrl?: string | null;
-  missingEvents?: string[];
-  warnings?: string[];
-  error?: string;
-}
-
 interface SponsoredVisitHealth {
   generatedAt: string;
-  alertLastSent: string | null;
   window24h: { successCount: number; totalRewardUsd: string };
   window7d: { successCount: number; totalRewardUsd: string };
   activeCampaigns: number;
@@ -1691,9 +1675,6 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   const [monitorRunning, setMonitorRunning] = useState<boolean | null>(null);
   const [monitorToggling, setMonitorToggling] = useState(false);
   const [monitorError, setMonitorError] = useState("");
-  const [alertResetting, setAlertResetting] = useState(false);
-  const [alertResetMsg, setAlertResetMsg] = useState("");
-  const [recentResets, setRecentResets] = useState<{ id: string; actorUsername: string | null; ip: string | null; createdAt: string }[]>([]);
 
   async function load() {
     setLoading(true);
@@ -1708,18 +1689,6 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
       setError(e.message ?? "Failed to load");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadRecentResets() {
-    try {
-      const res = await fetch("/api/admin/security-audit?event=sponsored_visit_alert_reset&limit=5", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      setRecentResets(json.entries ?? []);
-    } catch {
     }
   }
 
@@ -1756,29 +1725,9 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
     }
   }
 
-  async function resetAlertDebounce() {
-    if (alertResetting) return;
-    setAlertResetting(true);
-    setAlertResetMsg("");
-    try {
-      const res = await fetch("/api/admin/health/sponsored-visits/reset-alert", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setAlertResetMsg("Debounce cleared — next check can send a fresh alert.");
-      await Promise.all([load(), loadRecentResets()]);
-    } catch (e: any) {
-      setAlertResetMsg(`Failed: ${e.message ?? "unknown error"}`);
-    } finally {
-      setAlertResetting(false);
-    }
-  }
-
   useEffect(() => {
     load();
     loadMonitorStatus();
-    loadRecentResets();
     const interval = setInterval(load, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -1861,58 +1810,6 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {monitorError}
-        </div>
-      )}
-
-      {/* Alert debounce reset */}
-      <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-amber-500/10 flex-shrink-0">
-            <BellOff className="w-4 h-4 text-amber-400" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white">Settlement alert debounce</p>
-            <p className="text-xs text-white/40 mt-0.5">
-              {data?.alertLastSent
-                ? `Last alert sent ${fmt(data.alertLastSent)} — silenced for 4 h`
-                : "No alert sent yet — debounce is clear"}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={resetAlertDebounce}
-          disabled={alertResetting || !data?.alertLastSent}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
-        >
-          <RotateCcw className={`w-3.5 h-3.5 ${alertResetting ? "animate-spin" : ""}`} />
-          Reset debounce
-        </button>
-      </div>
-
-      {alertResetMsg && (
-        <div className={`flex items-center gap-2 text-sm rounded-xl px-4 py-3 ${
-          alertResetMsg.startsWith("Failed")
-            ? "text-red-400 bg-red-500/10 border border-red-500/20"
-            : "text-[#00E676] bg-[#00E676]/10 border border-[#00E676]/20"
-        }`}>
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {alertResetMsg}
-        </div>
-      )}
-
-      {recentResets.length > 0 && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-white/[0.04]">
-            <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Debounce reset history</p>
-          </div>
-          <div className="divide-y divide-white/[0.04]">
-            {recentResets.map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-5 py-2.5">
-                <span className="text-white/60 text-xs">{r.actorUsername ?? "admin"}</span>
-                <span className="text-white/30 text-xs">{fmt(r.createdAt)}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -2062,7 +1959,7 @@ function formatLastChecked(date: Date): string {
   return `${diffMin} min ago`;
 }
 
-function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked, webhookHealth, webhookHealthLoading, webhookHealthChecking, recheckWebhookHealth }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null; webhookHealth: PayPalWebhookHealth | null; webhookHealthLoading: boolean; webhookHealthChecking: boolean; recheckWebhookHealth: () => void }) {
+function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -2089,14 +1986,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
-  const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
-  const [searchRefreshing, setSearchRefreshing] = useState(false);
-  const [searchStats, setSearchStats] = useState<{ d7: { searches: number; points: number }; d30: { searches: number; points: number } } | null>(null);
-  const [searchPerUserRange, setSearchPerUserRange] = useState<"7d" | "30d">("7d");
-  const [searchPerUserRows, setSearchPerUserRows] = useState<{ userId: string; username: string; searches: number; points: number }[]>([]);
-  const [searchPerUserLoading, setSearchPerUserLoading] = useState(true);
-  const [paypalPing, setPaypalPing] = useState<"idle" | "loading" | "live-ok" | "sandbox-ok" | "error">("loading");
-  const [paypalPingMsg, setPaypalPingMsg] = useState("");
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2104,100 +1993,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     const id = setInterval(() => setTick(t => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
-
-  const fetchSearchConfig = useCallback(
-    (showSpinner = false) => {
-      if (showSpinner) setSearchRefreshing(true);
-      fetch("/api/earn/search/config", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d) => setSearchConfigured(Boolean(d.configured)))
-        .catch(() => setSearchConfigured(false))
-        .finally(() => setSearchRefreshing(false));
-    },
-    [token],
-  );
-
-  const fetchSearchPerUser = useCallback(
-    async (range: "7d" | "30d") => {
-      setSearchPerUserLoading(true);
-      try {
-        const res = await fetch(`/api/admin/search-stats-per-user?range=${range}&limit=20`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Failed");
-        const data = await res.json();
-        setSearchPerUserRows(data.users ?? []);
-      } catch {
-        setSearchPerUserRows([]);
-      } finally {
-        setSearchPerUserLoading(false);
-      }
-    },
-    [token],
-  );
-
-  const fetchSearchStats = useCallback(() => {
-    fetch("/api/admin/search-stats", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setSearchStats(d))
-      .catch(() => setSearchStats(null));
-  }, [token]);
-
-  useEffect(() => {
-    fetchSearchConfig();
-    fetchSearchStats();
-  }, [fetchSearchConfig, fetchSearchStats]);
-
-  useEffect(() => {
-    fetchSearchPerUser(searchPerUserRange);
-  }, [searchPerUserRange, fetchSearchPerUser]);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetchSearchConfig();
-      fetch("/api/admin/search-stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d) => setSearchStats(d))
-        .catch(() => setSearchStats(null));
-      fetchSearchPerUser(searchPerUserRange);
-    }, 60_000);
-    return () => clearInterval(id);
-  }, [fetchSearchConfig, fetchSearchPerUser, searchPerUserRange, token]);
-
-  const runPaypalPing = useCallback(async () => {
-    setPaypalPing("loading");
-    setPaypalPingMsg("");
-    try {
-      const res = await fetch("/api/admin/paypal-ping", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setPaypalPing(data.mode === "live" ? "live-ok" : "sandbox-ok");
-        setPaypalPingMsg(`Mode: ${data.mode}`);
-      } else {
-        setPaypalPing("error");
-        setPaypalPingMsg(data.error ?? "Unknown error");
-      }
-    } catch {
-      setPaypalPing("error");
-      setPaypalPingMsg("Request failed");
-    }
-  }, [token]);
-
-  useEffect(() => {
-    runPaypalPing();
-    const id = setInterval(runPaypalPing, 60_000);
-    return () => clearInterval(id);
-  }, [runPaypalPing]);
-
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2684,268 +2479,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
             These values will be enforced when users request withdrawals.
           </p>
         </div>
-      </div>
-
-      {/* Search & Earn monetization status */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Globe className="w-4 h-4 text-[#00E676]" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
-            Search &amp; Earn
-          </h3>
-          <button
-            onClick={() => { fetchSearchConfig(true); fetchSearchStats(); }}
-            disabled={searchRefreshing}
-            title="Refresh status"
-            className="ml-auto p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${searchRefreshing ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-        <div className="flex items-center gap-3 mb-4">
-          {searchConfigured === null ? (
-            <span className="text-white/30 text-xs">Checking…</span>
-          ) : searchConfigured ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/15 border border-[#00E676]/30 text-[#00E676] text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
-              Search revenue active
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-              Publisher code not set
-            </span>
-          )}
-          <p className="text-white/30 text-xs">
-            {searchConfigured
-              ? "SEARCH_PUBLISHER_CODE is configured — Yahoo search revenue sharing is active."
-              : "Set SEARCH_PUBLISHER_CODE in Production app secrets to enable Yahoo revenue sharing."}
-          </p>
-        </div>
-        {/* Search earnings totals */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          {(["d7", "d30"] as const).map((key) => {
-            const label    = key === "d7" ? "Last 7 days" : "Last 30 days";
-            const searches = searchStats?.[key].searches ?? null;
-            const points   = searchStats?.[key].points   ?? null;
-            return (
-              <div key={key} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3">
-                <p className="text-white/40 text-xs mb-2">{label}</p>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-white/50 text-xs">Searches</span>
-                    <span className="text-white text-sm font-semibold tabular-nums">
-                      {searches === null ? "—" : searches.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-white/50 text-xs">Points awarded</span>
-                    <span className="text-[#00E676] text-sm font-semibold tabular-nums">
-                      {points === null ? "—" : points.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Per-user search breakdown */}
-        <div className="border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
-            <span className="text-white/60 text-xs font-semibold">Top Searchers</span>
-            <div className="flex items-center gap-1">
-              {(["7d", "30d"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setSearchPerUserRange(r)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    searchPerUserRange === r
-                      ? "bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30"
-                      : "bg-white/[0.05] text-white/50 border border-white/10 hover:bg-white/[0.1]"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          {searchPerUserLoading ? (
-            <div className="text-center py-8 text-white/30 text-xs">Loading…</div>
-          ) : searchPerUserRows.length === 0 ? (
-            <div className="text-center py-8 text-white/30 text-xs">No searches in this range</div>
-          ) : (
-            <div className="divide-y divide-white/[0.04]">
-              {searchPerUserRows.map((u, i) => (
-                <div
-                  key={u.userId}
-                  className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-4 py-2.5"
-                >
-                  <span className="text-white/30 text-xs font-bold w-5">{i + 1}</span>
-                  <span className="text-white text-xs font-semibold truncate">{u.username}</span>
-                  <span className="text-white/40 text-xs whitespace-nowrap tabular-nums">
-                    {u.searches.toLocaleString()} searches
-                  </span>
-                  <span className="text-[#00E676] text-xs font-bold tabular-nums">
-                    {u.points.toLocaleString()} pts
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* PayPal credential health check */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="w-4 h-4 text-blue-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
-            PayPal Credentials
-          </h3>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {paypalPing === "idle" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-white/40 text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/30 inline-block" />
-              Unchecked
-            </span>
-          )}
-          {paypalPing === "loading" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-white/40 text-xs font-semibold">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              Checking…
-            </span>
-          )}
-          {paypalPing === "live-ok" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/15 border border-[#00E676]/30 text-[#00E676] text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
-              Live — credentials OK
-            </span>
-          )}
-          {paypalPing === "sandbox-ok" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-              Sandbox — credentials OK
-            </span>
-          )}
-          {paypalPing === "error" && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
-              Auth failed
-            </span>
-          )}
-          <button
-            disabled={paypalPing === "loading"}
-            onClick={runPaypalPing}
-            className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-          >
-            Test credentials
-          </button>
-          {paypalPingMsg && (
-            <p className="text-white/30 text-xs">{paypalPingMsg}</p>
-          )}
-        </div>
-      </div>
-
-      {/* PayPal Webhook Health */}
-      <div id="paypal-webhook-health" className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <ShieldCheck className="w-4 h-4 text-blue-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
-            PayPal Webhook Health
-          </h3>
-          <button
-            onClick={recheckWebhookHealth}
-            disabled={webhookHealthChecking || webhookHealthLoading}
-            title="Re-check webhook registration"
-            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-white/[0.05] border border-white/10 text-white/50 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-colors"
-          >
-            <RefreshCw className={`w-3 h-3 ${webhookHealthChecking ? "animate-spin" : ""}`} />
-            Re-check
-          </button>
-        </div>
-        {webhookHealthLoading ? (
-          <p className="text-white/30 text-xs">Loading…</p>
-        ) : !webhookHealth || !webhookHealth.checked ? (
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-            <p className="text-amber-300 text-xs">
-              {webhookHealth?.message ?? "Startup check has not run yet or PayPal is not configured"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* Status badge */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {webhookHealth.ok ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/15 border border-[#00E676]/30 text-[#00E676] text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
-                  Webhook OK
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                  Issues found
-                </span>
-              )}
-              {webhookHealth.checkedAt && (
-                <span className="text-white/30 text-xs">
-                  Last checked {new Date(webhookHealth.checkedAt).toLocaleString()}
-                </span>
-              )}
-            </div>
-            {/* Details grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-3 py-2">
-                <p className="text-white/40 text-[10px] uppercase tracking-wider mb-0.5">Webhook ID</p>
-                <p className="text-white text-xs font-mono truncate">
-                  {webhookHealth.webhookId ?? <span className="text-red-400">Not set</span>}
-                </p>
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-3 py-2">
-                <p className="text-white/40 text-[10px] uppercase tracking-wider mb-0.5">Registered URL</p>
-                <p className={`text-xs font-mono truncate ${webhookHealth.urlMatch === false ? "text-red-400" : "text-white"}`}>
-                  {webhookHealth.registeredUrl ?? <span className="text-white/30">—</span>}
-                  {webhookHealth.urlMatch === false && (
-                    <span className="text-red-400 ml-1">(URL mismatch)</span>
-                  )}
-                </p>
-              </div>
-            </div>
-            {/* Missing events */}
-            {webhookHealth.missingEvents && webhookHealth.missingEvents.length > 0 && (
-              <div className="bg-red-500/[0.07] border border-red-500/20 rounded-xl px-3 py-2">
-                <p className="text-red-400 text-[10px] uppercase tracking-wider mb-1">Missing event subscriptions</p>
-                <div className="flex flex-wrap gap-1">
-                  {webhookHealth.missingEvents.map((evt) => (
-                    <span key={evt} className="px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-300 text-[10px] font-mono">
-                      {evt}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Warnings */}
-            {webhookHealth.warnings && webhookHealth.warnings.length > 0 && (
-              <div className="space-y-1">
-                {webhookHealth.warnings.map((w, i) => (
-                  <div key={i} className="flex items-start gap-1.5">
-                    <AlertCircle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-amber-300 text-xs">{w}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Error */}
-            {webhookHealth.error && (
-              <div className="flex items-start gap-1.5">
-                <AlertCircle className="w-3 h-3 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-red-400 text-xs">{webhookHealth.error}</p>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {error && (
@@ -3652,9 +3185,6 @@ function Dashboard({
   const [healthCount, setHealthCount] = useState<number | null>(null);
   const [healthError, setHealthError] = useState(false);
   const [healthLastChecked, setHealthLastChecked] = useState<Date | null>(null);
-  const [webhookHealth, setWebhookHealth] = useState<PayPalWebhookHealth | null>(null);
-  const [webhookHealthLoading, setWebhookHealthLoading] = useState(true);
-  const [webhookHealthChecking, setWebhookHealthChecking] = useState(false);
 
   useEffect(() => {
     function fetchHealth() {
@@ -3672,56 +3202,6 @@ function Dashboard({
     const interval = setInterval(fetchHealth, 60 * 1000);
     return () => clearInterval(interval);
   }, [token]);
-
-  const fetchWebhookHealth = useCallback(async () => {
-    setWebhookHealthLoading(true);
-    try {
-      const res = await fetch("/api/admin/paypal/webhook-health", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setWebhookHealth(await res.json());
-    } catch {
-      setWebhookHealth({ checked: false, message: "Failed to load webhook health" });
-    } finally {
-      setWebhookHealthLoading(false);
-    }
-  }, [token]);
-
-  async function recheckWebhookHealth() {
-    setWebhookHealthChecking(true);
-    try {
-      const res = await fetch("/api/admin/paypal/webhook-health/refresh", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setWebhookHealth(await res.json());
-    } catch {
-      // silently ignore — panel inside CashClip Users tab shows errors
-    } finally {
-      setWebhookHealthChecking(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchWebhookHealth();
-    const webhookInterval = setInterval(fetchWebhookHealth, 5 * 60 * 1000);
-    return () => clearInterval(webhookInterval);
-  }, [fetchWebhookHealth]);
-
-  function goToWebhookHealth() {
-    setTab("cashclip");
-    setTimeout(() => {
-      document.getElementById("paypal-webhook-health")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 150);
-  }
-
-  const webhookBadgeStatus: "ok" | "warning" | "loading" = webhookHealthLoading
-    ? "loading"
-    : webhookHealth?.checked && webhookHealth?.ok
-    ? "ok"
-    : "warning";
 
   const loggedInAs = (() => {
     try {
@@ -3838,7 +3318,6 @@ function Dashboard({
         <div className="max-w-7xl mx-auto mt-4 flex items-center gap-1">
           {tabs.map((t) => {
             const showAlert = t.id === "earnhealth" && !healthError && healthCount === 0;
-            const showWebhookAlert = t.id === "cashclip" && !webhookHealthLoading && webhookBadgeStatus === "warning";
             return (
               <button
                 key={t.id}
@@ -3853,9 +3332,6 @@ function Dashboard({
                 {t.label}
                 {showAlert && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#06060E]" />
-                )}
-                {showWebhookAlert && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#06060E]" />
                 )}
               </button>
             );
@@ -4014,42 +3490,6 @@ function Dashboard({
               </div>
               <div className="space-y-4">
                 <MiniCalendar />
-                {/* PayPal Webhook Health badge */}
-                <button
-                  onClick={goToWebhookHealth}
-                  className="w-full text-left bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.14] hover:bg-white/[0.05] transition-colors group"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                    <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm flex-1">
-                      PayPal Webhook
-                    </h3>
-                    <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
-                  </div>
-                  {webhookHealthLoading ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white/20 inline-block animate-pulse" />
-                      <span className="text-white/30 text-xs">Checking…</span>
-                    </div>
-                  ) : webhookBadgeStatus === "ok" ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
-                      <span className="text-[#00E676] text-xs font-semibold">Webhook OK</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                      <span className="text-amber-400 text-xs font-semibold">
-                        {webhookHealth?.message ?? "Issues found"}
-                      </span>
-                    </div>
-                  )}
-                  {webhookHealth?.checkedAt && (
-                    <p className="text-white/20 text-[10px] mt-1.5">
-                      Checked {new Date(webhookHealth.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
-                </button>
                 <RemindersPanel />
                 <QuickActions />
               </div>
@@ -4057,7 +3497,7 @@ function Dashboard({
           </>
         )}
 
-        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} webhookHealth={webhookHealth} webhookHealthLoading={webhookHealthLoading} webhookHealthChecking={webhookHealthChecking} recheckWebhookHealth={recheckWebhookHealth} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} />}
         {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}

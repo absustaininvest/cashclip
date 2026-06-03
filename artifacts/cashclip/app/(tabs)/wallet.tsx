@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -33,7 +32,6 @@ import {
   claimAllReady,
   formatPoints,
   pointsToUsd,
-  getSearchConfig,
   type PendingState,
 } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -176,12 +174,7 @@ export default function WalletScreen() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
-  const [searchDailyUsed, setSearchDailyUsed] = useState(0);
-  const [searchDailyCap, setSearchDailyCap] = useState(20);
   const [isConverting, setIsConverting] = useState(false);
-  const [lockedNudgeMsg, setLockedNudgeMsg] = useState<string | null>(null);
-  const nudgeOpacity = useRef(new Animated.Value(0)).current;
-  const nudgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -202,12 +195,11 @@ export default function WalletScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    const [s, txns, srv, pending, searchCfg] = await Promise.all([
+    const [s, txns, srv, pending] = await Promise.all([
       getUserStats(),
       getTransactions(),
       fetchServerBalance(),
       refreshPendingFromServer(),
-      getSearchConfig(),
     ]);
     setStats(s);
     setTransactions(txns);
@@ -219,10 +211,6 @@ export default function WalletScreen() {
       setTiers(getWithdrawalTiers(s.balance));
     }
     if (pending) setPendingState(pending);
-    if (searchCfg) {
-      setSearchDailyUsed(searchCfg.dailyUsed);
-      setSearchDailyCap(searchCfg.dailyCap);
-    }
   }, [fetchServerBalance]);
 
   const handleConvertNow = useCallback(async () => {
@@ -242,32 +230,15 @@ export default function WalletScreen() {
         await loadData();
       }
     } catch {
-      Alert.alert(t.common.error, t.wallet.convertError);
+      Alert.alert("Error", "Could not convert points. Please try again.");
     } finally {
       setIsConverting(false);
     }
   }, [isConverting, pendingState, t, loadData]);
 
-  const showLockedNudge = useCallback((amt: number) => {
-    const needed = Math.max(0, amt - serverBalance);
-    const msg = tFn(t, "wallet.keepEarningNudge", {
-      needed: needed.toFixed(2),
-      tier: amt.toFixed(2),
-    });
-    if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
-    setLockedNudgeMsg(msg);
-    nudgeOpacity.setValue(0);
-    Animated.timing(nudgeOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-    nudgeTimer.current = setTimeout(() => {
-      Animated.timing(nudgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
-        setLockedNudgeMsg(null);
-      });
-    }, 2500);
-  }, [serverBalance, t, nudgeOpacity]);
-
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -282,7 +253,10 @@ export default function WalletScreen() {
     ]);
 
     if (!integrity.clean) {
-      Alert.alert(t.wallet.deviceNotSupported, t.wallet.deviceNotSupportedMsg);
+      Alert.alert(
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+      );
       return;
     }
 
@@ -295,7 +269,7 @@ export default function WalletScreen() {
       Alert.alert(
         t.wallet.minimumNotReached,
         srv
-          ? tFn(t, "wallet.verifiedBalanceMinMsg", { amount: effective.toFixed(2) })
+          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $1.00 minimum.`
           : t.wallet.needAtLeast
       );
       return;
@@ -317,13 +291,16 @@ export default function WalletScreen() {
     if (!selectedTier || !paypalEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(paypalEmail.trim())) {
-      Alert.alert(t.wallet.invalidEmail, t.wallet.invalidEmailMsg);
+      Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
       return;
     }
 
     const integrity = await checkDeviceIntegrity();
     if (!integrity.clean) {
-      Alert.alert(t.wallet.deviceNotSupported, t.wallet.deviceNotSupportedMsg);
+      Alert.alert(
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+      );
       return;
     }
 
@@ -339,13 +316,13 @@ export default function WalletScreen() {
       setShowWithdrawModal(false);
       Alert.alert(
         t.wallet.withdrawalSuccessful,
-        tFn(t, "wallet.withdrawalSentMsg", { amount: selectedTier.totalPayout.toFixed(2), email: paypalEmail.trim() })
+        `$${selectedTier.totalPayout.toFixed(2)} will be sent to ${paypalEmail.trim()} via PayPal. Please allow 3-5 business days for processing.`
       );
       await loadData();
     } catch (err: unknown) {
-      const fallback = t.wallet.withdrawalFailed;
+      const fallback = "Failed to submit withdrawal request";
       const rawMsg = err instanceof Error ? err.message : fallback;
-      Alert.alert(t.common.error, extractApiErrorMessage(rawMsg, fallback));
+      Alert.alert("Error", extractApiErrorMessage(rawMsg, fallback));
     } finally {
       setSubmitting(false);
     }
@@ -426,38 +403,6 @@ export default function WalletScreen() {
                   <Text style={styles.pointsStatLabel}>{t.wallet.convertiblePoints}</Text>
                 </View>
               </View>
-
-              {/* Search breakdown: show when any search tokens are pending/claimable */}
-              {(() => {
-                const searchPts = [
-                  ...(pendingState?.pending ?? []),
-                  ...(pendingState?.claimable ?? []),
-                ].filter(tok => tok.actionType === "search")
-                  .reduce((s, tok) => s + tok.points, 0);
-                if (searchPts === 0) return null;
-                return (
-                  <View style={styles.searchBreakdownRow}>
-                    <Ionicons name="search-outline" size={13} color={Colors.primary} />
-                    <Text style={styles.searchBreakdownLabel}>{t.wallet.searchEarned}</Text>
-                    <Text style={styles.searchBreakdownPts}>{formatPoints(searchPts)}</Text>
-                  </View>
-                );
-              })()}
-
-              {/* Daily search progress */}
-              {searchDailyCap > 0 && (
-                <View style={styles.searchProgressRow}>
-                  <View style={styles.searchProgressBar}>
-                    <View style={[styles.searchProgressFill, { width: `${Math.min((searchDailyUsed / searchDailyCap) * 100, 100)}%` as any }]} />
-                  </View>
-                  <Text style={styles.searchProgressText}>
-                    {t.wallet.searchDailyProgress
-                      .replace("{{count}}", String(searchDailyUsed))
-                      .replace("{{cap}}", String(searchDailyCap))}
-                  </Text>
-                </View>
-              )}
-
               <Pressable
                 onPress={handleConvertNow}
                 disabled={isConverting || (pendingState?.claimablePoints ?? 0) === 0}
@@ -502,11 +447,11 @@ export default function WalletScreen() {
             <View style={styles.verifiedBalanceCard}>
               <View style={styles.verifiedBalanceRow}>
                 <Feather name="shield" size={14} color={Colors.primary} />
-                <Text style={styles.verifiedBalanceLabel}>{t.wallet.verifiedBalance}</Text>
+                <Text style={styles.verifiedBalanceLabel}>Verified withdrawable balance</Text>
               </View>
               <Text style={styles.verifiedBalanceAmount}>${serverBalance.toFixed(2)}</Text>
               <Text style={styles.verifiedBalanceHint}>
-                {t.wallet.verifiedBalanceHint}
+                Only earnings verified by survey and offer providers can be withdrawn.
               </Text>
             </View>
 
@@ -532,18 +477,18 @@ export default function WalletScreen() {
 
             <View style={styles.tierPreview}>
               <View style={styles.tierPreviewHeader}>
-                <Text style={styles.tierPreviewTitle}>{t.wallet.withdrawalOptions}</Text>
+                <Text style={styles.tierPreviewTitle}>Withdrawal Options</Text>
                 {tiers.length > 0 && (
                   <View style={styles.readyBadge}>
                     <Feather name="check-circle" size={11} color={Colors.background} />
-                    <Text style={styles.readyBadgeText}>{t.wallet.readyToCashOut}</Text>
+                    <Text style={styles.readyBadgeText}>Ready to Cash Out!</Text>
                   </View>
                 )}
               </View>
               <Text style={styles.tierPreviewSubtitle}>
                 {tiers.length > 0
-                  ? tFn(t, "wallet.canWithdrawNow", { amounts: tiers.map((tier) => `$${tier.amount.toFixed(2)}`).join(", ") })
-                  : tFn(t, "wallet.keepEarningNudge", { needed: Math.max(0, 1 - displayBalance).toFixed(2), tier: "1.00" })}
+                  ? `You can withdraw ${tiers.map((t) => `$${t.amount.toFixed(2)}`).join(", ")} right now`
+                  : `Earn $${Math.max(0, 1 - displayBalance).toFixed(2)} more to unlock withdrawals`}
               </Text>
               <View style={styles.tierMiniGrid}>
                 {[1, 3, 5, 7].map((amt) => {
@@ -564,35 +509,19 @@ export default function WalletScreen() {
                       >
                         <Feather name="check-circle" size={13} color={Colors.primary} style={{ marginBottom: 3 }} />
                         <Text style={styles.tierMiniAmt}>${amt.toFixed(2)}</Text>
-                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>{t.wallet.available}</Text>
+                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>Available</Text>
                       </Pressable>
                     );
                   }
                   return (
-                    <Pressable
-                      key={amt}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        showLockedNudge(amt);
-                      }}
-                      style={({ pressed }) => [
-                        styles.tierMiniItem,
-                        { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
-                      ]}
-                    >
+                    <View key={amt} style={styles.tierMiniItem}>
                       <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
                       <Text style={[styles.tierMiniAmt, { color: Colors.textMuted }]}>${amt.toFixed(2)}</Text>
-                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>{t.wallet.tierLocked}</Text>
-                    </Pressable>
+                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>Locked</Text>
+                    </View>
                   );
                 })}
               </View>
-              {lockedNudgeMsg && (
-                <Animated.View style={[styles.lockedNudge, { opacity: nudgeOpacity }]}>
-                  <Feather name="trending-up" size={13} color={Colors.primary} />
-                  <Text style={styles.lockedNudgeText}>{lockedNudgeMsg}</Text>
-                </Animated.View>
-              )}
             </View>
 
             <Text style={styles.sectionTitle}>{t.wallet.transactionHistory}</Text>
@@ -648,12 +577,12 @@ export default function WalletScreen() {
                 <View style={styles.paypalSection}>
                   <View style={styles.paypalHeader}>
                     <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.paypalLabel}>{t.wallet.paypalEmailLabel}</Text>
+                    <Text style={styles.paypalLabel}>PayPal Email</Text>
                   </View>
                   <View style={styles.paypalInputWrapper}>
                     <TextInput
                       style={styles.paypalInput}
-                      placeholder={t.wallet.paypalEmailPlaceholder}
+                      placeholder="your@email.com"
                       placeholderTextColor={Colors.textMuted}
                       value={paypalEmail}
                       onChangeText={setPaypalEmail}
@@ -683,7 +612,7 @@ export default function WalletScreen() {
                   {paypalEmail.trim() ? (
                     <View style={styles.paypalConfirmRow}>
                       <Feather name="send" size={12} color={Colors.textSecondary} />
-                      <Text style={styles.paypalConfirmText}>{tFn(t, "wallet.viaPaypalTo", { email: paypalEmail.trim() })}</Text>
+                      <Text style={styles.paypalConfirmText}>via PayPal to {paypalEmail.trim()}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -757,21 +686,6 @@ const styles = StyleSheet.create({
   },
   convertButtonDisabled: { backgroundColor: Colors.surfaceHighlight },
   convertText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.background },
-  searchBreakdownRow: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(0,230,118,0.07)", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8,
-  },
-  searchBreakdownLabel: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.text, flex: 1 },
-  searchBreakdownPts: { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary },
-  searchProgressRow: {
-    flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10,
-  },
-  searchProgressBar: {
-    flex: 1, height: 4, backgroundColor: Colors.surfaceHighlight, borderRadius: 2, overflow: "hidden",
-  },
-  searchProgressFill: { height: "100%", backgroundColor: Colors.primary, borderRadius: 2 },
-  searchProgressText: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, minWidth: 110, textAlign: "right" },
   nextTierCard: {
     backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: "rgba(255, 214, 0, 0.15)",
@@ -828,16 +742,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
   },
   readyBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 11, color: Colors.background },
-  tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 0 },
-  lockedNudge: {
-    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10,
-    backgroundColor: "rgba(0,230,118,0.10)", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 7,
-    borderWidth: 1, borderColor: "rgba(0,230,118,0.25)",
-  },
-  lockedNudgeText: {
-    fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary, flexShrink: 1,
-  },
+  tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tierMiniItem: {
     width: "20%" as any, flexGrow: 1, backgroundColor: Colors.surfaceHighlight,
     borderRadius: 10, paddingVertical: 10, alignItems: "center",

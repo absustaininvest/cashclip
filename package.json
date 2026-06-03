@@ -10,7 +10,7 @@
     "check-vitest-configs": "pnpm --filter @workspace/scripts run check-vitest-configs",
     "build": "pnpm run check-public-archives && pnpm run typecheck:deploy && BASE_PATH=/ pnpm --filter @workspace/absustain run build && pnpm --filter @workspace/api-server run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck && pnpm run check-vitest-configs && pnpm -r --if-present run test",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck && pnpm run check-vitest-configs",
     "typecheck:deploy": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck",
     "expo": "pnpm --filter @workspace/cashclip exec expo",
     "eas-build-post-install": "command -v pod && echo 'pod found' || (for d in /opt/homebrew/bin /opt/homebrew/opt/cocoapods/bin /usr/local/bin /usr/bin; do [ -f \"$d/pod\" ] && ln -sf \"$d/pod\" /usr/local/bin/pod && echo \"Linked pod from $d\" && break; done) || sudo gem install cocoapods"
@@ -35,7 +35,6 @@
   },
   "devDependencies": {
     "prettier": "^3.8.1",
-    "typescript": "~5.9.2",
-    "vitest": "^4.1.5"
+    "typescript": "~5.9.2"
   }
 }

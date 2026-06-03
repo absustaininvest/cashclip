@@ -117,33 +117,10 @@ export default function ProfileScreen() {
     {
       icon: "globe",
       label: t.profile.language,
-      languageBadge: lang === "en" ? "EN" : lang === "es" ? "ES" : lang === "pt" ? "PT" : lang === "fr" ? "FR" : "DE",
+      languageBadge: lang === "en" ? "EN" : "ES",
       action: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const options: { label: string; code: "en" | "es" | "pt" | "fr" | "de" }[] = [
-          { label: "English", code: "en" },
-          { label: "Español", code: "es" },
-          { label: "Português", code: "pt" },
-          { label: "Français", code: "fr" },
-          { label: "Deutsch", code: "de" },
-        ];
-        Alert.alert(
-          t.profile.language,
-          undefined,
-          [
-            ...options.map((opt) => ({
-              text: lang === opt.code ? `✓  ${opt.label}` : `    ${opt.label}`,
-              onPress: () => {
-                if (lang !== opt.code) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setLang(opt.code);
-                }
-              },
-            })),
-            { text: t.auth.cancel, style: "cancel" as const },
-          ],
-          { cancelable: true }
-        );
+        setLang(lang === "en" ? "es" : "en");
       },
     },
     ...(isAdmin ? [{ icon: "settings", label: t.admin.title, action: () => router.push("/admin") }] : []),

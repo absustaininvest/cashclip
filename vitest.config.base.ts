@@ -24,13 +24,5 @@ export default defineConfig({
      * This prevents empty test suites from silently passing in CI.
      */
     passWithNoTests: false,
-    /**
-     * Enable vitest result caching so unchanged test files are skipped on
-     * repeated runs.  The cache directory is intentionally placed outside
-     * node_modules so it survives installs and is easy to gitignore.
-     */
-    cache: {
-      dir: ".vitest-cache",
-    },
   },
 });

@@ -17,10 +17,8 @@ import {
   adEvents,
   webhookAudit,
   securityAuditLog,
-  spinChallenges,
 } from "@workspace/db";
 import { db } from "@workspace/db";
-import { maybeSendThresholdPush } from "./lib/push";
 import { eq, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -45,8 +43,7 @@ export type SecurityAuditEvent =
   | "password_changed"
   | "password_reset"
   | "admin_password_reset"
-  | "admin_factory_reset"
-  | "sponsored_visit_alert_reset";
+  | "admin_factory_reset";
 
 export const SECURITY_AUDIT_EVENTS: readonly SecurityAuditEvent[] = [
   "totp_enabled",
@@ -54,7 +51,6 @@ export const SECURITY_AUDIT_EVENTS: readonly SecurityAuditEvent[] = [
   "backup_codes_regenerated",
   "password_changed",
   "password_reset",
-  "sponsored_visit_alert_reset",
 ] as const;
 
 // A security audit row enriched with the actor's username/email for display.
@@ -206,7 +202,6 @@ export interface IStorage {
   getWebhookAuditProviders(): Promise<string[]>;
   pruneWebhookAudit(before: Date): Promise<number>;
   pruneSecurityAudit(before: Date): Promise<number>;
-  pruneSpinChallenges(before: Date): Promise<number>;
 }
 
 function n(value: string | number | null | undefined): number {
@@ -461,7 +456,7 @@ export class DatabaseStorage implements IStorage {
     }
     const amountStr = amount.toFixed(2);
 
-    const result = await db.transaction(async (tx: DbTx) => {
+    return await db.transaction(async (tx: DbTx) => {
       const isEarning = type === "survey" || type === "offerwall" || type === "bonus";
       const updateSet = isEarning
         ? {
@@ -490,10 +485,6 @@ export class DatabaseStorage implements IStorage {
 
       return { balance: n(updated.balance), totalEarned: n(updated.totalEarned) };
     });
-
-    // Fire-and-forget: notify the user if their balance just crossed $1
-    maybeSendThresholdPush(userId, result.balance - amount, result.balance);
-    return result;
   }
 
   async debitUser({
@@ -814,7 +805,7 @@ export class DatabaseStorage implements IStorage {
   } | { conflict: "duplicate" } | { conflict: "not_claimable" }> {
     const { sessionToken, userId, type, description, providerTransactionId, finalReward } = args;
     try {
-      const txResult = await db.transaction(async (tx: DbTx) => {
+      return await db.transaction(async (tx: DbTx) => {
         const now = new Date();
 
         // Row-level lock: serialize concurrent claims on the same session token.
@@ -886,12 +877,6 @@ export class DatabaseStorage implements IStorage {
           reward,
         };
       });
-
-      // Fire-and-forget: notify the user if their balance just crossed $1
-      if (!("conflict" in txResult)) {
-        maybeSendThresholdPush(userId, txResult.balance - txResult.reward, txResult.balance);
-      }
-      return txResult;
     } catch (err: unknown) {
       const code = (err as { code?: string } | null)?.code;
       if (code === "23505") {
@@ -1400,14 +1385,6 @@ export class DatabaseStorage implements IStorage {
       .delete(securityAuditLog)
       .where(lt(securityAuditLog.createdAt, before))
       .returning({ id: securityAuditLog.id });
-    return rows.length;
-  }
-
-  async pruneSpinChallenges(before: Date): Promise<number> {
-    const rows = await db
-      .delete(spinChallenges)
-      .where(lt(spinChallenges.expiresAt, before))
-      .returning({ token: spinChallenges.token });
     return rows.length;
   }
 }

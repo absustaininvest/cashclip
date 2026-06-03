@@ -23,17 +23,14 @@ June 3, 2026 — all screenshots purged per owner request.
 
 Requests last 7 days: 860 (+173%). Spike around May 31–Jun 1 = Colombia promotion start.
 
-## Mediation groups — COMPLETE (Jun 3 2026 ~3:57 AM — 6 groups total) ✅
+## Mediation groups (as of Jun 3 2026 ~2:55 AM — 5 groups total)
 | Priority | Name | Ad units | Platform | Est. earnings (7d) | Notes |
 |---|---|---|---|---|---|
-| 1 | App Open iOS | CashClip App Open | **iOS** | — | **COMPLETED Jun 3 2026** — AdMob Network only (Unity Ads does NOT support App Open format) ✅ |
-| 2 | Interstitial_iOS | CashClip Interstitial + Set Paced | **iOS** | — | **COMPLETED Jun 3 2026** — AdMob Network + Unity Ads bidding ✅ |
-| 3 | Banner Mediation iOS | Bees + CashClip Banner | **iOS** | — | **COMPLETED Jun 3 2026** — AdMob Network + Unity Ads bidding ✅ |
-| 4 | Cash-Clip Reward... | CashClip Rewarded Video | **Android** | $0 | Zero traffic = Android not publicly live yet (Play Store internal testing). NOT broken. |
-| 5 | CashClip Rewarde... | iOS rewarded | **iOS** | $6.62 (+1,732%) | Main revenue driver — 127 impressions last 7d. |
-| — | AdMob (default) | fallback | both | $0.28 | Fallback when no group matches. |
-
-**All iOS ad units now have dedicated mediation groups. Colombian market AdMob setup is 100% complete.**
+| 1 | Interstitial_iOS | CashClip Interstitial + Set Paced | **iOS** | — | **COMPLETED Jun 3 2026** — AdMob Network + Unity Ads (bidding) both Active ✅ |
+| 2 | Banner Mediation iOS | Bees + CashClip Banner | **iOS** | — | **COMPLETED Jun 3 2026** — AdMob Network + Unity Ads (bidding) both Active ✅ |
+| 3 | Cash-Clip Reward... | CashClip Rewarded Video | **Android** | $0 | Zero traffic = Android not publicly live yet (Play Store internal testing). NOT broken — correct setup. |
+| 4 | CashClip Rewarde... | (iOS rewarded) | **iOS** | $6.62 (+1,732%) | Doing all the revenue work. 127 impressions last 7d. |
+| — | AdMob (default) | fallback | both | $0.28 | Fallback when groups don't match. |
 
 ## Unity Ads status — FULLY MAPPED (confirmed Jun 3 2026 ~3:19 AM)
 - **Partnership: Active** ✅ (confirmed in Partnership tab)

@@ -12,10 +12,6 @@ import { registerRoutes } from "./routes/cashclip";
 import { appVersionMiddleware } from "./lib/versionCheck";
 import { getClientIp } from "./lib/clientIp";
 import { startSponsoredVisitAlertMonitor } from "./lib/sponsoredVisitMonitor";
-import { verifyWebhookRegistration } from "./paypal";
-import { db, spinChallenges } from "@workspace/db";
-import { lt } from "drizzle-orm";
-import { runSearchChallengeSweep } from "./lib/searchChallengeSweep";
 
 const ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
@@ -279,46 +275,5 @@ registerRoutes(app);
 startSponsoredVisitAlertMonitor().catch((err) => {
   logger.error({ err }, "Failed to start sponsored-visit alert monitor");
 });
-
-// ── SPIN CHALLENGE STARTUP SWEEP ─────────────────────────────────────────────
-// The periodic in-process cleanup (every 60 s) won't run during restarts or
-// idle autoscale periods. Delete any already-expired rows immediately on boot
-// so stale challenges never accumulate across server restarts.
-db.delete(spinChallenges)
-  .where(lt(spinChallenges.expiresAt, new Date()))
-  .then((result) => {
-    logger.info({ deleted: result.rowCount ?? 0 }, "spin challenge startup sweep complete");
-  })
-  .catch((err) => {
-    logger.warn({ err }, "spin challenge startup sweep failed");
-  });
-
-// ── SEARCH CHALLENGE STARTUP SWEEP ───────────────────────────────────────────
-// The periodic in-process cleanup (every 60 s) won't run during restarts or
-// idle autoscale periods. Delete any already-expired rows immediately on boot
-// so stale challenges never accumulate across server restarts.
-runSearchChallengeSweep();
-
-// ── PAYPAL WEBHOOK REGISTRATION CHECK ────────────────────────────────────────
-// Verifies PAYPAL_WEBHOOK_ID against the live PayPal API on startup.
-// Logs warnings if the ID is invalid, the URL doesn't match, or required
-// events are missing. Never crashes the server — payout callbacks continue
-// to work even if the check fails (they use their own per-request verify).
-verifyWebhookRegistration()
-  .then((result) => {
-    if (result.ok) {
-      logger.info({ webhookId: result.webhookId }, "PayPal webhook registration verified OK");
-    } else {
-      for (const w of result.warnings) {
-        logger.warn({ webhookId: result.webhookId }, `PayPal webhook registration: ${w}`);
-      }
-      if (result.error) {
-        logger.warn({ webhookId: result.webhookId, error: result.error }, "PayPal webhook registration check failed");
-      }
-    }
-  })
-  .catch((err) => {
-    logger.warn({ err }, "PayPal webhook registration check threw unexpectedly");
-  });
 
 export default app;

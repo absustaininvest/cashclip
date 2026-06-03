@@ -2,7 +2,6 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, numeric, integer, boolean, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { AD_CATEGORIES } from "@workspace/api-zod";
 
 export const users = pgTable("users", {
   id: varchar("id")
@@ -36,7 +35,6 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   totpBackupCodes: text("totp_backup_codes").array(),
-  expoPushToken: text("expo_push_token"),
 },
 (t) => ({
   balanceNonNegative: check("users_balance_non_negative", sql`${t.balance} >= 0`),
@@ -145,7 +143,6 @@ export const campaigns = pgTable(
     status: text("status").notNull().default("pending"),
     adminNote: text("admin_note"),
     postbackSecret: varchar("postback_secret", { length: 64 }),
-    category: text("category"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -156,14 +153,6 @@ export const campaigns = pgTable(
     // purchased budget or create a campaign with negative spend.
     spentNonNegative: check("campaigns_spent_non_negative", sql`${t.spent} >= 0`),
     spentWithinBudget: check("campaigns_spent_within_budget", sql`${t.spent} <= ${t.totalBudget}`),
-    // Enforce category is one of the known ad categories (or null/unset).
-    // The IN-list is generated from AD_CATEGORIES so the constraint stays in
-    // sync with the shared constant — a mismatch would require editing that
-    // constant, which TypeScript propagates to all consumers.
-    categoryValid: check(
-      "campaigns_category_valid",
-      sql.raw(`category IS NULL OR category IN (${AD_CATEGORIES.map(c => `'${c}'`).join(", ")})`),
-    ),
   })
 );
 
@@ -354,9 +343,7 @@ export type Lead = typeof leads.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
 export type CampaignClick = typeof campaignClicks.$inferSelect;
 
-export const insertCampaignSchema = createInsertSchema(campaigns)
-  .omit({ id: true, createdAt: true, updatedAt: true, spent: true, clicks: true, status: true, adminNote: true })
-  .extend({ category: z.enum(AD_CATEGORIES).nullish() });
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true, updatedAt: true, spent: true, clicks: true, status: true, adminNote: true });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -417,43 +404,6 @@ export const deviceInstalls = pgTable(
 );
 
 export type DeviceInstall = typeof deviceInstalls.$inferSelect;
-
-// ── SPIN CHALLENGES ───────────────────────────────────────────────────────────
-// Short-lived server-issued tokens for the Spin Wheel earn flow. Stored in the
-// DB so they are consistent across autoscaled replicas (no in-memory Map).
-// /complete atomically DELETE…RETURNING inside the earn transaction to enforce
-// single-use even when two replicas race with different valid tokens.
-export const spinChallenges = pgTable(
-  "spin_challenges",
-  {
-    token: text("token").primaryKey(),
-    userId: varchar("user_id").notNull().references(() => users.id),
-    issuedAt: timestamp("issued_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-  },
-  (t) => ({
-    expiresAtIdx: index("spin_challenges_expires_at_idx").on(t.expiresAt),
-    userIdx: index("spin_challenges_user_idx").on(t.userId),
-  })
-);
-
-// ── SEARCH CHALLENGES ─────────────────────────────────────────────────────────
-// Short-lived server-issued tokens for the Search & Earn flow. Stored in the DB
-// so they survive server restarts and are consistent across autoscaled replicas.
-export const searchChallenges = pgTable(
-  "search_challenges",
-  {
-    token: text("token").primaryKey(),
-    userId: varchar("user_id").notNull().references(() => users.id),
-    issuedAt: timestamp("issued_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-  },
-  (t) => ({
-    expiresAtIdx: index("search_challenges_expires_at_idx").on(t.expiresAt),
-    userIdx: index("search_challenges_user_idx").on(t.userId),
-  })
-);
-
 
 export const earnTokens = pgTable("earn_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

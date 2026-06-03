@@ -59,6 +59,3 @@ keys/
 
 .env
 certs/private-key.pem
-
-# vitest result cache
-.vitest-cache/

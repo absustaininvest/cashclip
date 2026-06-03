@@ -3,7 +3,6 @@ import { getApiUrl } from "./query-client";
 import { secureGet, secureSet, secureMultiDelete } from "./secure-store";
 import { setAdMobUserId } from "./admob";
 import { setLevelPlayUserId } from "./levelplay";
-import { registerAndUploadPushToken } from "./push-token";
 
 const AUTH_TOKEN_KEY = "cashclip_auth_token";
 const REFRESH_TOKEN_KEY = "cashclip_refresh_token";
@@ -97,8 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(data.user);
           setToken(savedToken);
           setIsLoading(false);
-          // Register push token with the restored session token (best-effort)
-          registerAndUploadPushToken(savedToken).catch(() => {});
           return;
         }
       }
@@ -135,8 +132,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setToken(data.token);
       setUser(data.user);
-      // Register push token (best-effort, silently no-ops on old builds or denied permission)
-      registerAndUploadPushToken(data.token).catch(() => {});
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || "Network error" };

@@ -34,7 +34,7 @@ import {
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import SponsoredSection from "@/components/SponsoredSection";
-import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI, type AdCategory } from "@/lib/video-data";
+import { adVideos } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
 import { isLevelPlayAvailable, isLevelPlayReady, showLevelPlayRewardedAd, preloadLevelPlayAd } from "@/lib/levelplay";
@@ -89,7 +89,6 @@ const WHEEL_SEGMENTS = [
 
 // Check-in streak visual rewards (pts) — server awards 100 pts per check-in
 const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
-
 
 function AdCard({
   ad,
@@ -385,20 +384,12 @@ function DailyMissionCard({
   onClaim: (id: string) => void;
 }) {
   const scale = useSharedValue(1);
-  const progressAnim = useSharedValue(Math.min(mission.progress / mission.target, 1));
-
-  useEffect(() => {
-    const target = Math.min(mission.progress / mission.target, 1);
-    progressAnim.value = withTiming(target, { duration: 400 });
-  }, [mission.progress, mission.target]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const progressBarStyle = useAnimatedStyle(() => ({
-    width: `${progressAnim.value * 100}%`,
-  }));
+  const progress = Math.min(mission.progress / mission.target, 1);
 
   return (
     <Animated.View style={animStyle}>
@@ -435,15 +426,15 @@ function DailyMissionCard({
             <Text style={styles.missionDesc}>{mission.description}</Text>
             <View style={styles.missionProgressRow}>
               <View style={styles.missionBarBg}>
-                <Animated.View
+                <View
                   style={[
                     styles.missionBarFill,
                     {
+                      width: `${progress * 100}%`,
                       backgroundColor: mission.completed
                         ? Colors.primary
                         : Colors.accent,
                     },
-                    progressBarStyle,
                   ]}
                 />
               </View>
@@ -488,20 +479,12 @@ function WeeklyMissionCard({
   onClaim: (id: string) => void;
 }) {
   const scale = useSharedValue(1);
-  const progressAnim = useSharedValue(Math.min(mission.progress / mission.target, 1));
-
-  useEffect(() => {
-    const target = Math.min(mission.progress / mission.target, 1);
-    progressAnim.value = withTiming(target, { duration: 400 });
-  }, [mission.progress, mission.target]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const progressBarStyle = useAnimatedStyle(() => ({
-    width: `${progressAnim.value * 100}%`,
-  }));
+  const progress = Math.min(mission.progress / mission.target, 1);
 
   return (
     <Animated.View style={animStyle}>
@@ -538,15 +521,15 @@ function WeeklyMissionCard({
             <Text style={styles.missionDesc}>{mission.description}</Text>
             <View style={styles.missionProgressRow}>
               <View style={styles.missionBarBg}>
-                <Animated.View
+                <View
                   style={[
                     styles.missionBarFill,
                     {
+                      width: `${progress * 100}%`,
                       backgroundColor: mission.completed
                         ? Colors.accent
                         : Colors.primary,
                     },
-                    progressBarStyle,
                   ]}
                 />
               </View>
@@ -611,7 +594,6 @@ export default function EarnScreen() {
 
   const balancePulse = useSharedValue(1);
   const wheelRotation = useSharedValue(0);
-  const goalProgressAnim = useSharedValue(0);
 
   const [fontsLoaded] = useFonts({
     Outfit_400Regular,
@@ -672,19 +654,11 @@ export default function EarnScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsSpinning(true);
 
-    // Resolve the server result FIRST so the wheel lands on the correct segment.
-    // begin → complete immediately (no time-gap enforcement for spin).
+    // Begin spin challenge BEFORE animation — challenge has 60s TTL
     const challengeToken = await beginSpin();
-    const token = challengeToken ? await completeSpin(challengeToken) : null;
-    const pts = token?.points ?? WHEEL_SEGMENTS[Math.floor(Math.random() * WHEEL_SEGMENTS.length)].value;
 
-    // Find the segment index whose value matches the server result.
-    // Falls back to a random index only if the server returns an unexpected value.
-    const matchIdx = WHEEL_SEGMENTS.findIndex(s => s.value === pts);
-    const segmentIndex = matchIdx !== -1
-      ? matchIdx
-      : Math.floor(Math.random() * WHEEL_SEGMENTS.length);
-
+    // Spin animation — visual only, reward is server-determined
+    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
     const segmentAngle = (segmentIndex * 360) / WHEEL_SEGMENTS.length;
     const targetRotation = 360 * 5 + (360 - segmentAngle);
 
@@ -694,9 +668,13 @@ export default function EarnScreen() {
     );
 
     setTimeout(async () => {
+      // Lock spin timer client-side immediately
       await recordSpinTimestamp();
       setSpinAvailable(false);
       setNextSpinTime(Date.now() + 2 * 60 * 60 * 1000);
+      // Complete spin with the server-issued challenge token
+      const token = challengeToken ? await completeSpin(challengeToken) : null;
+      const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
       setSpinReward(pts);
       setIsSpinning(false);
       setShowSpinReward(true);
@@ -707,7 +685,6 @@ export default function EarnScreen() {
 
   const [adLoading, setAdLoading] = useState(false);
   const [adPreloaded, setAdPreloaded] = useState(false);
-  const [selectedAdCategory, setSelectedAdCategory] = useState("All");
   const [lpAdReady, setLpAdReady] = useState(false);
   const [lpAdLoading, setLpAdLoading] = useState(false);
 
@@ -870,16 +847,6 @@ export default function EarnScreen() {
   const wheelStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${wheelRotation.value}deg` }],
   }));
-
-  const goalProgressStyle = useAnimatedStyle(() => ({
-    width: `${goalProgressAnim.value * 100}%`,
-  }));
-
-  useEffect(() => {
-    if (!stats) return;
-    const target = Math.min(stats.dailyAdsWatched / DAILY_GOAL, 1);
-    goalProgressAnim.value = withTiming(target, { duration: 400 });
-  }, [stats?.dailyAdsWatched]);
 
   if (!fontsLoaded || !stats) return null;
 
@@ -1266,14 +1233,15 @@ export default function EarnScreen() {
             </Text>
           </View>
           <View style={styles.goalBarBg}>
-            <Animated.View style={[styles.goalBarFill, goalProgressStyle]}>
-              <LinearGradient
-                colors={[Colors.primary, Colors.accent]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ width: "100%", height: "100%" }}
-              />
-            </Animated.View>
+            <LinearGradient
+              colors={[Colors.primary, Colors.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.goalBarFill,
+                { width: `${dailyProgress * 100}%` },
+              ]}
+            />
           </View>
           {dailyProgress >= 1 && (
             <View style={styles.goalComplete}>
@@ -1294,48 +1262,11 @@ export default function EarnScreen() {
 
         {/* Ads Section */}
         <Text style={styles.adsSectionTitle}>{t.earn.availableAds}</Text>
-
-        {/* Category Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {[
-            { key: "All", emoji: "", label: t.earn.categoryAll },
-            ...AD_CATEGORIES.map((cat) => ({
-              key: cat,
-              emoji: AD_CATEGORY_EMOJI[cat],
-              label: t.earn.adCategoryLabel[cat],
-            })),
-          ].map((cat) => (
-            <Pressable
-              key={cat.key}
-              onPress={() => setSelectedAdCategory(cat.key)}
-              style={[styles.categoryChip, selectedAdCategory === cat.key && styles.categoryChipActive]}
-            >
-              <Text style={[styles.categoryChipText, selectedAdCategory === cat.key && styles.categoryChipTextActive]}>
-                {cat.emoji}{cat.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {(() => {
-          const filtered = selectedAdCategory === "All"
-            ? adVideos
-            : adVideos.filter((ad) => ad.category === selectedAdCategory);
-          return filtered.length > 0 ? (
-            filtered.map((ad, i) => (
-              <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
-                <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
-              </View>
-            ))
-          ) : (
-            <Text style={styles.categoryEmptyText}>{t.earn.categoryEmpty}</Text>
-          );
-        })()}
+        {adVideos.map((ad, i) => (
+          <View key={ad.id} style={{ marginBottom: i < adVideos.length - 1 ? 10 : 0 }}>
+            <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
+          </View>
+        ))}
 
         {/* LevelPlay Rewarded Ad */}
         {isLevelPlayAvailable && (
@@ -1837,42 +1768,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.text,
     marginTop: 20,
-    marginBottom: 10,
-  },
-  categoryScroll: {
     marginBottom: 12,
-  },
-  categoryScrollContent: {
-    paddingRight: 8,
-    gap: 8,
-    flexDirection: "row",
-  },
-  categoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  categoryChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  categoryChipText: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  categoryChipTextActive: {
-    color: "#000",
-  },
-  categoryEmptyText: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginVertical: 20,
   },
   sponsoredCard: {
     backgroundColor: Colors.surface,

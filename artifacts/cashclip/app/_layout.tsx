@@ -51,13 +51,6 @@ const loadingStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
 });
 
-function SplashHider() {
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-  return null;
-}
-
 function RootLayoutNav() {
   const { t } = useLanguage();
   return (
@@ -116,6 +109,12 @@ export default function RootLayout() {
   const appReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
+    if (appReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [appReady]);
+
+  useEffect(() => {
     startAdAnalyticsFlush();
     return () => stopAdAnalyticsFlush();
   }, []);
@@ -126,7 +125,6 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
-          <SplashHider />
           <AuthProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <StatusBar style="light" />
@@ -135,11 +133,10 @@ export default function RootLayout() {
                   {/* TrackingConsentGate shows Apple-style pre-permission screens
                       first, fires the ATT prompt, then AdsConsent — fully
                       serialized. Only after the user taps Continue does AdMob
-                      initialize. The native splash is held until fonts AND language
-                      are ready (SplashHider fires inside LanguageProvider once both
-                      conditions are met). It is NOT gated on consent resolving —
-                      the consent screen must be visible so the user can interact
-                      with it, otherwise the app would sit frozen behind the splash. */}
+                      initialize. The native splash is hidden as soon as fonts are
+                      ready (see appReady above), NOT when consent resolves — the
+                      consent screen must be visible so the user can interact with
+                      it, otherwise the app would sit frozen behind the splash. */}
                   <TrackingConsentGate onConsentDone={() => {
                     initializeAdMob().then((initialized) => {
                       if (initialized) preloadRewardedAd();
