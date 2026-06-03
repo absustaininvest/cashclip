@@ -1186,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       if (!verification.ok) {
         logWebhookVerificationFailure(req, "paypal", verification.reason ?? "unknown");
-        res.status(401).json({ error: "Webhook verification failed" }); return;
+        res.status(400).json({ error: "Webhook verification failed" }); return;
       }
 
       const event = req.body as {
@@ -1222,7 +1222,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(200).json({ status: "ignored", reason: "withdrawal not found" }); return;
       }
 
-      if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
+      const SUCCESS_EVENTS = new Set([
+        "PAYMENT.PAYOUTS-ITEM.SUCCEEDED",
+        "PAYMENT.PAYOUTSBATCH.SUCCESS",
+      ]);
+
+      if (SUCCESS_EVENTS.has(eventType)) {
         await storage.updateWithdrawalStatusIfStatus(
           withdrawal.id,
           ["paying"],
