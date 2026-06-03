@@ -3564,7 +3564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Errors thrown here roll the whole transaction back, including the
       // click insert — so a budget-exhausted race never leaves a settled
       // click row without a matching credit.
-      type SettlementError = "BUDGET_EXHAUSTED" | "ALREADY_VISITED" | "USER_MISSING" | "DAILY_CAP";
+      type SettlementError = "BUDGET_EXHAUSTED" | "ALREADY_VISITED" | "USER_MISSING" | "DAILY_CAP" | "VISIT_COUNT_CAP";
 
       // Per-user daily sponsored-earnings cap (default $1/day).
       // Enforced inside the transaction so concurrent /visit calls cannot
@@ -3583,7 +3583,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // bigint for the xact-scoped lock (released at COMMIT/ROLLBACK).
           await tx.execute(drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${req.userId!})::bigint)`);
 
-          // 0b. Daily cap check (defense against Sybil-style automation).
+          // 0b. Per-account daily visit COUNT recheck (inside the lock).
+          // The pre-flight check outside the transaction is a fast-path
+          // optimization only. Under concurrency, parallel requests for
+          // different campaigns all pass the outer check before any of them
+          // hold the lock. Rechecking here — while the advisory lock is held
+          // and the transaction is open — ensures the COUNT is serialized
+          // and the cap cannot be exceeded by simultaneous requests.
+          {
+            const countRows = await tx.execute(drizzleSql`
+              SELECT COUNT(*)::int AS n
+              FROM campaign_clicks
+              WHERE visitor_user_id = ${req.userId!}
+                AND created_at >= NOW() - INTERVAL '24 hours'
+            `);
+            const countNow = Number((countRows.rows[0] as { n: number }).n);
+            if (countNow >= acctVisitMax) {
+              const err = new Error("VISIT_COUNT_CAP") as Error & { settlement?: SettlementError };
+              err.settlement = "VISIT_COUNT_CAP";
+              throw err;
+            }
+          }
+
+          // 0c. Daily cap check (defense against Sybil-style automation).
           if (dailyCapEnabled) {
             const sumRows = await tx.execute(drizzleSql`
               SELECT COALESCE(SUM(reward_granted), 0)::text AS total
@@ -3685,6 +3707,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: "Daily sponsored-visit earnings cap reached. Try again tomorrow.",
             dailyCap,
           });
+          return;
+        }
+        if (settlement === "VISIT_COUNT_CAP") {
+          await releaseIpSlot("visit-count-cap");
+          res.status(429).json({ error: "Daily sponsored-visit limit reached for this account. Try again tomorrow." });
           return;
         }
         if (settlement === "USER_MISSING") {
