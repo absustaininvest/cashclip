@@ -7,11 +7,11 @@
  *   receive a reward — /visit rejects with 400 because witnessedAt is null.
  *
  * /c/:token is the server-observed gate:
- *   - The browser MUST route through GET /c/:token?q=<sig> to reach the
+ *   - The browser MUST route through GET /c/:token?ack=<ackToken> to reach the
  *     advertiser; the server records witnessedAt during that GET.
- *   - sig = HMAC-SHA256(JWT_SECRET, "completion:"+token) — unforgeable
- *     without the server secret.
- *   - Without a valid sig, /c/:token returns 403 and witnessedAt stays null,
+ *   - ackToken = HMAC-SHA256(token + ":" + witnessNonce, JWT_ACCESS_SECRET) —
+ *     unforgeable without the server secret.
+ *   - Without a valid ack, /c/:token returns 403 and witnessedAt stays null,
  *     so /visit rejects settlement.
  */
 
@@ -23,6 +23,9 @@ import type { Express } from "express";
 
 const TEST_JWT_SECRET = "test-jwt-secret-for-sponsored-witness-tests-padded-to-64-chars-xy";
 
+// A fixed witness nonce that matches what's stored in the DB mock below.
+const WITNESS_NONCE = "testnonce123abc456def789abc12345";
+
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 const dbMocks = vi.hoisted(() => {
   const attempt = {
@@ -33,10 +36,13 @@ const dbMocks = vi.hoisted(() => {
     createdAt: new Date(),
     expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     redirectedAt: new Date(Date.now() - 60_000),
-    redirectIpHash: "dummy-ip-hash",
-    redirectUaHash: "dummy-ua-hash",
+    // null so the IP/UA binding check in /c/:token is skipped in tests.
+    redirectIpHash: null as string | null,
+    redirectUaHash: null as string | null,
     witnessedAt: null as Date | null,
     settledAt: null as Date | null,
+    // witnessNonce stored in DB by /r/:token; /c/:token reads it to verify ack.
+    witnessNonce: "testnonce123abc456def789abc12345" as string | null,
   };
 
   const campaign = {
@@ -119,13 +125,21 @@ vi.mock("../auth", async () => {
 vi.mock("../lib/dbRateLimit", () => ({
   recordLoginAttempt: vi.fn().mockResolvedValue({ allowed: true, current: 1 }),
   checkLoginAttempts: vi.fn().mockResolvedValue({ allowed: true, current: 1 }),
+  // Required so releaseIpSlot() inside /visit doesn't throw when it tries to
+  // decrement the per-IP cap after a legitimate rejection.
+  decrementLoginAttempt: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeCompletionSig(token: string): string {
+/**
+ * Build the ack token that /c/:token now expects.
+ * ackToken = HMAC-SHA256(token + ":" + witnessNonce, JWT_ACCESS_SECRET)
+ * This replaced the old ?q= sig (which was HMAC of "completion:"+token).
+ */
+function makeAckToken(token: string, nonce: string = WITNESS_NONCE): string {
   return createHmac("sha256", TEST_JWT_SECRET)
-    .update("completion:" + token)
+    .update(token + ":" + nonce)
     .digest("hex");
 }
 
@@ -146,6 +160,12 @@ beforeAll(async () => {
   const { registerRoutes } = await import("../routes/cashclip");
   app = express();
   app.use(express.json());
+  // Attach a minimal pino-like logger to req so handlers using req.log.warn()
+  // (without optional chaining) don't throw in the test environment.
+  app.use((req: any, _res, next) => {
+    req.log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+    next();
+  });
   registerRoutes(app);
 });
 
@@ -162,6 +182,9 @@ beforeEach(() => {
     settledAt:   null,
     expiresAt:   new Date(Date.now() + 15 * 60 * 1000),
     redirectedAt: new Date(Date.now() - 60_000),
+    witnessNonce: WITNESS_NONCE,
+    redirectIpHash: null,
+    redirectUaHash: null,
   });
   dbMocks.campaignRows.push({ ...dbMocks.campaign });
 
@@ -194,51 +217,60 @@ beforeEach(() => {
 // ── Tests: completion redirect /c/:token ──────────────────────────────────────
 
 describe("GET /api/earn/sponsored/c/:token — server-observed completion redirect", () => {
-  describe("signature gate (no DB access on failure)", () => {
-    it("returns 403 when ?q sig is missing", async () => {
-      const res = await request(app).get(`/api/earn/sponsored/c/${VALID_TOKEN}`);
+  describe("ack gate (no DB update on failure)", () => {
+    it("returns 403 when ?ack is missing", async () => {
+      const res = await request(app)
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}`)
+        .set("Sec-Fetch-Mode", "navigate");
       expect(res.status).toBe(403);
-      expect(dbMocks.db.select).not.toHaveBeenCalled();
+      // witnessedAt must not have been recorded — the gate fired before any update.
+      expect(dbMocks.db.update).not.toHaveBeenCalled();
     });
 
-    it("returns 403 when ?q sig is wrong (attacker guessing)", async () => {
+    it("returns 403 when ?ack is wrong (attacker guessing)", async () => {
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${"0".repeat(64)}`);
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${"0".repeat(64)}`)
+        .set("Sec-Fetch-Mode", "navigate");
       expect(res.status).toBe(403);
-      expect(dbMocks.db.select).not.toHaveBeenCalled();
+      expect(dbMocks.db.update).not.toHaveBeenCalled();
     });
 
-    it("returns 403 when sig is for a different token (replay)", async () => {
-      const wrongSig = makeCompletionSig(OTHER_TOKEN);
+    it("returns 403 when ack is for a different token (replay)", async () => {
+      const wrongAck = makeAckToken(OTHER_TOKEN);
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${wrongSig}`);
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${wrongAck}`)
+        .set("Sec-Fetch-Mode", "navigate");
       expect(res.status).toBe(403);
-      expect(dbMocks.db.select).not.toHaveBeenCalled();
+      expect(dbMocks.db.update).not.toHaveBeenCalled();
     });
 
-    it("returns 404 for a malformed token regardless of sig", async () => {
+    it("returns 404 for a malformed token regardless of ack", async () => {
       const res = await request(app)
-        .get("/api/earn/sponsored/c/not-valid-hex?q=anything");
+        .get("/api/earn/sponsored/c/not-valid-hex?ack=anything")
+        .set("Sec-Fetch-Mode", "navigate");
       expect(res.status).toBe(404);
       expect(dbMocks.db.select).not.toHaveBeenCalled();
     });
   });
 
-  describe("with correct sig — happy path", () => {
+  describe("with correct ack — happy path", () => {
     it("redirects 302 to the campaign target URL", async () => {
-      const sig = makeCompletionSig(VALID_TOKEN);
+      const ack = makeAckToken(VALID_TOKEN);
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${sig}`)
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${ack}`)
+        .set("Sec-Fetch-Mode", "navigate")
         .redirects(0);
 
       expect(res.status).toBe(302);
-      expect(res.headers.location).toBe(dbMocks.campaign.targetUrl);
+      // Handler appends ?cashclip_cb=<pixelUrl> to the advertiser redirect.
+      expect(res.headers.location).toContain(dbMocks.campaign.targetUrl);
     });
 
     it("calls DB update to set witnessedAt on first call", async () => {
-      const sig = makeCompletionSig(VALID_TOKEN);
+      const ack = makeAckToken(VALID_TOKEN);
       await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${sig}`)
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${ack}`)
+        .set("Sec-Fetch-Mode", "navigate")
         .redirects(0);
 
       expect(dbMocks.db.update).toHaveBeenCalledTimes(1);
@@ -246,9 +278,11 @@ describe("GET /api/earn/sponsored/c/:token — server-observed completion redire
 
     it("skips DB update when attempt is already witnessed (idempotent)", async () => {
       dbMocks.attemptRows[0]!.witnessedAt = new Date(Date.now() - 5000);
-      const sig = makeCompletionSig(VALID_TOKEN);
+      // ack check is bypassed when witnessedAt is already set (idempotent path).
+      const ack = makeAckToken(VALID_TOKEN);
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${sig}`)
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${ack}`)
+        .set("Sec-Fetch-Mode", "navigate")
         .redirects(0);
 
       expect(res.status).toBe(302);
@@ -257,9 +291,10 @@ describe("GET /api/earn/sponsored/c/:token — server-observed completion redire
 
     it("returns 410 when the attempt has expired", async () => {
       dbMocks.attemptRows[0]!.expiresAt = new Date(Date.now() - 1000);
-      const sig = makeCompletionSig(VALID_TOKEN);
+      const ack = makeAckToken(VALID_TOKEN);
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${sig}`);
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${ack}`)
+        .set("Sec-Fetch-Mode", "navigate");
 
       expect(res.status).toBe(410);
     });
@@ -272,9 +307,10 @@ describe("GET /api/earn/sponsored/c/:token — server-observed completion redire
         from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
       }));
 
-      const sig = makeCompletionSig(VALID_TOKEN);
+      const ack = makeAckToken(VALID_TOKEN);
       const res = await request(app)
-        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?q=${sig}`);
+        .get(`/api/earn/sponsored/c/${VALID_TOKEN}?ack=${ack}`)
+        .set("Sec-Fetch-Mode", "navigate");
 
       expect(res.status).toBe(404);
     });
@@ -310,7 +346,7 @@ describe("Adversarial: scripted begin→r→visit (skipping /c/:token)", () => {
     // Simulate the attempt state AFTER /r/:token was fetched
     // (redirectedAt set, enough dwell time elapsed) but BEFORE /c/:token was
     // called (witnessedAt null). This is the scripted-API attack path:
-    //   GET /r/:token → parse sig → POST /visit (skip /c/:token entirely)
+    //   GET /r/:token → parse ack → POST /visit (skip /c/:token entirely)
     // /visit must reject because witnessedAt is still null.
 
     dbMocks.attemptRows[0]!.witnessedAt  = null;
@@ -328,6 +364,9 @@ describe("Adversarial: scripted begin→r→visit (skipping /c/:token)", () => {
 
     const res = await request(app)
       .post("/api/earn/sponsored/camp-1/visit")
+      // A valid 64-char hex install token is required to pass the format check
+      // at the top of /visit — the handler must reach the witnessedAt gate.
+      .set("x-install-token", "a".repeat(64))
       .set("Content-Type", "application/json")
       .send({ attemptToken: VALID_TOKEN });
 
