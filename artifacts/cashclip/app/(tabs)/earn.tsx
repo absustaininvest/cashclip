@@ -37,7 +37,7 @@ import SponsoredSection from "@/components/SponsoredSection";
 import { adVideos } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
-import { isLevelPlayAvailable, isLevelPlayReady, showLevelPlayRewardedAd, preloadLevelPlayAd } from "@/lib/levelplay";
+import { isLevelPlayInitialized, isLevelPlayReady, showLevelPlayRewardedAd, preloadLevelPlayAd } from "@/lib/levelplay";
 import { useAuth } from "@/lib/AuthContext";
 import {
   trackAdImpression,
@@ -687,11 +687,17 @@ export default function EarnScreen() {
   const [adPreloaded, setAdPreloaded] = useState(false);
   const [lpAdReady, setLpAdReady] = useState(false);
   const [lpAdLoading, setLpAdLoading] = useState(false);
+  // Only show the LevelPlay card once the ironSource SDK has actually
+  // initialized. On older builds whose native binary lacks the SDK (e.g. the
+  // live App Store build), init never succeeds, so the card stays hidden
+  // instead of sitting forever on "Waiting for ad…".
+  const [lpInitialized, setLpInitialized] = useState(false);
 
   useEffect(() => {
     setAdPreloaded(isRewardedAdPreloaded());
     const interval = setInterval(() => {
       setAdPreloaded(isRewardedAdPreloaded());
+      setLpInitialized(isLevelPlayInitialized());
       setLpAdReady(isLevelPlayReady());
     }, 2000);
     return () => clearInterval(interval);
@@ -1269,7 +1275,7 @@ export default function EarnScreen() {
         ))}
 
         {/* LevelPlay Rewarded Ad */}
-        {isLevelPlayAvailable && (
+        {lpInitialized && (
           <Pressable
             onPress={handleWatchLevelPlayAd}
             disabled={lpAdLoading || !lpAdReady}
