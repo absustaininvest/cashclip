@@ -50,7 +50,11 @@ const providerMocks = vi.hoisted(() => ({
     monlix:      { min: 0.05, max: 15.00 },
     paymentwall: { min: 0.10, max: 20.00 },
   } as Record<string, { min: number; max: number }>,
-  parseProviderReward: vi.fn(),
+  parseProviderReward: (val: unknown): number | undefined => {
+    if (val === undefined || val === null || val === "") return undefined;
+    const n = parseFloat(String(val));
+    return Number.isFinite(n) ? n : undefined;
+  },
 }));
 
 vi.mock("./storage", () => ({ storage: storageMocks }));
@@ -455,5 +459,217 @@ describe("surveys /complete — completeRewardSessionAndCredit receives clamped 
     expect(callArg.sessionToken).toBe("test-session-token");
     expect(callArg.userId).toBe("test-user-id");
     expect(callArg.finalReward).toBe(3.00);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WEBHOOK PATH — creditSurveyViaWebhook clamping
+// These tests exercise the same guard via the actual webhook HTTP routes so
+// that a regression in creditSurveyViaWebhook is caught independently of the
+// /complete user-initiated path.
+// ---------------------------------------------------------------------------
+
+describe("webhook creditSurveyViaWebhook — Pollfish: over-max clamped", () => {
+  it("clamps a Pollfish reward_value above max (1.50) down to 1.50", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-abc", sessionToken: "wh-session-1" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-abc", user_id: "test-user-id", reward_value: "99.99", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(1.50);
+  });
+
+  it("never passes the raw webhook reward_value when it exceeds the Pollfish max", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-abc", sessionToken: "wh-session-2" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-abc", user_id: "test-user-id", reward_value: "500", status: "completed" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).not.toBe(500);
+    expect(finalReward).toBeLessThanOrEqual(1.50);
+  });
+});
+
+describe("webhook creditSurveyViaWebhook — Pollfish: under-min clamped", () => {
+  it("floors a Pollfish reward_value below min (0.30) up to 0.30", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-xyz", sessionToken: "wh-session-3" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-xyz", user_id: "test-user-id", reward_value: "0.001", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.30);
+  });
+});
+
+describe("webhook creditSurveyViaWebhook — Pollfish: within-range pass-through", () => {
+  it("passes a Pollfish reward_value within bounds unchanged", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-ok", sessionToken: "wh-session-4" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-ok", user_id: "test-user-id", reward_value: "0.80", status: "completed" });
+
+    expect(res.status).toBe(200);
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.80);
+  });
+});
+
+describe("webhook creditSurveyViaWebhook — Pollfish: missing reward field falls back to session.expectedReward", () => {
+  it("falls back to session.expectedReward when reward_value is absent, and clamps it", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-noval", sessionToken: "wh-session-5", expectedReward: "1.00" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-noval", user_id: "test-user-id", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(1.00);
+  });
+
+  it("clamps the session.expectedReward fallback when it exceeds the Pollfish max", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-bigexpected", sessionToken: "wh-session-6", expectedReward: "999.00" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-bigexpected", user_id: "test-user-id", status: "completed" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(1.50);
+  });
+
+  it("clamps the session.expectedReward fallback when it is below the Pollfish min", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "pollfish", externalId: "pollfish_survey-tinyexpected", sessionToken: "wh-session-7", expectedReward: "0.01" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/pollfish")
+      .query({ survey_id: "survey-tinyexpected", user_id: "test-user-id", status: "completed" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.30);
+  });
+});
+
+describe("webhook creditSurveyViaWebhook — CPX: always uses session.expectedReward (ignores amount_local)", () => {
+  it("credits the session.expectedReward (clamped) regardless of any query params", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "cpx", externalId: "cpx_survey-cpx1", sessionToken: "wh-cpx-1", expectedReward: "0.75" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/cpx")
+      .query({ trans_id: "t1", survey_id: "survey-cpx1", ext_user_id: "test-user-id", status: "1" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.75);
+  });
+
+  it("clamps session.expectedReward to CPX max (3.00) when it is inflated", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "cpx", externalId: "cpx_survey-cpx2", sessionToken: "wh-cpx-2", expectedReward: "500.00" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/cpx")
+      .query({ trans_id: "t2", survey_id: "survey-cpx2", ext_user_id: "test-user-id", status: "completed" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(3.00);
+  });
+
+  it("clamps session.expectedReward to CPX min (0.20) when it is below the floor", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "cpx", externalId: "cpx_survey-cpx3", sessionToken: "wh-cpx-3", expectedReward: "0.01" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/cpx")
+      .query({ trans_id: "t3", survey_id: "survey-cpx3", ext_user_id: "test-user-id", status: "1" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.20);
+  });
+
+  it("does NOT credit when the session is not found (no completeRewardSessionAndCredit call)", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/cpx")
+      .query({ trans_id: "t4", survey_id: "survey-missing", ext_user_id: "test-user-id", status: "1" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});
+
+describe("webhook creditSurveyViaWebhook — BitLabs: reward clamping via val param", () => {
+  it("clamps a BitLabs val above max (2.50) down to 2.50", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "bitlabs", externalId: "bitlabs_survey-bl1", sessionToken: "wh-bl-1" })
+    );
+
+    const res = await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "survey-bl1", user_id: "test-user-id", val: "999", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(2.50);
+  });
+
+  it("floors a BitLabs val below min (0.20) up to 0.20", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "bitlabs", externalId: "bitlabs_survey-bl2", sessionToken: "wh-bl-2" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "survey-bl2", user_id: "test-user-id", val: "0.001", status: "completed" });
+
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(0.20);
+  });
+
+  it("falls back to session.expectedReward when val is absent, and clamps it", async () => {
+    storageMocks.findPendingRewardSession.mockResolvedValue(
+      makeSession({ provider: "bitlabs", externalId: "bitlabs_survey-bl3", sessionToken: "wh-bl-3", expectedReward: "1.20" })
+    );
+
+    await request(app)
+      .get("/api/surveys/webhook/bitlabs")
+      .query({ survey_id: "survey-bl3", user_id: "test-user-id", status: "completed" });
+
+    expect(storageMocks.completeRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = storageMocks.completeRewardSessionAndCredit.mock.calls[0]![0];
+    expect(finalReward).toBe(1.20);
   });
 });
