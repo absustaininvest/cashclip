@@ -94,9 +94,23 @@ async function runCheck(): Promise<void> {
   });
 }
 
+let monitorHandle: ReturnType<typeof setInterval> | null = null;
+
 export { runCheck as _runCheckForTests };
 
+export function stopSponsoredVisitAlertMonitor(): void {
+  if (monitorHandle !== null) {
+    clearInterval(monitorHandle);
+    monitorHandle = null;
+  }
+}
+
 export async function startSponsoredVisitAlertMonitor(): Promise<void> {
+  if (monitorHandle !== null) {
+    clearInterval(monitorHandle);
+    monitorHandle = null;
+  }
+
   try {
     await ensureSystemKvTable();
   } catch (err) {
@@ -109,7 +123,7 @@ export async function startSponsoredVisitAlertMonitor(): Promise<void> {
     "Sponsored-visit settlement monitor started",
   );
 
-  setInterval(() => {
+  monitorHandle = setInterval(() => {
     runCheck().catch((err) => {
       logger.error({ err }, "Sponsored-visit settlement check failed");
     });

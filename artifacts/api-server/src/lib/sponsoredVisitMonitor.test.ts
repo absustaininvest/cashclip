@@ -60,7 +60,11 @@ vi.mock("@workspace/db", () => ({
 
 // ── Imports (after mocks are registered) ─────────────────────────────────────
 
-import { _runCheckForTests as runCheck, startSponsoredVisitAlertMonitor } from "./sponsoredVisitMonitor";
+import {
+  _runCheckForTests as runCheck,
+  startSponsoredVisitAlertMonitor,
+  stopSponsoredVisitAlertMonitor,
+} from "./sponsoredVisitMonitor";
 import { sendSponsoredVisitSettlementAlert } from "./email";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -300,6 +304,7 @@ describe("startSponsoredVisitAlertMonitor — startup", () => {
   });
 
   afterEach(() => {
+    stopSponsoredVisitAlertMonitor();
     vi.useRealTimers();
   });
 
@@ -358,5 +363,31 @@ describe("startSponsoredVisitAlertMonitor — startup", () => {
       expect.stringContaining("sponsored-visit monitor will not start"),
     );
     expect(mockLogger.info).not.toHaveBeenCalled();
+  });
+
+  // ── No duplicate intervals on restart ─────────────────────────────────────
+  it("calling start twice does not register two independent intervals", async () => {
+    // First start: ensureSystemKvTable succeeds
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    await startSponsoredVisitAlertMonitor();
+
+    // Second start: ensureSystemKvTable succeeds again
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    await startSponsoredVisitAlertMonitor();
+
+    // After both starts, prime runCheck with suppress-alert data so the check
+    // completes without side-effects (settlements present → early return)
+    mockExecute
+      .mockResolvedValueOnce(settlementRow(1))
+      .mockResolvedValueOnce(campaignRow(2));
+
+    const callsBeforeAdvance = mockExecute.mock.calls.length; // 2 (two CREATE TABLE calls)
+
+    // Advance exactly one interval — only ONE interval should be active
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+
+    // runCheck issues exactly 2 COUNT queries per invocation; with one interval
+    // we expect exactly 2 additional calls (not 4 which would indicate two intervals)
+    expect(mockExecute.mock.calls.length - callsBeforeAdvance).toBe(2);
   });
 });
