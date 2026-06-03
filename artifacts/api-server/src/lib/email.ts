@@ -510,3 +510,65 @@ export async function sendWithdrawalStatusUpdate(options: {
       </div>`,
   });
 }
+
+export async function sendWithdrawalRequestedUser(options: {
+  toEmail: string;
+  username: string;
+  totalPayout: string;
+  paypalEmail: string;
+}): Promise<void> {
+  const { toEmail, username, totalPayout, paypalEmail } = options;
+  const safeUsername = escapeHtml(username);
+  const safeTotalPayout = escapeHtml(totalPayout);
+  const safePaypalEmail = escapeHtml(paypalEmail);
+  await send({
+    to: toEmail,
+    subject: `Your CashClip withdrawal of $${totalPayout} is on its way`,
+    text: `Hi ${username},\n\nWe received your withdrawal request for $${totalPayout}. It's on its way to your PayPal (${paypalEmail}) — you'll receive it within minutes.\n\nThank you for using CashClip.`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #00C853;padding-bottom:12px">Withdrawal On Its Way</h2>
+        <p style="color:#333">Hi ${safeUsername},</p>
+        <p style="color:#333">We received your withdrawal request for <strong>$${safeTotalPayout}</strong>. It's on its way to your PayPal (<strong>${safePaypalEmail}</strong>) — you'll receive it within minutes.</p>
+        <p style="color:#333">Thank you for using CashClip.<br><strong>The CashClip Team</strong></p>
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <p style="font-size:12px;color:#999">CashClip · cash-clip.app · support@absustaininvest.com</p>
+      </div>`,
+  });
+}
+
+export async function sendWithdrawalVelocityAdmin(alert: {
+  username: string;
+  countToday: number;
+  amount: string;
+  totalPayout: string;
+  paypalEmail: string;
+  withdrawalId: string;
+}): Promise<void> {
+  const safeUsername = escapeHtml(alert.username);
+  const safeAmount = escapeHtml(alert.amount);
+  const safeTotalPayout = escapeHtml(alert.totalPayout);
+  const safePaypalEmail = escapeHtml(alert.paypalEmail);
+  const safeId = escapeHtml(alert.withdrawalId);
+  const safeCount = escapeHtml(String(alert.countToday));
+  await send({
+    to: ADMIN_EMAIL,
+    subject: `[CashClip] Velocity alert — ${alert.username} made withdrawal #${alert.countToday} today`,
+    text: `Velocity alert:\n\nUser: ${alert.username}\nWithdrawal #${alert.countToday} today\nThis withdrawal: $${alert.totalPayout}\nPayPal: ${alert.paypalEmail}\nID: ${alert.withdrawalId}`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #FB8C00;padding-bottom:12px">Withdrawal Velocity Alert</h2>
+        <p style="color:#333">A user has made <strong>${safeCount}</strong> withdrawals today.</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:8px 0;font-weight:600;color:#555;width:140px">User</td><td style="padding:8px 0">${safeUsername}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Today's count</td><td style="padding:8px 0">${safeCount}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">This withdrawal</td><td style="padding:8px 0">$${safeTotalPayout} (base $${safeAmount})</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">PayPal</td><td style="padding:8px 0">${safePaypalEmail}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">ID</td><td style="padding:8px 0;font-size:12px;color:#999">${safeId}</td></tr>
+        </table>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip Admin · cash-clip.app</p>
+      </div>`,
+  });
+}

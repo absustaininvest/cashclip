@@ -29,7 +29,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
   getRecentRejections,
@@ -832,13 +832,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(201).json({ withdrawal: result.withdrawal, balance: result.balance });
-      sendWithdrawalRequestedAdmin({
-        id: result.withdrawal.id,
-        username: user.username,
-        amount: tier.amount.toFixed(2),
-        totalPayout: tier.totalPayout.toFixed(2),
-        paypalEmail: paypalEmail.trim(),
-      }).catch(() => {});
+
+      // Withdrawal emails are intentionally limited to the maxed-out $7 cashouts
+      // (the top payout tier) so routine $3/$5 requests don't spam either the
+      // user or the operator. Fire-and-forget; never block the response.
+      const isMaxCashout = tier.amount >= DAILY_WITHDRAWAL_MAX;
+      if (isMaxCashout) {
+        sendWithdrawalRequestedAdmin({
+          id: result.withdrawal.id,
+          username: user.username,
+          amount: tier.amount.toFixed(2),
+          totalPayout: tier.totalPayout.toFixed(2),
+          paypalEmail: paypalEmail.trim(),
+        }).catch(() => {});
+
+        const userContactEmail = user.email || paypalEmail.trim();
+        sendWithdrawalRequestedUser({
+          toEmail: userContactEmail,
+          username: user.username,
+          totalPayout: tier.totalPayout.toFixed(2),
+          paypalEmail: paypalEmail.trim(),
+        }).catch(() => {});
+      }
+
+      // Velocity flag (operator only): alert when a user makes their 2nd (or any
+      // further) withdrawal in the same day — the realistic "more than twice a
+      // day" signal under the current $7/day cap.
+      if (result.withdrawalsTodayCount >= 2) {
+        sendWithdrawalVelocityAdmin({
+          username: user.username,
+          countToday: result.withdrawalsTodayCount,
+          amount: tier.amount.toFixed(2),
+          totalPayout: tier.totalPayout.toFixed(2),
+          paypalEmail: paypalEmail.trim(),
+          withdrawalId: result.withdrawal.id,
+        }).catch(() => {});
+      }
     } catch (err: any) {
       res.status(500).json({ error: "Failed to create withdrawal request" });
     }

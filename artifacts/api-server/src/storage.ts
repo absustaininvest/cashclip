@@ -132,7 +132,7 @@ export interface IStorage {
     dailyCapMax: number;
     dayStart: Date;
   }): Promise<
-    | { ok: true; withdrawal: Withdrawal; balance: number }
+    | { ok: true; withdrawal: Withdrawal; balance: number; withdrawalsTodayCount: number }
     | { ok: false; reason: "DAILY_CAP_EXCEEDED"; withdrawnToday: number; remaining: number }
     | { ok: false; reason: "INSUFFICIENT_BALANCE"; balance: number }
   >;
@@ -566,7 +566,7 @@ export class DatabaseStorage implements IStorage {
     dailyCapMax: number;
     dayStart: Date;
   }): Promise<
-    | { ok: true; withdrawal: Withdrawal; balance: number }
+    | { ok: true; withdrawal: Withdrawal; balance: number; withdrawalsTodayCount: number }
     | { ok: false; reason: "DAILY_CAP_EXCEEDED"; withdrawnToday: number; remaining: number }
     | { ok: false; reason: "INSUFFICIENT_BALANCE"; balance: number }
   > {
@@ -583,11 +583,15 @@ export class DatabaseStorage implements IStorage {
       // Sum today's withdrawals inside the same locked transaction so the
       // read is consistent with the insert that follows.
       const [todaySumRow] = await tx
-        .select({ total: sql<string>`COALESCE(SUM(${withdrawals.amount}::numeric), 0)` })
+        .select({
+          total: sql<string>`COALESCE(SUM(${withdrawals.amount}::numeric), 0)`,
+          count: sql<number>`COUNT(*)`,
+        })
         .from(withdrawals)
         .where(and(eq(withdrawals.userId, userId), gte(withdrawals.createdAt, dayStart)));
 
       const withdrawnToday = parseFloat(todaySumRow?.total ?? "0");
+      const priorWithdrawalsToday = Number(todaySumRow?.count ?? 0);
       if (withdrawnToday + amount > dailyCapMax + 1e-9) {
         const remaining = Math.max(0, dailyCapMax - withdrawnToday);
         return { ok: false as const, reason: "DAILY_CAP_EXCEEDED" as const, withdrawnToday, remaining };
@@ -621,7 +625,7 @@ export class DatabaseStorage implements IStorage {
         .values({ userId, username, amount: amountStr, bonusPercent, bonusAmount, totalPayout, paypalEmail })
         .returning();
 
-      return { ok: true as const, withdrawal, balance: n(updated.balance) };
+      return { ok: true as const, withdrawal, balance: n(updated.balance), withdrawalsTodayCount: priorWithdrawalsToday + 1 };
     });
   }
 
