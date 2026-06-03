@@ -1,17 +1,18 @@
 ---
 name: AdMob mediation state
-description: CashClip AdMob earnings snapshot and mediation group config as of Jun 3 2026; screenshots purged per owner request.
+description: CashClip AdMob earnings snapshot, mediation groups, ad units, and Unity Ads setup as of Jun 3 2026; all screenshots purged per owner request.
 ---
 
 ## Snapshot date
-June 3, 2026 (owner-provided screenshots, now purged from attached_assets/)
+June 3, 2026 — two batches of screenshots, all purged per owner request.
 
-## App identity
+## App identity (iOS)
 - Name: CashClip: Earn Real Money
-- Platform in AdMob: iOS only (Android not yet added — Play Store still internal testing)
-- Status: Ready
+- App Store ID: 6759931285
+- App verification: Verified | Approval status: Ready
+- Frequency capping: No cap | High-engagement ads: On
 
-## Earnings (as of Jun 3 2026 ~1:43 AM)
+## Earnings (as of Jun 3 ~1:43 AM)
 | Period | Amount |
 |---|---|
 | Today so far | $0.04 |
@@ -20,24 +21,36 @@ June 3, 2026 (owner-provided screenshots, now purged from attached_assets/)
 | Last month (May) | $46.72 |
 | Last 7 days by source | $6.90 (+1,303%) |
 
-Requests last 7 days: 860 (+173%). Strong growth spike around May 31–Jun 1 (Colombia promotion start).
+Requests last 7 days: 860 (+173%). Spike around May 31–Jun 1 = Colombia promotion start.
 
 ## Mediation groups (3 total)
-| Priority | Name | Est. earnings (7d) | Impressions (7d) | Notes |
-|---|---|---|---|---|
-| 1 | Cash-Clip Reward... | — (none) | — (none) | Active/green but ZERO traffic — likely misconfigured or newly created with no matching ad units |
-| 2 | CashClip Rewarde... | $6.62 (+1,732%) | 127 (+2,440%) | Doing the heavy lifting |
-| — | AdMob (default) | $0.28 (+114%) | 223 (+757%) | Fallback group |
+| Priority | Name | Ad unit | Platform | Est. earnings (7d) | Notes |
+|---|---|---|---|---|---|
+| 1 | Cash-Clip Reward... | CashClip Rewarded Video | **Android** | $0 | Zero traffic = Android not publicly live yet (Play Store internal testing). NOT broken — correct setup. |
+| 2 | CashClip Rewarde... | (iOS rewarded) | **iOS** | $6.62 (+1,732%) | Doing all the revenue work. 127 impressions last 7d. |
+| — | AdMob (default) | fallback | both | $0.28 | Fallback when groups don't match. |
 
-**Action needed**: Investigate Priority 1 group — it has no impressions despite being highest priority. Likely missing ad unit assignments or network adapter config. If broken, it's blocking revenue that should flow to Priority 2.
+## Unity Ads status
+- **Partnership: Active** ✅ (confirmed in Partnership tab)
+- Direct relationship with Unity Ads
+- Android: 1 mapping — CashClip Rewarded → Placement ID: `Rewarded_Android` → 1 mediation group, Active ✅
+- iOS: 2 mappings configured (detail collapsed in screenshot)
+- Bidding sources: AdMob Network (Active) + Unity Ads (Active) both in Priority 1 group
 
-## Unity Ads mediation status
-- Unity Ads SDK baked into build 38 (rejected) as AdMob mediation adapter (GoogleMobileAdsMediationUnity iOS + Gradle Android)
-- NOT yet active on live build 29
-- Game IDs stored as secrets: UNITY_ADS_GAME_ID_ANDROID, UNITY_ADS_GAME_ID_IOS
-- To activate: AdMob dashboard → Mediation → add Unity Ads network to a group → enter Game IDs
+## iOS ad units (7 total — CashClip: Earn Real Money iOS)
+| Ad unit name | Format | Active mediation groups |
+|---|---|---|
+| Bees | Banner | 0 ← no mediation |
+| CashClip App Open | App open | 0 ← no mediation |
+| CashClip Banner | Banner | 0 ← no mediation |
+| CashClip Interstitial | Interstitial | 0 ← no mediation |
+| CashClip Rewarded Video | Rewarded | **1 active** |
+| Set Paced | Interstitial | 0 ← no mediation |
+| Viewers Choice | Rewarded | **1 active** |
 
-## LevelPlay (ironSource)
-- App key hardcoded in levelplay.ts: `2690d87e5`
-- Handles rewarded video only (separate from AdMob)
-- Also only in build 38, not live on build 29
+**Gap**: Banner, App Open, and Interstitial iOS units have no mediation groups — only AdMob default fills them. Adding Unity Ads bidding to those groups would increase fill rate and eCPM for those formats.
+
+## Key action items (for owner to do in AdMob)
+1. Create mediation groups for iOS Banner + Interstitial ad units and add Unity Ads as bidding source
+2. Once Android goes public (promote Play Store build 38 from internal → production), Priority 1 group will start earning
+3. Unity Ads mediation SDK is baked into build 38 (app code) but NOT in live build 29 — need new approved App Store build to activate Unity on iOS
