@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
-import { db, earnTokens, users, earningsLedger, searchChallenges } from "@workspace/db";
+import { db, earnTokens, users, earningsLedger, searchChallenges, spinChallenges } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
@@ -71,18 +71,17 @@ const SERVER_ONLY_ACTIONS = new Set([
   "search",
 ]);
 
-// ── SPIN CHALLENGE STORE ──────────────────────────────────────────────────────
-// Server-issued single-use challenge tokens for the spin wheel.
-// /begin issues a token; /complete requires it before crediting the earn token.
-// This ensures the client called /begin (server-observed) before earning points.
+// ── SPIN CHALLENGE CONSTANTS ──────────────────────────────────────────────────
+// Challenges are stored in the `spin_challenges` DB table so they survive
+// server restarts and remain consistent across autoscaled replicas.
 const SPIN_CHALLENGE_TTL_MS   = 60_000;  // challenge valid for 60 s
 const SPIN_CHALLENGE_MIN_MS   = 3_000;   // must wait ≥3 s between begin→complete
-interface SpinChallenge { userId: string; issuedAt: number; }
-const spinChallenges = new Map<string, SpinChallenge>();
-setInterval(() => {
-  const cutoff = Date.now() - SPIN_CHALLENGE_TTL_MS;
-  for (const [k, v] of spinChallenges) {
-    if (v.issuedAt < cutoff) spinChallenges.delete(k);
+// Periodic sweep: delete expired rows from the DB (30 s interval)
+setInterval(async () => {
+  try {
+    await db.delete(spinChallenges).where(lt(spinChallenges.expiresAt, new Date()));
+  } catch (err) {
+    logger.warn({ err }, "spin challenge cleanup error");
   }
 }, 30_000);
 
@@ -313,10 +312,8 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/spin/begin ────────────────────────────────────────────────
-  // Issues a server-side spin challenge token. The client must present this
-  // token to /api/earn/spin/complete before an earn token is issued.
-  // This enforces a server-observed "begin" step — /complete is rejected
-  // without a valid, unexpired, same-user challenge.
+  // Issues a server-side spin challenge token stored in the DB so it survives
+  // restarts. The client must present this token to /complete after ≥3 s.
   app.post(
     "/api/earn/spin/begin",
     authMiddleware,
@@ -325,7 +322,14 @@ export function registerEarningsRoutes(app: Express): void {
       try {
         const { randomBytes } = await import("node:crypto");
         const challengeToken = randomBytes(32).toString("hex");
-        spinChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + SPIN_CHALLENGE_TTL_MS);
+        await db.insert(spinChallenges).values({
+          token: challengeToken,
+          userId: req.userId!,
+          issuedAt: now,
+          expiresAt,
+        });
         logger.info({ userId: req.userId }, "spin challenge issued");
         res.status(201).json({ challengeToken });
       } catch (err) {
@@ -336,9 +340,9 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/spin/complete ─────────────────────────────────────────────
-  // Validates the server-issued spin challenge and issues an earn token.
-  // Enforced: challenge must exist, belong to this user, not be expired,
-  // and have been issued at least SPIN_CHALLENGE_MIN_MS ago (anti-instant-replay).
+  // Validates the server-issued spin challenge (looked up from the DB) and
+  // issues an earn token. Enforced: challenge must exist, belong to this user,
+  // not be expired, and have been issued at least SPIN_CHALLENGE_MIN_MS ago.
   // Then applies the standard 2h server-side cooldown + daily cap.
   app.post(
     "/api/earn/spin/complete",
@@ -351,27 +355,44 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(400).json({ error: "challengeToken is required" }); return;
         }
 
-        const challenge = spinChallenges.get(challengeToken);
+        // Look up the challenge first (do NOT consume yet — timing checks below
+        // may reject without consuming, so the user can retry).
+        const [challenge] = await db
+          .select()
+          .from(spinChallenges)
+          .where(eq(spinChallenges.token, challengeToken));
+
         if (!challenge) {
           res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
         }
         if (challenge.userId !== req.userId) {
           res.status(403).json({ error: "Spin challenge does not belong to this user" }); return;
         }
-        const age = Date.now() - challenge.issuedAt;
-        if (age > SPIN_CHALLENGE_TTL_MS) {
-          spinChallenges.delete(challengeToken);
+        const now = Date.now();
+        if (now > challenge.expiresAt.getTime()) {
+          // Expired — clean up the stale row and reject
+          await db.delete(spinChallenges).where(eq(spinChallenges.token, challengeToken));
           res.status(403).json({ error: "Spin challenge expired — please spin again" }); return;
         }
+        const age = now - challenge.issuedAt.getTime();
         if (age < SPIN_CHALLENGE_MIN_MS) {
+          // Too fast — do NOT consume so the user can retry after the minimum wait
           res.status(425).json({
             error: "Spin completed too quickly",
             retryAfterMs: SPIN_CHALLENGE_MIN_MS - age,
           }); return;
         }
 
-        // Consume challenge — single use (in-memory, done before the transaction)
-        spinChallenges.delete(challengeToken);
+        // All checks passed — atomically consume the challenge (single-use).
+        // DELETE…RETURNING is atomic: if two replicas race, only one gets a row back.
+        const [deleted] = await db
+          .delete(spinChallenges)
+          .where(eq(spinChallenges.token, challengeToken))
+          .returning();
+        if (!deleted) {
+          // Another replica consumed it between our SELECT and DELETE
+          res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
+        }
 
         const config = ACTION_CONFIG.spin;
 

@@ -435,6 +435,24 @@ export const searchChallenges = pgTable(
   })
 );
 
+// ── SPIN CHALLENGES ───────────────────────────────────────────────────────────
+// Short-lived server-issued tokens for the Spin Wheel earn flow. Stored in the
+// DB so they survive server restarts and are consistent across autoscaled
+// replicas. Same shape as search_challenges.
+export const spinChallenges = pgTable(
+  "spin_challenges",
+  {
+    token: text("token").primaryKey(),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    issuedAt: timestamp("issued_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => ({
+    expiresAtIdx: index("spin_challenges_expires_at_idx").on(t.expiresAt),
+    userIdx: index("spin_challenges_user_idx").on(t.userId),
+  })
+);
+
 export const earnTokens = pgTable("earn_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
