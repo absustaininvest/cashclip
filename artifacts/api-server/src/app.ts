@@ -13,6 +13,8 @@ import { appVersionMiddleware } from "./lib/versionCheck";
 import { getClientIp } from "./lib/clientIp";
 import { startSponsoredVisitAlertMonitor } from "./lib/sponsoredVisitMonitor";
 import { verifyWebhookRegistration } from "./paypal";
+import { db, spinChallenges } from "@workspace/db";
+import { lt } from "drizzle-orm";
 
 const ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
@@ -276,6 +278,19 @@ registerRoutes(app);
 startSponsoredVisitAlertMonitor().catch((err) => {
   logger.error({ err }, "Failed to start sponsored-visit alert monitor");
 });
+
+// ── SPIN CHALLENGE STARTUP SWEEP ─────────────────────────────────────────────
+// The periodic in-process cleanup (every 60 s) won't run during restarts or
+// idle autoscale periods. Delete any already-expired rows immediately on boot
+// so stale challenges never accumulate across server restarts.
+db.delete(spinChallenges)
+  .where(lt(spinChallenges.expiresAt, new Date()))
+  .then((result) => {
+    logger.info({ deleted: result.rowCount ?? 0 }, "spin challenge startup sweep complete");
+  })
+  .catch((err) => {
+    logger.warn({ err }, "spin challenge startup sweep failed");
+  });
 
 // ── PAYPAL WEBHOOK REGISTRATION CHECK ────────────────────────────────────────
 // Verifies PAYPAL_WEBHOOK_ID against the live PayPal API on startup.
