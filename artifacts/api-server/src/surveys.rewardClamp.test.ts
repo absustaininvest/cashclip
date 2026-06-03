@@ -31,6 +31,26 @@ const providerMocks = vi.hoisted(() => ({
   fetchExternalSurveys: vi.fn().mockResolvedValue([]),
   getProviderStatus: vi.fn().mockReturnValue([]),
   buildCpxWallUrl: vi.fn().mockReturnValue("https://offers.cpx-research.com/"),
+  PROVIDER_REWARD_RANGES: {
+    pollfish:    { min: 0.30, max: 1.50 },
+    cint:        { min: 1.00, max: 5.00 },
+    lucid:       { min: 0.80, max: 4.00 },
+    cpx:         { min: 0.20, max: 3.00 },
+    bitlabs:     { min: 0.20, max: 2.50 },
+    internal:    { min: 0.15, max: 0.75 },
+    tapjoy:      { min: 0.10, max: 25.00 },
+    adgate:      { min: 0.10, max: 20.00 },
+    offertoro:   { min: 0.10, max: 20.00 },
+    lootably:    { min: 0.10, max: 20.00 },
+    adjoe:       { min: 0.10, max: 25.00 },
+    adgem:       { min: 0.10, max: 20.00 },
+    ayet:        { min: 0.10, max: 20.00 },
+    notik:       { min: 0.05, max: 10.00 },
+    revlum:      { min: 0.05, max: 15.00 },
+    monlix:      { min: 0.05, max: 15.00 },
+    paymentwall: { min: 0.10, max: 20.00 },
+  } as Record<string, { min: number; max: number }>,
+  parseProviderReward: vi.fn(),
 }));
 
 vi.mock("./storage", () => ({ storage: storageMocks }));
