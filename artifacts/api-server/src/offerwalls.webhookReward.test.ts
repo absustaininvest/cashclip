@@ -592,6 +592,17 @@ describe("Lootably offerwall webhook — reward propagation", () => {
     expect(res.status).toBe(200);
     expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
   });
+
+  it("still returns 200 and does not credit when session is not found (no-op / duplicate replay)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(undefined);
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lb14", user_id: "u-5", payout: 4.00, status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -664,6 +675,17 @@ describe("Adjoe offerwall webhook — reward propagation", () => {
     const res = await request(app)
       .post("/api/offerwalls/webhook/adjoe")
       .send({ offer_id: "aj23", user_id: "u-6", payout: 7.50, status: "failed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+
+  it("still returns 200 and does not credit when session is not found (no-op / duplicate replay)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(undefined);
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "aj24", user_id: "u-6", payout: 7.50, status: "completed" });
 
     expect(res.status).toBe(200);
     expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
