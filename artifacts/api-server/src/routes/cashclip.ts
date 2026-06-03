@@ -19,7 +19,7 @@ import {
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
 import { db, updateUserProfileSchema } from "@workspace/db";
-import { AD_CATEGORIES } from "@workspace/api-zod";
+import { AD_CATEGORIES, adCategorySchema } from "@workspace/api-zod";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
@@ -2134,9 +2134,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof totalBudget !== "number" || totalBudget < 0.50 || totalBudget > 500
       ) { res.status(400).json({ error: "Invalid campaign data" }); return; }
 
-      if (category !== undefined && !(AD_CATEGORIES as readonly string[]).includes(category)) {
-        res.status(400).json({ error: `Invalid category. Must be one of: ${AD_CATEGORIES.join(", ")}` });
-        return;
+      if (category !== undefined) {
+        const categoryParse = adCategorySchema.safeParse(category);
+        if (!categoryParse.success) {
+          res.status(400).json({ error: `Invalid category. Must be one of: ${AD_CATEGORIES.join(", ")}` });
+          return;
+        }
       }
 
       const user = await storage.getUser(req.userId!);
