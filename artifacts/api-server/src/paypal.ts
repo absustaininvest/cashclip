@@ -165,6 +165,141 @@ export function isPayPalWebhookConfigured(): boolean {
   return !!(process.env.PAYPAL_WEBHOOK_ID);
 }
 
+const REQUIRED_WEBHOOK_EVENTS = [
+  "PAYMENT.PAYOUTS-ITEM.SUCCEEDED",
+  "PAYMENT.PAYOUTS-ITEM.FAILED",
+  "PAYMENT.PAYOUTS-ITEM.DENIED",
+  "PAYMENT.PAYOUTS-ITEM.BLOCKED",
+  "PAYMENT.PAYOUTS-ITEM.RETURNED",
+  "PAYMENT.PAYOUTS-ITEM.UNCLAIMED",
+] as const;
+
+const EXPECTED_WEBHOOK_URL = "https://api.cash-clip.app/api/paypal/webhook";
+
+export interface WebhookRegistrationResult {
+  ok: boolean;
+  checkedAt: string;
+  webhookId: string | null;
+  urlMatch: boolean | null;
+  registeredUrl: string | null;
+  missingEvents: string[];
+  warnings: string[];
+  error?: string;
+}
+
+let _cachedWebhookCheck: WebhookRegistrationResult | null = null;
+
+export function getCachedWebhookRegistrationResult(): WebhookRegistrationResult | null {
+  return _cachedWebhookCheck;
+}
+
+export async function verifyWebhookRegistration(): Promise<WebhookRegistrationResult> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  const now = new Date().toISOString();
+
+  if (!webhookId) {
+    const result: WebhookRegistrationResult = {
+      ok: false,
+      checkedAt: now,
+      webhookId: null,
+      urlMatch: null,
+      registeredUrl: null,
+      missingEvents: [...REQUIRED_WEBHOOK_EVENTS],
+      warnings: ["PAYPAL_WEBHOOK_ID is not set"],
+      error: "PAYPAL_WEBHOOK_ID not configured",
+    };
+    _cachedWebhookCheck = result;
+    return result;
+  }
+
+  if (!isPayPalConfigured()) {
+    const result: WebhookRegistrationResult = {
+      ok: false,
+      checkedAt: now,
+      webhookId,
+      urlMatch: null,
+      registeredUrl: null,
+      missingEvents: [],
+      warnings: [],
+      error: "PayPal API credentials not configured — cannot verify webhook registration",
+    };
+    _cachedWebhookCheck = result;
+    return result;
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+    const res = await fetch(`${PAYPAL_API_BASE}/v1/notifications/webhooks/${encodeURIComponent(webhookId)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      const result: WebhookRegistrationResult = {
+        ok: false,
+        checkedAt: now,
+        webhookId,
+        urlMatch: null,
+        registeredUrl: null,
+        missingEvents: [],
+        warnings: [],
+        error: `PayPal webhook lookup failed: ${res.status} ${text.slice(0, 200)}`,
+      };
+      _cachedWebhookCheck = result;
+      return result;
+    }
+
+    const data = (await res.json()) as {
+      url?: string;
+      event_types?: Array<{ name: string }>;
+    };
+
+    const registeredUrl = data.url ?? null;
+    const urlMatch = registeredUrl === EXPECTED_WEBHOOK_URL;
+    const registeredEvents = new Set((data.event_types ?? []).map((e) => e.name));
+    const missingEvents = REQUIRED_WEBHOOK_EVENTS.filter((e) => !registeredEvents.has(e));
+    const warnings: string[] = [];
+
+    if (!urlMatch) {
+      warnings.push(
+        `Webhook URL mismatch: registered="${registeredUrl ?? "(none)"}" expected="${EXPECTED_WEBHOOK_URL}"`,
+      );
+    }
+    if (missingEvents.length > 0) {
+      warnings.push(`Missing required event subscriptions: ${missingEvents.join(", ")}`);
+    }
+
+    const ok = urlMatch && missingEvents.length === 0;
+    const result: WebhookRegistrationResult = {
+      ok,
+      checkedAt: now,
+      webhookId,
+      urlMatch,
+      registeredUrl,
+      missingEvents,
+      warnings,
+    };
+    _cachedWebhookCheck = result;
+    return result;
+  } catch (err: any) {
+    const result: WebhookRegistrationResult = {
+      ok: false,
+      checkedAt: now,
+      webhookId,
+      urlMatch: null,
+      registeredUrl: null,
+      missingEvents: [],
+      warnings: [],
+      error: `verifyWebhookRegistration failed: ${err.message}`,
+    };
+    _cachedWebhookCheck = result;
+    return result;
+  }
+}
+
 function headerStr(
   headers: Record<string, string | string[] | undefined>,
   name: string,

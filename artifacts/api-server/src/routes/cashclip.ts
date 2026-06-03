@@ -1080,6 +1080,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  /**
+   * GET /api/admin/paypal/webhook-health
+   *
+   * Returns the most-recent result of the startup PayPal webhook registration
+   * check (ID validity, URL match, required event subscriptions). The check
+   * runs once at startup; this endpoint surfaces the cached result so the
+   * admin dashboard can display it without re-calling PayPal. Call
+   * POST /api/admin/paypal/webhook-health/refresh to force a live re-check.
+   */
+  app.get("/api/admin/paypal/webhook-health", adminMiddleware, async (_req: AuthRequest, res) => {
+    const { getCachedWebhookRegistrationResult } = await import("../paypal");
+    const cached = getCachedWebhookRegistrationResult();
+    if (!cached) {
+      res.json({ checked: false, message: "Startup check has not run yet or PayPal is not configured" });
+      return;
+    }
+    res.json({ checked: true, ...cached });
+  });
+
+  app.post("/api/admin/paypal/webhook-health/refresh", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { verifyWebhookRegistration } = await import("../paypal");
+      const result = await verifyWebhookRegistration();
+      if (!result.ok) {
+        req.log.warn({ warnings: result.warnings, error: result.error }, "PayPal webhook registration re-check: issues found");
+      } else {
+        req.log.info({ webhookId: result.webhookId }, "PayPal webhook registration re-check: OK");
+      }
+      res.json({ checked: true, ...result });
+    } catch (err: any) {
+      req.log.error({ err }, "Failed to re-check PayPal webhook registration");
+      res.status(500).json({ error: "Failed to re-check PayPal webhook registration" });
+    }
+  });
+
   // PayPal Payouts webhook — receives payout status notifications from PayPal.
   // Public endpoint (called by PayPal, not users). Verifies the signature via
   // PayPal's /v1/notifications/verify-webhook-signature API before acting.
