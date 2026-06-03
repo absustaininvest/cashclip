@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
+  Animated as RNAnimated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -71,6 +72,14 @@ export default function SearchScreen() {
 
   const toastOpacity = useSharedValue(0);
 
+  // Animated progress bar fill (0–100 mapped to '0%'–'100%')
+  const progressAnim = useRef(new RNAnimated.Value(0)).current;
+  const progressWidthInterp = progressAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+    extrapolate: "clamp",
+  });
+
   // Active challenge token; set in handleSearch, consumed in handleWebViewLoad,
   // and explicitly cleared in handleWebViewError so a failed load never earns.
   const activeChallengeRef = useRef<string | null>(null);
@@ -81,6 +90,16 @@ export default function SearchScreen() {
     loadRecent();
     loadSearchConfig();
   }, []);
+
+  // Animate the progress bar whenever the server-authoritative count changes
+  useEffect(() => {
+    const target = dailyCap > 0 ? Math.min((dailyCount / dailyCap) * 100, 100) : 0;
+    RNAnimated.timing(progressAnim, {
+      toValue: target,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+  }, [dailyCount, dailyCap]);
 
   const loadSearchConfig = async () => {
     const cfg = await getSearchConfig();
@@ -243,11 +262,8 @@ export default function SearchScreen() {
       {dailyCap > 0 && (
         <View style={styles.searchProgressRow}>
           <View style={styles.searchProgressBar}>
-            <View
-              style={[
-                styles.searchProgressFill,
-                { width: `${Math.min((dailyCount / dailyCap) * 100, 100)}%` as any },
-              ]}
+            <RNAnimated.View
+              style={[styles.searchProgressFill, { width: progressWidthInterp }]}
             />
           </View>
           <Text style={styles.searchProgressText}>
