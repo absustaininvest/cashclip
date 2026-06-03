@@ -10,25 +10,26 @@ import crypto from "node:crypto";
 // factory closures even though they are textually defined before the factory.
 // ---------------------------------------------------------------------------
 const storageMocks = vi.hoisted(() => ({
-  getUser: vi.fn(),
-  getWebhookAudits: vi.fn(),
-  getWebhookAuditOffenders: vi.fn(),
-  getWebhookAuditProviders: vi.fn(),
+  getUser: vi.fn().mockResolvedValue(undefined),
+  getWebhookAudits: vi.fn().mockResolvedValue([]),
+  getWebhookAuditOffenders: vi.fn().mockResolvedValue([]),
+  getWebhookAuditProviders: vi.fn().mockResolvedValue([]),
   insertWebhookAudit: vi.fn().mockResolvedValue(undefined),
   countWebhookAuditByIp: vi.fn().mockResolvedValue(0),
   // Stubs for additional storage methods referenced by the route bundle at
-  // registration time. Returning undefined is safe — they are not invoked by
-  // the admin webhook-audit handler.
-  updateUserBalance: vi.fn(),
-  createEarningsLedgerEntry: vi.fn(),
-  createRewardSession: vi.fn(),
-  getRewardSession: vi.fn(),
-  createWithdrawal: vi.fn(),
-  getWithdrawals: vi.fn(),
-  getBalance: vi.fn(),
-  getTransactions: vi.fn(),
-  getUserByUsername: vi.fn(),
-  insertWebhookAuditBatch: vi.fn(),
+  // registration time. Pre-set to mockResolvedValue(undefined) so that if any
+  // route is accidentally exercised, awaiting the result does not throw an
+  // unhandled rejection (calling .catch()/.then() on undefined would throw).
+  updateUserBalance: vi.fn().mockResolvedValue(undefined),
+  createEarningsLedgerEntry: vi.fn().mockResolvedValue(undefined),
+  createRewardSession: vi.fn().mockResolvedValue(undefined),
+  getRewardSession: vi.fn().mockResolvedValue(undefined),
+  createWithdrawal: vi.fn().mockResolvedValue(undefined),
+  getWithdrawals: vi.fn().mockResolvedValue(undefined),
+  getBalance: vi.fn().mockResolvedValue(undefined),
+  getTransactions: vi.fn().mockResolvedValue(undefined),
+  getUserByUsername: vi.fn().mockResolvedValue(undefined),
+  insertWebhookAuditBatch: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../storage", () => ({ storage: storageMocks }));

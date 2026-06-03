@@ -42,8 +42,8 @@ vi.mock("./storage", () => ({
     updateUserPassword: (...args: unknown[]) => mockUpdateUserPassword(...args),
     setTotpBackupCodes: (...args: unknown[]) => mockSetTotpBackupCodes(...args),
     recordSecurityAudit: (...args: unknown[]) => mockRecordSecurityAudit(...args),
-    createUser: vi.fn(),
-    setEmailVerificationToken: vi.fn(),
+    createUser: vi.fn().mockResolvedValue(undefined),
+    setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
