@@ -2,11 +2,13 @@ import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
 
 let verifyProviderCompletion: typeof import("./surveyProviders").verifyProviderCompletion;
 let buildCpxWallUrl: typeof import("./surveyProviders").buildCpxWallUrl;
+let parseProviderReward: typeof import("./surveyProviders").parseProviderReward;
 
 beforeAll(async () => {
   const mod = await import("./surveyProviders");
   verifyProviderCompletion = mod.verifyProviderCompletion;
   buildCpxWallUrl = mod.buildCpxWallUrl;
+  parseProviderReward = mod.parseProviderReward;
 });
 
 afterEach(() => {
@@ -935,5 +937,83 @@ describe("buildCpxWallUrl — HMAC signature in wall URL", () => {
     const parsed = new URL(url);
     expect(parsed.searchParams.has("username")).toBe(false);
     expect(parsed.searchParams.has("email")).toBe(false);
+  });
+});
+
+describe("parseProviderReward", () => {
+  it("returns a positive number as-is", () => {
+    expect(parseProviderReward(1.5)).toBe(1.5);
+  });
+
+  it("returns a positive integer as-is", () => {
+    expect(parseProviderReward(10)).toBe(10);
+  });
+
+  it("parses a positive numeric string", () => {
+    expect(parseProviderReward("2.75")).toBe(2.75);
+  });
+
+  it("parses a positive integer string", () => {
+    expect(parseProviderReward("5")).toBe(5);
+  });
+
+  it("returns undefined for zero (number)", () => {
+    expect(parseProviderReward(0)).toBeUndefined();
+  });
+
+  it("returns undefined for a negative number", () => {
+    expect(parseProviderReward(-1)).toBeUndefined();
+  });
+
+  it("returns undefined for NaN", () => {
+    expect(parseProviderReward(NaN)).toBeUndefined();
+  });
+
+  it("returns undefined for Infinity", () => {
+    expect(parseProviderReward(Infinity)).toBeUndefined();
+  });
+
+  it("returns undefined for -Infinity", () => {
+    expect(parseProviderReward(-Infinity)).toBeUndefined();
+  });
+
+  it("returns undefined for string \"Infinity\"", () => {
+    expect(parseProviderReward("Infinity")).toBeUndefined();
+  });
+
+  it("returns undefined for a negative numeric string", () => {
+    expect(parseProviderReward("-5.00")).toBeUndefined();
+  });
+
+  it("returns undefined for string \"0\"", () => {
+    expect(parseProviderReward("0")).toBeUndefined();
+  });
+
+  it("returns undefined for a non-numeric string", () => {
+    expect(parseProviderReward("abc")).toBeUndefined();
+  });
+
+  it("returns undefined for null", () => {
+    expect(parseProviderReward(null)).toBeUndefined();
+  });
+
+  it("returns undefined for undefined", () => {
+    expect(parseProviderReward(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined for a boolean true", () => {
+    expect(parseProviderReward(true)).toBeUndefined();
+  });
+
+  it("returns undefined for a boolean false", () => {
+    expect(parseProviderReward(false)).toBeUndefined();
+  });
+
+  it("returns undefined for a plain object", () => {
+    expect(parseProviderReward({ amount: 1.5 })).toBeUndefined();
+  });
+
+  it("returns undefined for an array", () => {
+    expect(parseProviderReward([1.5])).toBeUndefined();
   });
 });
