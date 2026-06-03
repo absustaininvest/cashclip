@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Share,
   Alert,
+  AppState,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -174,9 +175,25 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Fire immediately on every focus event (tab switch, back-navigation, deep-link return).
       loadData();
+
+      // Poll every 75 s while the tab is in focus so the balance stays live.
       const intervalId = setInterval(loadData, 75_000);
-      return () => clearInterval(intervalId);
+
+      // Also refresh when the app returns to the foreground while this tab is
+      // focused. This covers the case where a survey or offerwall opens an
+      // external browser (not the in-app WebBrowser sheet), sending the app to
+      // the background. When the user returns, useFocusEffect does NOT re-fire
+      // because the screen was already focused — only AppState changes.
+      const appStateSub = AppState.addEventListener("change", (next) => {
+        if (next === "active") loadData();
+      });
+
+      return () => {
+        clearInterval(intervalId);
+        appStateSub.remove();
+      };
     }, [loadData])
   );
 
