@@ -498,18 +498,18 @@ export default function WalletScreen() {
 
             <View style={styles.tierPreview}>
               <View style={styles.tierPreviewHeader}>
-                <Text style={styles.tierPreviewTitle}>Withdrawal Options</Text>
+                <Text style={styles.tierPreviewTitle}>{t.wallet.withdrawalOptions}</Text>
                 {tiers.length > 0 && (
                   <View style={styles.readyBadge}>
                     <Feather name="check-circle" size={11} color={Colors.background} />
-                    <Text style={styles.readyBadgeText}>Ready to Cash Out!</Text>
+                    <Text style={styles.readyBadgeText}>{t.wallet.readyToCashOut}</Text>
                   </View>
                 )}
               </View>
               <Text style={styles.tierPreviewSubtitle}>
                 {tiers.length > 0
-                  ? `You can withdraw ${tiers.map((t) => `$${t.amount.toFixed(2)}`).join(", ")} right now`
-                  : `Earn $${Math.max(0, 1 - displayBalance).toFixed(2)} more to unlock withdrawals`}
+                  ? tFn(t, "wallet.canWithdrawNow", { amounts: tiers.map((tier) => `$${tier.amount.toFixed(2)}`).join(", ") })
+                  : tFn(t, "wallet.keepEarningNudge", { needed: Math.max(0, 1 - displayBalance).toFixed(2), tier: "1.00" })}
               </Text>
               <View style={styles.tierMiniGrid}>
                 {[1, 3, 5, 7].map((amt) => {
@@ -530,7 +530,7 @@ export default function WalletScreen() {
                       >
                         <Feather name="check-circle" size={13} color={Colors.primary} style={{ marginBottom: 3 }} />
                         <Text style={styles.tierMiniAmt}>${amt.toFixed(2)}</Text>
-                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>Available</Text>
+                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>{t.wallet.available}</Text>
                       </Pressable>
                     );
                   }
@@ -548,7 +548,7 @@ export default function WalletScreen() {
                     >
                       <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
                       <Text style={[styles.tierMiniAmt, { color: Colors.textMuted }]}>${amt.toFixed(2)}</Text>
-                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>Locked</Text>
+                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>{t.wallet.tierLocked}</Text>
                     </Pressable>
                   );
                 })}

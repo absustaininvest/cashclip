@@ -105,6 +105,10 @@ const en = {
       noPendingPoints: "No pending points yet",
       holdFor3h: "Held 3h before converting",
       keepEarningNudge: "Earn ${{needed}} more to unlock the ${{tier}} tier",
+      withdrawalOptions: "Withdrawal Options",
+      readyToCashOut: "Ready to Cash Out!",
+      canWithdrawNow: "You can withdraw {{amounts}} right now",
+      tierLocked: "Locked",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -612,6 +616,10 @@ const translations: Record<Language, Translations> = {
       noPendingPoints: "Sin puntos pendientes aún",
       holdFor3h: "Retenidos 3h antes de convertir",
       keepEarningNudge: "Gana ${{needed}} mas para desbloquear el nivel de ${{tier}}",
+      withdrawalOptions: "Opciones de Retiro",
+      readyToCashOut: "¡Listo para Retirar!",
+      canWithdrawNow: "Puedes retirar {{amounts}} ahora mismo",
+      tierLocked: "Bloqueado",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
