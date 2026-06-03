@@ -234,7 +234,7 @@ export default function WalletScreen() {
         await loadData();
       }
     } catch {
-      Alert.alert("Error", "Could not convert points. Please try again.");
+      Alert.alert(t.common.error, t.wallet.convertError);
     } finally {
       setIsConverting(false);
     }
@@ -274,10 +274,7 @@ export default function WalletScreen() {
     ]);
 
     if (!integrity.clean) {
-      Alert.alert(
-        "Device Not Supported",
-        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
-      );
+      Alert.alert(t.wallet.deviceNotSupported, t.wallet.deviceNotSupportedMsg);
       return;
     }
 
@@ -290,7 +287,7 @@ export default function WalletScreen() {
       Alert.alert(
         t.wallet.minimumNotReached,
         srv
-          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $1.00 minimum.`
+          ? tFn(t, "wallet.verifiedBalanceMinMsg", { amount: effective.toFixed(2) })
           : t.wallet.needAtLeast
       );
       return;
@@ -312,16 +309,13 @@ export default function WalletScreen() {
     if (!selectedTier || !paypalEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(paypalEmail.trim())) {
-      Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
+      Alert.alert(t.wallet.invalidEmail, t.wallet.invalidEmailMsg);
       return;
     }
 
     const integrity = await checkDeviceIntegrity();
     if (!integrity.clean) {
-      Alert.alert(
-        "Device Not Supported",
-        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
-      );
+      Alert.alert(t.wallet.deviceNotSupported, t.wallet.deviceNotSupportedMsg);
       return;
     }
 
@@ -337,13 +331,13 @@ export default function WalletScreen() {
       setShowWithdrawModal(false);
       Alert.alert(
         t.wallet.withdrawalSuccessful,
-        `$${selectedTier.totalPayout.toFixed(2)} will be sent to ${paypalEmail.trim()} via PayPal. Please allow 3-5 business days for processing.`
+        tFn(t, "wallet.withdrawalSentMsg", { amount: selectedTier.totalPayout.toFixed(2), email: paypalEmail.trim() })
       );
       await loadData();
     } catch (err: unknown) {
-      const fallback = "Failed to submit withdrawal request";
+      const fallback = t.wallet.withdrawalFailed;
       const rawMsg = err instanceof Error ? err.message : fallback;
-      Alert.alert("Error", extractApiErrorMessage(rawMsg, fallback));
+      Alert.alert(t.common.error, extractApiErrorMessage(rawMsg, fallback));
     } finally {
       setSubmitting(false);
     }
@@ -468,11 +462,11 @@ export default function WalletScreen() {
             <View style={styles.verifiedBalanceCard}>
               <View style={styles.verifiedBalanceRow}>
                 <Feather name="shield" size={14} color={Colors.primary} />
-                <Text style={styles.verifiedBalanceLabel}>Verified withdrawable balance</Text>
+                <Text style={styles.verifiedBalanceLabel}>{t.wallet.verifiedBalance}</Text>
               </View>
               <Text style={styles.verifiedBalanceAmount}>${serverBalance.toFixed(2)}</Text>
               <Text style={styles.verifiedBalanceHint}>
-                Only earnings verified by survey and offer providers can be withdrawn.
+                {t.wallet.verifiedBalanceHint}
               </Text>
             </View>
 
@@ -614,12 +608,12 @@ export default function WalletScreen() {
                 <View style={styles.paypalSection}>
                   <View style={styles.paypalHeader}>
                     <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.paypalLabel}>PayPal Email</Text>
+                    <Text style={styles.paypalLabel}>{t.wallet.paypalEmailLabel}</Text>
                   </View>
                   <View style={styles.paypalInputWrapper}>
                     <TextInput
                       style={styles.paypalInput}
-                      placeholder="your@email.com"
+                      placeholder={t.wallet.paypalEmailPlaceholder}
                       placeholderTextColor={Colors.textMuted}
                       value={paypalEmail}
                       onChangeText={setPaypalEmail}
@@ -649,7 +643,7 @@ export default function WalletScreen() {
                   {paypalEmail.trim() ? (
                     <View style={styles.paypalConfirmRow}>
                       <Feather name="send" size={12} color={Colors.textSecondary} />
-                      <Text style={styles.paypalConfirmText}>via PayPal to {paypalEmail.trim()}</Text>
+                      <Text style={styles.paypalConfirmText}>{tFn(t, "wallet.viaPaypalTo", { email: paypalEmail.trim() })}</Text>
                     </View>
                   ) : null}
                 </View>
