@@ -240,6 +240,24 @@ export default function SearchScreen() {
         </View>
       )}
 
+      {dailyCap > 0 && (
+        <View style={styles.searchProgressRow}>
+          <View style={styles.searchProgressBar}>
+            <View
+              style={[
+                styles.searchProgressFill,
+                { width: `${Math.min((dailyCount / dailyCap) * 100, 100)}%` as any },
+              ]}
+            />
+          </View>
+          <Text style={styles.searchProgressText}>
+            {t.wallet.searchDailyProgress
+              .replace("{{count}}", String(dailyCount))
+              .replace("{{cap}}", String(dailyCap))}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={18} color={Colors.textMuted} style={styles.searchIcon} />
@@ -391,6 +409,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#92400e",
     flex: 1,
+  },
+  searchProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  searchProgressBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: Colors.surfaceHighlight,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  searchProgressFill: {
+    height: "100%",
+    backgroundColor: Colors.primary,
+    borderRadius: 2,
+  },
+  searchProgressText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    minWidth: 110,
+    textAlign: "right",
   },
   searchRow: {
     flexDirection: "row",
