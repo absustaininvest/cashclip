@@ -5,12 +5,14 @@ interface LanguageContextValue {
   lang: Language;
   t: Translations;
   setLang: (lang: Language) => void;
+  loaded: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
   lang: "en",
   t: getTranslations("en"),
   setLang: () => {},
+  loaded: false,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -37,7 +39,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <LanguageContext.Provider value={{ lang, t: translations, setLang }}>
+    <LanguageContext.Provider value={{ lang, t: translations, setLang, loaded }}>
       {children}
     </LanguageContext.Provider>
   );
