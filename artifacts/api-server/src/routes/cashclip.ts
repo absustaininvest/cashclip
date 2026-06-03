@@ -187,12 +187,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: s.active ? "Active" : "Inactive",
       })),
       withdrawalTiers: [
-        { amount: 5, bonus: "0%", tier: "Minimum" },
-        { amount: 10, bonus: "+3%", tier: "Smart" },
-        { amount: 25, bonus: "+5%", tier: "Popular" },
-        { amount: 50, bonus: "+8%", tier: "Best Value" },
-        { amount: 100, bonus: "+12%", tier: "VIP" },
-        { amount: 250, bonus: "+15%", tier: "Elite" },
+        { amount: 3, bonus: "0%", tier: "Minimum" },
+        { amount: 5, bonus: "0%", tier: "Popular" },
+        { amount: 7, bonus: "0%", tier: "Best Value" },
       ],
     });
   });

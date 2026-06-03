@@ -204,8 +204,9 @@ export interface WithdrawalTier {
 
 export function getWithdrawalTiers(balance: number): WithdrawalTier[] {
   const tiers = [
-    { amount: 5, bonusPercent: 0, label: "$5.00", tag: "Minimum" },
-    { amount: 7, bonusPercent: 0, label: "$7.00", tag: "Standard" },
+    { amount: 3, bonusPercent: 0, label: "$3.00", tag: "Minimum" },
+    { amount: 5, bonusPercent: 0, label: "$5.00", tag: "Standard" },
+    { amount: 7, bonusPercent: 0, label: "$7.00", tag: "Best Value" },
   ];
   return tiers
     .filter((t) => t.amount <= balance)
@@ -218,7 +219,7 @@ export function getWithdrawalTiers(balance: number): WithdrawalTier[] {
 
 export async function withdraw(amount: number, bonusPercent: number = 0): Promise<boolean> {
   const balance = await getNumber(KEYS.BALANCE, 0);
-  if (amount > balance || amount < 5) return false;
+  if (amount > balance || amount < 3) return false;
   const bonusAmount = parseFloat(((amount * bonusPercent) / 100).toFixed(2));
   const totalPayout = parseFloat((amount + bonusAmount).toFixed(2));
   await setNumber(KEYS.BALANCE, parseFloat((balance - amount).toFixed(2)));

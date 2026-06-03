@@ -6,8 +6,7 @@ export interface CanonicalTier {
 }
 
 export const WITHDRAWAL_TIERS: CanonicalTier[] = [
-  { amount: 1, bonusPercent: 0, label: "$1.00", tag: "Minimum" },
-  { amount: 3, bonusPercent: 0, label: "$3.00", tag: "Standard" },
+  { amount: 3, bonusPercent: 0, label: "$3.00", tag: "Minimum" },
   { amount: 5, bonusPercent: 0, label: "$5.00", tag: "Popular" },
   { amount: 7, bonusPercent: 0, label: "$7.00", tag: "Best Value" },
 ];

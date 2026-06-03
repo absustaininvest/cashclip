@@ -265,11 +265,11 @@ export default function WalletScreen() {
       setServerBalance(srv.balance);
       setServerTotalEarned(srv.totalEarned);
     }
-    if (effective < 1) {
+    if (effective < 3) {
       Alert.alert(
         t.wallet.minimumNotReached,
         srv
-          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $1.00 minimum.`
+          ? `Your verified balance is $${effective.toFixed(2)}. Complete surveys or offers to reach the $3.00 minimum.`
           : t.wallet.needAtLeast
       );
       return;
@@ -326,10 +326,10 @@ export default function WalletScreen() {
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const displayBalance = serverBalance;
-  const progressToNext = displayBalance < 1
-    ? (displayBalance / 1) * 100
+  const progressToNext = displayBalance < 3
+    ? (displayBalance / 3) * 100
     : 100;
-  const nextTierAmount = displayBalance < 1 ? 1 : displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : displayBalance < 7 ? 7 : null;
+  const nextTierAmount = displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : displayBalance < 7 ? 7 : null;
   const nextTierBonus = 0;
 
   return (
@@ -426,7 +426,7 @@ export default function WalletScreen() {
                 <View style={styles.nextTierHeader}>
                   <Feather name="trending-up" size={14} color={Colors.accent} />
                   <Text style={styles.nextTierTitle}>
-                    {displayBalance < 1 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
+                    {displayBalance < 3 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -453,17 +453,17 @@ export default function WalletScreen() {
               onPress={openWithdrawModal}
               style={({ pressed }) => [
                 styles.withdrawButton,
-                serverBalance < 1 && styles.withdrawButtonDisabled,
+                serverBalance < 3 && styles.withdrawButtonDisabled,
                 { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
               ]}
             >
               <LinearGradient
-                colors={serverBalance >= 1 ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
+                colors={serverBalance >= 3 ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
                 style={styles.withdrawGradient}
               >
-                <Feather name="send" size={18} color={serverBalance >= 1 ? Colors.background : Colors.textMuted} />
-                <Text style={[styles.withdrawText, serverBalance < 1 && { color: Colors.textMuted }]}>
-                  {serverBalance >= 1 ? t.wallet.withdrawFunds : tFn(t, "wallet.moreToWithdraw", { amount: (1 - serverBalance).toFixed(2) })}
+                <Feather name="send" size={18} color={serverBalance >= 3 ? Colors.background : Colors.textMuted} />
+                <Text style={[styles.withdrawText, serverBalance < 3 && { color: Colors.textMuted }]}>
+                  {serverBalance >= 3 ? t.wallet.withdrawFunds : tFn(t, "wallet.moreToWithdraw", { amount: (3 - serverBalance).toFixed(2) })}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -473,7 +473,7 @@ export default function WalletScreen() {
               <Text style={styles.tierPreviewTitle}>Payout Limits</Text>
               <View style={styles.tierMiniGrid}>
                 {[
-                  { label: "Minimum", value: "$1.00" },
+                  { label: "Minimum", value: "$3.00" },
                   { label: "Daily Max", value: "$7.00" },
                   { label: "Processing", value: "3–5 days" },
                 ].map((item) => (
