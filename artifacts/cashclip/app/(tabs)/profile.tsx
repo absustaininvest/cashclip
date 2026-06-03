@@ -117,13 +117,15 @@ export default function ProfileScreen() {
     {
       icon: "globe",
       label: t.profile.language,
-      languageBadge: lang === "en" ? "EN" : lang === "es" ? "ES" : "PT",
+      languageBadge: lang === "en" ? "EN" : lang === "es" ? "ES" : lang === "pt" ? "PT" : lang === "fr" ? "FR" : "DE",
       action: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const options: { label: string; code: "en" | "es" | "pt" }[] = [
+        const options: { label: string; code: "en" | "es" | "pt" | "fr" | "de" }[] = [
           { label: "English", code: "en" },
           { label: "Español", code: "es" },
           { label: "Português", code: "pt" },
+          { label: "Français", code: "fr" },
+          { label: "Deutsch", code: "de" },
         ];
         Alert.alert(
           t.profile.language,
