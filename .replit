@@ -39,10 +39,6 @@ args = "Start application"
 task = "workflow.run"
 args = "Start Backend"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS Build29 OTA3"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -66,17 +62,6 @@ outputType = "console"
 task = "shell.exec"
 args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
-
-[[workflows.workflow]]
-name = "EAS Build29 OTA3"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd artifacts/cashclip && EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_PUBLIC_ENV=production EXPO_PUBLIC_DOMAIN=cash-clip.app pnpm exec eas update --branch production --message \"Fix tap-to-earn crash: restore PLACEHOLDER_CARDS/adSlotReward exports in native ad card\" --non-interactive 2>&1 | tee /tmp/eas_ota_build29_3.log; echo \"EAS_EXIT=${PIPESTATUS[0]}\" | tee -a /tmp/eas_ota_build29_3.log"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 3001
