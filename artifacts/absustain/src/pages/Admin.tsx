@@ -1868,7 +1868,7 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   );
 }
 
-function CashClipUsersPanel({ token }: { token: string }) {
+function CashClipUsersPanel({ token, healthCount, healthError }: { token: string; healthCount: number | null; healthError: boolean }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -1895,9 +1895,6 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
-  const [healthCount, setHealthCount] = useState<number | null>(null);
-  const [healthError, setHealthError] = useState(false);
-
   const PAGE_SIZE = 25;
 
   const showToast = (msg: string, ok = true) => {
@@ -1963,19 +1960,6 @@ function CashClipUsersPanel({ token }: { token: string }) {
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
 
-  useEffect(() => {
-    function fetchHealth() {
-      fetch("/api/admin/health/sponsored-visits", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
-        .catch(() => setHealthError(true));
-    }
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [token]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -3096,6 +3080,22 @@ function Dashboard({
   onLogout: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("submissions");
+  const [healthCount, setHealthCount] = useState<number | null>(null);
+  const [healthError, setHealthError] = useState(false);
+
+  useEffect(() => {
+    function fetchHealth() {
+      fetch("/api/admin/health/sponsored-visits", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
+        .catch(() => setHealthError(true));
+    }
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const loggedInAs = (() => {
     try {
@@ -3210,20 +3210,26 @@ function Dashboard({
         </div>
         {/* Tab nav */}
         <div className="max-w-7xl mx-auto mt-4 flex items-center gap-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
-                  : "text-white/40 hover:text-white hover:bg-white/[0.05]"
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const showAlert = t.id === "earnhealth" && !healthError && healthCount === 0;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  tab === t.id
+                    ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
+                    : "text-white/40 hover:text-white hover:bg-white/[0.05]"
+                }`}
+              >
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
+                {showAlert && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#06060E]" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -3385,7 +3391,7 @@ function Dashboard({
           </>
         )}
 
-        {tab === "cashclip" && <CashClipUsersPanel token={token} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} />}
         {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
