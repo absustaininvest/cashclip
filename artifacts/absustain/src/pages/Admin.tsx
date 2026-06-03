@@ -1868,7 +1868,15 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   );
 }
 
-function CashClipUsersPanel({ token, healthCount, healthError }: { token: string; healthCount: number | null; healthError: boolean }) {
+function formatLastChecked(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin === 1) return "1 min ago";
+  return `${diffMin} min ago`;
+}
+
+function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -2263,6 +2271,11 @@ function CashClipUsersPanel({ token, healthCount, healthError }: { token: string
             {!healthError && healthCount !== null && (
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${healthCount > 0 ? "bg-[#00E676]/15 text-[#00E676]" : "bg-red-500/15 text-red-400"}`}>
                 {healthCount > 0 ? `✓ ${healthCount} settled (24 h)` : "⚠ 0 settled"}
+              </span>
+            )}
+            {healthLastChecked && (
+              <span className="text-xs text-white/30">
+                Last checked {formatLastChecked(healthLastChecked)}
               </span>
             )}
           </h2>
@@ -3082,6 +3095,7 @@ function Dashboard({
   const [tab, setTab] = useState<Tab>("submissions");
   const [healthCount, setHealthCount] = useState<number | null>(null);
   const [healthError, setHealthError] = useState(false);
+  const [healthLastChecked, setHealthLastChecked] = useState<Date | null>(null);
 
   useEffect(() => {
     function fetchHealth() {
@@ -3089,7 +3103,10 @@ function Dashboard({
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
+        .then((d: SponsoredVisitHealth) => {
+          setHealthCount(d.window24h.successCount);
+          setHealthLastChecked(new Date());
+        })
         .catch(() => setHealthError(true));
     }
     fetchHealth();
@@ -3391,7 +3408,7 @@ function Dashboard({
           </>
         )}
 
-        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} />}
         {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
