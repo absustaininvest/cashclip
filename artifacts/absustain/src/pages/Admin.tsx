@@ -2046,6 +2046,7 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
+  const [searchConfigured, setSearchConfigured] = useState<boolean | null>(null);
   const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
 
@@ -2053,6 +2054,15 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
     const id = setInterval(() => setTick(t => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/earn/search/config", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setSearchConfigured(Boolean(d.configured)))
+      .catch(() => setSearchConfigured(false));
+  }, [token]);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2537,6 +2547,36 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
           </button>
           <p className="text-white/20 text-xs">
             These values will be enforced when users request withdrawals.
+          </p>
+        </div>
+      </div>
+
+      {/* Search & Earn monetization status */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-4 h-4 text-[#00E676]" />
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Search &amp; Earn
+          </h3>
+        </div>
+        <div className="flex items-center gap-3">
+          {searchConfigured === null ? (
+            <span className="text-white/30 text-xs">Checking…</span>
+          ) : searchConfigured ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/15 border border-[#00E676]/30 text-[#00E676] text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />
+              Search revenue active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              Publisher code not set
+            </span>
+          )}
+          <p className="text-white/30 text-xs">
+            {searchConfigured
+              ? "SEARCH_PUBLISHER_CODE is configured — Yahoo search revenue sharing is active."
+              : "Set SEARCH_PUBLISHER_CODE in Production app secrets to enable Yahoo revenue sharing."}
           </p>
         </div>
       </div>
