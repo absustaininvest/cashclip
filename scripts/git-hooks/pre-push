@@ -108,10 +108,47 @@ TC_WS_COUNT=0
 [ "${TC_SCRIPTS:-0}" -gt 0 ] && TC_WS_COUNT=$((TC_WS_COUNT + 1))
 
 if [ "${TC_ROOT:-0}" -gt 0 ] || [ "${TC_LIBS:-0}" -gt 0 ] || [ "$TC_WS_COUNT" -gt 1 ]; then
-  # Shared libs, root files, or multiple workspaces changed — full typecheck.
-  printf '\n[pre-push] Multiple workspaces or shared files changed — running full TypeScript typecheck...\n'
-  pnpm run typecheck
-  TYPECHECK_EXIT=$?
+  # Shared libs, root files, or multiple workspaces changed.
+  # Step 1: build shared libs serially (artifacts depend on lib build output).
+  printf '\n[pre-push] Multiple workspaces or shared files changed — running TypeScript typecheck in parallel...\n'
+  printf '[pre-push] (1/2) Building shared libs...\n'
+  pnpm run typecheck:libs
+  LIBS_EXIT=$?
+  if [ "$LIBS_EXIT" -ne 0 ]; then
+    printf '\n[pre-push] TypeScript typecheck failed. Fix the errors above or use --no-verify to skip.\n'
+    exit "$LIBS_EXIT"
+  fi
+
+  # Step 2: determine which workspaces to check.
+  # If root or lib files changed every artifact workspace is potentially affected.
+  if [ "${TC_ROOT:-0}" -gt 0 ] || [ "${TC_LIBS:-0}" -gt 0 ]; then
+    TC_CHECK_API=1; TC_CHECK_CASHCLIP=1; TC_CHECK_ABSUSTAIN=1; TC_CHECK_SCRIPTS=1
+  else
+    TC_CHECK_API="${TC_API:-0}"; TC_CHECK_CASHCLIP="${TC_CASHCLIP:-0}"
+    TC_CHECK_ABSUSTAIN="${TC_ABSUSTAIN:-0}"; TC_CHECK_SCRIPTS="${TC_SCRIPTS:-0}"
+  fi
+
+  # Step 3: spawn workspace typechecks in parallel, buffer output to temp files.
+  printf '[pre-push] (2/2) Type-checking workspaces in parallel...\n'
+  PID_API=; PID_CASHCLIP=; PID_ABSUSTAIN=; PID_SCRIPTS=
+  [ "${TC_CHECK_API:-0}"       -gt 0 ] && { pnpm --filter @workspace/api-server run typecheck >/tmp/tc-api-server.log 2>&1 & PID_API=$!; }
+  [ "${TC_CHECK_CASHCLIP:-0}"  -gt 0 ] && { pnpm --filter @workspace/cashclip  run typecheck >/tmp/tc-cashclip.log  2>&1 & PID_CASHCLIP=$!; }
+  [ "${TC_CHECK_ABSUSTAIN:-0}" -gt 0 ] && { pnpm --filter @workspace/absustain run typecheck >/tmp/tc-absustain.log 2>&1 & PID_ABSUSTAIN=$!; }
+  [ "${TC_CHECK_SCRIPTS:-0}"   -gt 0 ] && { pnpm --filter @workspace/scripts   run typecheck >/tmp/tc-scripts.log   2>&1 & PID_SCRIPTS=$!; }
+
+  # Collect exit codes; print each workspace's output so errors are visible.
+  TYPECHECK_EXIT=0
+  for _pair in "api-server:$PID_API" "cashclip:$PID_CASHCLIP" "absustain:$PID_ABSUSTAIN" "scripts:$PID_SCRIPTS"; do
+    _label="${_pair%%:*}"; _pid="${_pair##*:}"
+    [ -z "$_pid" ] && continue
+    wait "$_pid"; _code=$?
+    printf '\n[pre-push] typecheck:%s — %s\n' "$_label" "$([ "$_code" -eq 0 ] && printf 'OK' || printf 'FAILED')"
+    if [ "$_code" -ne 0 ]; then
+      cat "/tmp/tc-${_label}.log"
+      TYPECHECK_EXIT=1
+    fi
+    rm -f "/tmp/tc-${_label}.log"
+  done
 elif [ "$TC_WS_COUNT" -eq 1 ]; then
   # Single workspace changed — run only that workspace's typecheck.
   if [ "${TC_API:-0}" -gt 0 ]; then
