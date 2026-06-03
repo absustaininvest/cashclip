@@ -1964,12 +1964,17 @@ function CashClipUsersPanel({ token }: { token: string }) {
   }, [payoutRange, fetchPayouts]);
 
   useEffect(() => {
-    fetch("/api/admin/health/sponsored-visits", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
-      .catch(() => setHealthError(true));
+    function fetchHealth() {
+      fetch("/api/admin/health/sponsored-visits", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d: SponsoredVisitHealth) => setHealthCount(d.window24h.successCount))
+        .catch(() => setHealthError(true));
+    }
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [token]);
 
   function handleSearch(e: React.FormEvent) {
