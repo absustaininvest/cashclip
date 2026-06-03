@@ -17,13 +17,11 @@
     "reset-build-number": "tsx ./src/reset-build-number.ts",
     "check-public-archives": "tsx ./src/check-public-archives.ts",
     "check-signing-md-sync": "tsx ./src/check-signing-md-sync.ts",
-    "check-vitest-configs": "tsx ./src/check-vitest-configs.ts",
     "test": "node --import tsx/esm --test src/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/nodemailer": "^8.0.0",
     "tsx": "catalog:"
   },
   "dependencies": {

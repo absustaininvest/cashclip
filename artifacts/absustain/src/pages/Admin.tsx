@@ -40,7 +40,6 @@ import {
   History,
   ChevronLeft,
   Globe,
-  Power,
 } from "lucide-react";
 
 interface Lead {
@@ -1348,12 +1347,6 @@ function InboxPanel({ token }: { token: string }) {
     InboxMessage["category"] | "all"
   >("all");
   const [selected, setSelected] = useState<InboxMessage | null>(null);
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -1501,10 +1494,9 @@ function InboxPanel({ token }: { token: string }) {
                 {filtered.map((msg) => (
                   <button
                     key={msg.uid}
-                    onClick={() => {
-                      setSelected(selected?.uid === msg.uid ? null : msg);
-                      setTick(t => t + 1);
-                    }}
+                    onClick={() =>
+                      setSelected(selected?.uid === msg.uid ? null : msg)
+                    }
                     className={`w-full text-left flex items-start gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors ${
                       selected?.uid === msg.uid ? "bg-white/[0.06]" : ""
                     }`}
@@ -1579,8 +1571,6 @@ function InboxPanel({ token }: { token: string }) {
                       hour: "numeric",
                       minute: "2-digit",
                     })}
-                    {" · "}
-                    {timeAgoShort(selected.date)} ago
                   </span>
                 </div>
                 <button
@@ -1648,318 +1638,7 @@ interface CashClipUser {
   referredBy: string | null;
 }
 
-interface SponsoredVisitHealth {
-  generatedAt: string;
-  window24h: { successCount: number; totalRewardUsd: string };
-  window7d: { successCount: number; totalRewardUsd: string };
-  activeCampaigns: number;
-  expiredAttempts24h: {
-    total: number;
-    notRedirected: number;
-    redirectedNotWitnessed: number;
-    witnessedNotSettled: number;
-  };
-  recentSettlements: {
-    id: string;
-    campaignId: string;
-    campaignTitle: string;
-    rewardGranted: string;
-    createdAt: string;
-  }[];
-}
-
-function SponsoredVisitHealthPanel({ token }: { token: string }) {
-  const [data, setData] = useState<SponsoredVisitHealth | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [monitorRunning, setMonitorRunning] = useState<boolean | null>(null);
-  const [monitorToggling, setMonitorToggling] = useState(false);
-  const [monitorError, setMonitorError] = useState("");
-
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/health/sponsored-visits", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setData(await res.json());
-    } catch (e: any) {
-      setError(e.message ?? "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadMonitorStatus() {
-    try {
-      const res = await fetch("/api/admin/monitor/sponsored-visit", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      setMonitorRunning(json.running);
-    } catch {
-    }
-  }
-
-  async function toggleMonitor() {
-    if (monitorRunning === null || monitorToggling) return;
-    setMonitorToggling(true);
-    setMonitorError("");
-    const action = monitorRunning ? "stop" : "start";
-    try {
-      const res = await fetch("/api/admin/monitor/sponsored-visit", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const json = await res.json();
-      setMonitorRunning(json.running);
-    } catch (e: any) {
-      setMonitorError(e.message ?? "Failed to toggle monitor");
-    } finally {
-      setMonitorToggling(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-    loadMonitorStatus();
-    const interval = setInterval(load, 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  function fmt(iso: string) {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit",
-    });
-  }
-
-  const statusColor = !data
-    ? "text-white/30"
-    : data.window24h.successCount > 0
-      ? "text-[#00E676]"
-      : data.activeCampaigns === 0
-        ? "text-amber-400"
-        : "text-red-400";
-
-  const statusLabel = !data
-    ? "Unknown"
-    : data.window24h.successCount > 0
-      ? "Settling normally"
-      : data.activeCampaigns === 0
-        ? "No active campaigns"
-        : "No settlements in 24 h";
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <ShieldCheck className="w-5 h-5 text-[#00E676]" />
-          </div>
-          <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
-              Sponsored Visit Health
-            </h2>
-            <p className="text-white/40 text-sm">
-              Settlement outcomes drawn from the ledger — no synthetic traffic
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors disabled:opacity-40"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Monitor toggle */}
-      <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${monitorRunning === null ? "bg-white/20" : monitorRunning ? "bg-[#00E676] animate-pulse" : "bg-white/20"}`} />
-          <div>
-            <p className="text-sm font-medium text-white">Settlement alert monitor</p>
-            <p className="text-xs text-white/40 mt-0.5">
-              {monitorRunning === null ? "Checking…" : monitorRunning ? "Running — checks every 30 min" : "Stopped"}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={toggleMonitor}
-          disabled={monitorRunning === null || monitorToggling}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 ${
-            monitorRunning
-              ? "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20"
-              : "bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] hover:bg-[#00E676]/20"
-          }`}
-        >
-          <Power className={`w-3.5 h-3.5 ${monitorToggling ? "animate-pulse" : ""}`} />
-          {monitorRunning ? "Stop" : "Start"}
-        </button>
-      </div>
-
-      {monitorError && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {monitorError}
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {loading && !data && (
-        <div className="text-white/30 text-sm py-8 text-center">Loading…</div>
-      )}
-
-      {data && (
-        <>
-          {/* Status banner */}
-          <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
-            <div className={`w-2.5 h-2.5 rounded-full ${
-              statusColor === "text-[#00E676]"
-                ? "bg-[#00E676]"
-                : statusColor === "text-amber-400"
-                  ? "bg-amber-400"
-                  : statusColor === "text-red-400"
-                    ? "bg-red-400"
-                    : "bg-white/20"
-            } flex-shrink-0`} />
-            <span className={`font-medium text-sm ${statusColor}`}>{statusLabel}</span>
-            <span className="text-white/20 text-xs ml-auto">
-              as of {fmt(data.generatedAt)}
-            </span>
-          </div>
-
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-[#00E676]/10 w-fit mb-3">
-                <TrendingUp className="w-5 h-5 text-[#00E676]" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.window24h.successCount}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Settled (24 h)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 w-fit mb-3">
-                <BarChart3 className="w-5 h-5 text-emerald-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                ${data.window24h.totalRewardUsd}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Paid out (24 h)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-blue-500/10 w-fit mb-3">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.window7d.successCount}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Settled (7 d)</p>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 w-fit mb-3">
-                <Globe className="w-5 h-5 text-amber-400" />
-              </div>
-              <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
-                {data.activeCampaigns}
-              </p>
-              <p className="text-white/40 text-sm mt-1">Active campaigns</p>
-            </div>
-          </div>
-
-          {/* Expired attempts breakdown */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-base mb-1">
-              Abandoned attempts (last 24 h)
-            </h3>
-            <p className="text-white/30 text-xs mb-4">
-              Visit flows that started but expired without settling — normal attrition or a regression signal
-            </p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { label: "Total expired", value: data.expiredAttempts24h.total, color: "text-white" },
-                { label: "Never opened link", value: data.expiredAttempts24h.notRedirected, color: "text-white/60" },
-                { label: "Opened, no JS beacon", value: data.expiredAttempts24h.redirectedNotWitnessed, color: "text-amber-400" },
-                { label: "Witnessed, not claimed", value: data.expiredAttempts24h.witnessedNotSettled, color: "text-red-400" },
-              ].map((s) => (
-                <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
-                  <p className={`font-['Space_Grotesk'] text-2xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-white/30 text-xs mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-            {data.expiredAttempts24h.witnessedNotSettled > 0 && (
-              <div className="flex items-start gap-2 mt-4 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  {data.expiredAttempts24h.witnessedNotSettled} attempt
-                  {data.expiredAttempts24h.witnessedNotSettled !== 1 ? "s" : ""} completed
-                  the JS witness step but never reached /visit — may indicate a client bug or a
-                  settlement-breaking regression.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Recent settlements table */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.06]">
-              <h3 className="font-['Space_Grotesk'] font-bold text-white text-base">
-                Recent settlements
-              </h3>
-              <p className="text-white/30 text-xs mt-0.5">Last 20 successful visit payouts</p>
-            </div>
-            {data.recentSettlements.length === 0 ? (
-              <div className="px-5 py-8 text-white/30 text-sm text-center">
-                No settlements recorded yet
-              </div>
-            ) : (
-              <div className="divide-y divide-white/[0.04]">
-                {data.recentSettlements.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors">
-                    <div className="flex-1 min-w-0 mr-4">
-                      <p className="text-white text-sm font-medium truncate">{s.campaignTitle}</p>
-                      <p className="text-white/30 text-xs mt-0.5">{fmt(s.createdAt)}</p>
-                    </div>
-                    <span className="text-[#00E676] text-sm font-bold tabular-nums">
-                      +${s.rewardGranted}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function formatLastChecked(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin === 1) return "1 min ago";
-  return `${diffMin} min ago`;
-}
-
-function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked }: { token: string; healthCount: number | null; healthError: boolean; healthLastChecked: Date | null }) {
+function CashClipUsersPanel({ token }: { token: string }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -1986,13 +1665,8 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
-  const [, setTick] = useState(0);
-  const PAGE_SIZE = 25;
 
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
+  const PAGE_SIZE = 25;
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -2056,7 +1730,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   useEffect(() => {
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
-
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -2357,16 +2030,6 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
         <div>
           <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-[#00E676]" /> CashClip Users
-            {!healthError && healthCount !== null && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${healthCount > 0 ? "bg-[#00E676]/15 text-[#00E676]" : "bg-red-500/15 text-red-400"}`}>
-                {healthCount > 0 ? `✓ ${healthCount} settled (24 h)` : "⚠ 0 settled"}
-              </span>
-            )}
-            {healthLastChecked && (
-              <span className="text-xs text-white/30">
-                Last checked {formatLastChecked(healthLastChecked)}
-              </span>
-            )}
           </h2>
           <p className="text-white/40 text-sm mt-1">
             {total} total registered users
@@ -3170,7 +2833,6 @@ type Tab =
   | "inbox"
   | "account"
   | "cashclip"
-  | "earnhealth"
   | "security"
   | "securitylog";
 
@@ -3182,26 +2844,6 @@ function Dashboard({
   onLogout: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("submissions");
-  const [healthCount, setHealthCount] = useState<number | null>(null);
-  const [healthError, setHealthError] = useState(false);
-  const [healthLastChecked, setHealthLastChecked] = useState<Date | null>(null);
-
-  useEffect(() => {
-    function fetchHealth() {
-      fetch("/api/admin/health/sponsored-visits", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d: SponsoredVisitHealth) => {
-          setHealthCount(d.window24h.successCount);
-          setHealthLastChecked(new Date());
-        })
-        .catch(() => setHealthError(true));
-    }
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 60 * 1000);
-    return () => clearInterval(interval);
-  }, [token]);
 
   const loggedInAs = (() => {
     try {
@@ -3270,7 +2912,6 @@ function Dashboard({
   const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "submissions", label: "Submissions", icon: MessageSquare },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
-    { id: "earnhealth", label: "Earn Health", icon: ShieldCheck },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
     { id: "account", label: "Account", icon: User },
@@ -3316,26 +2957,20 @@ function Dashboard({
         </div>
         {/* Tab nav */}
         <div className="max-w-7xl mx-auto mt-4 flex items-center gap-1">
-          {tabs.map((t) => {
-            const showAlert = t.id === "earnhealth" && !healthError && healthCount === 0;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  tab === t.id
-                    ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
-                    : "text-white/40 hover:text-white hover:bg-white/[0.05]"
-                }`}
-              >
-                <t.icon className="w-3.5 h-3.5" />
-                {t.label}
-                {showAlert && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#06060E]" />
-                )}
-              </button>
-            );
-          })}
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
+                  : "text-white/40 hover:text-white hover:bg-white/[0.05]"
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -3497,8 +3132,7 @@ function Dashboard({
           </>
         )}
 
-        {tab === "cashclip" && <CashClipUsersPanel token={token} healthCount={healthCount} healthError={healthError} healthLastChecked={healthLastChecked} />}
-        {tab === "earnhealth" && <SponsoredVisitHealthPanel token={token} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
         {tab === "account" && (

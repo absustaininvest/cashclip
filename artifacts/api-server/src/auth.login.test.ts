@@ -38,8 +38,8 @@ vi.mock("./storage", () => ({
   storage: {
     getUserByUsername: (...args: unknown[]) => mockGetUserByUsername(...args),
     getUser: vi.fn().mockResolvedValue(null),
-    createUser: vi.fn().mockResolvedValue(undefined),
-    setEmailVerificationToken: vi.fn().mockResolvedValue(undefined),
+    createUser: vi.fn(),
+    setEmailVerificationToken: vi.fn(),
   },
 }));
 

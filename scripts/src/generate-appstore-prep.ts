@@ -60,7 +60,7 @@ function statusBadge(label: string, x: number, y: number, type: "ok" | "warn" | 
     done: { bg: C.lightGray, text: C.grayText, border: C.border },
   };
   const c = colors[type];
-  const w = doc.widthOfString(label, { fontSize: 8 } as any) + 18;
+  const w = doc.widthOfString(label, { fontSize: 8 }) + 18;
   doc.save().roundedRect(x, y - 1, w, 16, 4)
     .fill(c.bg).restore();
   doc.save().roundedRect(x, y - 1, w, 16, 4)
@@ -346,7 +346,7 @@ const checks = [
 checks.forEach((c, i) => {
   const cy = 90 + i * 38;
   doc.save().roundedRect(MARGIN_L, cy, CONTENT_W, 32, 6).fill(C.lightGray).restore();
-  const pw = doc.widthOfString(c.priority, { fontSize: 7.5 } as any) + 14;
+  const pw = doc.widthOfString(c.priority, { fontSize: 7.5 }) + 14;
   doc.save().roundedRect(MARGIN_L + 8, cy + 8, pw, 16, 3).fill(c.color + "22").restore();
   doc.save().fillColor(c.color).fontSize(7.5).font("Helvetica-Bold")
     .text(c.priority, MARGIN_L + 15, cy + 13, { lineBreak: false }).restore();

@@ -246,7 +246,7 @@ export default function WalletScreen() {
     setRefreshing(false);
   }, []);
 
-  const openWithdrawModal = useCallback(async (preselectedAmount?: number) => {
+  const openWithdrawModal = useCallback(async () => {
     const [integrity, srv] = await Promise.all([
       checkDeviceIntegrity(),
       fetchServerBalance(),
@@ -275,15 +275,9 @@ export default function WalletScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const freshTiers = getWithdrawalTiers(effective);
-    setTiers(freshTiers);
+    setTiers(getWithdrawalTiers(effective));
+    setSelectedTier(null);
     setPaypalEmail("");
-    if (preselectedAmount != null) {
-      const match = freshTiers.find((tier) => tier.amount === preselectedAmount) ?? null;
-      setSelectedTier(match);
-    } else {
-      setSelectedTier(null);
-    }
     setShowWithdrawModal(true);
   }, [fetchServerBalance, t]);
 
@@ -456,7 +450,7 @@ export default function WalletScreen() {
             </View>
 
             <Pressable
-              onPress={() => openWithdrawModal()}
+              onPress={openWithdrawModal}
               style={({ pressed }) => [
                 styles.withdrawButton,
                 serverBalance < 1 && styles.withdrawButtonDisabled,
@@ -476,51 +470,18 @@ export default function WalletScreen() {
 
 
             <View style={styles.tierPreview}>
-              <View style={styles.tierPreviewHeader}>
-                <Text style={styles.tierPreviewTitle}>Withdrawal Options</Text>
-                {tiers.length > 0 && (
-                  <View style={styles.readyBadge}>
-                    <Feather name="check-circle" size={11} color={Colors.background} />
-                    <Text style={styles.readyBadgeText}>Ready to Cash Out!</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.tierPreviewSubtitle}>
-                {tiers.length > 0
-                  ? `You can withdraw ${tiers.map((t) => `$${t.amount.toFixed(2)}`).join(", ")} right now`
-                  : `Earn $${Math.max(0, 1 - displayBalance).toFixed(2)} more to unlock withdrawals`}
-              </Text>
+              <Text style={styles.tierPreviewTitle}>Payout Limits</Text>
               <View style={styles.tierMiniGrid}>
-                {[1, 3, 5, 7].map((amt) => {
-                  const unlocked = tiers.some((t) => t.amount === amt);
-                  if (unlocked) {
-                    return (
-                      <Pressable
-                        key={amt}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          openWithdrawModal(amt);
-                        }}
-                        style={({ pressed }) => [
-                          styles.tierMiniItem,
-                          styles.tierMiniItemUnlocked,
-                          { opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
-                        ]}
-                      >
-                        <Feather name="check-circle" size={13} color={Colors.primary} style={{ marginBottom: 3 }} />
-                        <Text style={styles.tierMiniAmt}>${amt.toFixed(2)}</Text>
-                        <Text style={[styles.tierMiniPct, { color: Colors.primary }]}>Available</Text>
-                      </Pressable>
-                    );
-                  }
-                  return (
-                    <View key={amt} style={styles.tierMiniItem}>
-                      <Feather name="lock" size={13} color={Colors.textMuted} style={{ marginBottom: 3 }} />
-                      <Text style={[styles.tierMiniAmt, { color: Colors.textMuted }]}>${amt.toFixed(2)}</Text>
-                      <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>Locked</Text>
-                    </View>
-                  );
-                })}
+                {[
+                  { label: "Minimum", value: "$1.00" },
+                  { label: "Daily Max", value: "$7.00" },
+                  { label: "Processing", value: "3–5 days" },
+                ].map((item) => (
+                  <View key={item.label} style={[styles.tierMiniItem, { minWidth: "30%" }]}>
+                    <Text style={styles.tierMiniAmt}>{item.value}</Text>
+                    <Text style={[styles.tierMiniPct, { color: Colors.textMuted }]}>{item.label}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -734,22 +695,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 20,
     borderWidth: 1, borderColor: Colors.border,
   },
-  tierPreviewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 2 },
-  tierPreviewTitle: { fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text },
+  tierPreviewTitle: { fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text, marginBottom: 2 },
   tierPreviewSubtitle: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginBottom: 12 },
-  readyBadge: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: Colors.primary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
-  },
-  readyBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 11, color: Colors.background },
   tierMiniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tierMiniItem: {
-    width: "20%" as any, flexGrow: 1, backgroundColor: Colors.surfaceHighlight,
+    width: "30%" as any, flexGrow: 1, backgroundColor: Colors.surfaceHighlight,
     borderRadius: 10, paddingVertical: 10, alignItems: "center",
-  },
-  tierMiniItemUnlocked: {
-    backgroundColor: "rgba(0,230,118,0.08)",
-    borderWidth: 1, borderColor: "rgba(0,230,118,0.3)",
   },
   tierMiniAmt: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.text, marginBottom: 2 },
   tierMiniPct: { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary },

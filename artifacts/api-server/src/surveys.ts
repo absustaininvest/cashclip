@@ -4,8 +4,6 @@ import {
   verifyProviderCompletion,
   getProviderStatus,
   buildCpxWallUrl,
-  PROVIDER_REWARD_RANGES,
-  parseProviderReward,
   type SurveyProviderKey,
   type ExternalSurvey,
   type CompletionVerifyResponse,
@@ -19,6 +17,15 @@ import { buildDemographicEntryUrl } from "./lib/demographicUrl";
 import { getClientIp } from "./lib/clientIp";
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
+
+const PROVIDER_REWARD_RANGES: Record<SurveyProviderKey | string, { min: number; max: number }> = {
+  pollfish: { min: 0.30, max: 1.50 },
+  cint: { min: 1.00, max: 5.00 },
+  lucid: { min: 0.80, max: 4.00 },
+  cpx: { min: 0.20, max: 3.00 },
+  bitlabs: { min: 0.20, max: 2.50 },
+  internal: { min: 0.15, max: 0.75 },
+};
 
 export function registerSurveyRoutes(app: Express): void {
   app.get("/api/surveys/providers", adminMiddleware, (_req: Request, res: Response) => {
@@ -298,11 +305,12 @@ export function registerSurveyRoutes(app: Express): void {
     }
     const { survey_id, user_id, reward_value, status } = req.query;
     if (status === "completed" && survey_id && user_id) {
+      const reward = typeof reward_value === "string" ? parseFloat(reward_value) : undefined;
       await creditSurveyViaWebhook(
         "pollfish",
         String(user_id),
         `pollfish_${survey_id}`,
-        parseProviderReward(reward_value),
+        Number.isFinite(reward) ? reward : undefined,
         "[Pollfish Webhook]",
       );
     }
@@ -317,11 +325,12 @@ export function registerSurveyRoutes(app: Express): void {
     }
     const { survey_id, respondent_id, status, cpi } = req.body;
     if (status === "completed" && survey_id && respondent_id) {
+      const reward = typeof cpi === "number" ? cpi : typeof cpi === "string" ? parseFloat(cpi) : undefined;
       await creditSurveyViaWebhook(
         "cint",
         String(respondent_id),
         `cint_${survey_id}`,
-        parseProviderReward(cpi),
+        Number.isFinite(reward) ? reward : undefined,
         "[Cint Webhook]",
       );
     }
@@ -392,21 +401,16 @@ export function registerSurveyRoutes(app: Express): void {
     const isReceiptComplete = reasonStr === "RECEIPT_COMPLETE" || cashbackStateStr === "RECEIPT_COMPLETE";
 
     if ((isSurveyComplete || isCashbackComplete || isReceiptComplete) && resolvedUserId && resolvedRefId) {
-      const parsedVal = parseProviderReward(val);
-      // If val was explicitly sent but is not a valid positive number, reject without crediting.
-      // Do not fall back to expectedReward on a poisoned/invalid val field.
-      const valFieldPresent = val !== undefined && val !== null;
-      if (!valFieldPresent || parsedVal !== undefined) {
-        const prefix = isReceiptComplete ? "bitlabs_receipt_" : isCashbackComplete ? "bitlabs_cashback_" : "bitlabs_";
-        const label = isReceiptComplete ? "[BitLabs Receipt]" : isCashbackComplete ? "[BitLabs Cashback]" : "[BitLabs Survey]";
-        await creditSurveyViaWebhook(
-          "bitlabs",
-          String(resolvedUserId),
-          `${prefix}${resolvedRefId}`,
-          parsedVal,
-          label,
-        );
-      }
+      const reward = typeof val === "number" ? val : typeof val === "string" ? parseFloat(val) : undefined;
+      const prefix = isReceiptComplete ? "bitlabs_receipt_" : isCashbackComplete ? "bitlabs_cashback_" : "bitlabs_";
+      const label = isReceiptComplete ? "[BitLabs Receipt]" : isCashbackComplete ? "[BitLabs Cashback]" : "[BitLabs Survey]";
+      await creditSurveyViaWebhook(
+        "bitlabs",
+        String(resolvedUserId),
+        `${prefix}${resolvedRefId}`,
+        Number.isFinite(reward) ? reward : undefined,
+        label,
+      );
     }
     res.status(200).json({ status: "received" });
   });
@@ -419,11 +423,12 @@ export function registerSurveyRoutes(app: Express): void {
     }
     const { SurveyNumber, respondentId, status, CPI } = req.body;
     if (status === "complete" && SurveyNumber && respondentId) {
+      const reward = typeof CPI === "number" ? CPI : typeof CPI === "string" ? parseFloat(CPI) : undefined;
       await creditSurveyViaWebhook(
         "lucid",
         String(respondentId),
         `lucid_${SurveyNumber}`,
-        parseProviderReward(CPI),
+        Number.isFinite(reward) ? reward : undefined,
         "[Lucid Webhook]",
       );
     }
