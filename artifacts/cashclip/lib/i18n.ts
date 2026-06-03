@@ -132,6 +132,8 @@ const en = {
       convertError: "Could not convert points. Please try again.",
       withdrawalSentMsg: "${{amount}} will be sent to {{email}} via PayPal. Please allow 3-5 business days for processing.",
       withdrawalFailed: "Failed to submit withdrawal request",
+      searchEarned: "Search",
+      searchDailyProgress: "{{count}}/{{cap}} searches today",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -679,6 +681,8 @@ const translations: Record<Language, Translations> = {
       convertError: "No se pudieron convertir los puntos. Inténtalo de nuevo.",
       withdrawalSentMsg: "${{amount}} será enviado a {{email}} via PayPal. Por favor espera 3-5 días hábiles para el procesamiento.",
       withdrawalFailed: "No se pudo enviar la solicitud de retiro",
+      searchEarned: "Búsqueda",
+      searchDailyProgress: "{{count}}/{{cap}} búsquedas hoy",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
@@ -1213,6 +1217,8 @@ const translations: Record<Language, Translations> = {
       convertError: "Não foi possível converter os pontos. Tente novamente.",
       withdrawalSentMsg: "${{amount}} será enviado para {{email}} via PayPal. Por favor, aguarde de 3 a 5 dias úteis para o processamento.",
       withdrawalFailed: "Não foi possível enviar a solicitação de saque",
+      searchEarned: "Busca",
+      searchDailyProgress: "{{count}}/{{cap}} buscas hoje",
     },
     profile: {
       defaultUsername: "Usuário CashClip",
@@ -1747,6 +1753,8 @@ const translations: Record<Language, Translations> = {
       convertError: "Impossible de convertir les points. Veuillez réessayer.",
       withdrawalSentMsg: "${{amount}} sera envoyé à {{email}} via PayPal. Comptez 3 à 5 jours ouvrables.",
       withdrawalFailed: "Échec de la demande de retrait",
+      searchEarned: "Recherche",
+      searchDailyProgress: "{{count}}/{{cap}} recherches aujourd'hui",
     },
     profile: {
       defaultUsername: "Utilisateur CashClip",
@@ -2281,6 +2289,8 @@ const translations: Record<Language, Translations> = {
       convertError: "Punkte konnten nicht umgewandelt werden. Bitte erneut versuchen.",
       withdrawalSentMsg: "${{amount}} wird via PayPal an {{email}} gesendet. Bitte 3–5 Werktage einplanen.",
       withdrawalFailed: "Auszahlungsanfrage fehlgeschlagen",
+      searchEarned: "Suche",
+      searchDailyProgress: "{{count}}/{{cap}} Suchen heute",
     },
     profile: {
       defaultUsername: "CashClip-Benutzer",

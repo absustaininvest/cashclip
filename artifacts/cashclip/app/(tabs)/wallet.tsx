@@ -33,6 +33,7 @@ import {
   claimAllReady,
   formatPoints,
   pointsToUsd,
+  getSearchConfig,
   type PendingState,
 } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -175,6 +176,8 @@ export default function WalletScreen() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
+  const [searchDailyUsed, setSearchDailyUsed] = useState(0);
+  const [searchDailyCap, setSearchDailyCap] = useState(20);
   const [isConverting, setIsConverting] = useState(false);
   const [lockedNudgeMsg, setLockedNudgeMsg] = useState<string | null>(null);
   const nudgeOpacity = useRef(new Animated.Value(0)).current;
@@ -199,11 +202,12 @@ export default function WalletScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    const [s, txns, srv, pending] = await Promise.all([
+    const [s, txns, srv, pending, searchCfg] = await Promise.all([
       getUserStats(),
       getTransactions(),
       fetchServerBalance(),
       refreshPendingFromServer(),
+      getSearchConfig(),
     ]);
     setStats(s);
     setTransactions(txns);
@@ -215,6 +219,10 @@ export default function WalletScreen() {
       setTiers(getWithdrawalTiers(s.balance));
     }
     if (pending) setPendingState(pending);
+    if (searchCfg) {
+      setSearchDailyUsed(searchCfg.dailyUsed);
+      setSearchDailyCap(searchCfg.dailyCap);
+    }
   }, [fetchServerBalance]);
 
   const handleConvertNow = useCallback(async () => {
@@ -418,6 +426,38 @@ export default function WalletScreen() {
                   <Text style={styles.pointsStatLabel}>{t.wallet.convertiblePoints}</Text>
                 </View>
               </View>
+
+              {/* Search breakdown: show when any search tokens are pending/claimable */}
+              {(() => {
+                const searchPts = [
+                  ...(pendingState?.pending ?? []),
+                  ...(pendingState?.claimable ?? []),
+                ].filter(tok => tok.actionType === "search")
+                  .reduce((s, tok) => s + tok.points, 0);
+                if (searchPts === 0) return null;
+                return (
+                  <View style={styles.searchBreakdownRow}>
+                    <Ionicons name="search-outline" size={13} color={Colors.primary} />
+                    <Text style={styles.searchBreakdownLabel}>{t.wallet.searchEarned}</Text>
+                    <Text style={styles.searchBreakdownPts}>{formatPoints(searchPts)}</Text>
+                  </View>
+                );
+              })()}
+
+              {/* Daily search progress */}
+              {searchDailyCap > 0 && (
+                <View style={styles.searchProgressRow}>
+                  <View style={styles.searchProgressBar}>
+                    <View style={[styles.searchProgressFill, { width: `${Math.min((searchDailyUsed / searchDailyCap) * 100, 100)}%` as any }]} />
+                  </View>
+                  <Text style={styles.searchProgressText}>
+                    {t.wallet.searchDailyProgress
+                      .replace("{{count}}", String(searchDailyUsed))
+                      .replace("{{cap}}", String(searchDailyCap))}
+                  </Text>
+                </View>
+              )}
+
               <Pressable
                 onPress={handleConvertNow}
                 disabled={isConverting || (pendingState?.claimablePoints ?? 0) === 0}
@@ -717,6 +757,21 @@ const styles = StyleSheet.create({
   },
   convertButtonDisabled: { backgroundColor: Colors.surfaceHighlight },
   convertText: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: Colors.background },
+  searchBreakdownRow: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(0,230,118,0.07)", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8,
+  },
+  searchBreakdownLabel: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.text, flex: 1 },
+  searchBreakdownPts: { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary },
+  searchProgressRow: {
+    flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10,
+  },
+  searchProgressBar: {
+    flex: 1, height: 4, backgroundColor: Colors.surfaceHighlight, borderRadius: 2, overflow: "hidden",
+  },
+  searchProgressFill: { height: "100%", backgroundColor: Colors.primary, borderRadius: 2 },
+  searchProgressText: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, minWidth: 110, textAlign: "right" },
   nextTierCard: {
     backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: "rgba(255, 214, 0, 0.15)",
