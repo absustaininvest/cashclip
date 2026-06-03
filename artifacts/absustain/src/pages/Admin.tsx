@@ -1907,7 +1907,13 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
+  const [, setTick] = useState(0);
   const PAGE_SIZE = 25;
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
