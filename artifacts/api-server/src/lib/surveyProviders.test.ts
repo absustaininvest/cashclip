@@ -476,6 +476,170 @@ describe("verifyProviderCompletion — Lucid path", () => {
   });
 });
 
+describe("verifyProviderCompletion — Cint URL and header shape", () => {
+  it("sends the request to the Cint API domain containing the survey ID", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    let capturedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string) => {
+        capturedUrl = url;
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "cint-url-txn",
+              respondent_id: "cint-url-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "cint_survey-cint-url",
+      provider: "cint",
+      userId: "cint-url-user",
+      transactionId: "cint-url-txn",
+    });
+
+    expect(capturedUrl).toContain("api.cint.com");
+    expect(capturedUrl).toContain("survey-cint-url");
+  });
+
+  it("sends the CINT_API_KEY as the X-Api-Key header value", async () => {
+    vi.stubEnv("CINT_API_KEY", "test-cint-key");
+
+    let capturedHeaders: Record<string, string> = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        capturedHeaders = Object.fromEntries(
+          Object.entries((init?.headers as Record<string, string>) ?? {})
+        );
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "cint-hdr-txn",
+              respondent_id: "cint-hdr-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "cint_survey-cint-hdr",
+      provider: "cint",
+      userId: "cint-hdr-user",
+      transactionId: "cint-hdr-txn",
+    });
+
+    expect(capturedHeaders["X-Api-Key"]).toBe("test-cint-key");
+  });
+});
+
+describe("verifyProviderCompletion — Lucid URL and header shape", () => {
+  it("sends the request to the Lucid (samplicio.us) API domain containing the survey ID", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    let capturedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string) => {
+        capturedUrl = url;
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "lucid-url-txn",
+              respondent_id: "lucid-url-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "lucid_survey-lucid-url",
+      provider: "lucid",
+      userId: "lucid-url-user",
+      transactionId: "lucid-url-txn",
+    });
+
+    expect(capturedUrl).toContain("api.samplicio.us");
+    expect(capturedUrl).toContain("survey-lucid-url");
+  });
+
+  it("sends the LUCID_API_KEY as the Authorization header value", async () => {
+    vi.stubEnv("LUCID_API_KEY", "test-lucid-key");
+
+    let capturedHeaders: Record<string, string> = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        capturedHeaders = Object.fromEntries(
+          Object.entries((init?.headers as Record<string, string>) ?? {})
+        );
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "lucid-hdr-txn",
+              respondent_id: "lucid-hdr-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "lucid_survey-lucid-hdr",
+      provider: "lucid",
+      userId: "lucid-hdr-user",
+      transactionId: "lucid-hdr-txn",
+    });
+
+    expect(capturedHeaders["Authorization"]).toBe("test-lucid-key");
+  });
+});
+
+describe("verifyProviderCompletion — Pollfish Authorization header shape", () => {
+  it("sends the POLLFISH_API_KEY as a Bearer token in the Authorization header", async () => {
+    vi.stubEnv("POLLFISH_API_KEY", "test-pollfish-key");
+
+    let capturedHeaders: Record<string, string> = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        capturedHeaders = Object.fromEntries(
+          Object.entries((init?.headers as Record<string, string>) ?? {})
+        );
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              status: "completed",
+              transaction_id: "poll-hdr-txn",
+              user_id: "poll-hdr-user",
+            }),
+        };
+      })
+    );
+
+    await verifyProviderCompletion({
+      surveyId: "pollfish_survey-poll-hdr",
+      provider: "pollfish",
+      userId: "poll-hdr-user",
+      transactionId: "poll-hdr-txn",
+    });
+
+    expect(capturedHeaders["Authorization"]).toBe("Bearer test-pollfish-key");
+  });
+});
+
 describe("verifyProviderCompletion — BitLabs X-Api-Token header", () => {
   it("sends the BITLABS_API_KEY as the X-Api-Token header value", async () => {
     vi.stubEnv("BITLABS_API_KEY", "secret-bitlabs-key-abc");
