@@ -365,7 +365,7 @@ export interface ProviderCompletionPayload {
   [key: string]: unknown;
 }
 
-export function parseProviderReward(payload: ProviderCompletionPayload | null): number {
+function extractRewardFromPayload(payload: ProviderCompletionPayload | null): number {
   if (!payload) return 0;
   const raw = payload.reward ?? payload.payout ?? payload.amount ?? payload.value ?? payload.reward_value;
   if (raw === undefined || raw === null) return 0;
@@ -406,7 +406,7 @@ async function verifyPollfishCompletion(surveyId: string, apiKey: string, transa
     });
     if (!res.ok) return { verified: false, reward: 0 };
     const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: parseProviderReward(payload) };
+    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
   } catch {
     return { verified: false, reward: 0 };
   }
@@ -420,7 +420,7 @@ async function verifyCintCompletion(surveyId: string, apiKey: string, transactio
     });
     if (!res.ok) return { verified: false, reward: 0 };
     const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: parseProviderReward(payload) };
+    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
   } catch {
     return { verified: false, reward: 0 };
   }
@@ -434,7 +434,7 @@ async function verifyLucidCompletion(surveyId: string, apiKey: string, transacti
     });
     if (!res.ok) return { verified: false, reward: 0 };
     const payload = await safeJson(res);
-    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: parseProviderReward(payload) };
+    return { verified: isCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
   } catch {
     return { verified: false, reward: 0 };
   }
@@ -460,7 +460,7 @@ async function verifyCpxCompletion(surveyId: string, apiKey: string, transaction
     });
     if (!res.ok) return { verified: false, reward: 0 };
     const payload = await safeJson(res);
-    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: parseProviderReward(payload) };
+    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
   } catch {
     return { verified: false, reward: 0 };
   }
@@ -474,7 +474,7 @@ async function verifyBitlabsCompletion(surveyId: string, apiKey: string, transac
     });
     if (!res.ok) return { verified: false, reward: 0 };
     const payload = await safeJson(res);
-    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: parseProviderReward(payload) };
+    return { verified: isStrictCompletionPayloadValid(payload, transactionId, userId), reward: extractRewardFromPayload(payload) };
   } catch {
     return { verified: false, reward: 0 };
   }
@@ -533,4 +533,52 @@ export function getProviderStatus(): { provider: string; name: string; configure
     name: c.name,
     configured: c.isConfigured,
   }));
+}
+
+/**
+ * Reward clamp ranges for every provider (survey and offerwall).
+ * Exported so both surveys.ts and offerwalls.ts use the same bounds —
+ * a single source of truth makes accidental divergence impossible.
+ */
+export const PROVIDER_REWARD_RANGES: Record<string, { min: number; max: number }> = {
+  // Survey providers
+  pollfish:    { min: 0.30, max: 1.50 },
+  cint:        { min: 1.00, max: 5.00 },
+  lucid:       { min: 0.80, max: 4.00 },
+  cpx:         { min: 0.20, max: 3.00 },
+  bitlabs:     { min: 0.20, max: 2.50 },
+  internal:    { min: 0.15, max: 0.75 },
+  // Offerwall providers
+  tapjoy:      { min: 0.10, max: 25.00 },
+  adgate:      { min: 0.10, max: 20.00 },
+  offertoro:   { min: 0.10, max: 20.00 },
+  lootably:    { min: 0.10, max: 20.00 },
+  adjoe:       { min: 0.10, max: 25.00 },
+  adgem:       { min: 0.10, max: 20.00 },
+  ayet:        { min: 0.10, max: 20.00 },
+  notik:       { min: 0.05, max: 10.00 },
+  revlum:      { min: 0.05, max: 15.00 },
+  monlix:      { min: 0.05, max: 15.00 },
+  paymentwall: { min: 0.10, max: 20.00 },
+};
+
+/**
+ * Parse a numeric USD reward amount from a raw webhook field.
+ *
+ * Returns `undefined` when the value is absent, non-numeric, non-finite,
+ * or not positive — callers fall back to the server-committed
+ * `session.expectedReward` in that case.
+ *
+ * Intentionally does NOT clamp; callers apply `PROVIDER_REWARD_RANGES`
+ * after extraction so the clamping logic stays in one place.
+ */
+export function parseProviderReward(raw: unknown): number | undefined {
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+  }
+  if (typeof raw === "string") {
+    const n = parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }
+  return undefined;
 }

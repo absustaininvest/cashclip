@@ -12,23 +12,9 @@ import { webhookRateLimiter } from "./lib/webhookRateLimit";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
-import { parseProviderReward, type ProviderCompletionPayload } from "./lib/surveyProviders";
+import { PROVIDER_REWARD_RANGES, parseProviderReward, type ProviderCompletionPayload } from "./lib/surveyProviders";
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
-
-const PROVIDER_REWARD_BOUNDS: Record<string, { min: number; max: number }> = {
-  tapjoy:      { min: 0.10, max: 25.00 },
-  adgate:      { min: 0.10, max: 20.00 },
-  offertoro:   { min: 0.10, max: 20.00 },
-  lootably:    { min: 0.10, max: 20.00 },
-  adjoe:       { min: 0.10, max: 25.00 },
-  adgem:       { min: 0.10, max: 20.00 },
-  ayet:        { min: 0.10, max: 20.00 },
-  notik:       { min: 0.05, max: 10.00 },
-  revlum:      { min: 0.05, max: 15.00 },
-  monlix:      { min: 0.05, max: 15.00 },
-  paymentwall: { min: 0.10, max: 20.00 },
-};
 
 export function registerOfferwallRoutes(app: Express): void {
   app.get("/api/offerwalls/providers", adminMiddleware, (_req: Request, res: Response) => {
@@ -56,8 +42,8 @@ export function registerOfferwallRoutes(app: Express): void {
       const allOffers: Offer[] = results.flatMap((r) => r.offers);
 
       const clamped = allOffers.map((o) => {
-        const bounds = PROVIDER_REWARD_BOUNDS[o.provider] || { min: 0.10, max: 25.00 };
-        const safe = Math.max(bounds.min, Math.min(bounds.max, o.reward));
+        const range = PROVIDER_REWARD_RANGES[o.provider] ?? { min: 0.10, max: 25.00 };
+        const safe = Math.max(range.min, Math.min(range.max, o.reward));
         return { ...o, reward: parseFloat(safe.toFixed(2)) };
       });
 
@@ -181,12 +167,9 @@ export function registerOfferwallRoutes(app: Express): void {
         }); return;
       }
 
-      const providerBounds = PROVIDER_REWARD_BOUNDS[session.provider] ?? { min: 0.10, max: 25.00 };
-      const rawFinal =
-        Number.isFinite(verifyResult.reward) && verifyResult.reward > 0
-          ? verifyResult.reward
-          : parseFloat(session.expectedReward);
-      const finalReward = Math.max(providerBounds.min, Math.min(providerBounds.max, rawFinal));
+      const providerRange = PROVIDER_REWARD_RANGES[session.provider] ?? { min: 0.10, max: 25.00 };
+      const rawFinal = parseProviderReward(verifyResult.reward) ?? parseFloat(session.expectedReward);
+      const finalReward = Math.max(providerRange.min, Math.min(providerRange.max, rawFinal));
 
       const outcome = await storage.completeRewardSessionAndCredit({
         sessionToken,
@@ -229,10 +212,9 @@ export function registerOfferwallRoutes(app: Express): void {
       if (!session) {
         return;
       }
-      const extracted = parseProviderReward(payload);
-      const rawReward = extracted > 0 ? extracted : parseFloat(session.expectedReward);
-      const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
-      const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rawReward));
+      const rawReward = parseProviderReward(payload) ?? parseFloat(session.expectedReward);
+      const range = PROVIDER_REWARD_RANGES[provider] ?? { min: 0.10, max: 25.00 };
+      const clampedReward = Math.max(range.min, Math.min(range.max, rawReward));
       await storage.completeRewardSessionAndCredit({
         sessionToken: session.sessionToken,
         userId,
