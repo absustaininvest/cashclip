@@ -14,7 +14,7 @@ const storageMocks = vi.hoisted(() => ({
   getWebhookAudits: vi.fn(),
   getWebhookAuditOffenders: vi.fn(),
   getWebhookAuditProviders: vi.fn(),
-  insertWebhookAudit: vi.fn(),
+  insertWebhookAudit: vi.fn().mockResolvedValue(undefined),
   countWebhookAuditByIp: vi.fn().mockResolvedValue(0),
   // Stubs for additional storage methods referenced by the route bundle at
   // registration time. Returning undefined is safe — they are not invoked by
