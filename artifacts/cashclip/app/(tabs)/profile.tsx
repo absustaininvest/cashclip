@@ -120,7 +120,28 @@ export default function ProfileScreen() {
       languageBadge: lang === "en" ? "EN" : lang === "es" ? "ES" : "PT",
       action: () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLang(lang === "en" ? "es" : lang === "es" ? "pt" : "en");
+        const options: { label: string; code: "en" | "es" | "pt" }[] = [
+          { label: "English", code: "en" },
+          { label: "Español", code: "es" },
+          { label: "Português", code: "pt" },
+        ];
+        Alert.alert(
+          t.profile.language,
+          undefined,
+          [
+            ...options.map((opt) => ({
+              text: lang === opt.code ? `✓  ${opt.label}` : `    ${opt.label}`,
+              onPress: () => {
+                if (lang !== opt.code) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setLang(opt.code);
+                }
+              },
+            })),
+            { text: t.auth.cancel, style: "cancel" as const },
+          ],
+          { cancelable: true }
+        );
       },
     },
     ...(isAdmin ? [{ icon: "settings", label: t.admin.title, action: () => router.push("/admin") }] : []),
