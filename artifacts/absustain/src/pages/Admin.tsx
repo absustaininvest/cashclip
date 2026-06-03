@@ -2165,9 +2165,10 @@ function CashClipUsersPanel({ token, healthCount, healthError, healthLastChecked
         .then((r) => (r.ok ? r.json() : Promise.reject()))
         .then((d) => setSearchStats(d))
         .catch(() => setSearchStats(null));
+      fetchSearchPerUser(searchPerUserRange);
     }, 60_000);
     return () => clearInterval(id);
-  }, [fetchSearchConfig, token]);
+  }, [fetchSearchConfig, fetchSearchPerUser, searchPerUserRange, token]);
 
   const runPaypalPing = useCallback(async () => {
     setPaypalPing("loading");
