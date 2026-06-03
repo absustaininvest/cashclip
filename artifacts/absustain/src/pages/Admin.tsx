@@ -1680,6 +1680,7 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   const [monitorError, setMonitorError] = useState("");
   const [alertResetting, setAlertResetting] = useState(false);
   const [alertResetMsg, setAlertResetMsg] = useState("");
+  const [recentResets, setRecentResets] = useState<{ id: string; actorUsername: string | null; ip: string | null; createdAt: string }[]>([]);
 
   async function load() {
     setLoading(true);
@@ -1694,6 +1695,18 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
       setError(e.message ?? "Failed to load");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadRecentResets() {
+    try {
+      const res = await fetch("/api/admin/security-audit?event=sponsored_visit_alert_reset&limit=5", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      setRecentResets(json.entries ?? []);
+    } catch {
     }
   }
 
@@ -1741,7 +1754,7 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
       });
       if (!res.ok) throw new Error(`${res.status}`);
       setAlertResetMsg("Debounce cleared — next check can send a fresh alert.");
-      await load();
+      await Promise.all([load(), loadRecentResets()]);
     } catch (e: any) {
       setAlertResetMsg(`Failed: ${e.message ?? "unknown error"}`);
     } finally {
@@ -1752,6 +1765,7 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   useEffect(() => {
     load();
     loadMonitorStatus();
+    loadRecentResets();
     const interval = setInterval(load, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -1870,6 +1884,22 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
         }`}>
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {alertResetMsg}
+        </div>
+      )}
+
+      {recentResets.length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/[0.04]">
+            <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Debounce reset history</p>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {recentResets.map((r) => (
+              <div key={r.id} className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-white/60 text-xs">{r.actorUsername ?? "admin"}</span>
+                <span className="text-white/30 text-xs">{fmt(r.createdAt)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

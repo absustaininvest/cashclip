@@ -1682,6 +1682,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clearSponsoredVisitAlertDebounce } = await import("../lib/sponsoredVisitMonitor");
       await clearSponsoredVisitAlertDebounce();
       req.log.info({ adminId: req.userId }, "Sponsored-visit alert debounce cleared by admin");
+      if (req.userId) {
+        const { getClientIp } = await import("../lib/clientIp");
+        storage.recordSecurityAudit({
+          actorUserId: req.userId,
+          event: "sponsored_visit_alert_reset",
+          ip: getClientIp(req),
+        }).catch((auditErr) => {
+          req.log.error({ err: auditErr }, "Failed to write audit log for sponsored-visit alert reset");
+        });
+      }
       res.json({ cleared: true });
     } catch (err) {
       req.log.error({ err }, "Failed to clear sponsored-visit alert debounce");

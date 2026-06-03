@@ -44,7 +44,8 @@ export type SecurityAuditEvent =
   | "password_changed"
   | "password_reset"
   | "admin_password_reset"
-  | "admin_factory_reset";
+  | "admin_factory_reset"
+  | "sponsored_visit_alert_reset";
 
 export const SECURITY_AUDIT_EVENTS: readonly SecurityAuditEvent[] = [
   "totp_enabled",
@@ -52,6 +53,7 @@ export const SECURITY_AUDIT_EVENTS: readonly SecurityAuditEvent[] = [
   "backup_codes_regenerated",
   "password_changed",
   "password_reset",
+  "sponsored_visit_alert_reset",
 ] as const;
 
 // A security audit row enriched with the actor's username/email for display.
