@@ -114,6 +114,8 @@ beforeAll(async () => {
   process.env.ADGATE_WEBHOOK_SECRET ??= "adgate-test-secret";
   process.env.OFFERTORO_WEBHOOK_SECRET ??= "offertoro-test-secret";
   process.env.TAPJOY_WEBHOOK_SECRET ??= "tapjoy-test-secret";
+  process.env.LOOTABLY_WEBHOOK_SECRET ??= "lootably-test-secret";
+  process.env.ADJOE_WEBHOOK_SECRET ??= "adjoe-test-secret";
   process.env.WEBHOOK_RATE_LIMIT_RPM ??= "10000";
 
   const { registerSurveyRoutes } = await import("./surveys");
@@ -513,5 +515,157 @@ describe("Tapjoy offerwall webhook — currency field ignored, uses session.expe
     expect(res.status).toBe(200);
     // creditOfferViaWebhook was called — no status check required
     expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lootably offerwall webhook — reward-present, reward-absent, status-gate
+// ---------------------------------------------------------------------------
+// Lootably sends `payout` in the body and requires status === "completed"
+// before crediting (same gate pattern as AdGate). Range: [0.10, 20.00].
+
+describe("Lootably offerwall webhook — reward propagation", () => {
+  it("uses the payout field from the body when present (reward-present)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lb10",
+      expectedReward: "0.40",
+      userId: "u-5",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lb10", user_id: "u-5", payout: 4.00, status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // payout=4.00 is within lootably range [0.10, 20.00]
+    expect(finalReward).toBeCloseTo(4.00, 5);
+  });
+
+  it("falls back to session.expectedReward when payout is absent (reward-absent)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lb11",
+      expectedReward: "0.90",
+      userId: "u-5",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lb11", user_id: "u-5", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // No payout → falls back to 0.90; within lootably range [0.10, 20.00]
+    expect(finalReward).toBeCloseTo(0.90, 5);
+  });
+
+  it("clamps an above-max payout to the provider ceiling", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "lootably",
+      externalId: "lootably_lb12",
+      expectedReward: "0.50",
+      userId: "u-5",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lb12", user_id: "u-5", payout: 999, status: "completed" });
+
+    expect(res.status).toBe(200);
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // Clamped to lootably max = 20.00
+    expect(finalReward).toBeCloseTo(20.00, 5);
+  });
+
+  it("ignores the webhook and returns 200 when status is not 'completed' (status-gate)", async () => {
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/lootably")
+      .send({ offer_id: "lb13", user_id: "u-5", payout: 4.00, status: "pending" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adjoe offerwall webhook — reward-present, reward-absent, status-gate
+// ---------------------------------------------------------------------------
+// Adjoe sends `payout` in the body and requires status === "completed" before
+// crediting (same gate pattern as AdGate). Range: [0.10, 25.00].
+
+describe("Adjoe offerwall webhook — reward propagation", () => {
+  it("uses the payout field from the body when present (reward-present)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_aj20",
+      expectedReward: "0.60",
+      userId: "u-6",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "aj20", user_id: "u-6", payout: 7.50, status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // payout=7.50 is within adjoe range [0.10, 25.00]
+    expect(finalReward).toBeCloseTo(7.50, 5);
+  });
+
+  it("falls back to session.expectedReward when payout is absent (reward-absent)", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_aj21",
+      expectedReward: "1.10",
+      userId: "u-6",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "aj21", user_id: "u-6", status: "completed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).toHaveBeenCalledOnce();
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // No payout → falls back to 1.10; within adjoe range [0.10, 25.00]
+    expect(finalReward).toBeCloseTo(1.10, 5);
+  });
+
+  it("clamps an above-max payout to the provider ceiling", async () => {
+    mockFindPendingRewardSession.mockResolvedValue(makeSession({
+      source: "offerwall",
+      provider: "adjoe",
+      externalId: "adjoe_aj22",
+      expectedReward: "0.50",
+      userId: "u-6",
+    }));
+
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "aj22", user_id: "u-6", payout: 999, status: "completed" });
+
+    expect(res.status).toBe(200);
+    const { finalReward } = mockCompleteRewardSessionAndCredit.mock.calls[0]![0];
+    // Clamped to adjoe max = 25.00
+    expect(finalReward).toBeCloseTo(25.00, 5);
+  });
+
+  it("ignores the webhook and returns 200 when status is not 'completed' (status-gate)", async () => {
+    const res = await request(app)
+      .post("/api/offerwalls/webhook/adjoe")
+      .send({ offer_id: "aj23", user_id: "u-6", payout: 7.50, status: "failed" });
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteRewardSessionAndCredit).not.toHaveBeenCalled();
   });
 });
