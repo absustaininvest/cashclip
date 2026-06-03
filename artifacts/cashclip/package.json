@@ -84,11 +84,12 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "babel-preset-expo": "~54.0.10",
     "expo-device": "~7.0.3",
+    "expo-notifications": "^56.0.15",
     "expo-secure-store": "^15.0.8",
     "expo-tracking-transparency": "^6.0.8",
     "expo-updates": "~29.0.17",
-    "babel-preset-expo": "~54.0.10",
     "ironsource-mediation": "^3.2.0"
   }
 }

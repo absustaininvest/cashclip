@@ -28,6 +28,7 @@ import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
+import { maybeSendThresholdPush } from "../lib/push";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
@@ -3980,6 +3981,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dailyCap = dailyCapRaw === undefined ? 1.0 : parseFloat(dailyCapRaw);
       const dailyCapEnabled = Number.isFinite(dailyCap) && dailyCap > 0;
 
+      let settledBalance: number | undefined;
+
       try {
         await dbClient.transaction(async (tx: Parameters<Parameters<typeof dbClient.transaction>[0]>[0]) => {
           // ── SECURITY: parallel daily-count race fix ───────────────────────
@@ -4077,13 +4080,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalEarned: drizzleSql`${usersTable.totalEarned} + ${rewardStr}`,
             })
             .where(drizzleEqLocal(usersTable.id, req.userId!))
-            .returning({ id: usersTable.id });
+            .returning({ id: usersTable.id, balance: usersTable.balance });
 
           if (credited.length === 0) {
             const err = new Error("USER_MISSING") as Error & { settlement?: SettlementError };
             err.settlement = "USER_MISSING";
             throw err;
           }
+
+          settledBalance = parseFloat(credited[0].balance);
 
           await tx.insert(ledgerTable).values({
             userId: req.userId!,
@@ -4145,6 +4150,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Settlement succeeded — IP slot is legitimately consumed. Clear the
       // flag so the outer catch does not double-decrement on an unrelated error.
       ipSlotConsumed = false;
+
+      // Fire-and-forget: notify the user if their balance just crossed $1
+      if (settledBalance !== undefined) {
+        maybeSendThresholdPush(req.userId!, settledBalance - reward, settledBalance);
+      }
 
       req.log.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
       res.json({ ok: true, reward, message: `You earned $${reward.toFixed(2)}!` });

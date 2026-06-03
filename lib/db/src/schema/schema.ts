@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   totpBackupCodes: text("totp_backup_codes").array(),
+  expoPushToken: text("expo_push_token"),
 },
 (t) => ({
   balanceNonNegative: check("users_balance_non_negative", sql`${t.balance} >= 0`),

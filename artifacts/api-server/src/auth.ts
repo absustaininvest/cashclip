@@ -1206,6 +1206,30 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // ── POST /api/user/push-token ─────────────────────────────────────────────
+  // Saves or replaces the Expo push notification token for the authenticated
+  // user. Called by the mobile app on startup after push permissions are
+  // granted. Idempotent — safe to call on every app launch.
+  app.post("/api/user/push-token", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { token } = req.body as { token?: unknown };
+      if (!token || typeof token !== "string") {
+        res.status(400).json({ error: "token is required" }); return;
+      }
+      if (!token.startsWith("ExponentPushToken[") && !token.startsWith("ExpoPushToken[")) {
+        res.status(400).json({ error: "Invalid Expo push token format" }); return;
+      }
+      await db
+        .update(users)
+        .set({ expoPushToken: token })
+        .where(drizzleEq(users.id, req.userId!));
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, "push-token: save failed");
+      res.status(500).json({ error: "Failed to save push token" });
+    }
+  });
+
   // ── POST /api/auth/refresh ────────────────────────────────────────────────
   // Exchanges a valid rid cookie for a new JWT + refreshed sid + rid cookies.
   // No credentials required — the signed rid cookie is the proof of identity.

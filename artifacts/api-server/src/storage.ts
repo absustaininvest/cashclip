@@ -19,6 +19,7 @@ import {
   securityAuditLog,
 } from "@workspace/db";
 import { db } from "@workspace/db";
+import { maybeSendThresholdPush } from "./lib/push";
 import { eq, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -456,7 +457,7 @@ export class DatabaseStorage implements IStorage {
     }
     const amountStr = amount.toFixed(2);
 
-    return await db.transaction(async (tx: DbTx) => {
+    const result = await db.transaction(async (tx: DbTx) => {
       const isEarning = type === "survey" || type === "offerwall" || type === "bonus";
       const updateSet = isEarning
         ? {
@@ -485,6 +486,10 @@ export class DatabaseStorage implements IStorage {
 
       return { balance: n(updated.balance), totalEarned: n(updated.totalEarned) };
     });
+
+    // Fire-and-forget: notify the user if their balance just crossed $1
+    maybeSendThresholdPush(userId, result.balance - amount, result.balance);
+    return result;
   }
 
   async debitUser({
@@ -805,7 +810,7 @@ export class DatabaseStorage implements IStorage {
   } | { conflict: "duplicate" } | { conflict: "not_claimable" }> {
     const { sessionToken, userId, type, description, providerTransactionId, finalReward } = args;
     try {
-      return await db.transaction(async (tx: DbTx) => {
+      const txResult = await db.transaction(async (tx: DbTx) => {
         const now = new Date();
 
         // Row-level lock: serialize concurrent claims on the same session token.
@@ -877,6 +882,12 @@ export class DatabaseStorage implements IStorage {
           reward,
         };
       });
+
+      // Fire-and-forget: notify the user if their balance just crossed $1
+      if (!("conflict" in txResult)) {
+        maybeSendThresholdPush(userId, txResult.balance - txResult.reward, txResult.balance);
+      }
+      return txResult;
     } catch (err: unknown) {
       const code = (err as { code?: string } | null)?.code;
       if (code === "23505") {

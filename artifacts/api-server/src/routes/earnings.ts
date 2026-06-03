@@ -5,6 +5,7 @@ import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
+import { maybeSendThresholdPush } from "../lib/push";
 
 // ── CONVERSION & LIMITS ───────────────────────────────────────────────────────
 const POINTS_PER_DOLLAR       = 1000;
@@ -551,6 +552,11 @@ export function registerEarningsRoutes(app: Express): void {
           return;
         }
 
+        // Fire-and-forget: notify the user if their balance just crossed $1
+        if (result.creditedUsd > 0) {
+          maybeSendThresholdPush(req.userId!, result.newBalance - result.creditedUsd, result.newBalance);
+        }
+
         res.json(result);
       } catch (err) {
         logger.error({ err }, "earnings/claim error");
@@ -742,7 +748,7 @@ export function registerEarningsRoutes(app: Express): void {
 
       for (const { userId } of usersWithTokens) {
         try {
-          await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+          const creditResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
             await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
 
             await tx.update(earnTokens)
@@ -794,12 +800,13 @@ export function registerEarningsRoutes(app: Express): void {
               .set({ status: "claimed", claimedAt: now })
               .where(inArray(earnTokens.id, tokenIds));
 
-            await tx.update(users)
+            const [autoUpdated] = await tx.update(users)
               .set({
                 balance:     sql`${users.balance} + ${creditStr}`,
                 totalEarned: sql`${users.totalEarned} + ${creditStr}`,
               })
-              .where(eq(users.id, userId));
+              .where(eq(users.id, userId))
+              .returning({ balance: users.balance });
 
             await tx.insert(earningsLedger).values({
               userId,
@@ -809,7 +816,13 @@ export function registerEarningsRoutes(app: Express): void {
             });
 
             logger.info({ userId, tokensClaimed: tokenIds.length, totalPts, creditUsd }, "auto-convert: credited user");
+            return { newBalance: parseFloat(autoUpdated.balance), creditUsd };
           });
+
+          // Fire-and-forget: notify the user if their balance just crossed $1
+          if (creditResult) {
+            maybeSendThresholdPush(userId, creditResult.newBalance - creditResult.creditUsd, creditResult.newBalance);
+          }
         } catch (userErr) {
           logger.error({ err: userErr, userId }, "auto-convert: user transaction failed, skipping");
         }
