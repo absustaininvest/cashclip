@@ -269,6 +269,8 @@ export default function WalletScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
+      const intervalId = setInterval(loadData, 75_000);
+      return () => clearInterval(intervalId);
     }, [loadData])
   );
 
