@@ -37,6 +37,15 @@ Requests last 7 days: 860 (+173%). Spike around May 31–Jun 1 = Colombia promot
 - iOS: 2 mappings configured (detail collapsed in screenshot)
 - Bidding sources: AdMob Network (Active) + Unity Ads (Active) both in Priority 1 group
 
+## Unity Ads placement IDs (confirmed Jun 3 2026 from cloud.unity.com)
+| Format | iOS Placement ID | Android Placement ID |
+|---|---|---|
+| Interstitial | `Interstitial_iOS` | `Interstitial_Android` |
+| Rewarded | `Rewarded_iOS` | `Rewarded_Android` |
+| Banner | `Banner_iOS` | `Banner_Android` |
+
+Game IDs stored in secrets: UNITY_ADS_GAME_ID_IOS (6110340), UNITY_ADS_GAME_ID_ANDROID (6110341)
+
 ## iOS ad units (7 total — CashClip: Earn Real Money iOS)
 | Ad unit name | Format | Active mediation groups |
 |---|---|---|
