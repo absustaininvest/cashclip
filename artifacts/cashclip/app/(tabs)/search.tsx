@@ -9,17 +9,10 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
-  Animated as RNAnimated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-} from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getSearchConfig, beginSearch, completeSearch } from "@/lib/earn-client";
@@ -70,16 +63,6 @@ export default function SearchScreen() {
   const [searchBaseUrl, setSearchBaseUrl] = useState<string>(YAHOO_FALLBACK_BASE);
   const [searchConfigured, setSearchConfigured] = useState(false);
 
-  const toastOpacity = useSharedValue(0);
-
-  // Animated progress bar fill (0–100 mapped to '0%'–'100%')
-  const progressAnim = useRef(new RNAnimated.Value(0)).current;
-  const progressWidthInterp = progressAnim.interpolate({
-    inputRange: [0, 100],
-    outputRange: ["0%", "100%"],
-    extrapolate: "clamp",
-  });
-
   // Active challenge token; set in handleSearch, consumed in handleWebViewLoad,
   // and explicitly cleared in handleWebViewError so a failed load never earns.
   const activeChallengeRef = useRef<string | null>(null);
@@ -90,16 +73,6 @@ export default function SearchScreen() {
     loadRecent();
     loadSearchConfig();
   }, []);
-
-  // Animate the progress bar whenever the server-authoritative count changes
-  useEffect(() => {
-    const target = dailyCap > 0 ? Math.min((dailyCount / dailyCap) * 100, 100) : 0;
-    RNAnimated.timing(progressAnim, {
-      toValue: target,
-      duration: 400,
-      useNativeDriver: false,
-    }).start();
-  }, [dailyCount, dailyCap]);
 
   const loadSearchConfig = async () => {
     const cfg = await getSearchConfig();
@@ -133,15 +106,8 @@ export default function SearchScreen() {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    toastOpacity.value = withSequence(
-      withTiming(1, { duration: 250 }),
-      withTiming(1, { duration: 2200 }),
-      withTiming(0, { duration: 400 }),
-    );
     setTimeout(() => setToastMsg(null), 3000);
   };
-
-  const toastStyle = useAnimatedStyle(() => ({ opacity: toastOpacity.value }));
 
   // Build the WebView URL using the server-provided base (includes monetized
   // attribution params when SEARCH_PUBLISHER_CODE is configured).
@@ -262,8 +228,8 @@ export default function SearchScreen() {
       {dailyCap > 0 && (
         <View style={styles.searchProgressRow}>
           <View style={styles.searchProgressBar}>
-            <RNAnimated.View
-              style={[styles.searchProgressFill, { width: progressWidthInterp }]}
+            <View
+              style={[styles.searchProgressFill, { width: `${dailyCap > 0 ? Math.min((dailyCount / dailyCap) * 100, 100) : 0}%` }]}
             />
           </View>
           <Text style={styles.searchProgressText}>
@@ -360,10 +326,10 @@ export default function SearchScreen() {
       )}
 
       {toastMsg && (
-        <Animated.View style={[styles.toast, toastStyle]}>
+        <View style={styles.toast}>
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
           <Text style={styles.toastText}>{toastMsg}</Text>
-        </Animated.View>
+        </View>
       )}
     </View>
   );

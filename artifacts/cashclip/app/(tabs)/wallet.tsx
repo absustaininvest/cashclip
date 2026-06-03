@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
-import { useFocusEffect } from "expo-router";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -266,13 +265,9 @@ export default function WalletScreen() {
     }, 2500);
   }, [serverBalance, t, nudgeOpacity]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-      const intervalId = setInterval(loadData, 75_000);
-      return () => clearInterval(intervalId);
-    }, [loadData])
-  );
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
