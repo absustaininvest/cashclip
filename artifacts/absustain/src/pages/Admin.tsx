@@ -1578,6 +1578,8 @@ function InboxPanel({ token }: { token: string }) {
                       hour: "numeric",
                       minute: "2-digit",
                     })}
+                    {" · "}
+                    {timeAgoShort(selected.date)} ago
                   </span>
                 </div>
                 <button
