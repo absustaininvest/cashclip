@@ -333,7 +333,7 @@ const partnerY = 328;
 let px = MARGIN_L;
 let py = partnerY;
 partners.forEach((p) => {
-  const pw = doc.widthOfString(p.name, { fontSize: 9 }) + 24;
+  const pw = doc.widthOfString(p.name, { fontSize: 9 } as any) + 24;
   if (px + pw > MARGIN_L + CONTENT_W) { px = MARGIN_L; py += 28; }
   doc.save().roundedRect(px, py, pw, 22, 5).fill(C.gray1).restore();
   doc.save().fillColor(C.white).fontSize(9).font("Helvetica-Bold").text(p.name, px + 8, py + 6, { lineBreak: false }).restore();

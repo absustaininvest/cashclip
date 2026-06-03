@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/nodemailer": "^8.0.0",
     "tsx": "catalog:"
   },
   "dependencies": {

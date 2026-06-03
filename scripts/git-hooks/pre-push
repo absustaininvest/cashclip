@@ -70,4 +70,13 @@ if [ "$VITEST_CFG_EXIT" -ne 0 ]; then
   exit "$VITEST_CFG_EXIT"
 fi
 
+# --- TypeScript typecheck ---
+printf '\n[pre-push] Running TypeScript typecheck...\n'
+pnpm run typecheck
+TYPECHECK_EXIT=$?
+if [ "$TYPECHECK_EXIT" -ne 0 ]; then
+  printf '\n[pre-push] TypeScript typecheck failed. Fix the errors above or use --no-verify to skip.\n'
+  exit "$TYPECHECK_EXIT"
+fi
+
 exit 0
