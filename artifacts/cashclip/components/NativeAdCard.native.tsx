@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { getAdUnitId } from "@/lib/admob";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 export const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -72,54 +71,14 @@ interface NativeAdCardProps {
 
 export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
   const [adData, setAdData] = useState<AdData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const nativeAdRef = useRef<any>(null);
   const reward = parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const { NativeAd } = require("react-native-google-mobile-ads");
-        const unitId = getAdUnitId("native");
-        if (!unitId) throw new Error("No unit ID");
-
-        const ad = await NativeAd.createForAdRequest(unitId, {
-          requestNonPersonalizedAdsOnly: true,
-        });
-
-        if (cancelled) { ad.destroy(); return; }
-
-        nativeAdRef.current = ad;
-        setAdData({
-          headline: ad.headline,
-          body: ad.body,
-          callToAction: ad.callToAction,
-          advertiser: ad.advertiser,
-          color: colorForHeadline(ad.headline),
-        });
-      } catch {
-        if (!cancelled) {
-          const fb = FALLBACK_CARDS[index % FALLBACK_CARDS.length];
-          setAdData({ ...fb, callToAction: "Learn More" });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      nativeAdRef.current?.destroy();
-      nativeAdRef.current = null;
-    };
+    const fb = FALLBACK_CARDS[index % FALLBACK_CARDS.length];
+    setAdData({ ...fb, callToAction: "Learn More" });
   }, []);
 
-  if (loading) return <SkeletonCard />;
-  if (!adData) return null;
+  if (!adData) return <SkeletonCard />;
 
   const CardContent = (
     <View style={styles.card}>
@@ -147,17 +106,6 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
       </View>
     </View>
   );
-
-  if (nativeAdRef.current) {
-    const { NativeAdView } = require("react-native-google-mobile-ads");
-    return (
-      <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
-        <NativeAdView nativeAd={nativeAdRef.current} style={{ flex: 1 }}>
-          {CardContent}
-        </NativeAdView>
-      </Pressable>
-    );
-  }
 
   return (
     <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
