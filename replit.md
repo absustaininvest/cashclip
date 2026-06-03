@@ -34,6 +34,7 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `ADJOE_APP_ID` | Adjoe offerwall app ID |
 | `ADJOE_WEBHOOK_SECRET` | Adjoe webhook validation — secret from Adjoe dashboard, used to verify inbound completion callbacks at `/api/offerwalls/webhook/adjoe` |
 | `APP_VISIT_PROOF_KEY` | Sponsored-visit app attestation key. Must be a 32-byte random hex string. Set as an EAS secret (not `EXPO_PUBLIC_APP_VISIT_PROOF_KEY` — it must NOT be EXPO_PUBLIC so it is not intentionally client-exposed). app.config.js reads this and embeds it in `extra.appVisitProofKey`; the app reads it via `Constants.expoConfig.extra.appVisitProofKey`. The server reads it from this env var to validate HMAC-SHA256 attestations at `/api/earn/sponsored/:id/visit`. Must match on both sides. |
+| `SEARCH_PUBLISHER_CODE` | Yahoo OneSearch (Search & Earn) publisher/affiliate code — the `fr=` tag assigned when enrolling in Yahoo's mobile search monetization program. Without this set, searches fall back to plain Yahoo (no revenue share). Set via: Replit Deployment → Production app secrets → `SEARCH_PUBLISHER_CODE`. No new app build required — the API reads it server-side and returns the monetized URL to the app. |
 
 ## Apps / Artifacts
 

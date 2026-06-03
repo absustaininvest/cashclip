@@ -30,8 +30,14 @@ const MAX_RECENT_SEARCHES = 10;
 // The server also independently enforces a ≥5 s gap between begin→complete.
 const REWARD_VIEW_MIN_MS = 5500;
 
-// Plain Yahoo fallback — no rev-share attribution — used when
-// SEARCH_PUBLISHER_CODE has not been set on the server yet.
+// Search monetization architecture:
+//   • The monetized partner is Yahoo OneSearch (rev-share via fr= publisher tag).
+//   • The server (GET /api/earn/search/config) returns the base URL including all
+//     required attribution params (fr=<publisherCode>, fr2=, type=cashclip-search).
+//   • The publisher code is read from SEARCH_PUBLISHER_CODE in the deployment
+//     environment — it is never embedded in the client bundle.
+//   • This fallback is used only when SEARCH_PUBLISHER_CODE is not yet configured
+//     (no revenue attribution until the owner enrolls and sets the secret).
 const YAHOO_FALLBACK_BASE = "https://search.yahoo.com/search";
 
 let WebViewComponent: React.ComponentType<any> | null = null;

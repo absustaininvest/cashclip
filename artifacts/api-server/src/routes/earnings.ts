@@ -154,25 +154,21 @@ async function verifySSVSignature(
   }
 }
 
-// ── SEARCH PARTNER CONFIG ─────────────────────────────────────────────────────
-// Build the monetized Yahoo OneSearch URL using the server-side secret.
-// SEARCH_PUBLISHER_CODE must be set in the deployment environment after the
-// owner enrolls in Yahoo's mobile search monetization (publisher) program and
-// receives an assigned publisher code / "from" tag.
-// Set via: Replit Deployment → Production app secrets → SEARCH_PUBLISHER_CODE
-function buildMonetizedSearchUrl(query: string): string {
-  const publisherCode = process.env.SEARCH_PUBLISHER_CODE;
-  const encoded = encodeURIComponent(query);
-  if (!publisherCode) {
-    // Unconfigured: fall back to plain Yahoo search (no rev-share attribution).
-    // Revenue tracking will not work until SEARCH_PUBLISHER_CODE is set.
-    return `https://search.yahoo.com/search?p=${encoded}`;
-  }
-  return `https://search.yahoo.com/search?p=${encoded}&fr=${publisherCode}&fr2=p%3As%2Cv%3Aweb&type=cashclip-search`;
-}
 
 // ── ROUTE REGISTRATION ────────────────────────────────────────────────────────
 export function registerEarningsRoutes(app: Express): void {
+
+  // ── Search & Earn monetization startup check ──────────────────────────────
+  // Revenue attribution requires SEARCH_PUBLISHER_CODE to be set in the
+  // deployment environment (Replit → Publishing → Production app secrets).
+  // Without it, searches fall back to plain Yahoo with no rev-share.
+  // Enroll at https://developer.yahoo.com/boss/search/ or the OneSearch
+  // publisher portal to receive a publisher code.
+  if (!process.env.SEARCH_PUBLISHER_CODE) {
+    logger.warn("SEARCH_PUBLISHER_CODE is not set — Search & Earn revenue attribution inactive (falling back to plain Yahoo search)");
+  } else {
+    logger.info({ code: process.env.SEARCH_PUBLISHER_CODE.slice(0, 4) + "…" }, "Search & Earn: Yahoo OneSearch monetization active");
+  }
 
   // 60 record requests per minute per user (UX burst tolerance)
   const earnLimit = rateLimit({
