@@ -13,7 +13,22 @@
  *   7. Does not write to system_kv when the alert is suppressed.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// ── Logger mock ───────────────────────────────────────────────────────────────
+// vi.mock factories are hoisted, so mockLogger must also be hoisted via
+// vi.hoisted() to be accessible inside the factory.
+
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("./logger", () => ({
+  logger: mockLogger,
+}));
 
 // ── Email mock ────────────────────────────────────────────────────────────────
 
@@ -45,7 +60,7 @@ vi.mock("@workspace/db", () => ({
 
 // ── Imports (after mocks are registered) ─────────────────────────────────────
 
-import { _runCheckForTests as runCheck } from "./sponsoredVisitMonitor";
+import { _runCheckForTests as runCheck, startSponsoredVisitAlertMonitor } from "./sponsoredVisitMonitor";
 import { sendSponsoredVisitSettlementAlert } from "./email";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -273,5 +288,75 @@ describe("sponsoredVisitMonitor — runCheck", () => {
       // Alert was still dispatched before the failed write
       expect(sendSponsoredVisitSettlementAlert).toHaveBeenCalledOnce();
     });
+  });
+});
+
+// ── startSponsoredVisitAlertMonitor — startup wiring ─────────────────────────
+
+describe("startSponsoredVisitAlertMonitor — startup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("emits an info log on successful startup", async () => {
+    // ensureSystemKvTable → CREATE TABLE
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    await startSponsoredVisitAlertMonitor();
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ checkIntervalMinutes: 30 }),
+      expect.stringContaining("monitor started"),
+    );
+  });
+
+  it("registers an interval that invokes runCheck after 30 minutes", async () => {
+    // ensureSystemKvTable → CREATE TABLE
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // runCheck called by the interval: settlement count + campaign count
+    mockExecute
+      .mockResolvedValueOnce(settlementRow(0))
+      .mockResolvedValueOnce(campaignRow(0));
+
+    await startSponsoredVisitAlertMonitor();
+
+    const callsAfterStart = mockExecute.mock.calls.length; // 1 (CREATE TABLE only)
+
+    // Advance exactly one interval period
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+
+    // runCheck must have issued at least the two COUNT queries
+    expect(mockExecute.mock.calls.length).toBeGreaterThan(callsAfterStart);
+  });
+
+  it("does not start (no interval) when ensureSystemKvTable rejects", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("Table creation failed"));
+
+    await startSponsoredVisitAlertMonitor();
+
+    const callsAfterStart = mockExecute.mock.calls.length; // 1 (failed CREATE TABLE)
+
+    // Advance well past the interval — runCheck must never be called
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+
+    expect(mockExecute.mock.calls.length).toBe(callsAfterStart);
+  });
+
+  it("logs an error and returns without starting when ensureSystemKvTable rejects", async () => {
+    const cause = new Error("DB unavailable");
+    mockExecute.mockRejectedValueOnce(cause);
+
+    await startSponsoredVisitAlertMonitor();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: cause }),
+      expect.stringContaining("sponsored-visit monitor will not start"),
+    );
+    expect(mockLogger.info).not.toHaveBeenCalled();
   });
 });
