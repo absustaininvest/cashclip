@@ -461,6 +461,18 @@ async function verifyBitlabsCompletion(surveyId: string, apiKey: string, transac
   }
 }
 
+/**
+ * Verify that a survey completion event is genuine with the upstream provider.
+ *
+ * **Reward amount**: `response.reward` is always `0`. The provider verification
+ * APIs used here only confirm *that* a completion happened; they do not return a
+ * canonical payout figure. The authoritative reward amount lives in the DB session
+ * record (`expectedReward`) that was stored when the user started the survey.
+ * Callers MUST source the final reward from that record, not from this response.
+ * The `reward` field exists on `CompletionVerifyResponse` solely to keep the
+ * door open for future providers that do return a verified amount; any caller
+ * that uses it should still clamp and validate against `PROVIDER_REWARD_RANGES`.
+ */
 export async function verifyProviderCompletion(req: CompletionVerifyRequest): Promise<CompletionVerifyResponse> {
   const transactionId = (req.transactionId || "").trim();
   if (transactionId.length === 0) {

@@ -55,6 +55,44 @@ describe("verifyProviderCompletion — guard clauses", () => {
   });
 });
 
+describe("verifyProviderCompletion — reward contract", () => {
+  it("always returns reward=0 even when the upstream provider responds successfully (caller must use DB session expectedReward)", async () => {
+    vi.stubEnv("CPX_API_KEY", "key-reward-contract");
+    vi.stubEnv("CPX_APP_ID", "app-reward-contract");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            status: "completed",
+            transaction_id: "txn-reward-contract",
+            user_id: "u-reward-contract",
+            reward: 9.99,
+            payout: 9.99,
+            amount: 9.99,
+          }),
+      })
+    );
+
+    const result = await verifyProviderCompletion({
+      surveyId: "cpx_reward-contract",
+      provider: "cpx",
+      userId: "u-reward-contract",
+      transactionId: "txn-reward-contract",
+    });
+
+    expect(result.verified).toBe(true);
+    // The provider-reported reward fields are NOT parsed — reward is always 0.
+    // The authoritative amount lives in the DB session record (expectedReward).
+    // If this assertion fails it means someone changed verifyProviderCompletion
+    // to return a provider amount; the caller in surveys.ts already handles
+    // reward>0 via clamping, but the change must be intentional and reviewed.
+    expect(result.reward).toBe(0);
+  });
+});
+
 describe("verifyProviderCompletion — token-based path (Bearer / X-Api-Key)", () => {
   it("returns verified=true for pollfish when upstream responds with completed status", async () => {
     vi.stubEnv("POLLFISH_API_KEY", "test-pollfish-key");
