@@ -11,6 +11,7 @@ import { logger } from "./lib/logger";
 import { registerRoutes } from "./routes/cashclip";
 import { appVersionMiddleware } from "./lib/versionCheck";
 import { getClientIp } from "./lib/clientIp";
+import { startSponsoredVisitAlertMonitor } from "./lib/sponsoredVisitMonitor";
 
 const ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
@@ -270,5 +271,9 @@ app.get("/app-ads.txt", (_req, res) => {
 
 app.use("/api", router);
 registerRoutes(app);
+
+startSponsoredVisitAlertMonitor().catch((err) => {
+  logger.error({ err }, "Failed to start sponsored-visit alert monitor");
+});
 
 export default app;

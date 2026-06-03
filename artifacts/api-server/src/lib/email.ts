@@ -510,3 +510,42 @@ export async function sendWithdrawalStatusUpdate(options: {
       </div>`,
   });
 }
+
+export function sendSponsoredVisitSettlementAlert(options: {
+  activeCampaigns: number;
+  windowHours: number;
+  checkedAt: Date;
+}): void {
+  const { activeCampaigns, windowHours, checkedAt } = options;
+  const safeActive = escapeHtml(String(activeCampaigns));
+  const safeWindow = escapeHtml(String(windowHours));
+  const safeCheckedAt = escapeHtml(checkedAt.toUTCString());
+  const campaignWord = activeCampaigns === 1 ? "campaign" : "campaigns";
+  sendBestEffort({
+    to: ADMIN_EMAIL,
+    subject: `[CashClip Alert] No sponsored-visit settlements in the last ${windowHours}h`,
+    text: `CashClip Sponsored-Visit Alert\n\nNo sponsored-visit settlements have been recorded in the last ${windowHours} hours.\n\nActive campaigns: ${activeCampaigns}\nChecked at: ${checkedAt.toUTCString()}\n\nThis may indicate a regression in the /begin or /visit settlement flow. Please check the admin health panel:\nhttps://absustaininvest.com/sc-portal\n\n— CashClip Monitoring`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#FF6F00,#FFA000);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#0A0A0F;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#0A0A0F;opacity:0.75;text-transform:uppercase;letter-spacing:1px">Settlement Alert</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#fff">No sponsored-visit settlements in ${safeWindow}h</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#b0b0b0;line-height:1.6">Zero sponsored-visit settlements have been recorded in the last <strong style="color:#fff">${safeWindow} hours</strong>, but there ${activeCampaigns === 1 ? "is" : "are"} <strong style="color:#FFA000">${safeActive} active ${campaignWord}</strong> running.</p>
+          <div style="background:#1a1400;border:1px solid #FFA000;border-radius:12px;padding:16px;margin:24px 0">
+            <p style="margin:0;font-size:14px;color:#ffd180;line-height:1.6">This may indicate a regression in the <strong>/begin</strong> or <strong>/visit</strong> settlement flow. Check the admin health panel to investigate.</p>
+          </div>
+          <div style="text-align:center;margin:24px 0">
+            <a href="https://absustaininvest.com/sc-portal" style="display:inline-block;background:linear-gradient(135deg,#FF6F00,#FFA000);color:#0A0A0F;font-size:15px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:50px">Open Admin Panel</a>
+          </div>
+          <p style="margin:24px 0 0;font-size:12px;color:#555;text-align:center">Checked at ${safeCheckedAt}. This alert fires at most once every 4 hours.</p>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+  });
+}
