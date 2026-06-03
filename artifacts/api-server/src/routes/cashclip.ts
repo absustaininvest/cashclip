@@ -22,7 +22,7 @@ import { db, updateUserProfileSchema } from "@workspace/db";
 import { AD_CATEGORIES, adCategorySchema } from "@workspace/api-zod";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
-import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
+import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook, verifyWebhookRegistration } from "../paypal";
 import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
@@ -578,6 +578,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? "Saved to encrypted server store and will survive restarts."
         : "Stored in the running server process only. Set JWT_SECRET to enable durable storage, or add the value to project Secrets.",
     });
+
+    if (integration.envKey === "PAYPAL_WEBHOOK_ID") {
+      verifyWebhookRegistration()
+        .then((result) => {
+          if (result.ok) {
+            req.log.info(
+              { webhookId: result.webhookId },
+              "PayPal webhook registration re-checked after key update: OK",
+            );
+          } else {
+            req.log.warn(
+              { webhookId: result.webhookId, warnings: result.warnings, error: result.error },
+              "PayPal webhook registration re-checked after key update: issues found",
+            );
+          }
+        })
+        .catch((err: unknown) => {
+          req.log.error({ err }, "PayPal webhook re-check failed after PAYPAL_WEBHOOK_ID update");
+        });
+    }
   });
 
   app.delete("/api/admin/integrations/:id/key", adminMiddleware, secretsPassphraseMiddleware, async (req: AuthRequest, res) => {
