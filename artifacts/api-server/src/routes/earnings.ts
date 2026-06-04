@@ -216,6 +216,12 @@ async function verifySSVSignature(
   }
 }
 
+// Test seam: registerEarningsRoutes assigns the auto-convert sweep here so the
+// end-to-end earn→convert flow can be triggered deterministically in tests. In
+// production the sweep runs only on the timer registered at the bottom of
+// registerEarningsRoutes; this reference never changes its behaviour.
+export let runAutoConvertForTests: (() => Promise<void>) | null = null;
+
 // ── ROUTE REGISTRATION ────────────────────────────────────────────────────────
 export function registerEarningsRoutes(app: Express): void {
 
@@ -1065,6 +1071,9 @@ export function registerEarningsRoutes(app: Express): void {
       logger.error({ err }, "auto-convert: job error");
     }
   }
+
+  // Expose the sweep for deterministic testing of the earn→convert flow.
+  runAutoConvertForTests = runAutoConvert;
 
   // Initial run 5 minutes after startup, then every 2 hours
   setTimeout(() => {
