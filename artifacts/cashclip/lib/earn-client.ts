@@ -138,6 +138,22 @@ export async function refreshPendingFromServer(): Promise<PendingState | null> {
   }
 }
 
+// ── SERVER BALANCE (single source of truth) ──────────────────────────────────
+// The user's authoritative spendable balance lives only on the server (the
+// `users.balance` column, exposed at GET /api/balance). Every surface that shows
+// the wallet balance must read it from here so Home and Wallet can never diverge.
+// Uses apiRequest so the auth token (and 401 refresh) is handled consistently.
+export async function fetchServerBalance(): Promise<{ balance: number; totalEarned: number } | null> {
+  try {
+    const res = await apiRequest("GET", "/api/balance");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { balance: Number(data.balance) || 0, totalEarned: Number(data.totalEarned) || 0 };
+  } catch {
+    return null;
+  }
+}
+
 // ── LOCAL TOKEN CACHE (optimistic UI) ────────────────────────────────────────
 async function storeTokenLocally(token: EarnToken): Promise<void> {
   const existing = await getLocalTokens();

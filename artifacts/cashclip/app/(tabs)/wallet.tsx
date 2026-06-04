@@ -31,15 +31,15 @@ import {
 import {
   refreshPendingFromServer,
   claimAllReady,
+  fetchServerBalance,
   formatPoints,
   pointsToUsd,
   type PendingState,
 } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
-import { secureGet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
@@ -179,22 +179,6 @@ export default function WalletScreen() {
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
-  const fetchServerBalance = useCallback(async (): Promise<{ balance: number; totalEarned: number } | null> => {
-    try {
-      const authToken = await secureGet("cashclip_auth_token");
-      if (!authToken) return null;
-      const url = new URL("/api/balance", getApiUrl());
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return { balance: Number(data.balance) || 0, totalEarned: Number(data.totalEarned) || 0 };
-    } catch {
-      return null;
-    }
-  }, []);
-
   const loadData = useCallback(async () => {
     const [s, txns, srv, pending] = await Promise.all([
       getUserStats(),
@@ -212,7 +196,7 @@ export default function WalletScreen() {
       setTiers(getWithdrawalTiers(s.balance));
     }
     if (pending) setPendingState(pending);
-  }, [fetchServerBalance]);
+  }, []);
 
   const handleConvertNow = useCallback(async () => {
     if (isConverting || (pendingState?.claimablePoints ?? 0) === 0) return;
@@ -280,7 +264,7 @@ export default function WalletScreen() {
     setSelectedTier(null);
     setPaypalEmail("");
     setShowWithdrawModal(true);
-  }, [fetchServerBalance, t]);
+  }, [t]);
 
   const handleWithdraw = useCallback(async () => {
     if (!selectedTier || !paypalEmail.trim()) return;
@@ -353,7 +337,7 @@ export default function WalletScreen() {
               <View style={styles.balanceRow}>
                 <View>
                   <Text style={styles.balanceLabel}>{t.wallet.totalBalance}</Text>
-                  <Text style={styles.balanceAmount}>${(serverBalance > 0 ? serverBalance : stats.balance).toFixed(2)}</Text>
+                  <Text style={styles.balanceAmount}>${serverBalance.toFixed(2)}</Text>
                 </View>
                 <View style={styles.coinIcon}>
                   <MaterialCommunityIcons name="wallet" size={28} color={Colors.primary} />
@@ -362,7 +346,7 @@ export default function WalletScreen() {
 
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>${(serverTotalEarned > 0 ? serverTotalEarned : stats.totalEarned).toFixed(2)}</Text>
+                  <Text style={styles.statValue}>${serverTotalEarned.toFixed(2)}</Text>
                   <Text style={styles.statLabel}>{t.wallet.totalEarned}</Text>
                 </View>
                 <View style={styles.statDivider} />

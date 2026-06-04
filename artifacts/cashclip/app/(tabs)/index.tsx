@@ -19,8 +19,8 @@ import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from 
 import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
-import { getUserStats, getUnreadNotificationCount, recordAdWatch, type UserStats } from "@/lib/storage";
-import { recordEarnAction } from "@/lib/earn-client";
+import { getUnreadNotificationCount, recordAdWatch } from "@/lib/storage";
+import { recordEarnAction, fetchServerBalance } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
@@ -128,7 +128,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useLanguage();
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [adLoading, setAdLoading] = useState(false);
@@ -140,18 +140,23 @@ export default function HomeScreen() {
 
   const adIndices = Array.from({ length: AD_CARD_COUNT }, (_, i) => ({ id: `ad_${i}`, index: i }));
 
+  const loadBalance = useCallback(async () => {
+    const srv = await fetchServerBalance();
+    if (srv) setBalance(srv.balance);
+  }, []);
+
   useEffect(() => {
-    getUserStats().then(setStats);
+    loadBalance();
     getUnreadNotificationCount().then(setUnreadCount);
     if (isAdMobReady()) preloadRewardedAd();
-  }, []);
+  }, [loadBalance]);
 
   const creditAdReward = useCallback(async () => {
     await recordAdWatch();
     // Server-authoritative credit (same path as the Earn screen).
     recordEarnAction("rewarded_ad", "Watched rewarded ad");
-    getUserStats().then(setStats);
-  }, []);
+    loadBalance();
+  }, [loadBalance]);
 
   const handleAdPress = useCallback(async (index: number) => {
     if (adLoading) return;
@@ -205,8 +210,8 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const [s, unread] = await Promise.all([getUserStats(), getUnreadNotificationCount()]);
-    setStats(s);
+    const [srv, unread] = await Promise.all([fetchServerBalance(), getUnreadNotificationCount()]);
+    if (srv) setBalance(srv.balance);
     setUnreadCount(unread);
     setRefreshing(false);
   }, []);
@@ -258,10 +263,10 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </Pressable>
-                {stats && (
+                {balance !== null && (
                   <View style={styles.balanceChip}>
                     <MaterialCommunityIcons name="cash" size={15} color={Colors.primary} />
-                    <Text style={styles.balanceChipText}>${stats.balance.toFixed(2)}</Text>
+                    <Text style={styles.balanceChipText}>${balance.toFixed(2)}</Text>
                   </View>
                 )}
               </View>
