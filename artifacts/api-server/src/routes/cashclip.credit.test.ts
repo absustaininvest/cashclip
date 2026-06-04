@@ -15,7 +15,7 @@
  * mailer are mocked so the suite runs without a database or SMTP.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
@@ -30,6 +30,13 @@ const mockCreditUser = vi.fn();
 const mockDebitUser = vi.fn();
 const mockGetAdjustmentLedger = vi.fn();
 const mockSendAdminCreditReceipt = vi.fn();
+const mockSendMail = vi.fn().mockResolvedValue({});
+
+// Mock the SMTP transport so the REAL sendAdminCreditReceipt (exercised via
+// vi.importActual below) can be observed without touching the network.
+vi.mock("nodemailer", () => ({
+  default: { createTransport: vi.fn(() => ({ sendMail: mockSendMail })) },
+}));
 
 vi.mock("../storage", () => ({
   storage: {
@@ -270,5 +277,100 @@ describe("admin auth enforcement", () => {
     const res = await request(app).get("/api/admin/adjustments");
     expect(res.status).toBe(401);
     expect(mockGetAdjustmentLedger).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Audit-trail parity. The route suite above mocks sendAdminCreditReceipt, so it
+ * only proves the call happens with the right args. These tests exercise the REAL
+ * sendAdminCreditReceipt against a mocked SMTP transport to lock in that the
+ * website's signed /api/admin/credit tool always produces the support@ audit copy
+ * — for BOTH the credit (positive) and correction (negative) paths, which is the
+ * extra path this tool has over the app's credit-only /api/admin/credit-balance.
+ * Both routes share this single receipt function, so this mirrors the matching
+ * coverage in cashclip.credit-balance.test.ts.
+ */
+describe("admin credit audit-trail copy (real sendAdminCreditReceipt)", () => {
+  const SUPPORT_EMAIL = "support@absustaininvest.com";
+  let prevSmtpPassword: string | undefined;
+
+  beforeAll(() => {
+    prevSmtpPassword = process.env["ZOHO_SMTP_PASSWORD"];
+    // createTransport() returns null (no-op) without a password; set one so the
+    // mocked transport is used.
+    process.env["ZOHO_SMTP_PASSWORD"] = "test-smtp-password";
+  });
+
+  afterAll(() => {
+    if (prevSmtpPassword === undefined) delete process.env["ZOHO_SMTP_PASSWORD"];
+    else process.env["ZOHO_SMTP_PASSWORD"] = prevSmtpPassword;
+  });
+
+  beforeEach(() => {
+    mockSendMail.mockClear();
+  });
+
+  async function loadReal() {
+    return vi.importActual<typeof import("../lib/email")>("../lib/email");
+  }
+
+  it("sends a support@ audit copy alongside the user's receipt for a credit", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "victim@example.com",
+      username: "victim",
+      amount: 10,
+      newBalance: 15,
+      note: "support refund",
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(2));
+
+    const recipients = mockSendMail.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(recipients).toContain("victim@example.com");
+    expect(recipients).toContain(SUPPORT_EMAIL);
+  });
+
+  it("sends a support@ audit copy alongside the user's receipt for a correction (negative amount)", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "victim@example.com",
+      username: "victim",
+      amount: -4,
+      newBalance: 5,
+      note: "reverse error",
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(2));
+
+    const recipients = mockSendMail.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(recipients).toContain("victim@example.com");
+    expect(recipients).toContain(SUPPORT_EMAIL);
+
+    // The audit copy clearly labels the correction so support@ can tell it apart
+    // from a credit in their inbox.
+    const auditCall = mockSendMail.mock.calls.find(
+      (c) => (c[0] as { to: string }).to === SUPPORT_EMAIL,
+    );
+    expect((auditCall?.[0] as { subject: string }).subject).toMatch(/correction/i);
+  });
+
+  it("still sends the support@ audit copy for a correction when the user has no email on file", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "",
+      username: "victim",
+      amount: -4,
+      newBalance: 5,
+      note: "reverse error",
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(1));
+
+    const recipients = mockSendMail.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(recipients).toEqual([SUPPORT_EMAIL]);
   });
 });
