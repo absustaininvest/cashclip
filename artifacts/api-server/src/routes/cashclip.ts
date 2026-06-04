@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       clearVerificationState(integration.envKey);
 
-      req.log.warn(
+      req.log?.warn(
         {
           integrationId: integration.id,
           envKey: integration.envKey,
@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const status = getIntegrationStatuses().find((s) => s.id === integration.id);
-    req.log.info(
+    req.log?.info(
       {
         integrationId: integration.id,
         envKey: integration.envKey,
@@ -565,7 +565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     clearVerificationState(integration.envKey);
 
     const status = getIntegrationStatuses().find((s) => s.id === integration.id);
-    req.log.info(
+    req.log?.info(
       {
         integrationId: integration.id,
         envKey: integration.envKey,
@@ -635,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = rotateEncryptionSecret(oldSecret, newSecret, { dryRun });
 
-      req.log.info(
+      req.log?.info(
         {
           rotated: result.rotated,
           failed: result.failed,
@@ -685,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         note: noteFragments.join(" "),
       }); return;
     } catch (err) {
-      req.log.error({ err, userId: req.userId }, "Integration key store rotation failed");
+      req.log?.error({ err, userId: req.userId }, "Integration key store rotation failed");
       res.status(400).json({
         error: err instanceof Error ? err.message : "Rotation failed",
       }); return;
@@ -950,11 +950,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .qualifyReferral({ referredUserId: req.userId!, bonusUsd: REFERRAL_BONUS_USD })
           .then((r) => {
             if (r.credited) {
-              req.log.info({ referredUserId: req.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited");
+              req.log?.info({ referredUserId: req.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited");
             }
           })
           .catch((err) => {
-            req.log.error({ err, referredUserId: req.userId }, "Referral qualification failed");
+            req.log?.error({ err, referredUserId: req.userId }, "Referral qualification failed");
           });
       }
 
@@ -1682,7 +1682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json({ id: adEvent.id });
     } catch (err) {
-      req.log.error({ err }, "Failed to record ad event");
+      req.log?.error({ err }, "Failed to record ad event");
       res.status(500).json({ error: "Failed to record ad event" });
     }
   });
@@ -1721,7 +1721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json({ recorded: ids.length });
     } catch (err) {
-      req.log.error({ err }, "Failed to record ad events batch");
+      req.log?.error({ err }, "Failed to record ad events batch");
       res.status(500).json({ error: "Failed to record ad events" });
     }
   });
@@ -1731,7 +1731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getUserAdStats(req.userId!);
       res.json(stats);
     } catch (err) {
-      req.log.error({ err }, "Failed to get user ad stats");
+      req.log?.error({ err }, "Failed to get user ad stats");
       res.status(500).json({ error: "Failed to load ad stats" });
     }
   });
@@ -1761,7 +1761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ summary: { ...summary, ...fillRateSummary }, timeline, perUser, fillRateAlert });
     } catch (err) {
-      req.log.error({ err }, "Failed to get ad analytics");
+      req.log?.error({ err }, "Failed to get ad analytics");
       res.status(500).json({ error: "Failed to load ad analytics" });
     }
   });
@@ -1799,7 +1799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trend: trendBuckets,
       });
     } catch (err) {
-      req.log.error({ err }, "Failed to get fill rate analytics");
+      req.log?.error({ err }, "Failed to get fill rate analytics");
       res.status(500).json({ error: "Failed to load fill rate analytics" });
     }
   });
@@ -1813,7 +1813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const perUser = await storage.getAdRevenuePerUser(from, to, limit);
       res.json({ perUser });
     } catch (err) {
-      req.log.error({ err }, "Failed to get per-user ad analytics");
+      req.log?.error({ err }, "Failed to get per-user ad analytics");
       res.status(500).json({ error: "Failed to load per-user ad analytics" });
     }
   });
@@ -1827,7 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const perUser = await storage.getCombinedPayoutPerUser(from, to, limit);
       res.json({ perUser });
     } catch (err) {
-      req.log.error({ err }, "Failed to get combined payout per user");
+      req.log?.error({ err }, "Failed to get combined payout per user");
       res.status(500).json({ error: "Failed to load payout per user" });
     }
   });
@@ -1838,7 +1838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messages = await fetchInbox(folder);
       res.json({ messages, fetchedAt: new Date().toISOString() });
     } catch (err) {
-      req.log.error({ err }, "Failed to fetch inbox");
+      req.log?.error({ err }, "Failed to fetch inbox");
       res.status(500).json({
         error:
           "Failed to connect to mail server. Enable IMAP on the Zoho mailbox and set the ZOHO_IMAP_PASSWORD secret (a separate app-specific password from the SMTP one).",
@@ -1883,7 +1883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const DEDUPE_WINDOW_MS = 30_000;
       const { count } = await recordLoginAttempt(dedupeKey, 1, DEDUPE_WINDOW_MS);
       if (count > 1) {
-        req.log.warn(
+        req.log?.warn(
           {
             action: "inbox_reply_duplicate_suppressed",
             adminUserId: req.userId,
@@ -1923,13 +1923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inReplyTo: inReplyTo || null,
         });
       } catch (persistErr) {
-        req.log.error(
+        req.log?.error(
           { err: persistErr, adminUserId: req.userId, to },
           "Inbox reply sent but failed to persist to history",
         );
       }
 
-      req.log.info(
+      req.log?.info(
         {
           action: "inbox_reply_sent",
           adminUserId: req.userId,
@@ -1942,7 +1942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ ok: true, reply: savedReply });
     } catch (err) {
-      req.log.error({ err, adminUserId: req.userId }, "Failed to send inbox reply");
+      req.log?.error({ err, adminUserId: req.userId }, "Failed to send inbox reply");
       const message = err instanceof Error ? err.message : "Failed to send reply";
       res.status(500).json({ error: message });
     }
@@ -1958,7 +1958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const replies = await storage.getSupportRepliesByThread(inReplyTo);
       res.json({ replies });
     } catch (err) {
-      req.log.error({ err, adminUserId: req.userId }, "Failed to load inbox reply history");
+      req.log?.error({ err, adminUserId: req.userId }, "Failed to load inbox reply history");
       res.status(500).json({ error: "Failed to load reply history" });
     }
   });
@@ -2036,7 +2036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
       });
     } catch (err) {
-      req.log.error({ err }, "Failed to get webhook audit");
+      req.log?.error({ err }, "Failed to get webhook audit");
       res.status(500).json({ error: "Failed to load webhook audit" });
     }
   });
@@ -2105,7 +2105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.end();
     } catch (err) {
-      req.log.error({ err }, "Failed to export webhook audit CSV");
+      req.log?.error({ err }, "Failed to export webhook audit CSV");
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to export webhook audit CSV" });
       } else {
@@ -2163,7 +2163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
       });
     } catch (err) {
-      req.log.error({ err }, "Failed to get security audit log");
+      req.log?.error({ err }, "Failed to get security audit log");
       res.status(500).json({ error: "Failed to load security audit log" });
     }
   });
@@ -2195,10 +2195,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: subject.trim(),
         message: message.trim(),
       });
-      req.log.info({ userId: req.userId, subject: subject.trim() }, "Support ticket submitted");
+      req.log?.info({ userId: req.userId, subject: subject.trim() }, "Support ticket submitted");
       res.status(200).json({ ok: true });
     } catch (err) {
-      req.log.error({ err }, "Support ticket submission failed");
+      req.log?.error({ err }, "Support ticket submission failed");
       res.status(500).json({ error: "Something went wrong. Please try again." });
     }
   });
@@ -2228,10 +2228,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(drizzleSql`id = ${targetId}`);
 
-      req.log.info({ adminId: req.userId, targetId, grant, creditsToAdd }, "Publisher status updated");
+      req.log?.info({ adminId: req.userId, targetId, grant, creditsToAdd }, "Publisher status updated");
       res.json({ ok: true, grant, creditsAdded: creditsToAdd });
     } catch (err) {
-      req.log.error({ err }, "Grant publisher status failed");
+      req.log?.error({ err }, "Grant publisher status failed");
       res.status(500).json({ error: "Failed to update publisher status" });
     }
   });
@@ -2249,10 +2249,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dbClient.update(usersTable)
         .set({ adCredits: drizzleSql`${usersTable.adCredits} + ${String(amount)}` })
         .where(drizzleSql`id = ${targetId}`);
-      req.log.info({ adminId: req.userId, targetId, amount }, "Ad credits added");
+      req.log?.info({ adminId: req.userId, targetId, amount }, "Ad credits added");
       res.json({ ok: true, added: amount });
     } catch (err) {
-      req.log.error({ err }, "Add ad credits failed");
+      req.log?.error({ err }, "Add ad credits failed");
       res.status(500).json({ error: "Failed to add credits" });
     }
   });
@@ -2283,7 +2283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(drizzleDesc(campaignsTable.createdAt));
       res.json({ campaigns: rows });
     } catch (err) {
-      req.log.error({ err }, "Admin list campaigns failed");
+      req.log?.error({ err }, "Admin list campaigns failed");
       res.status(500).json({ error: "Failed to load campaigns" });
     }
   });
@@ -2299,10 +2299,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dbClient.update(campaignsTable)
         .set({ status, adminNote: adminNote ?? null, updatedAt: new Date() })
         .where(drizzleSql`id = ${req.params.id}`);
-      req.log.info({ adminId: req.userId, campaignId: req.params.id, status }, "Campaign status updated");
+      req.log?.info({ adminId: req.userId, campaignId: req.params.id, status }, "Campaign status updated");
       res.json({ ok: true });
     } catch (err) {
-      req.log.error({ err }, "Admin update campaign failed");
+      req.log?.error({ err }, "Admin update campaign failed");
       res.status(500).json({ error: "Failed to update campaign" });
     }
   });
@@ -2319,7 +2319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
       });
     } catch (err) {
-      req.log.error({ err }, "Publisher me failed");
+      req.log?.error({ err }, "Publisher me failed");
       res.status(500).json({ error: "Failed to load publisher info" });
     }
   });
@@ -2350,7 +2350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       res.json({ campaigns: campaignsWithKey });
     } catch (err) {
-      req.log.error({ err }, "Publisher list campaigns failed");
+      req.log?.error({ err }, "Publisher list campaigns failed");
       res.status(500).json({ error: "Failed to load campaigns" });
     }
   });
@@ -2427,10 +2427,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(campaign.id + ":cbk-v1")
         .digest("hex");
 
-      req.log.info({ userId: req.userId, campaignId: campaign.id, totalBudget }, "Campaign created");
+      req.log?.info({ userId: req.userId, campaignId: campaign.id, totalBudget }, "Campaign created");
       res.status(201).json({ campaign: { ...campaign, callbackKey } });
     } catch (err) {
-      req.log.error({ err }, "Create campaign failed");
+      req.log?.error({ err }, "Create campaign failed");
       res.status(500).json({ error: "Failed to create campaign" });
     }
   });
@@ -2494,7 +2494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ ok: true });
     } catch (err) {
-      req.log.error({ err }, "Pause campaign failed");
+      req.log?.error({ err }, "Pause campaign failed");
       res.status(500).json({ error: "Failed to update campaign" });
     }
   });
@@ -2548,10 +2548,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      req.log.info({ userId: req.userId, amount }, "Publisher top-up from earnings");
+      req.log?.info({ userId: req.userId, amount }, "Publisher top-up from earnings");
       res.json({ ok: true, converted: amount });
     } catch (err) {
-      req.log.error({ err }, "Publisher top-up failed");
+      req.log?.error({ err }, "Publisher top-up failed");
       res.status(500).json({ error: "Failed to convert credits" });
     }
   });
@@ -2601,7 +2601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ campaigns: result });
     } catch (err) {
-      req.log.error({ err }, "Earn sponsored failed");
+      req.log?.error({ err }, "Earn sponsored failed");
       res.status(500).json({ error: "Failed to load sponsored offers" });
     }
   });
@@ -2649,7 +2649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const existing = Number((countRows.rows[0] as { n: number }).n);
       if (existing >= maxTokens) {
-        req.log.warn({ userId: req.userId, existing }, "Device registration refused — token limit reached");
+        req.log?.warn({ userId: req.userId, existing }, "Device registration refused — token limit reached");
         res.status(429).json({ error: "Device registration limit reached for this account." });
         return;
       }
@@ -2664,10 +2664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.userId!,
       });
 
-      req.log.info({ userId: req.userId, tokenHashPrefix: tokenHash.slice(0, 8) }, "Device install token issued");
+      req.log?.info({ userId: req.userId, tokenHashPrefix: tokenHash.slice(0, 8) }, "Device install token issued");
       res.status(201).json({ installToken: rawToken });
     } catch (err: any) {
-      req.log.error({ err }, "Device registration failed");
+      req.log?.error({ err }, "Device registration failed");
       res.status(500).json({ error: "Failed to register device." });
     }
   });
@@ -2778,7 +2778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ attemptToken: token, redirectUrl });
     } catch (err: any) {
-      req.log.error({ err }, "Sponsored visit begin failed");
+      req.log?.error({ err }, "Sponsored visit begin failed");
       res.status(500).json({ error: "Failed to begin visit" });
     }
   });
@@ -3678,7 +3678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { decrementLoginAttempt } = await import("../lib/dbRateLimit");
         await decrementLoginAttempt(ipKey);
       } catch (decErr) {
-        req.log.warn({ err: decErr, reason }, "Sponsored /visit IP cap decrement failed");
+        req.log?.warn({ err: decErr, reason }, "Sponsored /visit IP cap decrement failed");
       }
     };
     try {
@@ -3695,7 +3695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // against the install record's hash to prevent token swapping between steps.
       const visitRawInstallToken = String(req.headers["x-install-token"] ?? "").slice(0, 64);
       if (!visitRawInstallToken || !/^[a-f0-9]{64}$/.test(visitRawInstallToken)) {
-        req.log.warn({ userId: req.userId }, "Sponsored visit refused — missing or malformed X-Install-Token");
+        req.log?.warn({ userId: req.userId }, "Sponsored visit refused — missing or malformed X-Install-Token");
         res.status(400).json({ error: "Invalid or missing install token — call /api/device/register first." });
         return;
       }
@@ -3739,7 +3739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (rateErr: any) {
         // Fail-closed: money-bearing endpoint must never fall back to
         // unlimited when the abuse-control DB lookup throws.
-        req.log.error({ err: rateErr }, "Sponsored /visit IP rate-limit lookup failed");
+        req.log?.error({ err: rateErr }, "Sponsored /visit IP rate-limit lookup failed");
         res.status(503).json({ error: "Rate-limit check unavailable — please retry." });
         return;
       }
@@ -3863,13 +3863,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [visitInstall] = await dbInstall.select().from(diTable)
           .where(eqInstall(diTable.tokenHash, visitInstallTokenHash));
         if (!visitInstall) {
-          req.log.warn({ userId: req.userId }, "Sponsored visit refused — unrecognised install token");
+          req.log?.warn({ userId: req.userId }, "Sponsored visit refused — unrecognised install token");
           await releaseIpSlot("unknown-install-token");
           res.status(403).json({ error: "Unrecognised install token — call /api/device/register first." });
           return;
         }
         if (visitInstall.userId !== req.userId) {
-          req.log.warn({ userId: req.userId, tokenOwner: visitInstall.userId }, "Sponsored visit refused — install token cross-user");
+          req.log?.warn({ userId: req.userId, tokenOwner: visitInstall.userId }, "Sponsored visit refused — install token cross-user");
           await releaseIpSlot("install-token-cross-user");
           res.status(403).json({ error: "Install token does not belong to this account." });
           return;
@@ -3878,7 +3878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // same token must be presented now.  null means a pre-migration attempt
         // — skip the check and proceed (other gates cover payout integrity).
         if (attempt.deviceHash !== null && visitInstallTokenHash !== attempt.deviceHash) {
-          req.log.warn(
+          req.log?.warn(
             { userId: req.userId, storedHashPrefix: attempt.deviceHash.slice(0, 8) },
             "Sponsored visit refused — install token mismatch between /begin and /visit",
           );
@@ -3916,7 +3916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
         const acctCount = Number((acctRows.rows[0] as { n: number }).n);
         if (acctCount >= acctVisitMax) {
-          req.log.warn(
+          req.log?.warn(
             { userId: req.userId, acctCount, acctVisitMax },
             "Sponsored visit refused — per-account daily visit count cap reached",
           );
@@ -3925,7 +3925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
       } catch (devErr: any) {
-        req.log.error({ err: devErr }, "Install token / account visit cap check failed");
+        req.log?.error({ err: devErr }, "Install token / account visit cap check failed");
         await releaseIpSlot("install-token-check-error");
         res.status(503).json({ error: "Abuse check unavailable — please retry." });
         return;
@@ -3950,7 +3950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sanity guard: snapshot should never exceed rewardPerVisit by more than
       // a rounding epsilon. If it does, something is wrong with the attempt row.
       if (reward <= 0 || reward > Number(campaign.rewardPerVisit) + 0.005) {
-        req.log.error(
+        req.log?.error(
           { campaignId, userId: req.userId, snapshot: reward, live: Number(campaign.rewardPerVisit) },
           "Reward snapshot out of range — refusing settlement",
         );
@@ -4108,7 +4108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // flag so the outer catch does not double-decrement on an unrelated error.
       ipSlotConsumed = false;
 
-      req.log.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
+      req.log?.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
       res.json({ ok: true, reward, message: `You earned $${reward.toFixed(2)}!` });
     } catch (err: any) {
       // Release the IP slot for any unhandled error so that unexpected failures
@@ -4118,7 +4118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true });
         return;
       }
-      req.log.error({ err }, "Record sponsored visit failed");
+      req.log?.error({ err }, "Record sponsored visit failed");
       res.status(500).json({ error: "Failed to record visit" });
     }
   });
