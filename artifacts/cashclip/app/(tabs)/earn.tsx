@@ -1074,6 +1074,20 @@ export default function EarnScreen() {
             })}
           </View>
 
+          {checkinStreak > 0 && !checkedInToday && (
+            <View style={styles.streakWarning}>
+              <Ionicons name="alert-circle" size={18} color={Colors.accent} />
+              <View style={styles.streakWarningTextWrap}>
+                <Text style={styles.streakWarningTitle}>
+                  {t.earn.streakWarningTitle.replace("{{days}}", String(checkinStreak))}
+                </Text>
+                <Text style={styles.streakWarningSubtext}>
+                  {t.earn.streakWarningSubtext}
+                </Text>
+              </View>
+            </View>
+          )}
+
           <Pressable
             onPress={handleCheckin}
             disabled={checkedInToday}
@@ -1717,6 +1731,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.background,
     letterSpacing: 1,
+  },
+  streakWarning: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(255, 214, 0, 0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 214, 0, 0.25)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  streakWarningTextWrap: {
+    flex: 1,
+  },
+  streakWarningTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 14,
+    color: Colors.accent,
+    marginBottom: 2,
+  },
+  streakWarningSubtext: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
   },
   spinRetryNotice: {
     flexDirection: "row",

@@ -71,6 +71,8 @@ const en = {
       milestoneTitle: "{{days}}-day streak!",
       milestoneBonusLabel: "bonus pts",
       milestoneSubtext: "Milestone bonus added to your pending earnings",
+      streakWarningTitle: "Don't lose your {{days}}-day streak!",
+      streakWarningSubtext: "Check in today to keep it going — miss a day and you're back to day 1.",
     },
     wallet: {
       totalBalance: "Total Balance",
@@ -606,6 +608,8 @@ const translations: Record<Language, Translations> = {
       milestoneTitle: "Racha de {{days}} días!",
       milestoneBonusLabel: "pts de bono",
       milestoneSubtext: "Bono de hito agregado a tus ganancias pendientes",
+      streakWarningTitle: "¡No pierdas tu racha de {{days}} días!",
+      streakWarningSubtext: "Regístrate hoy para mantenerla — si faltas un día, vuelves al día 1.",
     },
     wallet: {
       totalBalance: "Saldo Total",
