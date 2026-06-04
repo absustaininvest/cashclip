@@ -358,6 +358,86 @@ export function sendPasswordChangedNotice(options: {
   });
 }
 
+export function sendAdminCreditReceipt(options: {
+  to: string;
+  username: string;
+  amount: number; // signed: positive = credit, negative = correction
+  newBalance: number;
+  note: string;
+}): void {
+  const { to, username, amount, newBalance, note } = options;
+  const isCorrection = amount < 0;
+  const abs = Math.abs(amount).toFixed(2);
+  const balanceStr = newBalance.toFixed(2);
+  const safeUsername = escapeHtml(username);
+  const safeNote = escapeHtml(note);
+  const safeAbs = escapeHtml(abs);
+  const safeBalance = escapeHtml(balanceStr);
+  const signedLabel = isCorrection ? `-$${abs}` : `+$${abs}`;
+  const accent = isCorrection ? "#ffb300" : "#00E676";
+
+  const subject = isCorrection
+    ? "A balance correction was applied to your CashClip account"
+    : "You received a CashClip balance credit";
+  const lead = isCorrection
+    ? `Our team applied a manual balance correction of -$${abs} to your CashClip account.`
+    : `Our team added a manual credit of $${abs} to your CashClip account.`;
+
+  // User-facing receipt (skipped automatically if the address is missing/invalid).
+  sendBestEffort({
+    to,
+    subject,
+    text: `Hi ${username},\n\n${lead}\n\nReason: ${note}\nNew balance: $${balanceStr}\n\nIf you have any questions about this adjustment, just reply to this email.\n\n— The CashClip Team`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#00C853,#00E676);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#0A0A0F;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#0A0A0F;opacity:0.75">${isCorrection ? "Balance Correction" : "Balance Credit"}</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#b0b0b0;line-height:1.6">${escapeHtml(lead)}</p>
+          <div style="text-align:center;margin:24px 0">
+            <div style="display:inline-block;background:#1a1a2e;border:2px solid ${accent};border-radius:16px;padding:16px 36px">
+              <span style="font-size:34px;font-weight:800;color:${accent}">${isCorrection ? "-" : "+"}$${safeAbs}</span>
+              <span style="font-size:13px;color:#b0b0b0;display:block;margin-top:4px">new balance: $${safeBalance}</span>
+            </div>
+          </div>
+          <div style="margin:20px 0 0;background:#15151f;border:1px solid #1e1e2e;border-radius:12px;padding:16px">
+            <p style="margin:0;font-size:13px;color:#8a8a9a;text-transform:uppercase;letter-spacing:1px">Reason</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#e0e0e0;line-height:1.6">${safeNote}</p>
+          </div>
+          <p style="margin:24px 0 0;font-size:12px;color:#555;text-align:center">Questions about this adjustment? Just reply to this email.</p>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+  });
+
+  // Internal copy for the audit trail — always sent so support@ has a record
+  // even when the target account has no email on file.
+  sendBestEffort({
+    to: ADMIN_EMAIL,
+    subject: `[Admin receipt] ${isCorrection ? "Correction" : "Credit"} ${signedLabel} → ${username}`,
+    text: `Admin balance ${isCorrection ? "correction" : "credit"} applied.\n\nUser: ${username}${to ? ` <${to}>` : " (no email on file)"}\nAmount: ${signedLabel}\nReason: ${note}\nNew balance: $${balanceStr}`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid ${accent};padding-bottom:12px">Admin Balance ${isCorrection ? "Correction" : "Credit"}</h2>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:8px 0;font-weight:600;color:#555;width:110px">User</td><td style="padding:8px 0">${safeUsername}${to ? ` &lt;${escapeHtml(to)}&gt;` : " (no email)"}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Amount</td><td style="padding:8px 0;font-weight:700">${signedLabel}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">New balance</td><td style="padding:8px 0">$${safeBalance}</td></tr>
+        </table>
+        <div style="margin-top:16px;background:#f7f7f7;border-left:4px solid ${accent};padding:16px;border-radius:4px">
+          <p style="margin:0;white-space:pre-wrap;color:#333">${safeNote}</p>
+        </div>
+      </div>`,
+  });
+}
+
 export async function sendContactNotification(lead: {
   name: string;
   email: string;

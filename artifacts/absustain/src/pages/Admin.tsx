@@ -1665,6 +1665,13 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
+  const [creditAmountMap, setCreditAmountMap] = useState<Record<string, string>>({});
+  const [creditNoteMap, setCreditNoteMap] = useState<Record<string, string>>({});
+  const [auditRows, setAuditRows] = useState<
+    { id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: string }[]
+  >([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [showAudit, setShowAudit] = useState(true);
 
   const PAGE_SIZE = 25;
 
@@ -1730,6 +1737,26 @@ function CashClipUsersPanel({ token }: { token: string }) {
   useEffect(() => {
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
+
+  const fetchAdjustments = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`/api/admin/adjustments?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setAuditRows(data.adjustments ?? []);
+    } catch {
+      setAuditRows([]);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchAdjustments();
+  }, [fetchAdjustments]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -1811,6 +1838,57 @@ function CashClipUsersPanel({ token }: { token: string }) {
       if (!res.ok) throw new Error(data.error ?? "Failed");
       showToast(`Balance zeroed for ${u.username}`);
       fetchUsers(search, page);
+      fetchAdjustments();
+    } catch (err: any) {
+      showToast(err.message, false);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCredit(u: CashClipUser) {
+    const raw = creditAmountMap[u.id] ?? "";
+    const amt = Number(raw);
+    if (!Number.isFinite(amt) || amt === 0) {
+      showToast("Enter a non-zero amount (use a minus sign to correct down)", false);
+      return;
+    }
+    if (Math.abs(amt) > 1000) {
+      showToast("Amount must be between -1000 and 1000", false);
+      return;
+    }
+    const note = (creditNoteMap[u.id] ?? "").trim();
+    if (!note) {
+      showToast("Add a reason — it's recorded in the audit log", false);
+      return;
+    }
+    setActionLoading(`credit-${u.id}`);
+    try {
+      const res = await fetch(`/api/admin/credit`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username: u.username, amount: amt, note }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      showToast(
+        `${amt > 0 ? "Credited" : "Corrected"} ${u.username} — new balance $${Number(data.balance).toFixed(2)}`,
+      );
+      setCreditAmountMap((p) => {
+        const n = { ...p };
+        delete n[u.id];
+        return n;
+      });
+      setCreditNoteMap((p) => {
+        const n = { ...p };
+        delete n[u.id];
+        return n;
+      });
+      fetchUsers(search, page);
+      fetchAdjustments();
     } catch (err: any) {
       showToast(err.message, false);
     } finally {
@@ -2151,6 +2229,82 @@ function CashClipUsersPanel({ token }: { token: string }) {
         </div>
       )}
 
+      {/* Manual credit audit log — every admin credit & correction */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
+        <button
+          onClick={() => setShowAudit((s) => !s)}
+          className="w-full px-5 py-4 border-b border-white/[0.06] flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
+        >
+          <div>
+            <h3 className="text-white text-sm font-semibold">
+              Manual Credit Audit Log
+            </h3>
+            <p className="text-white/30 text-xs mt-0.5">
+              Every admin credit &amp; correction — who, how much, why, and when. A receipt is emailed to the user and support@absustaininvest.com on each one.
+            </p>
+          </div>
+          <span className="text-white/30 text-xs whitespace-nowrap">
+            {showAudit ? "Hide" : "Show"} ({auditRows.length})
+          </span>
+        </button>
+        {showAudit && (
+          <div className="max-h-80 overflow-y-auto">
+            {auditLoading ? (
+              <div className="px-5 py-6 text-white/30 text-sm">Loading audit log…</div>
+            ) : auditRows.length === 0 ? (
+              <div className="px-5 py-6 text-white/30 text-sm">
+                No manual credits or corrections recorded yet.
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-white/30 text-[10px] uppercase tracking-wider">
+                    <th className="text-left font-medium px-5 py-2">User</th>
+                    <th className="text-right font-medium px-3 py-2">Amount</th>
+                    <th className="text-left font-medium px-3 py-2">Reason</th>
+                    <th className="text-right font-medium px-5 py-2">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditRows.map((r) => {
+                    const amt = Number(r.amount);
+                    const positive = amt >= 0;
+                    return (
+                      <tr
+                        key={r.id}
+                        className="border-t border-white/[0.04] align-top"
+                      >
+                        <td className="px-5 py-2.5">
+                          <p className="text-white/80 text-xs font-medium break-all">
+                            {r.username}
+                          </p>
+                          <p className="text-white/25 text-[10px] break-all">
+                            {r.email ?? "—"}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          <span
+                            className={`text-xs font-semibold ${positive ? "text-[#00E676]" : "text-amber-400"}`}
+                          >
+                            {positive ? "+" : "-"}${Math.abs(amt).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-white/60 text-xs max-w-[280px] break-words">
+                          {r.description ?? "—"}
+                        </td>
+                        <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Combined payout per user — all offers */}
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
@@ -2432,6 +2586,49 @@ function CashClipUsersPanel({ token }: { token: string }) {
                       </button>
                       {u.role !== "admin" && (
                         <>
+                          <div
+                            className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-[320px]"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={creditAmountMap[u.id] ?? ""}
+                              onChange={(e) =>
+                                setCreditAmountMap((p) => ({
+                                  ...p,
+                                  [u.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="$ (e.g. 5 or -2.50)"
+                              className="w-28 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                            />
+                            <input
+                              type="text"
+                              value={creditNoteMap[u.id] ?? ""}
+                              onChange={(e) =>
+                                setCreditNoteMap((p) => ({
+                                  ...p,
+                                  [u.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Reason (required for audit log)"
+                              className="flex-1 min-w-[120px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCredit(u);
+                              }}
+                              disabled={actionLoading === `credit-${u.id}`}
+                              className="px-3 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-40 whitespace-nowrap"
+                              title="Positive amount credits, negative amount corrects down. Recorded in the audit log + emailed."
+                            >
+                              {actionLoading === `credit-${u.id}`
+                                ? "…"
+                                : "Apply Credit / Correction"}
+                            </button>
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

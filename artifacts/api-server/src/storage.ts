@@ -78,6 +78,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(limit?: number, offset?: number): Promise<{ users: User[]; total: number }>;
+  getAdjustmentLedger(limit?: number): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: Date }>>;
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
@@ -539,6 +540,24 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(earningsLedger)
       .where(eq(earningsLedger.userId, userId))
+      .orderBy(desc(earningsLedger.createdAt))
+      .limit(limit);
+  }
+
+  async getAdjustmentLedger(limit: number = 100): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: Date }>> {
+    return db
+      .select({
+        id: earningsLedger.id,
+        userId: earningsLedger.userId,
+        username: users.username,
+        email: users.email,
+        amount: earningsLedger.amount,
+        description: earningsLedger.description,
+        createdAt: earningsLedger.createdAt,
+      })
+      .from(earningsLedger)
+      .innerJoin(users, eq(earningsLedger.userId, users.id))
+      .where(eq(earningsLedger.type, "adjustment"))
       .orderBy(desc(earningsLedger.createdAt))
       .limit(limit);
   }

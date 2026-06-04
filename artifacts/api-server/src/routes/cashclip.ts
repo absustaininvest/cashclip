@@ -30,7 +30,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
   getRecentRejections,
@@ -1326,6 +1326,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "admin credited user balance",
       );
 
+      sendAdminCreditReceipt({
+        to: target.email ?? "",
+        username: target.username,
+        amount: amt,
+        newBalance: updated.balance,
+        note,
+      });
+
       res.json({
         userId: target.id,
         username: target.username,
@@ -1336,6 +1344,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }); return;
     } catch (err: any) {
       res.status(500).json({ error: "Failed to credit balance" }); return;
+    }
+  });
+
+  // Manager override: signed balance adjustment used by the website portal.
+  // Positive amount = credit, negative amount = correction/reset (debit).
+  // Every adjustment writes an auditable ledger row, an attributed server log,
+  // and a receipt to the user plus a copy to support@ for the audit trail.
+  app.post("/api/admin/credit", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { username, amount, note, description } = req.body ?? {};
+
+      if (typeof username !== "string" || username.trim().length === 0) {
+        res.status(400).json({ error: "username is required" }); return;
+      }
+      const amt = Number(amount);
+      if (!Number.isFinite(amt) || amt === 0 || Math.abs(amt) > 1000) {
+        res.status(400).json({ error: "amount must be a non-zero number between -1000 and 1000" }); return;
+      }
+
+      const rawNote =
+        typeof note === "string" && note.trim().length > 0
+          ? note.trim()
+          : typeof description === "string"
+            ? description.trim()
+            : "";
+      const finalNote = (rawNote.length > 0 ? rawNote : `Admin adjustment by ${req.userId}`).slice(0, 200);
+
+      const target = await storage.getUserByUsername(username.trim());
+      if (!target) {
+        res.status(404).json({ error: "user not found" }); return;
+      }
+
+      let updated: { balance: number; totalEarned: number };
+      try {
+        updated =
+          amt > 0
+            ? await storage.creditUser({ userId: target.id, amount: amt, type: "adjustment", description: finalNote })
+            : await storage.debitUser({ userId: target.id, amount: Math.abs(amt), type: "adjustment", description: finalNote });
+      } catch (err: any) {
+        if (err?.message === "INSUFFICIENT_BALANCE") {
+          res.status(400).json({ error: "Adjustment would put the balance below zero" }); return;
+        }
+        throw err;
+      }
+
+      req.log?.info(
+        { adminId: req.userId, targetUserId: target.id, amount: amt, note: finalNote },
+        "admin adjusted user balance",
+      );
+
+      sendAdminCreditReceipt({
+        to: target.email ?? "",
+        username: target.username,
+        amount: amt,
+        newBalance: updated.balance,
+        note: finalNote,
+      });
+
+      res.json({
+        userId: target.id,
+        username: target.username,
+        balance: updated.balance,
+        totalEarned: updated.totalEarned,
+        amount: amt,
+        description: finalNote,
+      }); return;
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to adjust balance" }); return;
+    }
+  });
+
+  // Audit log of every manual balance adjustment (credits + corrections).
+  app.get("/api/admin/adjustments", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const parsed = Number(req.query["limit"] ?? 100);
+      const limit = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 100;
+      const adjustments = await storage.getAdjustmentLedger(limit);
+      res.json({ adjustments });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to load adjustments" });
     }
   });
 
