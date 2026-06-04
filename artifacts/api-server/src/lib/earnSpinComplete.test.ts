@@ -248,3 +248,120 @@ describe("POST /api/earn/spin/complete — daily cap + 2h cooldown", () => {
     });
   });
 });
+
+// ── Concurrency: the row lock must serialize overlapping completions ──────────
+// Two /complete calls (each with its own valid challenge) fire at once with the
+// user one slot under the daily cap. The route serializes them with
+// `SELECT id FROM users WHERE id = ? FOR UPDATE`, so the lock-then-count-then-
+// insert ordering must let exactly ONE insert an earn token while the other,
+// resuming only after the first commits, sees the cap is full and gets 429.
+//
+// The mock models the row lock as a single mutex that is acquired on the route's
+// only `tx.execute` (the FOR UPDATE) and released when the transaction callback
+// returns (commit). The daily-count select reads the live shared token list and
+// the insert mutates it, so without serialization both transactions would read
+// the pre-insert count and both slip past the cap — which this test rejects.
+describe("POST /api/earn/spin/complete — concurrent spins can't both pass the daily cap", () => {
+  it("serializes two overlapping completions via the row lock: one inserts, the other gets 429", async () => {
+    // Both overlapping requests carry a valid, consumed challenge.
+    mockConsume.mockResolvedValue({ status: "ok" });
+
+    // Simulated earn_tokens rows for this user/day, seeded one slot under the cap.
+    // Seeded 3h ago so they count toward the daily cap but are outside the 2h
+    // cooldown window (keeping this a clean daily-cap race, not a cooldown one).
+    const spinTokens: Array<{ earnedAt: Date }> = Array.from(
+      { length: DAILY_CAP - 1 },
+      () => ({ earnedAt: new Date(Date.now() - 3 * 60 * 60 * 1000) }),
+    );
+
+    // A single mutex models the per-user `FOR UPDATE` row lock.
+    let lockHeld = false;
+    const waiters: Array<() => void> = [];
+    const acquire = async () => {
+      if (!lockHeld) { lockHeld = true; return; }
+      await new Promise<void>((resolve) => waiters.push(resolve));
+    };
+    const release = () => {
+      const next = waiters.shift();
+      if (next) next();        // hand the lock to the next waiter
+      else lockHeld = false;   // nobody waiting — free it
+    };
+    const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+    let inserts = 0;
+
+    function makeConcurrentTx() {
+      let selectIdx = 0;
+      let acquired = false;
+      return {
+        _release() { if (acquired) release(); },
+        // The route's sole execute call is the FOR UPDATE row lock. Acquiring the
+        // mutex here is what serializes the two transactions; the tick gives the
+        // other in-flight request a chance to (try to) race ahead.
+        execute: vi.fn().mockImplementation(async () => {
+          await acquire();
+          acquired = true;
+          await tick();
+          return { rows: [] };
+        }),
+        select: vi.fn().mockImplementation(() => {
+          const idx = selectIdx++;
+          return {
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockImplementation(() => {
+                // First select = daily count, read from live shared state.
+                if (idx === 0) {
+                  return Promise.resolve([{ todayCount: spinTokens.length }]);
+                }
+                // Second select = 2h cooldown lookup (awaited via .limit).
+                const recent = spinTokens.filter(
+                  (t) => t.earnedAt.getTime() >= Date.now() - TWO_HOURS_MS,
+                );
+                return { limit: vi.fn().mockResolvedValue(recent.slice(0, 1)) };
+              }),
+            }),
+          };
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockImplementation(() => ({
+            returning: vi.fn().mockImplementation(async () => {
+              await tick(); // write latency, still inside the held lock
+              spinTokens.push({ earnedAt: new Date() });
+              inserts += 1;
+              return [{ id: `tok-${inserts}` }];
+            }),
+          })),
+        }),
+      };
+    }
+
+    mockTransaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) => {
+        const tx = makeConcurrentTx();
+        try {
+          return await cb(tx);
+        } finally {
+          tx._release(); // commit/rollback releases the row lock
+        }
+      },
+    );
+
+    const [a, b] = await Promise.all([
+      request(app).post(COMPLETE).send({ challengeToken: TOKEN }),
+      request(app).post(COMPLETE).send({ challengeToken: TOKEN }),
+    ]);
+
+    // Exactly one winner (201) and one loser (429), regardless of which raced first.
+    expect([a.status, b.status].sort()).toEqual([201, 429]);
+
+    const winner = a.status === 201 ? a : b;
+    const loser = a.status === 429 ? a : b;
+    expect(winner.body.tokenId).toBeDefined();
+    expect(loser.body.error).toBe("Daily spin limit reached");
+    expect(loser.body.cap).toBe(DAILY_CAP);
+
+    // The lock guaranteed only one completion inserted, landing exactly on the cap.
+    expect(inserts).toBe(1);
+    expect(spinTokens.length).toBe(DAILY_CAP);
+  });
+});
