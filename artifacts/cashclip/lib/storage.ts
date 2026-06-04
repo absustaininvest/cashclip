@@ -47,6 +47,7 @@ const KEYS = {
   LAST_TETRIS_DATE: "cashclip_last_tetris_date",
   LAST_BLOCK_BLITZ_DATE: "cashclip_last_block_blitz_date",
   GAMES_PLAYED: "cashclip_games_played",
+  GAMES_SINCE_INTERSTITIAL: "cashclip_games_since_interstitial",
   GAME_EARNINGS: "cashclip_game_earnings",
   SPONSOR_BRANDS: "cashclip_sponsor_brands",
   ACCOUNT_CREATED: "cashclip_account_created",
@@ -781,6 +782,10 @@ const GAME_COOLDOWN_KEYS: Record<string, string> = {
   "block-blitz": KEYS.LAST_BLOCK_BLITZ_DATE,
 };
 
+// Show an interstitial once every Nth finished game (kept in the 2–3 range so
+// it lands roughly every couple of games without nagging on every round).
+const GAMES_PER_INTERSTITIAL = 2;
+
 export async function recordGamePlay(gameId: string, points: number, description: string): Promise<void> {
   const today = new Date().toDateString();
   const cooldownKey = GAME_COOLDOWN_KEYS[gameId];
@@ -801,12 +806,20 @@ export async function recordGamePlay(gameId: string, points: number, description
 
   await addEarnings(dollars, description, "game");
 
-  // Finishing a game round is a natural transition — attempt a frequency-capped
-  // interstitial. Fire-and-forget and lazily imported so it never blocks the
-  // reward flow and adds no startup cost. No-op on web / when AdMob isn't ready.
-  import("./admob")
-    .then((m) => m.maybeShowInterstitial())
-    .catch(() => {});
+  // Interstitials fire at a natural transition (finishing a game) but only once
+  // every Nth finished game so they stay non-annoying — not after every single
+  // round. maybeShowInterstitial still enforces its own ~4-min frequency cap as
+  // a hard floor. Fire-and-forget and lazily imported so it never blocks the
+  // reward flow. No-op on web / when AdMob isn't ready.
+  const sinceAd = (await getNumber(KEYS.GAMES_SINCE_INTERSTITIAL, 0)) + 1;
+  if (sinceAd >= GAMES_PER_INTERSTITIAL) {
+    await setNumber(KEYS.GAMES_SINCE_INTERSTITIAL, 0);
+    import("./admob")
+      .then((m) => m.maybeShowInterstitial())
+      .catch(() => {});
+  } else {
+    await setNumber(KEYS.GAMES_SINCE_INTERSTITIAL, sinceAd);
+  }
 }
 
 export async function canPlayGame(gameId: string): Promise<boolean> {

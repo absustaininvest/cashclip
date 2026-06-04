@@ -20,6 +20,7 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { canPlayGame, getGamesPlayedToday } from "@/lib/storage";
+import BackgroundBanner from "@/components/BackgroundBanner";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_GAP = 12;
@@ -303,6 +304,10 @@ export default function GamesHubScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <View style={{ paddingBottom: Platform.OS === "web" ? webBottomPad : insets.bottom }}>
+        <BackgroundBanner />
+      </View>
     </View>
   );
 }
