@@ -175,7 +175,10 @@ export default function SurveyProfileScreen() {
       if (!res.ok) throw new Error(data.error || "Failed to save");
       setProfileComplete(data.profileComplete || false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Saved!", "Your survey profile is complete. You'll now get better-matched surveys and higher payouts.", [
+      const msg = data.bonusAwarded
+        ? "Your survey profile is complete — we added a one-time +350 points bonus! You'll now get better-matched surveys and higher payouts."
+        : "Your survey profile is complete. You'll now get better-matched surveys and higher payouts.";
+      Alert.alert("Saved!", msg, [
         { text: "Great!", onPress: () => router.back() },
       ]);
     } catch (e: any) {
@@ -220,7 +223,7 @@ export default function SurveyProfileScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.heroTitle}>Unlock Better Surveys</Text>
             <Text style={styles.heroSub}>
-              A complete profile means higher-paying surveys matched to you. This info is only used to qualify you — it's never sold.
+              A complete profile is required to withdraw, and it matches you to higher-paying surveys. Finish it once to earn a +350 points bonus. This info is only used to qualify you — it's never sold.
             </Text>
           </View>
         </View>

@@ -198,6 +198,21 @@ export async function fetchServerBalance(): Promise<{ balance: number; totalEarn
   }
 }
 
+// ── SURVEY PROFILE COMPLETENESS ──────────────────────────────────────────────
+// Whether the user has finished their survey demographic profile (required to
+// withdraw and to unlock higher-paying surveys). Returns null when offline/unknown
+// so callers can avoid nagging users when we can't actually tell.
+export async function fetchProfileComplete(): Promise<boolean | null> {
+  try {
+    const res = await apiRequest("GET", "/api/profile");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return !!data.profileComplete;
+  } catch {
+    return null;
+  }
+}
+
 // ── LOCAL TOKEN CACHE (optimistic UI) ────────────────────────────────────────
 async function storeTokenLocally(token: EarnToken): Promise<void> {
   const existing = await getLocalTokens();

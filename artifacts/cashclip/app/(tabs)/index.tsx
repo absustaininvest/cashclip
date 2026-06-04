@@ -20,7 +20,7 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUnreadNotificationCount, recordAdWatch } from "@/lib/storage";
-import { recordEarnAction, fetchServerBalance } from "@/lib/earn-client";
+import { recordEarnAction, fetchServerBalance, fetchProfileComplete } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
@@ -41,10 +41,14 @@ const QUICK_ACCESS = [
   { icon: "layers", label: "Offers", color: "#E040FB", route: "/offerwalls" },
 ] as const;
 
+// Shows the survey-profile reminder at most once per app session (module scope
+// persists across Home remounts but resets on a cold start).
+let surveyProfilePromptShown = false;
+
 const EARN_HIGHLIGHTS = [
-  { icon: "rotate-cw", label: "Spin", value: "Up to 500 pts", color: "#1E88E5" },
-  { icon: "check-circle", label: "Check-in", value: "100 pts/day", color: "#43A047" },
-  { icon: "users", label: "Refer", value: "$0.50/friend", color: "#E53935" },
+  { icon: "rotate-cw", label: "Spin", value: "Up to 500 pts", color: "#1E88E5", route: "/earn" },
+  { icon: "check-circle", label: "Check-in", value: "100 pts/day", color: "#43A047", route: "/earn" },
+  { icon: "users", label: "Refer", value: "After $3 cashout", color: "#E53935", route: "/referral" },
 ];
 
 function AnnouncementBanner() {
@@ -96,6 +100,7 @@ function AnnouncementBanner() {
 }
 
 function EarnHighlightStrip() {
+  const router = useRouter();
   return (
     <View style={styles.highlightStrip}>
       <LinearGradient
@@ -109,13 +114,17 @@ function EarnHighlightStrip() {
         </View>
         <View style={styles.highlightRow}>
           {EARN_HIGHLIGHTS.map((h) => (
-            <View key={h.label} style={styles.highlightItem}>
+            <Pressable
+              key={h.label}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(h.route as any); }}
+              style={({ pressed }) => [styles.highlightItem, { opacity: pressed ? 0.7 : 1 }]}
+            >
               <View style={[styles.highlightIcon, { backgroundColor: `${h.color}20` }]}>
                 <Feather name={h.icon as any} size={14} color={h.color} />
               </View>
               <Text style={styles.highlightLabel}>{h.label}</Text>
               <Text style={styles.highlightValue}>{h.value}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       </LinearGradient>
@@ -149,7 +158,25 @@ export default function HomeScreen() {
     loadBalance();
     getUnreadNotificationCount().then(setUnreadCount);
     if (isAdMobReady()) preloadRewardedAd();
-  }, [loadBalance]);
+    // Once-per-session nudge to finish the survey profile (required to withdraw
+    // and unlocks a one-time +350 pts bonus). Only fires when we can confirm the
+    // profile is actually incomplete, so we never nag offline or mid-load.
+    if (!surveyProfilePromptShown) {
+      surveyProfilePromptShown = true;
+      fetchProfileComplete().then((complete) => {
+        if (complete === false) {
+          Alert.alert(
+            "Finish your survey profile",
+            "Complete your profile to unlock higher-paying surveys and enable withdrawals — plus a one-time +350 points bonus.",
+            [
+              { text: "Later", style: "cancel" },
+              { text: "Complete now", onPress: () => router.push("/survey-profile") },
+            ],
+          );
+        }
+      });
+    }
+  }, [loadBalance, router]);
 
   const creditAdReward = useCallback(async () => {
     await recordAdWatch();

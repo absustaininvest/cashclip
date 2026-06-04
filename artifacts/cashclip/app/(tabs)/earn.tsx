@@ -449,7 +449,7 @@ function DailyMissionCard({
             style={styles.missionClaimBtn}
           >
             <Text style={styles.missionClaimText}>
-              +${mission.reward.toFixed(2)}
+              +{mission.reward.toLocaleString()} pts
             </Text>
           </Pressable>
         ) : mission.claimed ? (
@@ -462,7 +462,7 @@ function DailyMissionCard({
           </View>
         ) : (
           <Text style={styles.missionRewardText}>
-            ${mission.reward.toFixed(2)}
+            {mission.reward.toLocaleString()} pts
           </Text>
         )}
       </Pressable>
@@ -547,7 +547,7 @@ function WeeklyMissionCard({
             ]}
           >
             <Text style={[styles.missionClaimText, { color: Colors.accent }]}>
-              +${mission.reward.toFixed(2)}
+              +{mission.reward.toLocaleString()} pts
             </Text>
           </Pressable>
         ) : mission.claimed ? (
@@ -560,7 +560,7 @@ function WeeklyMissionCard({
           </View>
         ) : (
           <Text style={[styles.missionRewardText, { color: Colors.accent }]}>
-            ${mission.reward.toFixed(2)}
+            {mission.reward.toLocaleString()} pts
           </Text>
         )}
       </Pressable>
@@ -1208,6 +1208,9 @@ export default function EarnScreen() {
               {stats.dailyAdsWatched}/{DAILY_GOAL}
             </Text>
           </View>
+          <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
+            Earn 50 pts per ad · up to 30 ads/day
+          </Text>
           <View style={styles.goalBarBg}>
             <LinearGradient
               colors={[Colors.primary, Colors.accent]}

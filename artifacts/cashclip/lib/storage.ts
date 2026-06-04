@@ -343,8 +343,21 @@ export async function redeemReferralCode(code: string): Promise<{ success: boole
   return { success: true, message: `Referral successful! You earned $0.50 bonus.` };
 }
 
+// ── DISPLAY / RESET HELPERS ───────────────────────────────────────────────────
+// Owner's display model: 10,000 points = $1.00. Mission rewards are now stored in
+// POINTS (what the UI shows); this converts them back into the local dollar-based
+// mock balance so the optimistic local balance stays numerically consistent. The
+// authoritative point→cash conversion is server-side and unchanged.
+const DISPLAY_POINTS_PER_DOLLAR = 10000;
+
+// Returns the calendar day in US Eastern time (midnight EST/EDT boundary) so the
+// daily check-in resets at 00:00 Eastern regardless of the device's timezone.
+function estDay(d: Date = new Date()): string {
+  return d.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+}
+
 export async function getDailyCheckinInfo(): Promise<{ checkedInToday: boolean; checkinStreak: number }> {
-  const today = new Date().toDateString();
+  const today = estDay();
   const lastCheckin = await AsyncStorage.getItem(KEYS.DAILY_CHECKIN_DATE);
   const streak = await getNumber(KEYS.CHECKIN_STREAK, 0);
   return {
@@ -354,7 +367,7 @@ export async function getDailyCheckinInfo(): Promise<{ checkedInToday: boolean; 
 }
 
 export async function performDailyCheckin(): Promise<{ reward: number; streak: number }> {
-  const today = new Date().toDateString();
+  const today = estDay();
   const lastCheckin = await AsyncStorage.getItem(KEYS.DAILY_CHECKIN_DATE);
 
   if (lastCheckin === today) {
@@ -366,7 +379,7 @@ export async function performDailyCheckin(): Promise<{ reward: number; streak: n
   if (lastCheckin) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    if (lastCheckin === yesterday.toDateString()) {
+    if (lastCheckin === estDay(yesterday)) {
       streak += 1;
     } else {
       streak = 1;
@@ -435,7 +448,7 @@ export async function getDailyMissions(): Promise<DailyMission[]> {
       description: "Open the app and check in",
       target: 1,
       progress: 0,
-      reward: 0.10,
+      reward: 1000,
       completed: false,
       claimed: false,
       icon: "log-in",
@@ -446,7 +459,7 @@ export async function getDailyMissions(): Promise<DailyMission[]> {
       description: "Watch 5 ad videos today",
       target: 5,
       progress: 0,
-      reward: 0.15,
+      reward: 1500,
       completed: false,
       claimed: false,
       icon: "eye",
@@ -457,7 +470,7 @@ export async function getDailyMissions(): Promise<DailyMission[]> {
       description: "View 10 videos in the feed",
       target: 10,
       progress: 0,
-      reward: 0.10,
+      reward: 1000,
       completed: false,
       claimed: false,
       icon: "play-circle",
@@ -468,7 +481,7 @@ export async function getDailyMissions(): Promise<DailyMission[]> {
       description: "Share your referral code",
       target: 1,
       progress: 0,
-      reward: 0.25,
+      reward: 2500,
       completed: false,
       claimed: false,
       icon: "user-plus",
@@ -479,7 +492,7 @@ export async function getDailyMissions(): Promise<DailyMission[]> {
       description: "Use your daily spin",
       target: 1,
       progress: 0,
-      reward: 0.05,
+      reward: 500,
       completed: false,
       claimed: false,
       icon: "refresh-cw",
@@ -504,10 +517,10 @@ export async function getWeeklyMissions(): Promise<WeeklyMission[]> {
     {
       id: "weekly_ads",
       title: "Ad Enthusiast",
-      description: "Watch 30 ads this week",
-      target: 30,
+      description: "Watch 50 ads this week",
+      target: 50,
       progress: 0,
-      reward: 1.00,
+      reward: 10000,
       completed: false,
       claimed: false,
       icon: "tv",
@@ -518,7 +531,7 @@ export async function getWeeklyMissions(): Promise<WeeklyMission[]> {
       description: "Browse 50 videos this week",
       target: 50,
       progress: 0,
-      reward: 0.75,
+      reward: 7500,
       completed: false,
       claimed: false,
       icon: "film",
@@ -526,10 +539,10 @@ export async function getWeeklyMissions(): Promise<WeeklyMission[]> {
     {
       id: "weekly_referrals",
       title: "Social Butterfly",
-      description: "Invite 3 friends this week",
+      description: "Invite 3 friends who cash out $3",
       target: 3,
       progress: 0,
-      reward: 2.00,
+      reward: 20000,
       completed: false,
       claimed: false,
       icon: "users",
@@ -537,10 +550,10 @@ export async function getWeeklyMissions(): Promise<WeeklyMission[]> {
     {
       id: "weekly_streak",
       title: "Consistency King",
-      description: "Check in 5 days this week",
-      target: 5,
+      description: "Check in 7 days this week",
+      target: 7,
       progress: 0,
-      reward: 1.50,
+      reward: 12000,
       completed: false,
       claimed: false,
       icon: "calendar",
@@ -578,7 +591,7 @@ async function updateWeeklyMissionProgress(missionId: string, increment: number)
       mission.completed = true;
       await addNotification({
         title: "Weekly Mission Complete!",
-        message: `You completed "${mission.title}". Claim your $${mission.reward.toFixed(2)} reward!`,
+        message: `You completed "${mission.title}". Claim your ${mission.reward.toLocaleString()} pts reward!`,
         type: "reward",
       });
     }
@@ -593,7 +606,7 @@ export async function claimMissionReward(missionId: string, isWeekly: boolean = 
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
-      await addEarnings(mission.reward, `Weekly mission: ${mission.title}`, "mission");
+      await addEarnings(mission.reward / DISPLAY_POINTS_PER_DOLLAR, `Weekly mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   } else {
@@ -602,7 +615,7 @@ export async function claimMissionReward(missionId: string, isWeekly: boolean = 
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.MISSIONS, JSON.stringify(missions));
-      await addEarnings(mission.reward, `Mission: ${mission.title}`, "mission");
+      await addEarnings(mission.reward / DISPLAY_POINTS_PER_DOLLAR, `Mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   }

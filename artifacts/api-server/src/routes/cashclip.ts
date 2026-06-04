@@ -18,7 +18,8 @@ import {
 } from "../lib/integrationVerificationState";
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
-import { db, updateUserProfileSchema } from "@workspace/db";
+import { db, updateUserProfileSchema, earnTokens } from "@workspace/db";
+import { snapshotRateString } from "../lib/pointsEconomy";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
@@ -725,7 +726,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parsed.success) {
         res.status(400).json({ error: "Invalid profile data", details: parsed.error.issues }); return;
       }
+      const before = await storage.getUserProfile(req.userId!);
+      const wasComplete = before?.profileComplete ?? false;
       const updated = await storage.updateUserProfile(req.userId!, parsed.data);
+
+      // One-time survey-profile completion bonus: +350 points the first time a
+      // user's profile transitions incomplete -> complete. Idempotent — guarded
+      // by the absence of any prior "survey_profile" earn token for this user, so
+      // editing an already-complete profile never re-grants it.
+      let bonusAwarded = false;
+      if (!wasComplete && updated.profileComplete) {
+        const existing = await db
+          .select({ id: earnTokens.id })
+          .from(earnTokens)
+          .where(drizzleAnd(drizzleEq(earnTokens.userId, req.userId!), drizzleEq(earnTokens.actionType, "survey_profile")))
+          .limit(1);
+        if (existing.length === 0) {
+          const now = new Date();
+          await db.insert(earnTokens).values({
+            userId: req.userId!,
+            points: 350,
+            actionType: "survey_profile",
+            description: "Survey profile completion bonus",
+            earnedAt: now,
+            claimableAt: now,
+            status: "pending",
+            usdPerPointSnapshot: await snapshotRateString(),
+          });
+          bonusAwarded = true;
+        }
+      }
+
       res.json({
         dateOfBirth: updated.dateOfBirth ?? null,
         gender: updated.gender ?? null,
@@ -736,6 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         educationLevel: updated.educationLevel ?? null,
         ethnicity: updated.ethnicity ?? null,
         profileComplete: updated.profileComplete ?? false,
+        bonusAwarded,
       });
     } catch (err) {
       res.status(500).json({ error: "Failed to update profile" });

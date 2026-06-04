@@ -14,3 +14,4 @@
 - [CashClip consent re-prompt root cause](cashclip-consent-reprompt.md) — "ATT accepted but keeps re-asking (toggle ON)" = phone on embedded build-29 fallback, not the OTA; the good OTA gates consent correctly; restore the good group, don't recode.
 - [API restart exits & register 503](api-restart-and-register-503.md) — `503` on register = intentional `REGISTRATION_PAUSED` gate (not crash); `signal: terminated` = routine restart now handled by graceful shutdown; pg SSL warning deferred (harmless).
 - [OTA update prompt vs native gate](cashclip-ota-update-prompt.md) — ForceUpdateGate=native store, OtaUpdateGate=OTA JS reload; an in-app update prompt only fires from a bundle that already has it, so first rollout of any display change still lands via cold start.
+- [Dual points-per-dollar rates](cashclip-points-display-rate.md) — display model 10,000 pts=$1 (UI/levels/missions) vs server economy 1,000 pts=$1 (real cash); intentionally different, don't collapse them.
