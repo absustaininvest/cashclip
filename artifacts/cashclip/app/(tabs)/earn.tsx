@@ -663,6 +663,7 @@ export default function EarnScreen() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinReward, setSpinReward] = useState(0); // pts from server
   const [showSpinReward, setShowSpinReward] = useState(false);
+  const [spinRetryNotice, setSpinRetryNotice] = useState(false); // gentle "try again in a moment" after a transient 503
   const [dailyMissions, setDailyMissions] = useState<DailyMission[]>([]);
   const [weeklyMissions, setWeeklyMissions] = useState<WeeklyMission[]>([]);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
@@ -749,10 +750,22 @@ export default function EarnScreen() {
   const handleSpin = useCallback(async () => {
     if (!spinAvailable || isSpinning) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setSpinRetryNotice(false);
     setIsSpinning(true);
 
-    // Begin spin challenge BEFORE animation — challenge has 60s TTL
-    const challengeToken = await beginSpin();
+    // Begin spin challenge BEFORE animation — challenge has 60s TTL.
+    // beginSpin() quietly retries a transient (retryable) 503 a couple of times.
+    const begin = await beginSpin();
+    if (!begin.ok && begin.retryable) {
+      // Momentary DB blip while starting the spin — show a gentle "try again in
+      // a moment" state instead of a hard error, and don't lock the spin timer
+      // so the user can simply tap again.
+      setIsSpinning(false);
+      setSpinRetryNotice(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    const challengeToken = begin.ok ? begin.challengeToken : null;
 
     // Spin animation — visual only, reward is server-determined
     const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
@@ -765,12 +778,22 @@ export default function EarnScreen() {
     );
 
     setTimeout(async () => {
-      // Lock spin timer client-side immediately
+      // Complete spin with the server-issued challenge token.
+      // completeSpin() also quietly retries a transient (retryable) 503.
+      const result = challengeToken ? await completeSpin(challengeToken) : null;
+      if (result && !result.ok && result.retryable) {
+        // Transient failure after the wheel stopped — gentle retry state, and
+        // keep the spin available so the user can try again in a moment.
+        setIsSpinning(false);
+        setSpinRetryNotice(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+      // Lock spin timer client-side now that we have a final result
       await recordSpinTimestamp();
       setSpinAvailable(false);
       setNextSpinTime(Date.now() + 2 * 60 * 60 * 1000);
-      // Complete spin with the server-issued challenge token
-      const token = challengeToken ? await completeSpin(challengeToken) : null;
+      const token = result && result.ok ? result.token : null;
       const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
       setSpinReward(pts);
       setIsSpinning(false);
@@ -1199,6 +1222,19 @@ export default function EarnScreen() {
               </Text>
             </LinearGradient>
           </Pressable>
+
+          {spinRetryNotice && (
+            <View style={styles.spinRetryNotice}>
+              <MaterialCommunityIcons
+                name="reload"
+                size={16}
+                color={Colors.textMuted}
+              />
+              <Text style={styles.spinRetryNoticeText}>
+                {t.earn.spinRetry}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Play Games */}
@@ -1681,6 +1717,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.background,
     letterSpacing: 1,
+  },
+  spinRetryNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+  },
+  spinRetryNoticeText: {
+    fontFamily: "Outfit_500Medium",
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: "center",
   },
   usedBadge: {
     backgroundColor: "rgba(255,82,82,0.12)",

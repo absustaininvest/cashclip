@@ -87,6 +87,38 @@ export async function apiRequest(
   return res;
 }
 
+// Like apiRequest, but never throws on a non-2xx status — it returns the raw
+// Response so callers can branch on the status code and body (e.g. honor a
+// retryable 503 by quietly retrying). The 401 refresh-and-retry handshake is
+// still performed.
+export async function apiRequestSafe(
+  method: string,
+  route: string,
+  data?: unknown,
+): Promise<Response> {
+  const baseUrl = getApiUrl();
+  const url = new URL(route, baseUrl);
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers: await buildHeaders(data),
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      return fetch(url.toString(), {
+        method,
+        headers: await buildHeaders(data),
+        body: data ? JSON.stringify(data) : undefined,
+      });
+    }
+  }
+
+  return res;
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;

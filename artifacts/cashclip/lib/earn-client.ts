@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest } from "./query-client";
+import { apiRequest, apiRequestSafe } from "./query-client";
 import { POINTS_PER_DOLLAR, pointsToUsd, formatPoints } from "./points";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -144,35 +144,87 @@ export async function recordCheckin(): Promise<{
 // The server rejects /complete without a valid challenge from /begin, ensuring
 // the client went through a server-observed initiation step before earning.
 
-export async function beginSpin(): Promise<string | null> {
+// When the database is briefly unavailable the server replies 503 with
+// { retryable: true } (see api-server earnings routes). We quietly retry a
+// couple of times with a short backoff so a momentary blip is invisible to the
+// user spinning the wheel, and only surface a gentle "try again" state if every
+// attempt fails.
+const SPIN_MAX_ATTEMPTS  = 3;
+const SPIN_RETRY_BASE_MS = 500;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function isRetryable503(res: Response): Promise<boolean> {
+  if (res.status !== 503) return false;
   try {
-    const res = await apiRequest("POST", "/api/earn/spin/begin", {});
-    if (!res.ok) return null;
-    const data = await res.json() as { challengeToken?: string };
-    return data.challengeToken ?? null;
+    const data = await res.clone().json() as { retryable?: boolean };
+    return data?.retryable === true;
   } catch {
-    return null;
+    return false;
   }
 }
 
-export async function completeSpin(challengeToken: string): Promise<EarnToken | null> {
-  try {
-    const res = await apiRequest("POST", "/api/earn/spin/complete", { challengeToken });
-    if (!res.ok) return null;
-    const data = await res.json() as { tokenId: string; points: number; claimableAt: string };
-    const token: EarnToken = {
-      id:          data.tokenId,
-      points:      data.points,
-      actionType:  "spin",
-      description: "Spin wheel",
-      earnedAt:    Date.now(),
-      claimableAt: new Date(data.claimableAt).getTime(),
-    };
-    await storeTokenLocally(token);
-    return token;
-  } catch {
-    return null;
+export type SpinBeginResult =
+  | { ok: true;  challengeToken: string }
+  | { ok: false; retryable: boolean };
+
+export async function beginSpin(): Promise<SpinBeginResult> {
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/spin/begin", {});
+      if (res.ok) {
+        const data = await res.json() as { challengeToken?: string };
+        return data.challengeToken
+          ? { ok: true, challengeToken: data.challengeToken }
+          : { ok: false, retryable: false };
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
   }
+  return { ok: false, retryable: true };
+}
+
+export type SpinCompleteResult =
+  | { ok: true;  token: EarnToken }
+  | { ok: false; retryable: boolean };
+
+export async function completeSpin(challengeToken: string): Promise<SpinCompleteResult> {
+  // The server leaves the challenge intact when the consume query throws, so
+  // retrying with the same token after a transient failure can still succeed.
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/spin/complete", { challengeToken });
+      if (res.ok) {
+        const data = await res.json() as { tokenId: string; points: number; claimableAt: string };
+        const token: EarnToken = {
+          id:          data.tokenId,
+          points:      data.points,
+          actionType:  "spin",
+          description: "Spin wheel",
+          earnedAt:    Date.now(),
+          claimableAt: new Date(data.claimableAt).getTime(),
+        };
+        await storeTokenLocally(token);
+        return { ok: true, token };
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
+  }
+  return { ok: false, retryable: true };
 }
 
 // ── CLAIM ALL READY TOKENS ────────────────────────────────────────────────────
