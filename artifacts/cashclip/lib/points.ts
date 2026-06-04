@@ -23,7 +23,33 @@
 // deliberate (Phase 3 "feature rebalancing").
 
 // Display rate: how many on-screen points represent $1 of perceived value.
+// This is the OFFLINE FALLBACK / default. The authoritative value is served by
+// the API (GET /api/economy/rate → displayPointsPerDollar). At runtime the
+// client overrides this with the server value via setDisplayPointsPerDollar so
+// the owner can retune the display number without shipping an app build. The two
+// match today, so behaviour is unchanged until the server value diverges.
 export const DISPLAY_POINTS_PER_DOLLAR = 10000;
+
+// Runtime-active display rate. Starts at the hardcoded default and is replaced
+// by the server-provided rate once it's fetched (or hydrated from the last
+// known value on a cold/offline start). All DISPLAY adapters below read this so
+// every surface shows ONE consistent number.
+let activeDisplayPointsPerDollar = DISPLAY_POINTS_PER_DOLLAR;
+
+// The live display rate every surface should use. Falls back to the default
+// when the server value hasn't been loaded yet (e.g. first launch offline).
+export function getDisplayPointsPerDollar(): number {
+  return activeDisplayPointsPerDollar;
+}
+
+// Apply a server-provided display rate. Ignores anything non-positive/invalid so
+// a bad payload can never zero out or corrupt the on-screen numbers; the last
+// good value (or the default) stays in effect.
+export function setDisplayPointsPerDollar(rate: number | null | undefined): void {
+  if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+    activeDisplayPointsPerDollar = rate;
+  }
+}
 
 // Cash rate: legacy/base client rate used only as a fallback when the server
 // hasn't supplied an explicit USD value for a points figure.
@@ -36,13 +62,13 @@ export const POINTS_PER_DOLLAR = CASH_POINTS_PER_DOLLAR;
 // ── DISPLAY adapters (cosmetic surfaces only) ─────────────────────────────────
 // Convert a dollar reward into the points the user sees (10,000 pts = $1).
 export function dollarsToPoints(dollars: number): number {
-  return Math.round(dollars * DISPLAY_POINTS_PER_DOLLAR);
+  return Math.round(dollars * activeDisplayPointsPerDollar);
 }
 
 // Convert display points back into their dollar-equivalent for the optimistic
 // local mock balance (mirrors how rewards are stored in display points).
 export function displayPointsToDollars(points: number): number {
-  return points / DISPLAY_POINTS_PER_DOLLAR;
+  return points / activeDisplayPointsPerDollar;
 }
 
 // ── CASH adapter (fallback only) ──────────────────────────────────────────────

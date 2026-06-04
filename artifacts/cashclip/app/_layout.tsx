@@ -16,6 +16,7 @@ import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics"
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { OtaUpdateGate } from "@/components/OtaUpdateGate";
+import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,6 +24,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Apply the last-known display rate immediately (cold/offline start), then
+  // refresh it from the server once the user is authenticated so every surface
+  // reads one consistent, owner-tunable display number. Both fail open to the
+  // hardcoded default in lib/points.ts.
+  useEffect(() => {
+    hydrateDisplayRate();
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchConversionRate();
+  }, [user]);
 
   useEffect(() => {
     if (isLoading) return;

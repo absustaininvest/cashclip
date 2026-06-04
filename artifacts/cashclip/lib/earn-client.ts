@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, apiRequestSafe } from "./query-client";
-import { POINTS_PER_DOLLAR, pointsToUsd, formatPoints } from "./points";
+import { POINTS_PER_DOLLAR, pointsToUsd, formatPoints, setDisplayPointsPerDollar } from "./points";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 // The cash rate (POINTS_PER_DOLLAR) and the points↔cash/format helpers live in
@@ -11,6 +11,9 @@ export const SPIN_INTERVAL_MS  = 2 * 60 * 60 * 1000; // 2-hour spin window
 
 const PENDING_TOKENS_KEY = "cashclip_earn_tokens_v2";
 const LAST_SPIN_TS_KEY   = "cashclip_last_spin_ts_v2";
+// Last server-provided display rate, persisted so a cold/offline start shows the
+// same on-screen numbers as the last online session before any network returns.
+const DISPLAY_RATE_KEY   = "cashclip_display_points_per_dollar";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 export interface EarnToken {
@@ -43,6 +46,9 @@ export interface ConversionRate {
   floorUsdPerPoint:  number;
   legacyUsdPerPoint: number;
   pointsPerDollar:   number | null;
+  // Cosmetic display rate (e.g. 10,000 pts = $1) the client uses for on-screen
+  // point figures. Null when the server didn't supply it (older API).
+  displayPointsPerDollar: number | null;
   method:            string;
   region:            string;
 }
@@ -291,16 +297,40 @@ export async function fetchConversionRate(): Promise<ConversionRate | null> {
     const res = await apiRequest("GET", "/api/economy/rate");
     if (!res.ok) return null;
     const data = await res.json();
+    const displayPointsPerDollar =
+      typeof data.displayPointsPerDollar === "number" ? data.displayPointsPerDollar : null;
+    // Apply the server display rate to every surface and remember it for the
+    // next cold/offline start. Invalid values are ignored by setDisplayPointsPerDollar.
+    if (displayPointsPerDollar && displayPointsPerDollar > 0) {
+      setDisplayPointsPerDollar(displayPointsPerDollar);
+      AsyncStorage.setItem(DISPLAY_RATE_KEY, String(displayPointsPerDollar)).catch(() => {});
+    }
     return {
       usdPerPoint:       Number(data.usdPerPoint)       || 0,
       floorUsdPerPoint:  Number(data.floorUsdPerPoint)  || 0,
       legacyUsdPerPoint: Number(data.legacyUsdPerPoint) || 0,
       pointsPerDollar:   typeof data.pointsPerDollar === "number" ? data.pointsPerDollar : null,
+      displayPointsPerDollar,
       method:            String(data.method ?? ""),
       region:            String(data.region ?? "GLOBAL"),
     };
   } catch {
     return null;
+  }
+}
+
+// ── HYDRATE DISPLAY RATE (cold/offline start) ────────────────────────────────
+// Apply the last server-provided display rate from local storage so on-screen
+// point figures match the previous online session even before any network call
+// returns. If nothing is stored (or storage fails) the hardcoded default in
+// "./points" stays in effect. Call once at app start; fetchConversionRate then
+// refreshes it from the server.
+export async function hydrateDisplayRate(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(DISPLAY_RATE_KEY);
+    if (raw != null) setDisplayPointsPerDollar(Number(raw));
+  } catch {
+    // Keep the default — display falls back gracefully.
   }
 }
 

@@ -30,6 +30,15 @@ export const ARPU_WINDOW_DAYS = 7;
 // Unity bidding) is captured on ad_events — see computeRevenueUsd().
 export const AD_REVENUE_PER_REWARD_USD = 0.012;
 
+// ── DISPLAY ECONOMY (cosmetic, owner-tunable) ─────────────────────────────────
+// How many on-screen "points" represent $1 of perceived value. PURELY COSMETIC:
+// this never touches real cash owed (that is usdPerPoint above). It exists only
+// so every client surface shows ONE consistent display number, and so the owner
+// can retune that number server-side via GET /api/economy/rate WITHOUT shipping
+// a new app build. The client keeps a hardcoded default of the same value as an
+// offline fallback; this is the authoritative source.
+export const DISPLAY_POINTS_PER_DOLLAR = 10000;
+
 export const DEFAULT_REGION = "GLOBAL";
 
 export interface RateInfo {

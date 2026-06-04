@@ -18,8 +18,8 @@ import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import { getUserStats, getReferralEarnings, getTotalReferrals, getUnreadNotificationCount, type UserStats } from "@/lib/storage";
-import { DISPLAY_POINTS_PER_DOLLAR } from "@/lib/points";
-import { fetchServerBalance } from "@/lib/earn-client";
+import { getDisplayPointsPerDollar } from "@/lib/points";
+import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import type { Translations } from "@/lib/i18n";
@@ -100,10 +100,14 @@ export default function ProfileScreen() {
       getTotalReferrals(),
       getUnreadNotificationCount(),
       fetchServerBalance(),
+      // Refresh the server-provided display rate (applied as a side-effect) so
+      // lifetime points and levels reflect the latest owner-tuned value.
+      fetchConversionRate(),
     ]);
     // Lifetime points come from the server-authoritative totalEarned (real cash
-    // earned), translated into the owner's 10,000 pts = $1 display model.
-    const lifetimePoints = Math.round((serverBal?.totalEarned ?? 0) * DISPLAY_POINTS_PER_DOLLAR);
+    // earned), translated into the server-provided display model (default
+    // 10,000 pts = $1) via getDisplayPointsPerDollar().
+    const lifetimePoints = Math.round((serverBal?.totalEarned ?? 0) * getDisplayPointsPerDollar());
     setStats({ ...s, totalReferrals: totalRefs, referralEarnings: refEarnings, unreadNotifs: unread, lifetimePoints });
   }, []);
 

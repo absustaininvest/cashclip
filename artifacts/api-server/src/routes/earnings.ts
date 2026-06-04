@@ -14,6 +14,7 @@ import {
   tokenUsd,
   tokenUsdSumSql,
   LEGACY_USD_PER_POINT,
+  DISPLAY_POINTS_PER_DOLLAR,
 } from "../lib/pointsEconomy";
 import { withAdvisoryLock } from "../lib/advisoryLock";
 
@@ -832,6 +833,10 @@ export function registerEarningsRoutes(app: Express): void {
           floorUsdPerPoint:  rate.floorUsdPerPoint,
           legacyUsdPerPoint: LEGACY_USD_PER_POINT,
           pointsPerDollar:   rate.usdPerPoint > 0 ? Math.round(1 / rate.usdPerPoint) : null,
+          // Cosmetic display rate (10,000 pts = $1). Served so every client
+          // surface shows one consistent number and the owner can retune it
+          // without an app build. Does NOT affect real cash (usdPerPoint above).
+          displayPointsPerDollar: DISPLAY_POINTS_PER_DOLLAR,
           method:            rate.method,
           region:            rate.region,
           updatedAt:         rate.computedAt,

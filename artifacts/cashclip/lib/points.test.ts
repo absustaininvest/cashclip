@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   DISPLAY_POINTS_PER_DOLLAR,
   CASH_POINTS_PER_DOLLAR,
@@ -7,6 +7,8 @@ import {
   displayPointsToDollars,
   pointsToUsd,
   formatPoints,
+  getDisplayPointsPerDollar,
+  setDisplayPointsPerDollar,
 } from "./points";
 
 // These tests pin the two intentionally-separate points-per-dollar rates and the
@@ -31,6 +33,35 @@ describe("points-per-dollar constants", () => {
 
   it("keeps the POINTS_PER_DOLLAR back-compat alias bound to the cash rate", () => {
     expect(POINTS_PER_DOLLAR).toBe(CASH_POINTS_PER_DOLLAR);
+  });
+});
+
+describe("server-provided display rate (getDisplayPointsPerDollar/setDisplayPointsPerDollar)", () => {
+  // The display rate is now owner-tunable from the server. The adapters must
+  // read the active value so every surface stays consistent, with the hardcoded
+  // default as a graceful offline fallback. Reset to the default after each test
+  // so the runtime override doesn't leak into the other suites in this file.
+  afterEach(() => {
+    setDisplayPointsPerDollar(DISPLAY_POINTS_PER_DOLLAR);
+  });
+
+  it("defaults to the hardcoded display rate before any server value loads", () => {
+    expect(getDisplayPointsPerDollar()).toBe(DISPLAY_POINTS_PER_DOLLAR);
+  });
+
+  it("applies a valid server-provided rate to the display adapters", () => {
+    setDisplayPointsPerDollar(20000);
+    expect(getDisplayPointsPerDollar()).toBe(20000);
+    expect(dollarsToPoints(1)).toBe(20000);
+    expect(displayPointsToDollars(20000)).toBe(1);
+  });
+
+  it("ignores invalid rates and keeps the last good value (fail-open)", () => {
+    setDisplayPointsPerDollar(15000);
+    for (const bad of [0, -1, NaN, Infinity, null, undefined] as const) {
+      setDisplayPointsPerDollar(bad);
+      expect(getDisplayPointsPerDollar()).toBe(15000);
+    }
   });
 });
 
