@@ -338,6 +338,38 @@ export const securityAuditLog = pgTable(
 export type SecurityAuditEntry = typeof securityAuditLog.$inferSelect;
 export type InsertSecurityAuditEntry = typeof securityAuditLog.$inferInsert;
 
+// Durable, browsable record of support replies an admin sends from the
+// /sc-portal Inbox. Complements the best-effort logger.info("inbox_reply_sent")
+// line, which is ephemeral. Gives the team an auditable support trail and lets
+// any operator see prior responses for a thread without digging through Zoho.
+export const supportReplies = pgTable(
+  "support_replies",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    // The admin who sent the reply.
+    adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+    // Recipient address the reply was sent to.
+    recipient: text("recipient").notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    // Message-ID of the original inbound message this reply threads onto.
+    // Used to look up prior replies for a selected thread. Null when the
+    // original message had no Message-ID.
+    inReplyTo: text("in_reply_to"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    inReplyToIdx: index("support_replies_in_reply_to_idx").on(t.inReplyTo),
+    adminIdx: index("support_replies_admin_idx").on(t.adminUserId, t.createdAt),
+    createdAtIdx: index("support_replies_created_at_idx").on(t.createdAt),
+  })
+);
+
+export type SupportReply = typeof supportReplies.$inferSelect;
+export type InsertSupportReply = typeof supportReplies.$inferInsert;
+
 export const insertAdEventSchema = createInsertSchema(adEvents).omit({ id: true, createdAt: true });
 export type InsertAdEvent = z.infer<typeof insertAdEventSchema>;
 export type AdEvent = typeof adEvents.$inferSelect;

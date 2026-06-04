@@ -17,6 +17,9 @@ import {
   adEvents,
   webhookAudit,
   securityAuditLog,
+  supportReplies,
+  type SupportReply,
+  type InsertSupportReply,
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
@@ -65,6 +68,18 @@ export interface SecurityAuditEntryView {
   createdAt: Date;
 }
 
+export interface SupportReplyView {
+  id: string;
+  adminUserId: string;
+  adminUsername: string | null;
+  adminEmail: string | null;
+  recipient: string;
+  subject: string;
+  body: string;
+  inReplyTo: string | null;
+  createdAt: Date;
+}
+
 export type LedgerType =
   | "survey"
   | "offerwall"
@@ -91,6 +106,8 @@ export interface IStorage {
     limit?: number;
     offset?: number;
   }): Promise<{ entries: SecurityAuditEntryView[]; total: number }>;
+  createSupportReply(entry: InsertSupportReply): Promise<SupportReply>;
+  getSupportRepliesByThread(inReplyTo: string): Promise<SupportReplyView[]>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -351,6 +368,50 @@ export class DatabaseStorage implements IStorage {
       })),
       total: Number(totalRow?.total ?? 0),
     };
+  }
+
+  // Persist a support reply sent from the /sc-portal Inbox so the team has a
+  // durable, browsable audit trail that survives restarts (logs are ephemeral).
+  async createSupportReply(entry: InsertSupportReply): Promise<SupportReply> {
+    const [row] = await db.insert(supportReplies).values(entry).returning();
+    return row;
+  }
+
+  // Prior replies for a selected thread, looked up by the original message's
+  // Message-ID. Oldest first so the conversation reads top-to-bottom. Joins the
+  // sending admin so the UI can attribute each reply.
+  async getSupportRepliesByThread(
+    inReplyTo: string,
+  ): Promise<SupportReplyView[]> {
+    if (!inReplyTo) return [];
+    const rows = await db
+      .select({
+        id: supportReplies.id,
+        adminUserId: supportReplies.adminUserId,
+        adminUsername: users.username,
+        adminEmail: users.email,
+        recipient: supportReplies.recipient,
+        subject: supportReplies.subject,
+        body: supportReplies.body,
+        inReplyTo: supportReplies.inReplyTo,
+        createdAt: supportReplies.createdAt,
+      })
+      .from(supportReplies)
+      .leftJoin(users, eq(supportReplies.adminUserId, users.id))
+      .where(eq(supportReplies.inReplyTo, inReplyTo))
+      .orderBy(supportReplies.createdAt);
+
+    return rows.map((r: (typeof rows)[number]) => ({
+      id: r.id,
+      adminUserId: r.adminUserId,
+      adminUsername: r.adminUsername ?? null,
+      adminEmail: r.adminEmail ?? null,
+      recipient: r.recipient,
+      subject: r.subject,
+      body: r.body,
+      inReplyTo: r.inReplyTo ?? null,
+      createdAt: r.createdAt,
+    }));
   }
 
   async getTotpBackupCodesRemaining(userId: string): Promise<number> {

@@ -1909,6 +1909,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw sendErr;
       }
 
+      // Persist the reply so the team has a durable, browsable support trail
+      // that survives restarts (the log line below is ephemeral). A failed
+      // persist must not make the admin think the email didn't send, so we
+      // log the error but still return success.
+      let savedReply: Awaited<ReturnType<typeof storage.createSupportReply>> | null = null;
+      try {
+        savedReply = await storage.createSupportReply({
+          adminUserId: req.userId!,
+          recipient: to,
+          subject,
+          body,
+          inReplyTo: inReplyTo || null,
+        });
+      } catch (persistErr) {
+        req.log.error(
+          { err: persistErr, adminUserId: req.userId, to },
+          "Inbox reply sent but failed to persist to history",
+        );
+      }
+
       req.log.info(
         {
           action: "inbox_reply_sent",
@@ -1920,11 +1940,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Admin sent inbox reply",
       );
 
-      res.json({ ok: true });
+      res.json({ ok: true, reply: savedReply });
     } catch (err) {
       req.log.error({ err, adminUserId: req.userId }, "Failed to send inbox reply");
       const message = err instanceof Error ? err.message : "Failed to send reply";
       res.status(500).json({ error: message });
+    }
+  });
+
+  app.get("/api/admin/inbox/replies", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const inReplyTo = typeof req.query.inReplyTo === "string" ? req.query.inReplyTo.trim() : "";
+      if (!inReplyTo) {
+        res.json({ replies: [] });
+        return;
+      }
+      const replies = await storage.getSupportRepliesByThread(inReplyTo);
+      res.json({ replies });
+    } catch (err) {
+      req.log.error({ err, adminUserId: req.userId }, "Failed to load inbox reply history");
+      res.status(500).json({ error: "Failed to load reply history" });
     }
   });
 

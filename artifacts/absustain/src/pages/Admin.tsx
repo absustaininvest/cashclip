@@ -1308,6 +1308,18 @@ interface InboxMessage {
   category: "corporate" | "app" | "pr" | "support" | "other";
 }
 
+interface SupportReplyRecord {
+  id: string;
+  adminUserId: string;
+  adminUsername: string | null;
+  adminEmail: string | null;
+  recipient: string;
+  subject: string;
+  body: string;
+  inReplyTo: string | null;
+  createdAt: string;
+}
+
 const INBOX_CATEGORIES: {
   id: InboxMessage["category"] | "all";
   label: string;
@@ -1354,6 +1366,8 @@ function InboxPanel({ token }: { token: string }) {
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState("");
   const [replySent, setReplySent] = useState(false);
+  const [replyHistory, setReplyHistory] = useState<SupportReplyRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const openReply = useCallback(() => {
     setReplyOpen(true);
@@ -1361,6 +1375,38 @@ function InboxPanel({ token }: { token: string }) {
     setReplyError("");
     setReplySent(false);
   }, []);
+
+  const fetchReplyHistory = useCallback(
+    async (messageId: string) => {
+      if (!messageId) {
+        setReplyHistory([]);
+        return;
+      }
+      setHistoryLoading(true);
+      try {
+        const res = await fetch(
+          `/api/admin/inbox/replies?inReplyTo=${encodeURIComponent(messageId)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) throw new Error("Failed to load reply history");
+        const data = await res.json();
+        setReplyHistory(data.replies ?? []);
+      } catch {
+        setReplyHistory([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    if (selected?.messageId) {
+      fetchReplyHistory(selected.messageId);
+    } else {
+      setReplyHistory([]);
+    }
+  }, [selected?.messageId, fetchReplyHistory]);
 
   const sendReply = useCallback(async () => {
     if (!selected) return;
@@ -1395,12 +1441,13 @@ function InboxPanel({ token }: { token: string }) {
       setReplySent(true);
       setReplyOpen(false);
       setReplyBody("");
+      if (selected.messageId) fetchReplyHistory(selected.messageId);
     } catch (err: any) {
       setReplyError(err.message);
     } finally {
       setReplySending(false);
     }
-  }, [selected, replyBody, replySending, token]);
+  }, [selected, replyBody, replySending, token, fetchReplyHistory]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -1657,6 +1704,49 @@ function InboxPanel({ token }: { token: string }) {
                 <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">
                   {selected.body || selected.preview || "(No body content)"}
                 </p>
+                {(historyLoading || replyHistory.length > 0) && (
+                  <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
+                    <div className="flex items-center gap-2 text-white/40 text-xs font-semibold uppercase tracking-wide">
+                      <Mail className="w-3.5 h-3.5" />
+                      Reply History
+                      {replyHistory.length > 0 && (
+                        <span className="text-white/25 normal-case font-normal">
+                          ({replyHistory.length})
+                        </span>
+                      )}
+                    </div>
+                    {historyLoading && replyHistory.length === 0 ? (
+                      <div className="flex items-center gap-2 text-white/30 text-xs">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Loading prior replies…
+                      </div>
+                    ) : (
+                      replyHistory.map((r) => (
+                        <div
+                          key={r.id}
+                          className="bg-[#00E676]/[0.04] border border-[#00E676]/15 rounded-xl px-4 py-3"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-[#00E676]/90 text-xs font-semibold truncate">
+                              {r.adminUsername || r.adminEmail || "Admin"}
+                            </span>
+                            <span className="text-white/25 text-[11px] flex-shrink-0">
+                              {new Date(r.createdAt).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-white/60 text-sm leading-relaxed whitespace-pre-wrap">
+                            {r.body}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
               <div className="px-5 py-3 border-t border-white/[0.06] space-y-3">
                 {replySent && !replyOpen && (
