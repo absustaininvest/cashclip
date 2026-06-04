@@ -326,4 +326,50 @@ describe("Earn screen check-in button locks after checking in", () => {
 
     expect(recordCheckin).toHaveBeenCalledTimes(1);
   });
+
+  it("re-enables the button when the server didn't record the check-in (checkedInToday: false)", async () => {
+    recordCheckin.mockResolvedValue({ points: 120, checkinStreak: 7, milestoneBonus: 0 });
+
+    // handleCheckin optimistically locks the button, then loadAll() reconciles
+    // with the server. Simulate the server NOT recording the check-in (the call
+    // failed or was rejected) by reporting checkedInToday: false throughout — the
+    // optimistic lock must unlatch so the user can retry.
+    fetchCheckinStatusMock.mockResolvedValue({
+      ...CHECKIN_STATUS_BASE,
+      checkedInToday: false,
+    });
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(EarnScreen));
+    });
+    await flush(); // let loadAll() settle so the screen renders
+
+    // Before any check-in: button is active, labeled "Check In", not disabled.
+    let btn = getCheckInButton(tr.root);
+    expect(btn.props.disabled).toBeFalsy();
+    expect(allText(tr.root)).toContain("Check In");
+    expect(allText(tr.root)).not.toContain("Checked In");
+
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+
+    expect(recordCheckin).toHaveBeenCalledTimes(1);
+
+    // After reconciliation: the button is enabled again and reads "Check In".
+    btn = getCheckInButton(tr.root);
+    expect(btn.props.disabled).toBeFalsy();
+    expect(allText(tr.root)).toContain("Check In");
+    expect(allText(tr.root)).not.toContain("Checked In");
+
+    // And it can fire again — the lock genuinely released.
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+
+    expect(recordCheckin).toHaveBeenCalledTimes(2);
+  });
 });
