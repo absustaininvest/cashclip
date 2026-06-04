@@ -1482,6 +1482,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // One-time referral backfill: referral enforcement is forward-looking (it only
+  // fires on NEW withdrawals via the withdrawal hook), so any referred user who
+  // cashed out >= the qualifying amount BEFORE the feature shipped never credited
+  // their referrer. This guarded action finds those users (referredBy set, no
+  // referralCreditedAt, with a qualifying withdrawal on record) and runs them
+  // through the same idempotent `qualifyReferral` path used live. Safe to re-run:
+  // qualifyReferral is guarded by referralCreditedAt, so already-credited users
+  // are skipped. Pass { dryRun: true } to preview the candidate count without
+  // crediting anyone. High-privilege (passphrase-gated) because it moves money.
+  app.post(
+    "/api/admin/referrals/backfill",
+    adminMiddleware,
+    secretsPassphraseMiddleware,
+    async (req: AuthRequest, res): Promise<void> => {
+      try {
+        const dryRun = req.body?.dryRun === true;
+        const candidates = await storage.getReferralBackfillCandidates(REFERRAL_QUALIFY_USD);
+
+        if (dryRun) {
+          res.json({
+            dryRun: true,
+            candidates: candidates.length,
+            qualifyAmount: REFERRAL_QUALIFY_USD,
+            bonusPerReferral: REFERRAL_BONUS_USD,
+          });
+          return;
+        }
+
+        let credited = 0;
+        let skipped = 0;
+        let failed = 0;
+        for (const candidate of candidates) {
+          try {
+            const result = await storage.qualifyReferral({
+              referredUserId: candidate.id,
+              bonusUsd: REFERRAL_BONUS_USD,
+            });
+            if (result.credited) credited += 1;
+            else skipped += 1;
+          } catch (err) {
+            failed += 1;
+            req.log?.error(
+              { err, referredUserId: candidate.id },
+              "Referral backfill: qualifyReferral failed for candidate",
+            );
+          }
+        }
+
+        req.log?.info(
+          { adminId: req.userId, candidates: candidates.length, credited, skipped, failed },
+          "admin ran one-time referral backfill",
+        );
+
+        res.json({
+          dryRun: false,
+          candidates: candidates.length,
+          credited,
+          skipped,
+          failed,
+          bonusPerReferral: REFERRAL_BONUS_USD,
+        });
+      } catch (err: any) {
+        res.status(500).json({ error: "Failed to run referral backfill" });
+      }
+    },
+  );
+
   app.get("/api/admin/users", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
       const limit = Math.min(Number(req.query["limit"] ?? 50), 200);

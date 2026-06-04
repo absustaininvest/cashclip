@@ -134,6 +134,9 @@ export interface IStorage {
     referredUserId: string;
     bonusUsd: number;
   }): Promise<{ credited: boolean; referrerId?: string }>;
+  getReferralBackfillCandidates(minWithdrawalUsd: number): Promise<
+    { id: string; username: string; referredBy: string }[]
+  >;
   getReferralStats(username: string): Promise<{
     totalReferrals: number;
     qualifiedReferrals: number;
@@ -634,6 +637,39 @@ export class DatabaseStorage implements IStorage {
 
       return { credited: true as const, referrerId: referrer.id };
     });
+  }
+
+  // One-time backfill helper: find referred users who completed a qualifying
+  // (>= minWithdrawalUsd) cash-out BEFORE referral enforcement shipped, so they
+  // never triggered `qualifyReferral`. These are users with `referredBy` set,
+  // `referralCreditedAt` still NULL, and at least one withdrawal at or above the
+  // qualifying amount. We match the forward rule exactly — which fires on
+  // withdrawal *request* creation regardless of final status — so withdrawal
+  // status is intentionally not filtered here. The returned ids are then fed
+  // through the same idempotent `qualifyReferral` path, so re-running is safe.
+  async getReferralBackfillCandidates(
+    minWithdrawalUsd: number,
+  ): Promise<{ id: string; username: string; referredBy: string }[]> {
+    const minStr = minWithdrawalUsd.toFixed(2);
+    const rows = await db
+      .selectDistinct({
+        id: users.id,
+        username: users.username,
+        referredBy: users.referredBy,
+      })
+      .from(users)
+      .innerJoin(withdrawals, eq(withdrawals.userId, users.id))
+      .where(
+        and(
+          sql`${users.referredBy} IS NOT NULL`,
+          sql`${users.referralCreditedAt} IS NULL`,
+          gte(withdrawals.amount, minStr),
+        ),
+      );
+    return rows.filter(
+      (r): r is { id: string; username: string; referredBy: string } =>
+        typeof r.referredBy === "string" && r.referredBy.length > 0,
+    );
   }
 
   // Referral stats for a referrer, keyed by their username (== their referral
