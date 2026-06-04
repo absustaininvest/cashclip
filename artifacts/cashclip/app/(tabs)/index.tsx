@@ -290,14 +290,26 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </Pressable>
-                {balance !== null && (
-                  <View style={styles.balanceChip}>
-                    <MaterialCommunityIcons name="cash" size={15} color={Colors.primary} />
-                    <Text style={styles.balanceChipText}>${balance.toFixed(2)}</Text>
-                  </View>
-                )}
               </View>
             </View>
+
+            {/* Balance card — matches Wallet's balance card */}
+            {balance !== null && (
+              <LinearGradient
+                colors={["#0D2818", "#0A1F14"]}
+                style={styles.balanceCard}
+              >
+                <View style={styles.balanceRow}>
+                  <View>
+                    <Text style={styles.balanceLabel}>{t.wallet.totalBalance}</Text>
+                    <Text style={styles.balanceAmount}>${balance.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.coinIcon}>
+                    <MaterialCommunityIcons name="wallet" size={28} color={Colors.primary} />
+                  </View>
+                </View>
+              </LinearGradient>
+            )}
 
             {/* Today's earn strip */}
             <EarnHighlightStrip />
@@ -411,21 +423,37 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#fff",
   },
-  balanceChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(0,230,118,0.10)",
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+  balanceCard: {
     borderRadius: 20,
+    padding: 24,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(0,230,118,0.2)",
+    borderColor: "rgba(0, 230, 118, 0.15)",
   },
-  balanceChipText: {
-    fontFamily: "Outfit_700Bold",
+  balanceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  balanceLabel: {
+    fontFamily: "Outfit_400Regular",
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  balanceAmount: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 40,
+    color: Colors.text,
+    letterSpacing: -1,
+  },
+  coinIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(0, 230, 118, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   highlightStrip: {
     marginBottom: 12,
