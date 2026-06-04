@@ -44,7 +44,7 @@ export function Scene1() {
         >
           <div className="h-[1px] w-[5vw] bg-sky-400" />
           <p className="text-[1.5vw] text-sky-400 font-semibold tracking-[0.3em] uppercase">
-            One Monorepo
+            One Team
           </p>
           <div className="h-[1px] w-[5vw] bg-sky-400" />
         </motion.div>

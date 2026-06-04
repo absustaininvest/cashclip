@@ -29,7 +29,7 @@ export function Scene4() {
           initial={{ opacity: 0, y: -20 }}
           animate={phase >= 1 ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
         >
-          Unified Architecture
+          One Engine Behind It All
         </motion.h2>
       </div>
 
@@ -93,8 +93,8 @@ export function Scene4() {
           animate={phase >= 1 ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 50, scale: 0.8 }}
           transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
         >
-          <span className="text-[1.5vw] font-bold text-indigo-400">PostgreSQL</span>
-          <span className="text-[1vw] text-indigo-200/50 mt-1">Database</span>
+          <span className="text-[1.5vw] font-bold text-indigo-400">Secure Data</span>
+          <span className="text-[1vw] text-indigo-200/50 mt-1">Storage</span>
         </motion.div>
 
         {/* Central API */}
@@ -106,8 +106,8 @@ export function Scene4() {
           transition={{ type: "spring", stiffness: 150, damping: 15 }}
         >
           <div className="absolute inset-0 rounded-2xl bg-sky-400/10 animate-pulse" />
-          <div className="text-[2.5vw] font-black text-white relative z-10">Express</div>
-          <div className="text-[1.2vw] text-sky-300 mt-2 font-mono relative z-10">API / Backend</div>
+          <div className="text-[2.5vw] font-black text-white relative z-10">The Engine</div>
+          <div className="text-[1.2vw] text-sky-300 mt-2 relative z-10">Powers Both</div>
         </motion.div>
 
         {/* Animated Data Particles */}
