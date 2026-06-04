@@ -346,6 +346,76 @@ function SpinRewardModal({
   );
 }
 
+function MilestoneRewardModal({
+  visible,
+  streak,
+  bonus,
+  onClose,
+  t,
+}: {
+  visible: boolean;
+  streak: number;
+  bonus: number;
+  onClose: () => void;
+  t: Translations;
+}) {
+  const celebScale = useSharedValue(0);
+  const flameRotate = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      celebScale.value = 0;
+      celebScale.value = withSpring(1, { damping: 6, stiffness: 100 });
+      flameRotate.value = withRepeat(
+        withSequence(
+          withTiming(-12, { duration: 280, easing: Easing.inOut(Easing.ease) }),
+          withTiming(12, { duration: 280, easing: Easing.inOut(Easing.ease) }),
+        ),
+        -1,
+        true,
+      );
+    } else {
+      flameRotate.value = 0;
+    }
+  }, [visible]);
+
+  const celebStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: celebScale.value }],
+  }));
+  const flameStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${flameRotate.value}deg` }],
+  }));
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <View style={styles.modalOverlay}>
+        <Animated.View style={celebStyle}>
+          <View style={styles.milestoneModal}>
+            <Animated.View style={flameStyle}>
+              <Ionicons name="flame" size={64} color={Colors.accent} />
+            </Animated.View>
+            <Text style={styles.milestoneTitle}>
+              {t.earn.milestoneTitle.replace("{{days}}", String(streak))}
+            </Text>
+            <Text style={styles.milestoneAmount}>
+              +{bonus} {t.earn.milestoneBonusLabel}
+            </Text>
+            <Text style={styles.milestoneSubtext}>{t.earn.milestoneSubtext}</Text>
+            <Pressable onPress={onClose} style={styles.claimButton}>
+              <LinearGradient
+                colors={[Colors.primary, Colors.primaryDark]}
+                style={styles.claimGradient}
+              >
+                <Text style={styles.claimText}>{t.earn.collect}</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 function WheelSegment({
   index,
   segment,
@@ -586,6 +656,9 @@ export default function EarnScreen() {
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [dayRewards, setDayRewards] = useState<number[]>(DAY_REWARDS_FALLBACK);
+  const [milestoneEvery, setMilestoneEvery] = useState(0);
+  const [showMilestone, setShowMilestone] = useState(false);
+  const [milestoneCelebration, setMilestoneCelebration] = useState({ streak: 0, bonus: 0 });
   const [spinAvailable, setSpinAvailable] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinReward, setSpinReward] = useState(0); // pts from server
@@ -625,6 +698,7 @@ export default function EarnScreen() {
       setCheckedInToday(checkinServer.checkedInToday);
       setCheckinStreak(checkinServer.checkinStreak);
       if (checkinServer.ladder.length > 0) setDayRewards(checkinServer.ladder);
+      setMilestoneEvery(checkinServer.milestoneEvery);
     } else {
       setCheckedInToday(checkinInfo.checkedInToday);
       setCheckinStreak(checkinInfo.checkinStreak);
@@ -661,6 +735,8 @@ export default function EarnScreen() {
       setCheckinStreak(server.checkinStreak);
       if (server.milestoneBonus > 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setMilestoneCelebration({ streak: server.checkinStreak, bonus: server.milestoneBonus });
+        setShowMilestone(true);
       }
     }
     balancePulse.value = withSequence(
@@ -926,6 +1002,7 @@ export default function EarnScreen() {
               const isActive = dayNum <= checkinStreak;
               const isCurrent = dayNum === checkinStreak + 1 && !checkedInToday;
               const isToday = dayNum === checkinStreak && checkedInToday;
+              const isMilestone = milestoneEvery > 0 && dayNum % milestoneEvery === 0;
               return (
                 <View
                   key={i}
@@ -934,8 +1011,14 @@ export default function EarnScreen() {
                     isActive && styles.dayCircleActive,
                     isToday && styles.dayCircleToday,
                     isCurrent && styles.dayCircleCurrent,
+                    isMilestone && styles.dayCircleMilestone,
                   ]}
                 >
+                  {isMilestone && (
+                    <View style={styles.dayMilestoneBadge}>
+                      <Ionicons name="star" size={9} color={Colors.background} />
+                    </View>
+                  )}
                   {isActive ? (
                     <Ionicons
                       name="checkmark"
@@ -947,6 +1030,7 @@ export default function EarnScreen() {
                       style={[
                         styles.dayNum,
                         isCurrent && { color: Colors.primary },
+                        isMilestone && { color: Colors.accent },
                       ]}
                     >
                       {dayNum}
@@ -957,6 +1041,7 @@ export default function EarnScreen() {
                       styles.dayReward,
                       isActive && { color: Colors.primary },
                       isCurrent && { color: Colors.primary },
+                      isMilestone && !isActive && { color: Colors.accent },
                     ]}
                   >
                     {reward} pts
@@ -1323,6 +1408,14 @@ export default function EarnScreen() {
         t={t}
       />
 
+      <MilestoneRewardModal
+        visible={showMilestone}
+        streak={milestoneCelebration.streak}
+        bonus={milestoneCelebration.bonus}
+        onClose={() => setShowMilestone(false)}
+        t={t}
+      />
+
       <Modal visible={adLoading} transparent animationType="fade">
         <View style={styles.adLoadingOverlay}>
           <View style={styles.adLoadingBox}>
@@ -1442,6 +1535,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.primary,
     borderStyle: "dashed",
+  },
+  dayCircleMilestone: {
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+  },
+  dayMilestoneBadge: {
+    position: "absolute",
+    top: -6,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   dayNum: {
     fontFamily: "Outfit_600SemiBold",
@@ -1693,6 +1802,37 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     marginBottom: 8,
+  },
+  milestoneModal: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    width: SCREEN_WIDTH - 64,
+    maxWidth: 340,
+  },
+  milestoneTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 24,
+    color: Colors.text,
+    marginTop: 16,
+    textAlign: "center",
+  },
+  milestoneAmount: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 40,
+    color: Colors.accent,
+    marginTop: 8,
+  },
+  milestoneSubtext: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 8,
+    textAlign: "center",
   },
   claimReadyBadge: {
     flexDirection: "row",

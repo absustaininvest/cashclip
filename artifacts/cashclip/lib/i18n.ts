@@ -67,6 +67,9 @@ const en = {
       rewardEarned: "Reward Earned!",
       sRemaining: "s remaining",
       claimReward: "Claim Reward",
+      milestoneTitle: "{{days}}-day streak!",
+      milestoneBonusLabel: "bonus pts",
+      milestoneSubtext: "Milestone bonus added to your pending earnings",
     },
     wallet: {
       totalBalance: "Total Balance",
@@ -598,6 +601,9 @@ const translations: Record<Language, Translations> = {
       rewardEarned: "Recompensa Ganada!",
       sRemaining: "s restantes",
       claimReward: "Reclamar Recompensa",
+      milestoneTitle: "Racha de {{days}} días!",
+      milestoneBonusLabel: "pts de bono",
+      milestoneSubtext: "Bono de hito agregado a tus ganancias pendientes",
     },
     wallet: {
       totalBalance: "Saldo Total",
