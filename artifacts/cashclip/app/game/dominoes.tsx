@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -271,7 +271,7 @@ export default function DominoesGame() {
           : result === "draw"
           ? "Dominoes: Draw"
           : "Dominoes: Lost";
-      recordGamePlay("dominoes", reward, desc);
+      recordGamePlay("dominoes", dollarsToPoints(reward), desc);
       setTimeout(showResult, 500);
     },
     [showResult]
@@ -701,7 +701,7 @@ export default function DominoesGame() {
                   <Ionicons name="trophy" size={48} color={Colors.accent} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                <Text style={styles.resultReward}>${reward.toFixed(2)}</Text>
+                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
               </>
             ) : gameState === "draw" ? (
               <>
@@ -709,7 +709,7 @@ export default function DominoesGame() {
                   <Ionicons name="remove-circle" size={48} color={Colors.warning} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.draw}</Text>
-                <Text style={styles.resultReward}>${reward.toFixed(2)}</Text>
+                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
               </>
             ) : (
               <>
@@ -717,7 +717,7 @@ export default function DominoesGame() {
                   <Ionicons name="close-circle" size={48} color={Colors.error} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youLose}</Text>
-                <Text style={styles.resultReward}>${reward.toFixed(2)}</Text>
+                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
               </>
             )}
 

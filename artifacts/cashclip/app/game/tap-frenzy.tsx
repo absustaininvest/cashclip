@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -178,7 +178,7 @@ export default function TapFrenzyScreen() {
     setReward(earnedReward);
     setGameState("finished");
 
-    recordGamePlay("tap-frenzy", earnedReward, `Tap Frenzy: ${finalScore} taps - $${earnedReward.toFixed(2)}`);
+    recordGamePlay("tap-frenzy", dollarsToPoints(earnedReward), `Tap Frenzy: ${finalScore} taps - ${formatPoints(dollarsToPoints(earnedReward))}`);
     setCanPlay(false);
   }, []);
 
@@ -353,17 +353,17 @@ export default function TapFrenzyScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.rewardValue]}>${reward.toFixed(2)}</Text>
+              <Text style={[styles.statValue, styles.rewardValue]}>{formatPoints(dollarsToPoints(reward))}</Text>
               <Text style={styles.statLabel}>{t.games.earned}</Text>
             </View>
           </View>
 
           <View style={styles.tierBreakdown}>
             {[
-              { min: 0, max: 10, reward: "$0.03" },
-              { min: 11, max: 20, reward: "$0.08" },
-              { min: 21, max: 30, reward: "$0.15" },
-              { min: 31, max: 99, reward: "$0.25" },
+              { min: 0, max: 10, reward: "300 pts" },
+              { min: 11, max: 20, reward: "800 pts" },
+              { min: 21, max: 30, reward: "1,500 pts" },
+              { min: 31, max: 99, reward: "2,500 pts" },
             ].map((tier, i) => (
               <View
                 key={i}

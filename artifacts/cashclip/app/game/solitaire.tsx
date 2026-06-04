@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -297,7 +297,7 @@ export default function SolitaireGame() {
             setGameState("won");
             if (!rewardRecorded.current) {
               rewardRecorded.current = true;
-              recordGamePlay("solitaire", 0.25, "Solitaire: Won the game!");
+              recordGamePlay("solitaire", dollarsToPoints(0.25), "Solitaire: Won the game!");
             }
             setTimeout(showResult, 500);
           }
@@ -448,7 +448,7 @@ export default function SolitaireGame() {
           setGameState("won");
           if (!rewardRecorded.current) {
             rewardRecorded.current = true;
-            recordGamePlay("solitaire", 0.25, "Solitaire: Won the game!");
+            recordGamePlay("solitaire", dollarsToPoints(0.25), "Solitaire: Won the game!");
           }
           setTimeout(showResult, 500);
         }
@@ -462,7 +462,7 @@ export default function SolitaireGame() {
   const handleGiveUp = useCallback(() => {
     if (!rewardRecorded.current) {
       rewardRecorded.current = true;
-      recordGamePlay("solitaire", 0.05, "Solitaire: Played but did not win");
+      recordGamePlay("solitaire", dollarsToPoints(0.05), "Solitaire: Played but did not win");
     }
     setGameState("won");
     setTimeout(showResult, 100);

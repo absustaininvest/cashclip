@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const CATCHER_WIDTH = 80;
@@ -134,7 +134,7 @@ export default function CoinCatcherScreen() {
     const finalScore = Math.max(0, scoreRef.current);
     const reward = parseFloat(finalScore.toFixed(2));
     if (reward > 0) {
-      recordGamePlay("coin-catcher", reward, `Coin Catcher: earned $${reward.toFixed(2)}`);
+      recordGamePlay("coin-catcher", dollarsToPoints(reward), `Coin Catcher: earned ${formatPoints(dollarsToPoints(reward))}`);
     }
   }, [cleanup]);
 
@@ -327,11 +327,11 @@ export default function CoinCatcherScreen() {
             {finalReward > 0 ? t.games.youWon : t.games.gameOver}
           </Text>
           {finalReward > 0 && (
-            <Text style={styles.rewardAmount}>${finalReward.toFixed(2)}</Text>
+            <Text style={styles.rewardAmount}>{formatPoints(dollarsToPoints(finalReward))}</Text>
           )}
           <Text style={styles.resultSubtitle}>
             {finalReward > 0
-              ? `${t.games.earned}: $${finalReward.toFixed(2)}`
+              ? `${t.games.earned}: ${formatPoints(dollarsToPoints(finalReward))}`
               : t.games.tryHarder}
           </Text>
           <TouchableOpacity

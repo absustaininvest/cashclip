@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -204,7 +204,7 @@ export default function TetrisGame() {
     }
     const totalLines = linesRef.current;
     const reward = getReward(totalLines);
-    recordGamePlay("tetris", reward, `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
+    recordGamePlay("tetris", dollarsToPoints(reward), `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
   }, []);
 
   const spawnNewPiece = useCallback(() => {
@@ -442,7 +442,7 @@ export default function TetrisGame() {
                 <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
                 <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
                 <Text style={styles.gameOverLines}>{t.games.lines}: {lines} | {t.games.level}: {level}</Text>
-                <Text style={styles.gameOverReward}>${reward.toFixed(2)}</Text>
+                <Text style={styles.gameOverReward}>{formatPoints(dollarsToPoints(reward))}</Text>
                 <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
 
                 <TouchableOpacity testID="play-again-button" style={styles.playAgainBtn} onPress={handleNewGame}>

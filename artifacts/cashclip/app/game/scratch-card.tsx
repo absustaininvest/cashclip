@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -138,7 +138,7 @@ function ScratchCell({
           ]}
         >
           <Ionicons name={config.icon as any} size={36} color={config.color} />
-          <Text style={[styles.cellReward, { color: config.color }]}>${config.reward.toFixed(2)}</Text>
+          <Text style={[styles.cellReward, { color: config.color }]}>{formatPoints(dollarsToPoints(config.reward))}</Text>
         </Animated.View>
       </Animated.View>
     </TouchableOpacity>
@@ -203,7 +203,7 @@ export default function ScratchCardGame() {
         setMatchedSymbol(symbol);
         setGameState("won");
         const reward = SYMBOL_CONFIG[symbol].reward;
-        recordGamePlay("scratch-card", reward, `Scratch Card: matched 3 ${symbol}s`);
+        recordGamePlay("scratch-card", dollarsToPoints(reward), `Scratch Card: matched 3 ${symbol}s`);
         setTimeout(showResult, 500);
       } else if (newCount >= 9) {
         setGameState("lost");
@@ -269,7 +269,7 @@ export default function ScratchCardGame() {
                   <View key={key} style={styles.legendItem}>
                     <Ionicons name={config.icon as any} size={18} color={config.color} />
                     <Text style={[styles.legendText, { color: config.color }]}>
-                      ${config.reward.toFixed(2)}
+                      {formatPoints(dollarsToPoints(config.reward))}
                     </Text>
                   </View>
                 )
@@ -293,7 +293,7 @@ export default function ScratchCardGame() {
                   <Ionicons name="trophy" size={48} color={Colors.accent} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                <Text style={styles.resultReward}>${reward.toFixed(2)}</Text>
+                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
                 <Text style={styles.resultSubtext}>
                   {t.games.matched} 3x {matchedSymbol}
                 </Text>

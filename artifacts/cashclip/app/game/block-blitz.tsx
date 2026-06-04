@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GRID_SIZE = 8;
@@ -221,7 +221,7 @@ export default function BlockBlitzGame() {
     if (linesCleared >= 5) reward = 0.08;
     if (linesCleared >= 12) reward = 0.15;
     if (linesCleared >= 20) reward = 0.25;
-    await recordGamePlay("block-blitz", reward, `Block Blitz: ${score} pts, ${linesCleared} lines`);
+    await recordGamePlay("block-blitz", dollarsToPoints(reward), `Block Blitz: ${score} pts, ${linesCleared} lines`);
   }, [score, linesCleared]);
 
   const handleCellPress = useCallback(

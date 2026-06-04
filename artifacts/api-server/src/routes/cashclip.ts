@@ -29,7 +29,7 @@ import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
-import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX } from "../withdrawalTiers";
+import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
@@ -836,8 +836,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // New-account hold: an account must age NEW_ACCOUNT_HOLD_HOURS (default
+      // 48h) before its first withdrawal. This blocks throwaway accounts farmed
+      // for an instant payout while letting genuine users cash out after a short
+      // wait. Enforced server-side off the trusted user.createdAt timestamp.
+      const holdMs = NEW_ACCOUNT_HOLD_HOURS * 60 * 60 * 1000;
+      const accountAgeMs = Date.now() - new Date(user.createdAt).getTime();
+      if (holdMs > 0 && accountAgeMs < holdMs) {
+        const hoursLeft = Math.max(1, Math.ceil((holdMs - accountAgeMs) / (60 * 60 * 1000)));
+        res.status(403).json({
+          error: `For your account's security, new accounts can make their first withdrawal ${NEW_ACCOUNT_HOLD_HOURS} hours after signing up. Please try again in about ${hoursLeft} hour${hoursLeft === 1 ? "" : "s"}. Your balance is safe in the meantime.`,
+          code: "NEW_ACCOUNT_HOLD",
+          hoursLeft,
+        });
+        return;
+      }
+
+      // Survey-profile required before the FIRST withdrawal. Completing the
+      // survey profile is what unlocks paid surveys and lets us verify the
+      // account, so it's required once before any money leaves. Returning users
+      // (who already have a prior withdrawal) are not re-gated.
+      if (!user.profileComplete) {
+        const priorWithdrawals = await storage.getUserWithdrawals(req.userId!);
+        if (priorWithdrawals.length === 0) {
+          res.status(403).json({
+            error: "Please complete your survey profile before your first withdrawal. It only takes a minute, unlocks paid surveys, and helps us verify your account.",
+            code: "PROFILE_REQUIRED",
+          });
+          return;
+        }
+      }
+
       const dayStart = new Date();
       dayStart.setUTCHours(0, 0, 0, 0);
+
+      const dailyFloatMax = getDailyPayoutFloatUsd();
 
       const result = await storage.createWithdrawalAtomic({
         userId: req.userId!,
@@ -848,6 +881,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalPayout: tier.totalPayout.toFixed(2),
         paypalEmail: paypalEmail.trim(),
         dailyCapMax: DAILY_WITHDRAWAL_MAX,
+        maxPerDay: MAX_WITHDRAWALS_PER_DAY,
+        dailyFloatMax,
         dayStart,
       });
 
@@ -858,6 +893,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             dailyLimit: DAILY_WITHDRAWAL_MAX,
             withdrawnToday: result.withdrawnToday,
             remaining: result.remaining,
+          }); return;
+        }
+        if (result.reason === "DAILY_COUNT_EXCEEDED") {
+          res.status(400).json({
+            error: `You can request up to ${result.maxPerDay} withdrawal${result.maxPerDay === 1 ? "" : "s"} per day. You've reached today's limit — please come back tomorrow.`,
+            code: "DAILY_COUNT_EXCEEDED",
+            maxPerDay: result.maxPerDay,
+            withdrawalsTodayCount: result.withdrawalsTodayCount,
+          }); return;
+        }
+        if (result.reason === "FLOAT_EXCEEDED") {
+          // Float discipline reached: total payouts for everyone today have hit
+          // the daily revenue float. The user's balance is untouched — they just
+          // need to wait until the float refreshes tomorrow.
+          res.status(429).json({
+            error: "We've reached today's payout limit across all members. Your balance is safe — please come back tomorrow to withdraw. Thanks for your patience!",
+            code: "PAYOUT_FLOAT_REACHED",
           }); return;
         }
         res.status(400).json({ error: "Insufficient balance", balance: result.balance }); return;

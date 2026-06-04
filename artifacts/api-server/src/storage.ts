@@ -19,7 +19,7 @@ import {
   securityAuditLog,
 } from "@workspace/db";
 import { db } from "@workspace/db";
-import { eq, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
+import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -130,10 +130,14 @@ export interface IStorage {
     totalPayout: string;
     paypalEmail: string;
     dailyCapMax: number;
+    maxPerDay: number;
+    dailyFloatMax: number;
     dayStart: Date;
   }): Promise<
     | { ok: true; withdrawal: Withdrawal; balance: number; withdrawalsTodayCount: number }
     | { ok: false; reason: "DAILY_CAP_EXCEEDED"; withdrawnToday: number; remaining: number }
+    | { ok: false; reason: "DAILY_COUNT_EXCEEDED"; withdrawalsTodayCount: number; maxPerDay: number }
+    | { ok: false; reason: "FLOAT_EXCEEDED"; floatMax: number; paidOutToday: number; remaining: number }
     | { ok: false; reason: "INSUFFICIENT_BALANCE"; balance: number }
   >;
   getWithdrawals(status?: string): Promise<Withdrawal[]>;
@@ -564,16 +568,27 @@ export class DatabaseStorage implements IStorage {
     totalPayout: string;
     paypalEmail: string;
     dailyCapMax: number;
+    maxPerDay: number;
+    dailyFloatMax: number;
     dayStart: Date;
   }): Promise<
     | { ok: true; withdrawal: Withdrawal; balance: number; withdrawalsTodayCount: number }
     | { ok: false; reason: "DAILY_CAP_EXCEEDED"; withdrawnToday: number; remaining: number }
+    | { ok: false; reason: "DAILY_COUNT_EXCEEDED"; withdrawalsTodayCount: number; maxPerDay: number }
+    | { ok: false; reason: "FLOAT_EXCEEDED"; floatMax: number; paidOutToday: number; remaining: number }
     | { ok: false; reason: "INSUFFICIENT_BALANCE"; balance: number }
   > {
-    const { userId, username, amount, bonusPercent, bonusAmount, totalPayout, paypalEmail, dailyCapMax, dayStart } = args;
+    const { userId, username, amount, bonusPercent, bonusAmount, totalPayout, paypalEmail, dailyCapMax, maxPerDay, dailyFloatMax, dayStart } = args;
     const amountStr = amount.toFixed(2);
 
     return await db.transaction(async (tx: DbTx) => {
+      // Serialize all withdrawal creations globally for the duration of this
+      // transaction with a transaction-scoped advisory lock. This is required so
+      // the per-day FLOAT (total outflow across ALL users) check below is
+      // race-free: a row lock on one user would not stop a concurrent
+      // withdrawal by a different user from blowing past the float ceiling.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(742241)`);
+
       // Acquire a row-level lock on the user row for the duration of this
       // transaction. Concurrent withdrawal requests for the same user will
       // block here until the first one commits or rolls back, which
@@ -592,9 +607,34 @@ export class DatabaseStorage implements IStorage {
 
       const withdrawnToday = parseFloat(todaySumRow?.total ?? "0");
       const priorWithdrawalsToday = Number(todaySumRow?.count ?? 0);
+
+      // Per-user count limit (e.g. max 2 withdrawals/day).
+      if (priorWithdrawalsToday >= maxPerDay) {
+        return {
+          ok: false as const,
+          reason: "DAILY_COUNT_EXCEEDED" as const,
+          withdrawalsTodayCount: priorWithdrawalsToday,
+          maxPerDay,
+        };
+      }
+
       if (withdrawnToday + amount > dailyCapMax + 1e-9) {
         const remaining = Math.max(0, dailyCapMax - withdrawnToday);
         return { ok: false as const, reason: "DAILY_CAP_EXCEEDED" as const, withdrawnToday, remaining };
+      }
+
+      // Float discipline: total outflow committed across ALL users today must
+      // not exceed the revenue float. Rejected (refunded) withdrawals don't
+      // count because that money was returned to the user, never paid out.
+      const [floatRow] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${withdrawals.amount}::numeric), 0)` })
+        .from(withdrawals)
+        .where(and(gte(withdrawals.createdAt, dayStart), ne(withdrawals.status, "rejected")));
+
+      const paidOutToday = parseFloat(floatRow?.total ?? "0");
+      if (paidOutToday + amount > dailyFloatMax + 1e-9) {
+        const remaining = Math.max(0, dailyFloatMax - paidOutToday);
+        return { ok: false as const, reason: "FLOAT_EXCEEDED" as const, floatMax: dailyFloatMax, paidOutToday, remaining };
       }
 
       // Debit the balance, guarded by a sufficient-balance predicate.

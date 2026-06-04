@@ -49,3 +49,7 @@ export async function showRewardedAd(_adUnitId?: string): Promise<{ rewarded: bo
 export async function showInterstitialAd(_adUnitId?: string): Promise<boolean> {
   return false;
 }
+
+export async function maybeShowInterstitial(): Promise<boolean> {
+  return false;
+}

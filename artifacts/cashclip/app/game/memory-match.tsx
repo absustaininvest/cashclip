@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -263,7 +263,7 @@ export default function MemoryMatchGame() {
 
               recordGamePlay(
                 "memory-match",
-                earnedReward,
+                dollarsToPoints(earnedReward),
                 `Memory Match - ${newMoves} moves`
               );
 
@@ -425,7 +425,7 @@ export default function MemoryMatchGame() {
               <View style={styles.resultStatItem}>
                 <Text style={styles.resultStatLabel}>{t.games.reward}</Text>
                 <Text style={[styles.resultStatValue, { color: Colors.primary }]}>
-                  ${reward.toFixed(2)}
+                  {formatPoints(dollarsToPoints(reward))}
                 </Text>
               </View>
             </View>

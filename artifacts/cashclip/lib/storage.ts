@@ -348,7 +348,17 @@ export async function redeemReferralCode(code: string): Promise<{ success: boole
 // POINTS (what the UI shows); this converts them back into the local dollar-based
 // mock balance so the optimistic local balance stays numerically consistent. The
 // authoritative point→cash conversion is server-side and unchanged.
-const DISPLAY_POINTS_PER_DOLLAR = 10000;
+export const DISPLAY_POINTS_PER_DOLLAR = 10000;
+
+// Convert a dollar reward into the points the user sees (10,000 pts = $1).
+export function dollarsToPoints(dollars: number): number {
+  return Math.round(dollars * DISPLAY_POINTS_PER_DOLLAR);
+}
+
+// Format a points value for display, e.g. 1500 -> "1,500 pts".
+export function formatPoints(points: number): string {
+  return `${Math.round(points).toLocaleString("en-US")} pts`;
+}
 
 // Returns the calendar day in US Eastern time (midnight EST/EDT boundary) so the
 // daily check-in resets at 00:00 Eastern regardless of the device's timezone.
@@ -788,7 +798,7 @@ const GAME_COOLDOWN_KEYS: Record<string, string> = {
   "block-blitz": KEYS.LAST_BLOCK_BLITZ_DATE,
 };
 
-export async function recordGamePlay(gameId: string, reward: number, description: string): Promise<void> {
+export async function recordGamePlay(gameId: string, points: number, description: string): Promise<void> {
   const today = new Date().toDateString();
   const cooldownKey = GAME_COOLDOWN_KEYS[gameId];
   if (cooldownKey) {
@@ -798,10 +808,22 @@ export async function recordGamePlay(gameId: string, reward: number, description
   const gamesPlayed = await getNumber(KEYS.GAMES_PLAYED, 0);
   await setNumber(KEYS.GAMES_PLAYED, gamesPlayed + 1);
 
-  const gameEarnings = await getNumber(KEYS.GAME_EARNINGS, 0);
-  await setNumber(KEYS.GAME_EARNINGS, gameEarnings + reward);
+  // Games award POINTS (display currency, 10,000 pts = $1), not direct dollars.
+  // Mirror the mission pattern: convert points to their dollar-equivalent for
+  // the optimistic local balance. The authoritative economy is server-side.
+  const dollars = points / DISPLAY_POINTS_PER_DOLLAR;
 
-  await addEarnings(reward, description, "game");
+  const gameEarnings = await getNumber(KEYS.GAME_EARNINGS, 0);
+  await setNumber(KEYS.GAME_EARNINGS, gameEarnings + dollars);
+
+  await addEarnings(dollars, description, "game");
+
+  // Finishing a game round is a natural transition — attempt a frequency-capped
+  // interstitial. Fire-and-forget and lazily imported so it never blocks the
+  // reward flow and adds no startup cost. No-op on web / when AdMob isn't ready.
+  import("./admob")
+    .then((m) => m.maybeShowInterstitial())
+    .catch(() => {});
 }
 
 export async function canPlayGame(gameId: string): Promise<boolean> {

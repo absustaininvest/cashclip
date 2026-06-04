@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -212,7 +212,7 @@ export default function TriviaGame() {
     setGameState("finished");
 
     if (reward > 0) {
-      await recordGamePlay("trivia", reward, `Trivia Quiz: ${finalCorrect}/10 correct`);
+      await recordGamePlay("trivia", dollarsToPoints(reward), `Trivia Quiz: ${finalCorrect}/10 correct`);
     }
   }, [correctCount]);
 
@@ -361,7 +361,7 @@ export default function TriviaGame() {
       {totalReward > 0 && (
         <View style={styles.rewardBadge}>
           <Ionicons name="cash" size={20} color={Colors.background} />
-          <Text style={styles.rewardBadgeText}>+${totalReward.toFixed(2)}</Text>
+          <Text style={styles.rewardBadgeText}>+{formatPoints(dollarsToPoints(totalReward))}</Text>
         </View>
       )}
 

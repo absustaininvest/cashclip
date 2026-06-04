@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import type { RewardedAd as RewardedAdType, RewardedAdReward } from "react-native-google-mobile-ads";
 import {
@@ -466,6 +467,37 @@ export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boo
     console.warn("Rewarded ad error:", e);
     preloadRewardedAd();
     return { rewarded: false };
+  }
+}
+
+// Minimum gap between interstitials so they stay non-annoying. Interstitials
+// only fire at natural transitions (e.g. finishing a game round) and are capped
+// to at most one per this window across the whole app.
+const INTERSTITIAL_MIN_GAP_MS = 4 * 60 * 1000;
+const INTERSTITIAL_LAST_AT_KEY = "cashclip_last_interstitial_at";
+
+/**
+ * Frequency-capped interstitial. Call this at natural transition points. It
+ * shows an interstitial only if AdMob is ready and the last one was more than
+ * INTERSTITIAL_MIN_GAP_MS ago. Impressions/completions are tracked inside
+ * showInterstitialAd, so these count in the ads-revenue analytics path.
+ * Fails closed (returns false) on any error so it never blocks the user.
+ */
+export async function maybeShowInterstitial(): Promise<boolean> {
+  if (!isAdMobReady()) return false;
+  try {
+    const raw = await AsyncStorage.getItem(INTERSTITIAL_LAST_AT_KEY);
+    const last = raw ? parseInt(raw, 10) : 0;
+    if (Number.isFinite(last) && last > 0 && Date.now() - last < INTERSTITIAL_MIN_GAP_MS) {
+      return false;
+    }
+    // Stamp the time up-front so rapid transitions or a slow ad load can't
+    // queue two interstitials back-to-back.
+    await AsyncStorage.setItem(INTERSTITIAL_LAST_AT_KEY, Date.now().toString());
+    return await showInterstitialAd();
+  } catch (e) {
+    console.warn("maybeShowInterstitial error:", e);
+    return false;
   }
 }
 

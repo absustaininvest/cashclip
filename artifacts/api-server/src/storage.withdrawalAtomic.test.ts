@@ -84,20 +84,36 @@ function makeTx(userId: string, dayStart: Date) {
       // acquireUserLock in db.transaction; nothing to do here.
     }),
 
-    select: (_fields: unknown) => ({
+    select: (fields: Record<string, unknown> | unknown) => ({
       from: (table: unknown) => ({
         where: (_cond: unknown) => {
-          // Two different SELECT shapes are used by createWithdrawalAtomic:
-          //   1) sum of today's withdrawals (from the withdrawals table)
-          //   2) balance fallback read (from the users table)
-          //
-          // We distinguish by which table object was passed.
+          // Three SELECT shapes are used by createWithdrawalAtomic:
+          //   1) per-user sum+count of today's withdrawals (withdrawals table,
+          //      fields include a `count` key)
+          //   2) global FLOAT sum across ALL users today, excluding rejected
+          //      (withdrawals table, fields are just `{ total }`)
+          //   3) balance fallback read (users table)
           if (table === "withdrawals_table") {
-            // Daily sum query
-            const todayTotal = dbWithdrawals
-              .filter((w) => w.userId === userId && w.createdAt >= dayStart)
-              .reduce((s, w) => s + parseFloat(w.amount), 0);
-            return new FakeQuery([{ total: todayTotal.toFixed(2) }]);
+            const isPerUser =
+              !!fields && Object.prototype.hasOwnProperty.call(fields, "count");
+            if (isPerUser) {
+              const rows = dbWithdrawals.filter(
+                (w) => w.userId === userId && w.createdAt >= dayStart,
+              );
+              const todayTotal = rows.reduce((s, w) => s + parseFloat(w.amount), 0);
+              return new FakeQuery([
+                { total: todayTotal.toFixed(2), count: rows.length },
+              ]);
+            }
+            // Global float sum (all users, excluding refunded/rejected rows).
+            const floatRows = dbWithdrawals.filter(
+              (w) => w.createdAt >= dayStart && w.status !== "rejected",
+            );
+            const floatTotal = floatRows.reduce(
+              (s, w) => s + parseFloat(w.amount),
+              0,
+            );
+            return new FakeQuery([{ total: floatTotal.toFixed(2) }]);
           }
           // Balance fallback (users table)
           const user = dbUsers.find((u) => u.id === userId);
@@ -222,8 +238,29 @@ const BASE_ARGS = {
   totalPayout: "7.00",
   paypalEmail: "user@example.com",
   dailyCapMax: 7,
+  maxPerDay: 2,
+  dailyFloatMax: 60,
   dayStart: DAY_START,
 } as const;
+
+function makeWithdrawalRow(
+  amount: string,
+  status = "pending",
+  userId = "user-1",
+): FakeWithdrawal {
+  return {
+    id: `w-seed-${dbWithdrawals.length + 1}`,
+    userId,
+    username: "testuser",
+    amount,
+    bonusPercent: "0.00",
+    bonusAmount: "0.00",
+    totalPayout: amount,
+    paypalEmail: "user@example.com",
+    status,
+    createdAt: new Date(),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -265,6 +302,56 @@ describe("createWithdrawalAtomic — daily-cap enforcement", () => {
       expect((result as { reason: string }).reason).toBe("DAILY_CAP_EXCEEDED");
     }
     // Balance must be untouched.
+    expect(parseFloat(dbUsers[0]!.balance)).toBeCloseTo(14, 2);
+  });
+
+  it("rejects when the per-day withdrawal COUNT is reached", async () => {
+    // Two small prior withdrawals today exhaust the maxPerDay=2 limit without
+    // hitting the dollar cap, so the next request must fail on count.
+    dbWithdrawals.push(makeWithdrawalRow("1.00"));
+    dbWithdrawals.push(makeWithdrawalRow("1.00"));
+
+    const store = new DatabaseStorage();
+    const result = await store.createWithdrawalAtomic({
+      ...BASE_ARGS,
+      amount: 3,
+      totalPayout: "3.00",
+      dailyCapMax: 100, // high so the cap can't be what trips
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("DAILY_COUNT_EXCEEDED");
+    }
+    // No new withdrawal row, balance untouched.
+    expect(dbWithdrawals).toHaveLength(2);
+    expect(parseFloat(dbUsers[0]!.balance)).toBeCloseTo(14, 2);
+  });
+
+  it("rejects when the global daily payout FLOAT is reached", async () => {
+    // Another user has already drained today's float; this user's request must
+    // be paced even though their own count/cap/balance are all fine.
+    dbWithdrawals.push(makeWithdrawalRow("5.00", "pending", "user-2"));
+
+    const store = new DatabaseStorage();
+    const result = await store.createWithdrawalAtomic({
+      ...BASE_ARGS,
+      amount: 7,
+      totalPayout: "7.00",
+      dailyCapMax: 100, // high so the cap can't be what trips
+      dailyFloatMax: 10, // 5 already paid + 7 would exceed 10
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.reason === "FLOAT_EXCEEDED") {
+      expect(result.floatMax).toBeCloseTo(10, 2);
+      expect(result.paidOutToday).toBeCloseTo(5, 2);
+      expect(result.remaining).toBeCloseTo(5, 2);
+    } else {
+      expect((result as { reason: string }).reason).toBe("FLOAT_EXCEEDED");
+    }
+    // Only the seeded row exists; balance untouched.
+    expect(dbWithdrawals).toHaveLength(1);
     expect(parseFloat(dbUsers[0]!.balance)).toBeCloseTo(14, 2);
   });
 
