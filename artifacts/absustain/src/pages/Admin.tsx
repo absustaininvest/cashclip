@@ -41,6 +41,7 @@ import {
   History,
   ChevronLeft,
   Globe,
+  Search,
 } from "lucide-react";
 
 interface Lead {
