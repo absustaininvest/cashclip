@@ -191,6 +191,7 @@ beforeAll(async () => {
       description text NOT NULL,
       ref_id text,
       provider text,
+      actor_user_id varchar,
       created_at timestamptz NOT NULL DEFAULT now()
     );
     CREATE TABLE conversion_rates (
