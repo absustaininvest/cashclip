@@ -1364,6 +1364,7 @@ function InboxPanel({ token }: { token: string }) {
 
   const sendReply = useCallback(async () => {
     if (!selected) return;
+    if (replySending) return;
     if (!replyBody.trim()) {
       setReplyError("Reply message cannot be empty.");
       return;
@@ -1399,7 +1400,7 @@ function InboxPanel({ token }: { token: string }) {
     } finally {
       setReplySending(false);
     }
-  }, [selected, replyBody, token]);
+  }, [selected, replyBody, replySending, token]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);

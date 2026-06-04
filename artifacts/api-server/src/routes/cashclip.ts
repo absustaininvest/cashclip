@@ -25,7 +25,8 @@ import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
 import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
-import { recordLoginAttempt } from "../lib/dbRateLimit";
+import { recordLoginAttempt, decrementLoginAttempt } from "../lib/dbRateLimit";
+import { createHash } from "node:crypto";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
@@ -1863,7 +1864,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const subject = rawSubject || "Re: your message";
 
-      await sendSupportReply({ to, subject, body, inReplyTo: inReplyTo || undefined });
+      // Dedupe guard: prevent the same reply being sent twice in quick
+      // succession (double-click, retry on a slow SMTP response, impatient
+      // operator). Keyed on admin + Message-ID (or recipient/subject) + body
+      // hash. Backed by the shared login_attempts table so it holds across
+      // autoscaled replicas, per threat_model.md.
+      const dedupeBasis = [
+        req.userId ?? "",
+        inReplyTo || "",
+        to.toLowerCase(),
+        subject,
+        body,
+      ].join("\u0000");
+      const dedupeKey = `inbox_reply:${createHash("sha256")
+        .update(dedupeBasis)
+        .digest("hex")
+        .slice(0, 40)}`;
+      const DEDUPE_WINDOW_MS = 30_000;
+      const { count } = await recordLoginAttempt(dedupeKey, 1, DEDUPE_WINDOW_MS);
+      if (count > 1) {
+        req.log.warn(
+          {
+            action: "inbox_reply_duplicate_suppressed",
+            adminUserId: req.userId,
+            to,
+            inReplyTo: inReplyTo || null,
+          },
+          "Suppressed duplicate inbox reply",
+        );
+        res.status(409).json({
+          error:
+            "This reply was just sent. Please wait a moment before sending it again.",
+          duplicate: true,
+        });
+        return;
+      }
+
+      try {
+        await sendSupportReply({ to, subject, body, inReplyTo: inReplyTo || undefined });
+      } catch (sendErr) {
+        // Release the reserved slot so a genuine retry after a failed send
+        // is not blocked by the dedupe window.
+        await decrementLoginAttempt(dedupeKey).catch(() => {});
+        throw sendErr;
+      }
 
       req.log.info(
         {
