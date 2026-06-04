@@ -292,4 +292,46 @@ describe("admin credit audit-trail copy (real sendAdminCreditReceipt)", () => {
     const recipients = mockSendMail.mock.calls.map((c) => (c[0] as { to: string }).to);
     expect(recipients).toEqual([SUPPORT_EMAIL]);
   });
+
+  it("attributes the acting admin in the support@ audit copy", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "victim@example.com",
+      username: "victim",
+      amount: 10,
+      newBalance: 15,
+      note: "support refund",
+      actor: ADMIN_ID,
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(2));
+
+    const auditCopy = mockSendMail.mock.calls
+      .map((c) => c[0] as { to: string; text: string; html: string })
+      .find((m) => m.to === SUPPORT_EMAIL);
+    expect(auditCopy).toBeDefined();
+    expect(auditCopy!.text).toContain(`Issued by: ${ADMIN_ID}`);
+    expect(auditCopy!.html).toContain(ADMIN_ID);
+  });
+
+  it("falls back to 'unknown admin' in the audit copy when no actor is given", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "victim@example.com",
+      username: "victim",
+      amount: 10,
+      newBalance: 15,
+      note: "support refund",
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(2));
+
+    const auditCopy = mockSendMail.mock.calls
+      .map((c) => c[0] as { to: string; text: string })
+      .find((m) => m.to === SUPPORT_EMAIL);
+    expect(auditCopy).toBeDefined();
+    expect(auditCopy!.text).toContain("Issued by: unknown admin");
+  });
 });

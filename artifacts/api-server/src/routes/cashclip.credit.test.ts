@@ -373,4 +373,26 @@ describe("admin credit audit-trail copy (real sendAdminCreditReceipt)", () => {
     const recipients = mockSendMail.mock.calls.map((c) => (c[0] as { to: string }).to);
     expect(recipients).toEqual([SUPPORT_EMAIL]);
   });
+
+  it("attributes the acting admin in the support@ audit copy for a correction", async () => {
+    const { sendAdminCreditReceipt } = await loadReal();
+
+    sendAdminCreditReceipt({
+      to: "victim@example.com",
+      username: "victim",
+      amount: -4,
+      newBalance: 5,
+      note: "reverse error",
+      actor: "admin-1",
+    });
+
+    await vi.waitFor(() => expect(mockSendMail).toHaveBeenCalledTimes(2));
+
+    const auditCopy = mockSendMail.mock.calls
+      .map((c) => c[0] as { to: string; text: string; html: string })
+      .find((m) => m.to === SUPPORT_EMAIL);
+    expect(auditCopy).toBeDefined();
+    expect(auditCopy!.text).toContain("Issued by: admin-1");
+    expect(auditCopy!.html).toContain("admin-1");
+  });
 });

@@ -364,8 +364,11 @@ export function sendAdminCreditReceipt(options: {
   amount: number; // signed: positive = credit, negative = correction
   newBalance: number;
   note: string;
+  actor?: string; // identity of the admin who issued the adjustment (audit trail)
 }): void {
-  const { to, username, amount, newBalance, note } = options;
+  const { to, username, amount, newBalance, note, actor } = options;
+  const actorLabel = actor && actor.trim().length > 0 ? actor.trim() : "unknown admin";
+  const safeActor = escapeHtml(actorLabel);
   const isCorrection = amount < 0;
   const abs = Math.abs(amount).toFixed(2);
   const balanceStr = newBalance.toFixed(2);
@@ -421,7 +424,7 @@ export function sendAdminCreditReceipt(options: {
   sendBestEffort({
     to: ADMIN_EMAIL,
     subject: `[Admin receipt] ${isCorrection ? "Correction" : "Credit"} ${signedLabel} → ${username}`,
-    text: `Admin balance ${isCorrection ? "correction" : "credit"} applied.\n\nUser: ${username}${to ? ` <${to}>` : " (no email on file)"}\nAmount: ${signedLabel}\nReason: ${note}\nNew balance: $${balanceStr}`,
+    text: `Admin balance ${isCorrection ? "correction" : "credit"} applied.\n\nUser: ${username}${to ? ` <${to}>` : " (no email on file)"}\nAmount: ${signedLabel}\nReason: ${note}\nNew balance: $${balanceStr}\nIssued by: ${actorLabel}`,
     // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
     html: `
       <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
@@ -430,6 +433,7 @@ export function sendAdminCreditReceipt(options: {
           <tr><td style="padding:8px 0;font-weight:600;color:#555;width:110px">User</td><td style="padding:8px 0">${safeUsername}${to ? ` &lt;${escapeHtml(to)}&gt;` : " (no email)"}</td></tr>
           <tr><td style="padding:8px 0;font-weight:600;color:#555">Amount</td><td style="padding:8px 0;font-weight:700">${signedLabel}</td></tr>
           <tr><td style="padding:8px 0;font-weight:600;color:#555">New balance</td><td style="padding:8px 0">$${safeBalance}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Issued by</td><td style="padding:8px 0">${safeActor}</td></tr>
         </table>
         <div style="margin-top:16px;background:#f7f7f7;border-left:4px solid ${accent};padding:16px;border-radius:4px">
           <p style="margin:0;white-space:pre-wrap;color:#333">${safeNote}</p>

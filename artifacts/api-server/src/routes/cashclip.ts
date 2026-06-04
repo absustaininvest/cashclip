@@ -1385,6 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: amt,
         newBalance: updated.balance,
         note,
+        actor: req.userId,
       });
 
       res.json({
@@ -1453,6 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: amt,
         newBalance: updated.balance,
         note: finalNote,
+        actor: req.userId,
       });
 
       res.json({
