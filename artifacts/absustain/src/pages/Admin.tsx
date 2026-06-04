@@ -2129,7 +2129,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [creditAmountMap, setCreditAmountMap] = useState<Record<string, string>>({});
   const [creditNoteMap, setCreditNoteMap] = useState<Record<string, string>>({});
   const [auditRows, setAuditRows] = useState<
-    { id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: string }[]
+    { id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: string }[]
   >([]);
   const [auditLoading, setAuditLoading] = useState(true);
   const [showAudit, setShowAudit] = useState(true);
@@ -2934,6 +2934,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
                     <th className="text-left font-medium px-5 py-2">User</th>
                     <th className="text-right font-medium px-3 py-2">Amount</th>
                     <th className="text-left font-medium px-3 py-2">Reason</th>
+                    <th className="text-left font-medium px-3 py-2">Issued by</th>
                     <th className="text-right font-medium px-5 py-2">When</th>
                   </tr>
                 </thead>
@@ -2963,6 +2964,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
                         </td>
                         <td className="px-3 py-2.5 text-white/60 text-xs max-w-[280px] break-words">
                           {r.description ?? "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-white/60 text-xs break-all">
+                          {r.actorUsername ?? r.actorUserId ?? "—"}
                         </td>
                         <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
                           {new Date(r.createdAt).toLocaleString()}

@@ -232,8 +232,8 @@ describe("POST /api/admin/credit — manager-override credit/correction", () => 
 describe("GET /api/admin/adjustments — audit ledger", () => {
   it("returns the adjustment ledger from getAdjustmentLedger", async () => {
     const rows = [
-      { id: "l1", userId: TARGET_ID, username: "victim", email: "victim@example.com", amount: "10.00", description: "support refund", createdAt: new Date("2026-06-01T00:00:00Z") },
-      { id: "l2", userId: TARGET_ID, username: "victim", email: "victim@example.com", amount: "-4.00", description: "reverse error", createdAt: new Date("2026-06-02T00:00:00Z") },
+      { id: "l1", userId: TARGET_ID, username: "victim", email: "victim@example.com", amount: "10.00", description: "support refund", actorUserId: ADMIN_ID, actorUsername: "boss", createdAt: new Date("2026-06-01T00:00:00Z") },
+      { id: "l2", userId: TARGET_ID, username: "victim", email: "victim@example.com", amount: "-4.00", description: "reverse error", actorUserId: ADMIN_ID, actorUsername: "boss", createdAt: new Date("2026-06-02T00:00:00Z") },
     ];
     mockGetAdjustmentLedger.mockResolvedValue(rows);
 
@@ -242,17 +242,18 @@ describe("GET /api/admin/adjustments — audit ledger", () => {
     expect(res.status).toBe(200);
     expect(mockGetAdjustmentLedger).toHaveBeenCalledTimes(1);
     expect(res.body.adjustments).toHaveLength(2);
-    expect(res.body.adjustments[0]).toMatchObject({ id: "l1", amount: "10.00" });
-    expect(res.body.adjustments[1]).toMatchObject({ id: "l2", amount: "-4.00" });
+    expect(res.body.adjustments[0]).toMatchObject({ id: "l1", amount: "10.00", actorUserId: ADMIN_ID, actorUsername: "boss" });
+    expect(res.body.adjustments[1]).toMatchObject({ id: "l2", amount: "-4.00", actorUserId: ADMIN_ID, actorUsername: "boss" });
   });
 
   it("a credit and a correction are both recorded as adjustment rows readable via the ledger", async () => {
     await asAdmin(request(app).post("/api/admin/credit").send({ username: "victim", amount: 10 }));
     await asAdmin(request(app).post("/api/admin/credit").send({ username: "victim", amount: -4 }));
 
-    // Both mutations went through the adjustment-typed ledger writers.
-    expect(mockCreditUser).toHaveBeenCalledWith(expect.objectContaining({ type: "adjustment" }));
-    expect(mockDebitUser).toHaveBeenCalledWith(expect.objectContaining({ type: "adjustment" }));
+    // Both mutations went through the adjustment-typed ledger writers, and the
+    // acting admin's id is recorded as a first-class field on each write.
+    expect(mockCreditUser).toHaveBeenCalledWith(expect.objectContaining({ type: "adjustment", actorUserId: ADMIN_ID }));
+    expect(mockDebitUser).toHaveBeenCalledWith(expect.objectContaining({ type: "adjustment", actorUserId: ADMIN_ID }));
 
     // And the audit read surfaces adjustment rows.
     mockGetAdjustmentLedger.mockResolvedValue([

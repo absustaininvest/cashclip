@@ -80,6 +80,7 @@ export const earningsLedger = pgTable(
     description: text("description").notNull(),
     refId: text("ref_id"),
     provider: text("provider"),
+    actorUserId: varchar("actor_user_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

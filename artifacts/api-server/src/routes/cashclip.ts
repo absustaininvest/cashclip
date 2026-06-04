@@ -1372,6 +1372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: amt,
         type: "adjustment",
         description: note,
+        actorUserId: req.userId,
       });
 
       req.log?.info(
@@ -1434,8 +1435,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         updated =
           amt > 0
-            ? await storage.creditUser({ userId: target.id, amount: amt, type: "adjustment", description: finalNote })
-            : await storage.debitUser({ userId: target.id, amount: Math.abs(amt), type: "adjustment", description: finalNote });
+            ? await storage.creditUser({ userId: target.id, amount: amt, type: "adjustment", description: finalNote, actorUserId: req.userId })
+            : await storage.debitUser({ userId: target.id, amount: Math.abs(amt), type: "adjustment", description: finalNote, actorUserId: req.userId });
       } catch (err: any) {
         if (err?.message === "INSUFFICIENT_BALANCE") {
           res.status(400).json({ error: "Adjustment would put the balance below zero" }); return;

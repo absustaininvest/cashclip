@@ -23,6 +23,7 @@ import {
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -94,7 +95,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(limit?: number, offset?: number): Promise<{ users: User[]; total: number }>;
-  getAdjustmentLedger(limit?: number): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: Date }>>;
+  getAdjustmentLedger(limit?: number): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>>;
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
@@ -590,6 +591,7 @@ export class DatabaseStorage implements IStorage {
     description,
     refId,
     provider,
+    actorUserId,
   }: {
     userId: string;
     amount: number;
@@ -597,6 +599,7 @@ export class DatabaseStorage implements IStorage {
     description: string;
     refId?: string;
     provider?: string;
+    actorUserId?: string;
   }): Promise<{ balance: number; totalEarned: number }> {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error("Credit amount must be a positive number");
@@ -628,6 +631,7 @@ export class DatabaseStorage implements IStorage {
         description,
         refId: refId ?? null,
         provider: provider ?? null,
+        actorUserId: actorUserId ?? null,
       });
 
       return { balance: n(updated.balance), totalEarned: n(updated.totalEarned) };
@@ -779,12 +783,14 @@ export class DatabaseStorage implements IStorage {
     type,
     description,
     refId,
+    actorUserId,
   }: {
     userId: string;
     amount: number;
     type: LedgerType;
     description: string;
     refId?: string;
+    actorUserId?: string;
   }): Promise<{ balance: number; totalEarned: number }> {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error("Debit amount must be a positive number");
@@ -810,6 +816,7 @@ export class DatabaseStorage implements IStorage {
         type,
         description,
         refId: refId ?? null,
+        actorUserId: actorUserId ?? null,
       });
 
       return { balance: n(updated.balance), totalEarned: n(updated.totalEarned) };
@@ -825,7 +832,8 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getAdjustmentLedger(limit: number = 100): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; createdAt: Date }>> {
+  async getAdjustmentLedger(limit: number = 100): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>> {
+    const actor = alias(users, "actor");
     return db
       .select({
         id: earningsLedger.id,
@@ -834,10 +842,13 @@ export class DatabaseStorage implements IStorage {
         email: users.email,
         amount: earningsLedger.amount,
         description: earningsLedger.description,
+        actorUserId: earningsLedger.actorUserId,
+        actorUsername: actor.username,
         createdAt: earningsLedger.createdAt,
       })
       .from(earningsLedger)
       .innerJoin(users, eq(earningsLedger.userId, users.id))
+      .leftJoin(actor, eq(earningsLedger.actorUserId, actor.id))
       .where(eq(earningsLedger.type, "adjustment"))
       .orderBy(desc(earningsLedger.createdAt))
       .limit(limit);
