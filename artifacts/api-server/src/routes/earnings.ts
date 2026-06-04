@@ -4,6 +4,7 @@ import { authMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { runSpinChallengeSweep, type SpinChallenge } from "../lib/spinChallengeSweep";
 import { rateLimit } from "express-rate-limit";
 import {
   DEFAULT_REGION,
@@ -153,13 +154,9 @@ const SERVER_ONLY_ACTIONS = new Set([
 // This ensures the client called /begin (server-observed) before earning points.
 const SPIN_CHALLENGE_TTL_MS  = 60_000;  // challenge valid for 60 s
 const SPIN_CHALLENGE_MIN_MS  = 3_000;   // must wait ≥3 s between begin→complete
-interface SpinChallenge { userId: string; issuedAt: number; }
 const spinChallenges = new Map<string, SpinChallenge>();
 setInterval(() => {
-  const cutoff = Date.now() - SPIN_CHALLENGE_TTL_MS;
-  for (const [k, v] of spinChallenges) {
-    if (v.issuedAt < cutoff) spinChallenges.delete(k);
-  }
+  runSpinChallengeSweep(spinChallenges, SPIN_CHALLENGE_TTL_MS);
 }, 30_000);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
