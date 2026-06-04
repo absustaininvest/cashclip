@@ -22,7 +22,7 @@ import {
   type InsertSupportReply,
 } from "@workspace/db";
 import { db } from "@workspace/db";
-import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between } from "drizzle-orm";
+import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -108,6 +108,12 @@ export interface IStorage {
   }): Promise<{ entries: SecurityAuditEntryView[]; total: number }>;
   createSupportReply(entry: InsertSupportReply): Promise<SupportReply>;
   getSupportRepliesByThread(inReplyTo: string): Promise<SupportReplyView[]>;
+  listSupportReplies(opts?: {
+    recipient?: string;
+    adminUserId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ replies: SupportReplyView[]; total: number }>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -415,6 +421,67 @@ export class DatabaseStorage implements IStorage {
       inReplyTo: r.inReplyTo ?? null,
       createdAt: r.createdAt,
     }));
+  }
+
+  // Global, paginated log of every support reply the team has ever sent, across
+  // all threads. Newest first so operators see the most recent activity. Optional
+  // filters narrow by recipient (substring, case-insensitive) or sending admin.
+  async listSupportReplies(opts: {
+    recipient?: string;
+    adminUserId?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ replies: SupportReplyView[]; total: number }> {
+    const conditions = [];
+    if (opts.recipient) {
+      conditions.push(ilike(supportReplies.recipient, `%${opts.recipient}%`));
+    }
+    if (opts.adminUserId) {
+      conditions.push(eq(supportReplies.adminUserId, opts.adminUserId));
+    }
+    const where = conditions.length ? and(...conditions) : undefined;
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+    const offset = Math.max(opts.offset ?? 0, 0);
+
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select({
+          id: supportReplies.id,
+          adminUserId: supportReplies.adminUserId,
+          adminUsername: users.username,
+          adminEmail: users.email,
+          recipient: supportReplies.recipient,
+          subject: supportReplies.subject,
+          body: supportReplies.body,
+          inReplyTo: supportReplies.inReplyTo,
+          createdAt: supportReplies.createdAt,
+        })
+        .from(supportReplies)
+        .leftJoin(users, eq(supportReplies.adminUserId, users.id))
+        .where(where)
+        .orderBy(desc(supportReplies.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(supportReplies)
+        .where(where),
+    ]);
+
+    return {
+      replies: rows.map((r: (typeof rows)[number]) => ({
+        id: r.id,
+        adminUserId: r.adminUserId,
+        adminUsername: r.adminUsername ?? null,
+        adminEmail: r.adminEmail ?? null,
+        recipient: r.recipient,
+        subject: r.subject,
+        body: r.body,
+        inReplyTo: r.inReplyTo ?? null,
+        createdAt: r.createdAt,
+      })),
+      total: Number(totalRow?.total ?? 0),
+    };
   }
 
   async getTotpBackupCodesRemaining(userId: string): Promise<number> {

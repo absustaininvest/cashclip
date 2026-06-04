@@ -2032,6 +2032,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Global, paginated log of every support reply sent from the Inbox, across all
+  // threads — a standalone "Sent Replies" audit trail. Newest first. Optional
+  // filters: recipient (substring match) and adminUserId (exact sending admin).
+  app.get("/api/admin/inbox/replies/all", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "50"), 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+      const recipient = typeof req.query.recipient === "string" ? req.query.recipient.trim() : "";
+      const adminUserId = typeof req.query.adminUserId === "string" ? req.query.adminUserId.trim() : "";
+      const { replies, total } = await storage.listSupportReplies({
+        limit,
+        offset,
+        recipient: recipient || undefined,
+        adminUserId: adminUserId || undefined,
+      });
+      res.json({ replies, total, limit, offset });
+    } catch (err) {
+      req.log?.error({ err, adminUserId: req.userId }, "Failed to load sent replies log");
+      res.status(500).json({ error: "Failed to load sent replies" });
+    }
+  });
+
   app.get("/api/admin/webhook-alerts", adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const alertLimit = Math.min(parseInt(String(req.query.limit || "50"), 10) || 50, 100);

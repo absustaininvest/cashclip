@@ -1370,6 +1370,15 @@ function InboxPanel({ token }: { token: string }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [view, setView] = useState<"inbox" | "sent">("inbox");
+  const [sentReplies, setSentReplies] = useState<SupportReplyRecord[]>([]);
+  const [sentTotal, setSentTotal] = useState(0);
+  const [sentLoading, setSentLoading] = useState(false);
+  const [sentError, setSentError] = useState("");
+  const [sentPage, setSentPage] = useState(0);
+  const [sentRecipientInput, setSentRecipientInput] = useState("");
+  const [sentRecipient, setSentRecipient] = useState("");
+  const SENT_PAGE_SIZE = 25;
 
   const openReply = useCallback(() => {
     setReplyOpen(true);
@@ -1416,6 +1425,38 @@ function InboxPanel({ token }: { token: string }) {
       setHistoryError("");
     }
   }, [selected?.messageId, fetchReplyHistory]);
+
+  const fetchSentReplies = useCallback(async () => {
+    setSentLoading(true);
+    setSentError("");
+    try {
+      const params = new URLSearchParams({
+        limit: String(SENT_PAGE_SIZE),
+        offset: String(sentPage * SENT_PAGE_SIZE),
+      });
+      if (sentRecipient) params.set("recipient", sentRecipient);
+      const res = await fetch(
+        `/api/admin/inbox/replies/all?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).error || "Failed to load sent replies");
+      }
+      const data = await res.json();
+      setSentReplies(data.replies ?? []);
+      setSentTotal(data.total ?? 0);
+    } catch (err: any) {
+      setSentError(err.message);
+      setSentReplies([]);
+    } finally {
+      setSentLoading(false);
+    }
+  }, [token, sentPage, sentRecipient]);
+
+  useEffect(() => {
+    if (view === "sent") fetchSentReplies();
+  }, [view, fetchSentReplies]);
 
   const sendReply = useCallback(async () => {
     if (!selected) return;
@@ -1520,26 +1561,73 @@ function InboxPanel({ token }: { token: string }) {
             Inbox
           </h2>
           <p className="text-white/40 text-sm mt-0.5">
-            Submissions — one view.
-            {fetchedAt && (
-              <span className="ml-2 text-white/20">
-                Last synced {timeAgoShort(fetchedAt)} ago
-              </span>
+            {view === "inbox" ? (
+              <>
+                Submissions — one view.
+                {fetchedAt && (
+                  <span className="ml-2 text-white/20">
+                    Last synced {timeAgoShort(fetchedAt)} ago
+                  </span>
+                )}
+              </>
+            ) : (
+              <>Every reply the team has sent — full audit trail.</>
             )}
           </p>
         </div>
+        {view === "inbox" ? (
+          <button
+            onClick={fetchMessages}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            {loading ? "Syncing…" : "Sync Now"}
+          </button>
+        ) : (
+          <button
+            onClick={fetchSentReplies}
+            disabled={sentLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${sentLoading ? "animate-spin" : ""}`}
+            />
+            {sentLoading ? "Loading…" : "Refresh"}
+          </button>
+        )}
+      </div>
+
+      {/* View switcher: Inbox vs Sent Replies */}
+      <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 w-fit">
         <button
-          onClick={fetchMessages}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+          onClick={() => setView("inbox")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            view === "inbox"
+              ? "bg-white/[0.08] text-white"
+              : "text-white/40 hover:text-white hover:bg-white/[0.04]"
+          }`}
         >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
-          />
-          {loading ? "Syncing…" : "Sync Now"}
+          <Inbox className="w-3.5 h-3.5" />
+          Inbox
+        </button>
+        <button
+          onClick={() => setView("sent")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            view === "sent"
+              ? "bg-white/[0.08] text-white"
+              : "text-white/40 hover:text-white hover:bg-white/[0.04]"
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          Sent Replies
         </button>
       </div>
 
+      {view === "inbox" && (
+      <>
       {/* Category tabs */}
       <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 overflow-x-auto">
         {INBOX_CATEGORIES.map((cat) => {
@@ -1834,6 +1922,137 @@ function InboxPanel({ token }: { token: string }) {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      </>
+      )}
+
+      {view === "sent" && (
+        <div className="space-y-4">
+          {/* Recipient filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={sentRecipientInput}
+                onChange={(e) => setSentRecipientInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setSentPage(0);
+                    setSentRecipient(sentRecipientInput.trim());
+                  }
+                }}
+                placeholder="Filter by recipient email…"
+                className="w-full bg-white/[0.05] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setSentPage(0);
+                setSentRecipient(sentRecipientInput.trim());
+              }}
+              className="px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm"
+            >
+              Search
+            </button>
+            {sentRecipient && (
+              <button
+                onClick={() => {
+                  setSentRecipientInput("");
+                  setSentRecipient("");
+                  setSentPage(0);
+                }}
+                className="px-3 py-2 text-white/40 hover:text-white transition-colors text-sm"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {sentError && (
+            <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-400 text-sm">{sentError}</p>
+            </div>
+          )}
+
+          {sentLoading && sentReplies.length === 0 ? (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-12 text-center">
+              <RefreshCw className="w-8 h-8 text-white/20 animate-spin mx-auto mb-3" />
+              <p className="text-white/40 text-sm">Loading sent replies…</p>
+            </div>
+          ) : sentReplies.length === 0 ? (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl py-16 text-center">
+              <Mail className="w-10 h-10 text-white/10 mx-auto mb-3" />
+              <p className="text-white/30 text-sm">
+                {sentRecipient
+                  ? "No replies match this recipient"
+                  : "No replies have been sent yet"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.04]">
+              {sentReplies.map((r) => (
+                <div key={r.id} className="px-5 py-4">
+                  <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[#00E676]/90 text-xs font-semibold truncate">
+                        {r.adminUsername || r.adminEmail || "Admin"}
+                      </span>
+                      <span className="text-white/20 text-xs">→</span>
+                      <span className="text-white/50 text-xs truncate">
+                        {r.recipient}
+                      </span>
+                    </div>
+                    <span className="text-white/25 text-[11px] flex-shrink-0">
+                      {new Date(r.createdAt).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-white/80 text-sm font-medium truncate mb-1">
+                    {r.subject}
+                  </p>
+                  <p className="text-white/50 text-sm leading-relaxed whitespace-pre-wrap line-clamp-3">
+                    {r.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {sentTotal > SENT_PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-white/30 text-xs">
+                Showing {sentPage * SENT_PAGE_SIZE + 1}–
+                {Math.min((sentPage + 1) * SENT_PAGE_SIZE, sentTotal)} of{" "}
+                {sentTotal}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSentPage((p) => Math.max(0, p - 1))}
+                  disabled={sentPage === 0 || sentLoading}
+                  className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-xs disabled:opacity-30"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setSentPage((p) => p + 1)}
+                  disabled={
+                    (sentPage + 1) * SENT_PAGE_SIZE >= sentTotal || sentLoading
+                  }
+                  className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-xs disabled:opacity-30"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
