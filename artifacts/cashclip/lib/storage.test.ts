@@ -28,6 +28,9 @@ import {
   recordGamePlay,
   getUserStats,
   getDailyMissions,
+  getWithdrawalTiers,
+  withdraw,
+  getTransactions,
 } from "./storage";
 import { displayPointsToDollars } from "./points";
 
@@ -35,6 +38,11 @@ const BALANCE_KEY = "cashclip_balance";
 const GAME_EARNINGS_KEY = "cashclip_game_earnings";
 const MISSIONS_KEY = "cashclip_missions";
 const MISSIONS_DATE_KEY = "cashclip_missions_date";
+const TRANSACTIONS_KEY = "cashclip_transactions";
+
+async function setBalance(dollars: number): Promise<void> {
+  store.set(BALANCE_KEY, dollars.toString());
+}
 
 async function getBalance(): Promise<number> {
   return (await getUserStats()).balance;
@@ -127,5 +135,102 @@ describe("game reward stored in display points credits the right local dollars",
     expect(expectedDollars).toBeCloseTo(0.75, 10);
     expect(await getBalance()).toBeCloseTo(expectedDollars, 10);
     expect(parseFloat(store.get(GAME_EARNINGS_KEY)!)).toBeCloseTo(expectedDollars, 10);
+  });
+});
+
+// getWithdrawalTiers gates which cash-out amounts the user is offered. A balance
+// must fully cover a tier's amount for it to appear, and the bonus/total math
+// must be exact — these are the numbers the payout screen shows and acts on.
+describe("getWithdrawalTiers only offers affordable tiers and computes payout math", () => {
+  it("offers no tiers when the balance is below the $3 minimum", () => {
+    expect(getWithdrawalTiers(0)).toEqual([]);
+    expect(getWithdrawalTiers(2.99)).toEqual([]);
+  });
+
+  it("offers only the $3 tier at exactly the minimum balance", () => {
+    const tiers = getWithdrawalTiers(3);
+    expect(tiers.map((t) => t.amount)).toEqual([3]);
+  });
+
+  it("offers tiers up to but not beyond what the balance can afford", () => {
+    expect(getWithdrawalTiers(4.99).map((t) => t.amount)).toEqual([3]);
+    expect(getWithdrawalTiers(5).map((t) => t.amount)).toEqual([3, 5]);
+    expect(getWithdrawalTiers(6.5).map((t) => t.amount)).toEqual([3, 5]);
+    expect(getWithdrawalTiers(7).map((t) => t.amount)).toEqual([3, 5, 7]);
+    expect(getWithdrawalTiers(100).map((t) => t.amount)).toEqual([3, 5, 7]);
+  });
+
+  it("computes a zero bonus and a total equal to the amount when bonusPercent is 0", () => {
+    for (const tier of getWithdrawalTiers(100)) {
+      expect(tier.bonusPercent).toBe(0);
+      expect(tier.bonusAmount).toBe(0);
+      expect(tier.totalPayout).toBe(tier.amount);
+    }
+  });
+});
+
+// withdraw moves a real-dollar balance, so the floor ($3), ceiling (balance),
+// deduction, and recorded transactions all have to be exactly right.
+describe("withdraw enforces limits, deducts the balance, and records transactions", () => {
+  it("rejects an amount below the $3 minimum without touching the balance", async () => {
+    await setBalance(10);
+    expect(await withdraw(2.99)).toBe(false);
+    expect(await getBalance()).toBe(10);
+    expect(await getTransactions()).toEqual([]);
+  });
+
+  it("rejects an amount greater than the balance without touching the balance", async () => {
+    await setBalance(5);
+    expect(await withdraw(7)).toBe(false);
+    expect(await getBalance()).toBe(5);
+    expect(await getTransactions()).toEqual([]);
+  });
+
+  it("allows withdrawing exactly the $3 minimum", async () => {
+    await setBalance(3);
+    expect(await withdraw(3)).toBe(true);
+    expect(await getBalance()).toBe(0);
+  });
+
+  it("allows withdrawing the entire balance", async () => {
+    await setBalance(7);
+    expect(await withdraw(7)).toBe(true);
+    expect(await getBalance()).toBe(0);
+  });
+
+  it("deducts the withdrawn amount and records a negative 'withdrawn' transaction", async () => {
+    await setBalance(10);
+    expect(await withdraw(7)).toBe(true);
+    expect(await getBalance()).toBeCloseTo(3, 10);
+
+    const txns = await getTransactions();
+    expect(txns).toHaveLength(1);
+    expect(txns[0].type).toBe("withdrawn");
+    expect(txns[0].amount).toBe(-7);
+    expect(txns[0].description).toBe("Withdrawal $7.00");
+  });
+
+  it("records a separate 'bonus' transaction when a bonus percent applies, without crediting it to the deducted balance", async () => {
+    await setBalance(10);
+    expect(await withdraw(5, 10)).toBe(true);
+    // Only the withdrawn amount leaves the balance; the bonus is a payout-side
+    // figure, not a credit back to the local balance.
+    expect(await getBalance()).toBeCloseTo(5, 10);
+
+    const txns = await getTransactions();
+    expect(txns).toHaveLength(2);
+    const withdrawnTx = txns.find((t) => t.type === "withdrawn")!;
+    const bonusTx = txns.find((t) => t.type === "bonus")!;
+    expect(withdrawnTx.amount).toBe(-5);
+    expect(bonusTx.amount).toBeCloseTo(0.5, 10);
+    expect(bonusTx.description).toBe("Cashout bonus (+10%)");
+  });
+
+  it("does not record a bonus transaction when the bonus rounds to zero", async () => {
+    await setBalance(10);
+    expect(await withdraw(3, 0)).toBe(true);
+    const txns = await getTransactions();
+    expect(txns).toHaveLength(1);
+    expect(txns.some((t) => t.type === "bonus")).toBe(false);
   });
 });
