@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import { getUserStats, getReferralEarnings, getTotalReferrals, getUnreadNotificationCount, type UserStats } from "@/lib/storage";
+import { DISPLAY_POINTS_PER_DOLLAR } from "@/lib/points";
 import { fetchServerBalance } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
@@ -34,8 +35,8 @@ interface Achievement {
 }
 
 // Levels are driven by total lifetime POINTS earned (simple cumulative).
-// Owner display model: 10,000 pts = $1. "Money Maker" unlocks at 50,000 pts ($5).
-const DISPLAY_POINTS_PER_DOLLAR = 10000;
+// Owner display model: 10,000 pts = $1 (DISPLAY_POINTS_PER_DOLLAR, imported from
+// the single source of truth). "Money Maker" unlocks at 50,000 pts ($5).
 const LEVEL_THRESHOLDS = [1000, 4000, 6000, 10000, 15000];
 
 function computeLevel(lifetimePoints: number): number {

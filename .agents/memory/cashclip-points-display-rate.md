@@ -7,12 +7,20 @@ description: Two intentionally different points→dollar rates coexist — the o
 
 - **Display model = 10,000 pts = $1.** Used ONLY for what the UI shows the user:
   mission card point values, profile lifetime-points figure, profile level
-  thresholds, and "Money Maker"-style achievement unlocks. Encoded as a local
-  `DISPLAY_POINTS_PER_DOLLAR = 10000` const in `storage.ts` and `profile.tsx`.
-- **Server economy = 1,000 pts = $1** (`POINTS_PER_DOLLAR` in `earn-client.ts`)
-  plus the server-authoritative floating rate in `api-server/lib/pointsEconomy.ts`
-  (each earn token snapshots its own usd/pt at earn time). This is the REAL cash
+  thresholds, and "Money Maker"-style achievement unlocks.
+- **Server economy = 1,000 pts = $1** (the base/fallback cash rate) plus the
+  server-authoritative floating rate in `api-server/lib/pointsEconomy.ts` (each
+  earn token snapshots its own usd/pt at earn time). This is the REAL cash
   conversion used for balances and withdrawals.
+
+**Single source of truth (Jun 2026):** both rates + the adapters now live ONLY in
+`artifacts/cashclip/lib/points.ts` (`DISPLAY_POINTS_PER_DOLLAR`,
+`CASH_POINTS_PER_DOLLAR`/`POINTS_PER_DOLLAR`, `dollarsToPoints`,
+`displayPointsToDollars`, `pointsToUsd`, `formatPoints`). `storage.ts` and
+`earn-client.ts` import and re-export from it (back-compat for existing
+importers); `profile.tsx` imports `DISPLAY_POINTS_PER_DOLLAR` from it. Do NOT
+re-declare either rate anywhere else — that re-introduces the divergence footgun.
+Centralizing changed no numeric value, so no balances moved.
 
 **Why:** the owner wanted bigger, more motivating point numbers on earning
 surfaces (Phase 3 "feature rebalancing") without changing the actual cash anyone

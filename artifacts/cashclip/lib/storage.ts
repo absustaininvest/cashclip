@@ -1,5 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { secureGet, secureSet, secureDelete } from "./secure-store";
+import {
+  DISPLAY_POINTS_PER_DOLLAR,
+  dollarsToPoints,
+  displayPointsToDollars,
+  formatPoints,
+} from "./points";
+
+// Re-export the shared display helpers so existing importers of "@/lib/storage"
+// keep working while the single source of truth lives in "./points".
+export { DISPLAY_POINTS_PER_DOLLAR, dollarsToPoints, formatPoints };
 
 const KEYS = {
   BALANCE: "cashclip_balance",
@@ -287,21 +297,12 @@ export async function cacheReferralStats(totalJoined: number, earnings: number):
 }
 
 // ── DISPLAY / RESET HELPERS ───────────────────────────────────────────────────
-// Owner's display model: 10,000 points = $1.00. Mission rewards are now stored in
-// POINTS (what the UI shows); this converts them back into the local dollar-based
-// mock balance so the optimistic local balance stays numerically consistent. The
-// authoritative point→cash conversion is server-side and unchanged.
-export const DISPLAY_POINTS_PER_DOLLAR = 10000;
-
-// Convert a dollar reward into the points the user sees (10,000 pts = $1).
-export function dollarsToPoints(dollars: number): number {
-  return Math.round(dollars * DISPLAY_POINTS_PER_DOLLAR);
-}
-
-// Format a points value for display, e.g. 1500 -> "1,500 pts".
-export function formatPoints(points: number): string {
-  return `${Math.round(points).toLocaleString("en-US")} pts`;
-}
+// The owner's display model (10,000 pts = $1) and the dollars↔points adapters
+// live in "./points" (the single source of truth) and are imported/re-exported
+// at the top of this file. Mission rewards are stored in DISPLAY points; we
+// convert them back into the local dollar-based mock balance with
+// displayPointsToDollars so the optimistic local balance stays numerically
+// consistent. The authoritative point→cash conversion is server-side.
 
 // Returns the calendar day in US Eastern time (midnight EST/EDT boundary) so the
 // daily check-in resets at 00:00 Eastern regardless of the device's timezone.
@@ -593,7 +594,7 @@ export async function claimMissionReward(missionId: string, isWeekly: boolean = 
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
-      await addEarnings(mission.reward / DISPLAY_POINTS_PER_DOLLAR, `Weekly mission: ${mission.title}`, "mission");
+      await addEarnings(displayPointsToDollars(mission.reward), `Weekly mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   } else {
@@ -602,7 +603,7 @@ export async function claimMissionReward(missionId: string, isWeekly: boolean = 
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.MISSIONS, JSON.stringify(missions));
-      await addEarnings(mission.reward / DISPLAY_POINTS_PER_DOLLAR, `Mission: ${mission.title}`, "mission");
+      await addEarnings(displayPointsToDollars(mission.reward), `Mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   }
@@ -788,7 +789,7 @@ export async function recordGamePlay(gameId: string, points: number, description
   // Games award POINTS (display currency, 10,000 pts = $1), not direct dollars.
   // Mirror the mission pattern: convert points to their dollar-equivalent for
   // the optimistic local balance. The authoritative economy is server-side.
-  const dollars = points / DISPLAY_POINTS_PER_DOLLAR;
+  const dollars = displayPointsToDollars(points);
 
   const gameEarnings = await getNumber(KEYS.GAME_EARNINGS, 0);
   await setNumber(KEYS.GAME_EARNINGS, gameEarnings + dollars);

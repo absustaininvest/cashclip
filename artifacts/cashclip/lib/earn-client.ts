@@ -1,8 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest } from "./query-client";
+import { POINTS_PER_DOLLAR, pointsToUsd, formatPoints } from "./points";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-export const POINTS_PER_DOLLAR = 1000;           // 1000 pts = $1.00
+// The cash rate (POINTS_PER_DOLLAR) and the points↔cash/format helpers live in
+// "./points" (the single source of truth) and are re-exported below so existing
+// importers of "@/lib/earn-client" keep working unchanged.
+export { POINTS_PER_DOLLAR, pointsToUsd, formatPoints };
 export const SPIN_INTERVAL_MS  = 2 * 60 * 60 * 1000; // 2-hour spin window
 
 const PENDING_TOKENS_KEY = "cashclip_earn_tokens_v2";
@@ -316,14 +320,7 @@ export async function getNextSpinTime(): Promise<number | null> {
 }
 
 // ── FORMATTING HELPERS ────────────────────────────────────────────────────────
-export function pointsToUsd(points: number): number {
-  return points / POINTS_PER_DOLLAR;
-}
-
-export function formatPoints(points: number): string {
-  return points.toLocaleString() + " pts";
-}
-
+// pointsToUsd and formatPoints are re-exported from "./points" (see top of file).
 export function formatCountdown(claimableAt: number): string {
   const remaining = claimableAt - Date.now();
   if (remaining <= 0) return "Ready!";
