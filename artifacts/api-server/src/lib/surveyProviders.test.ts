@@ -624,6 +624,111 @@ describe("fetchExternalSurveys — CPX mapping and fallback", () => {
   });
 });
 
+// --- Multi-provider aggregation -------------------------------------------
+// The per-provider tests above each configure exactly ONE provider. These tests
+// configure several at once and route the stubbed fetch per-URL so each provider
+// gets a distinct response. They guard the Promise.allSettled merge in
+// fetchExternalSurveys: one provider erroring or returning nothing must NOT drop
+// the other providers' surveys from the merged response.
+
+// Stub global fetch to dispatch on the requested URL. `handler` receives the URL
+// string and returns a Response; throwing (or returning a rejected promise)
+// simulates a network failure for just that provider.
+function stubFetchRouting(handler: (url: string) => Response) {
+  const spy = vi.fn(async (input: unknown) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : (input as { toString?: () => string })?.toString?.() ?? String(input);
+    return handler(url);
+  });
+  vi.stubGlobal("fetch", spy);
+  return spy;
+}
+
+describe("fetchExternalSurveys — multi-provider aggregation", () => {
+  function configureMany() {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    process.env.CINT_API_KEY = "cint-key";
+    process.env.CPX_API_KEY = "cpx-key";
+    process.env.CPX_APP_ID = "app-123";
+  }
+
+  const pollfishBody = {
+    surveys: [{ survey_id: "111", survey_name: "Quick Poll", reward_value: 0.75, loi: 4, category: "Food" }],
+  };
+  const cintBody = {
+    items: [{ id: "c1", name: "Brand Study", cpi: 2.0, loi: 5, category: "Brands" }],
+  };
+  const cpxBody = {
+    surveys: [{ id: "501", href: "https://offers.cpx-research.com/go?survey=501", payout: "0.80", loi: "5", category: "Lifestyle" }],
+  };
+
+  it("merges one SurveyListResponse entry per configured provider with the right surveys", async () => {
+    configureMany();
+    const fetchSpy = stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.cint.com")) return fakeResponse({ body: cintBody });
+      if (url.includes("cpx-research.com")) return fakeResponse({ body: cpxBody });
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+    // exactly one entry per configured provider, no extras
+    expect(results.map((r) => r.provider).sort()).toEqual(["cint", "cpx", "pollfish"]);
+
+    expect(surveysFor(results, "pollfish")).toHaveLength(1);
+    expect(surveysFor(results, "pollfish")[0]).toMatchObject({ id: "pollfish_111", reward: 0.75 });
+    expect(surveysFor(results, "cint")).toHaveLength(1);
+    expect(surveysFor(results, "cint")[0]).toMatchObject({ id: "cint_c1", reward: 2.0 });
+    expect(surveysFor(results, "cpx")).toHaveLength(1);
+    expect(surveysFor(results, "cpx")[0]).toMatchObject({ id: "cpx_501", reward: 0.8 });
+    // one outbound call per provider
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the other providers' surveys when one provider's fetch rejects", async () => {
+    configureMany();
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.cint.com")) throw new Error("cint network down");
+      if (url.includes("cpx-research.com")) return fakeResponse({ body: cpxBody });
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+    // every provider still has an entry (allSettled never drops one)
+    expect(results.map((r) => r.provider).sort()).toEqual(["cint", "cpx", "pollfish"]);
+    // the healthy providers' surveys survive the broken one
+    expect(surveysFor(results, "pollfish")[0]).toMatchObject({ id: "pollfish_111" });
+    expect(surveysFor(results, "cpx")[0]).toMatchObject({ id: "cpx_501" });
+    // the broken provider just contributes nothing rather than emptying the tab
+    expect(surveysFor(results, "cint")).toEqual([]);
+  });
+
+  it("keeps other surveys and still gives CPX its offerwall fallback when a provider returns non-OK", async () => {
+    configureMany();
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.cint.com")) return fakeResponse({ ok: false, status: 500 });
+      // CPX itself returns non-OK -> verifier path falls back to the wall card
+      if (url.includes("cpx-research.com")) return fakeResponse({ ok: false, status: 503 });
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+    expect(results.map((r) => r.provider).sort()).toEqual(["cint", "cpx", "pollfish"]);
+    // healthy provider unaffected
+    expect(surveysFor(results, "pollfish")[0]).toMatchObject({ id: "pollfish_111" });
+    // non-OK provider contributes nothing but doesn't drop others
+    expect(surveysFor(results, "cint")).toEqual([]);
+    // CPX never leaves the tab empty: falls back to the single offerwall card
+    const cpx = surveysFor(results, "cpx");
+    expect(cpx).toHaveLength(1);
+    expect(cpx[0]).toMatchObject({ id: "cpx_wall", provider: "cpx" });
+  });
+});
+
 describe("sanitizeSurveyUrl", () => {
   it("returns '' for empty/undefined input", () => {
     expect(sanitizeSurveyUrl("", "k", "pollfish")).toBe("");
