@@ -61,6 +61,8 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 - **Database**: PostgreSQL via Drizzle ORM (`@workspace/db`)
 - **Production URL**: `https://cash-clip.replit.app` (Replit deployment)
 - **Production API domain (baked into EAS builds)**: `api.cash-clip.app` — add as custom domain in Replit deployment panel, then set CNAME `api.cash-clip.app` → `cash-clip.replit.app` at DNS registrar
+- **`REGISTRATION_PAUSED` (soft-launch gate)**: when this env var is truthy (`true`/`1`/`yes`/`on`), `POST /api/auth/register` returns `503` with `{ paused: true }` and a friendly "signups reopen soon" message. The `503`s on `/api/auth/register` seen in deployment logs are this intentional gate, **not a crash**. To reopen signups, set `REGISTRATION_PAUSED=false` (or remove it) on the **production** deployment — an owner-authorized production env change, then re-publish. Login and all other routes are unaffected while paused.
+- **Restart/DB resilience**: the server handles `SIGTERM`/`SIGINT` with graceful shutdown (drains in-flight requests, closes the DB pool), so routine platform restarts log as clean exits, not errors. The DB pool (`lib/db/src/index.ts`) has an idle-client error handler plus connection limits/timeouts (`DB_POOL_MAX`, default 10; 5s connect timeout) so a brief database blip self-heals instead of surfacing as a `503`.
 
 ## AB Sustainability Investments (artifacts/absustain/)
 

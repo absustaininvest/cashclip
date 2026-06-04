@@ -1,4 +1,5 @@
 import app from "./app";
+import { pool } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { storage } from "./storage";
 import { RESERVED_ADMIN_USERNAMES } from "./auth";
@@ -66,7 +67,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -77,3 +78,43 @@ app.listen(port, (err) => {
   startWebhookAuditCleanupJob();
   startSecurityAuditCleanupJob();
 });
+
+// ── GRACEFUL SHUTDOWN ────────────────────────────────────────────────────────
+// The platform restarts the server by sending SIGTERM. Without a handler the
+// process is killed mid-flight and the restart shows up in the deployment logs
+// as an error exit ("signal: terminated"). Here we stop accepting new
+// connections, let in-flight requests drain, then close the DB pool so a
+// restart is a clean, expected shutdown instead of a crash.
+let shuttingDown = false;
+
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, "Shutdown signal received — draining connections");
+
+  // Hard stop if drain hangs, so the platform's own kill timeout is never the
+  // thing that ends us (which would still look like an error exit).
+  const forceTimer = setTimeout(() => {
+    logger.warn("Graceful shutdown timed out — forcing exit");
+    process.exit(0);
+  }, 10_000);
+  forceTimer.unref();
+
+  server.close(async (err) => {
+    if (err) {
+      logger.error({ err }, "Error closing HTTP server during shutdown");
+    }
+    try {
+      await pool.end();
+      logger.info("Database pool closed — shutdown complete");
+    } catch (e) {
+      logger.error({ err: e }, "Error closing database pool during shutdown");
+    } finally {
+      clearTimeout(forceTimer);
+      process.exit(0);
+    }
+  });
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
