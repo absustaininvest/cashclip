@@ -267,6 +267,12 @@ export const adEvents = pgTable(
     adUnitType: text("ad_unit_type").notNull(),
     rewardAmount: numeric("reward_amount", { precision: 8, scale: 2 }),
     rewardType: text("reward_type"),
+    // Real per-impression ad revenue in micros (1,000,000 micros = $1), as
+    // reported by the AdMob paid-event (valueMicros, which already includes
+    // Unity/mediation winners via in-app bidding). Null when the client did not
+    // report revenue for this event. Summed by computeRevenueUsd() to set the
+    // points→cash rate from real money instead of a per-reward proxy.
+    revenueMicros: numeric("revenue_micros", { precision: 18, scale: 0 }),
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
     durationMs: numeric("duration_ms", { precision: 10, scale: 0 }),

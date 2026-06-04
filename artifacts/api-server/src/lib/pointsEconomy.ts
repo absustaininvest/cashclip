@@ -1,5 +1,5 @@
 import { db, conversionRates, earnTokens, adEvents } from "@workspace/db";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, sql } from "drizzle-orm";
 import { logger } from "./logger";
 
 // ── POINTS ECONOMY ────────────────────────────────────────────────────────────
@@ -148,15 +148,34 @@ export async function snapshotRateString(region = DEFAULT_REGION): Promise<strin
 }
 
 // ── REVENUE MEASURE ───────────────────────────────────────────────────────────
-// Gross ad revenue over the window. Today this is count(verified rewarded ads)
-// × a per-reward proxy. When real mediation revenue is recorded per impression
-// (AdMob paid-event valueMicros → USD on ad_events), swap this to SUM that
-// column and the ARPU rate becomes exact with no other changes.
+// Gross ad revenue over the window, computed from REAL money when available.
+// AdMob's paid-event reports per-impression revenue as `valueMicros` (1,000,000
+// micros = $1); because Unity competes via in-app bidding through AdMob
+// mediation, that figure already includes the winning Unity revenue. We record
+// it on ad_events.revenue_micros and SUM it here.
+//
+// Transitional fallback: until a client build that reports valueMicros is live,
+// NO ad_events row carries real revenue at all, so there is nothing to SUM.
+// Returning 0 then would collapse the rate to the floor for everyone. So the
+// proxy is used ONLY while not a single row in the window has real revenue
+// recorded (revenueRows = 0). The moment real revenue starts flowing we switch
+// to the SUM and never use the proxy again — even a genuinely low/zero SUM over
+// real impressions is honored (we gate on "any real rows present", NOT sum>0,
+// so a valid low-value window can't wrongly inflate revenue via the proxy).
 export async function computeRevenueUsd(since: Date): Promise<number> {
-  const [{ rewardCount }] = await db
-    .select({ rewardCount: sql<string>`COUNT(*)` })
+  const [{ realMicros, revenueRows, rewardCount }] = await db
+    .select({
+      realMicros: sql<string>`COALESCE(SUM(${adEvents.revenueMicros}), 0)`,
+      revenueRows: sql<string>`COUNT(*) FILTER (WHERE ${adEvents.revenueMicros} IS NOT NULL)`,
+      rewardCount: sql<string>`COUNT(*) FILTER (WHERE ${adEvents.event} = 'reward_earned')`,
+    })
     .from(adEvents)
-    .where(and(eq(adEvents.event, "reward_earned"), gte(adEvents.createdAt, since)));
+    .where(gte(adEvents.createdAt, since));
+
+  // Real revenue has started flowing — use it exclusively (the proxy is dead).
+  if (Number(revenueRows ?? 0) > 0) return Number(realMicros ?? 0) / 1_000_000;
+
+  // No real per-impression revenue captured yet — estimate from the proxy.
   return Number(rewardCount ?? 0) * AD_REVENUE_PER_REWARD_USD;
 }
 

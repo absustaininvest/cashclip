@@ -84,6 +84,19 @@ function getHealthCheckUrl(integrationId: string): string | null {
   return urls[integrationId] ?? null;
 }
 
+// Normalize a client-reported per-impression ad revenue figure (AdMob
+// valueMicros; 1,000,000 micros = $1) into a non-negative integer string for
+// storage, or null when absent/invalid. Clients are untrusted, so reject
+// negative, non-finite, or absurdly large values rather than store garbage that
+// would skew the conversion-rate SUM. Cap at 1e12 micros ($1,000,000) per ad.
+function sanitizeRevenueMicros(value: unknown): string | null {
+  if (value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const capped = Math.min(Math.round(n), 1_000_000_000_000);
+  return String(capped);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
   registerSurveyRoutes(app);
@@ -1760,7 +1773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/ad-events", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
-      const { event, adUnitType, rewardAmount, rewardType, errorCode, errorMessage, durationMs, platform } = req.body;
+      const { event, adUnitType, rewardAmount, rewardType, errorCode, errorMessage, durationMs, platform, revenueMicros } = req.body;
 
       const validEvents = ["impression", "completion", "reward_earned", "load_failed", "clicked"];
       if (!event || !validEvents.includes(event)) {
@@ -1781,6 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errorMessage: errorMessage || null,
         durationMs: durationMs != null ? String(Math.round(durationMs)) : null,
         platform: platform || null,
+        revenueMicros: sanitizeRevenueMicros(revenueMicros),
       });
 
       res.status(201).json({ id: adEvent.id });
@@ -1818,6 +1832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errorMessage: e.errorMessage || null,
           durationMs: e.durationMs != null ? String(Math.round(e.durationMs)) : null,
           platform: e.platform || null,
+          revenueMicros: sanitizeRevenueMicros(e.revenueMicros),
         });
         ids.push(adEvent.id);
       }

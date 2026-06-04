@@ -2165,6 +2165,23 @@ export declare const adEvents: import("drizzle-orm/pg-core").PgTableWithColumns<
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        revenueMicros: import("drizzle-orm/pg-core").PgColumn<{
+            name: "revenue_micros";
+            tableName: "ad_events";
+            dataType: "string";
+            columnType: "PgNumeric";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         errorCode: import("drizzle-orm/pg-core").PgColumn<{
             name: "error_code";
             tableName: "ad_events";
@@ -2723,6 +2740,7 @@ export declare const insertAdEventSchema: z.ZodObject<{
     adUnitType: z.ZodString;
     rewardAmount: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     rewardType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    revenueMicros: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     errorCode: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     errorMessage: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     durationMs: z.ZodOptional<z.ZodNullable<z.ZodString>>;
