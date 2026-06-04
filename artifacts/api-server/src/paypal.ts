@@ -9,7 +9,7 @@
  * the current `PAYPAL_MODE` without requiring a module re-import or process
  * restart.
  */
-function getPayPalApiBase(): string {
+export function getPayPalApiBase(): string {
   return process.env.PAYPAL_MODE === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
