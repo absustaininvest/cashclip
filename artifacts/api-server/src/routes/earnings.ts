@@ -37,6 +37,29 @@ function pickRandom(pool: number[]): number {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ── PHASE 3 REWARD REBALANCE (Jun 2026) ──────────────────────────────────────
+// Phase 2 lowered the published FLOOR to 5,000 pts = $1 ($0.0002/pt) but left
+// these point AMOUNTS unchanged, so at the floor each action paid ~1/5 of its
+// pre-Phase-2 value. This pass re-tunes the amounts to the new floor on the
+// owner's CONSERVATIVE setting: keep cash value at/near current ("cheapest,
+// safest for payout economics"), nudging only the headline daily action.
+//
+// Cash value per action at the FLOOR (points × $0.0002), with daily cap:
+//   checkin        150 = $0.030  ×1   → $0.030/day  (daily retention anchor)
+//   rewarded_ad     50 = $0.010  ×30  → $0.300/day  (held; AdMob SSV only)
+//   spin       avg 180 = $0.036  ×12  → $0.432/day  (held; pool unchanged)
+//   mission_daily  100 = $0.020  ×10  → $0.200/day  (held; server-blocked)
+//   mission_weekly 500 = $0.100  ×4   → $0.400/day  (held; server-blocked)
+//   game        avg 56 = $0.011  ×10  → $0.110/day  (held; server-blocked)
+//   video            5 = $0.001  ×50  → $0.050/day  (held; server-blocked)
+// Total live-reachable guaranteed cost (checkin + rewarded_ad + spin) ≈
+// $0.76/user/day at the floor and ≈ $3.8 at the ceiling ($0.001/pt) — both sit
+// under the DAILY_CLAIM_CAP_USD ($5) backstop, so per-action caps are left as
+// is; they remain economically sound across the whole [floor, ceiling] band.
+// Note: rewarded_ad's per-ad payout slightly exceeds its eCPM-derived 55% share
+// under the proxy AD_REVENUE_PER_REWARD_USD; revisit once real per-impression
+// ad revenue replaces the proxy (separate task) rather than cutting it blind now.
+
 // Points per action — fully server-authoritative, client cannot override
 interface ActionConfig {
   points: number | null; // null = server-random from pool
@@ -44,7 +67,7 @@ interface ActionConfig {
 }
 
 const ACTION_CONFIG: Record<string, ActionConfig> = {
-  checkin:        { points: 100,  dailyCap: 1  },
+  checkin:        { points: 150,  dailyCap: 1  },
   rewarded_ad:    { points: 50,   dailyCap: 30 },
   spin:           { points: null, dailyCap: 12 },
   mission_daily:  { points: 100,  dailyCap: 10 },

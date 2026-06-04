@@ -86,7 +86,8 @@ const WHEEL_SEGMENTS = [
   { value: 500, label: "500 pts", color: "#D81B60" },
 ];
 
-// Check-in streak visual rewards (pts) — server awards 100 pts per check-in
+// Check-in streak visual rewards (pts) — server awards a flat 150 pts per
+// check-in (no server-side streak); these values are display-only.
 const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
 
 function AdCard({
