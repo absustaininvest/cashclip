@@ -1976,7 +1976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rejections: getRecentRejections(rejectionLimit),
       });
     } catch (err) {
-      req.log.error({ err }, "Failed to get webhook alerts");
+      req.log?.error({ err }, "Failed to get webhook alerts");
       res.status(500).json({ error: "Failed to load webhook alerts" });
     }
   });
