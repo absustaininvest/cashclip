@@ -1517,16 +1517,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let credited = 0;
         let skipped = 0;
         let failed = 0;
+        // Itemized outcomes so the operator can see exactly which referrers were
+        // paid (and which were skipped/failed) instead of just totals. referrer
+        // is the referred friend's `referredBy` (== the referrer's username).
+        const creditedReferrers: {
+          referrer: string;
+          referredFriend: string;
+          amount: number;
+        }[] = [];
+        const skippedReferrals: { referrer: string; referredFriend: string }[] = [];
+        const failedReferrals: { referrer: string; referredFriend: string; error: string }[] = [];
         for (const candidate of candidates) {
           try {
             const result = await storage.qualifyReferral({
               referredUserId: candidate.id,
               bonusUsd: REFERRAL_BONUS_USD,
             });
-            if (result.credited) credited += 1;
-            else skipped += 1;
+            if (result.credited) {
+              credited += 1;
+              creditedReferrers.push({
+                referrer: candidate.referredBy,
+                referredFriend: candidate.username,
+                amount: REFERRAL_BONUS_USD,
+              });
+            } else {
+              skipped += 1;
+              skippedReferrals.push({
+                referrer: candidate.referredBy,
+                referredFriend: candidate.username,
+              });
+            }
           } catch (err) {
             failed += 1;
+            failedReferrals.push({
+              referrer: candidate.referredBy,
+              referredFriend: candidate.username,
+              error: err instanceof Error ? err.message : "unknown error",
+            });
             req.log?.error(
               { err, referredUserId: candidate.id },
               "Referral backfill: qualifyReferral failed for candidate",
@@ -1546,6 +1573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           skipped,
           failed,
           bonusPerReferral: REFERRAL_BONUS_USD,
+          creditedReferrers,
+          skippedReferrals,
+          failedReferrals,
         });
       } catch (err: any) {
         res.status(500).json({ error: "Failed to run referral backfill" });

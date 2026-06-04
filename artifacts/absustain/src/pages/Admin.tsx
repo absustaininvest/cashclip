@@ -2188,6 +2188,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
     skipped: number;
     failed: number;
     bonusPerReferral: number;
+    creditedReferrers: { referrer: string; referredFriend: string; amount: number }[];
+    skippedReferrals: { referrer: string; referredFriend: string }[];
+    failedReferrals: { referrer: string; referredFriend: string; error?: string }[];
   } | null>(null);
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
@@ -2503,6 +2506,9 @@ function CashClipUsersPanel({ token }: { token: string }) {
           skipped: data.skipped ?? 0,
           failed: data.failed ?? 0,
           bonusPerReferral: data.bonusPerReferral ?? 0,
+          creditedReferrers: data.creditedReferrers ?? [],
+          skippedReferrals: data.skippedReferrals ?? [],
+          failedReferrals: data.failedReferrals ?? [],
         });
         setBackfillPreview(null);
         fetchUsers(search, page);
@@ -2815,6 +2821,61 @@ function CashClipUsersPanel({ token }: { token: string }) {
                 </p>
               </div>
             </div>
+            {(backfillResult.creditedReferrers.length > 0 ||
+              backfillResult.skippedReferrals.length > 0 ||
+              backfillResult.failedReferrals.length > 0) && (
+              <div className="mb-5 max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] divide-y divide-white/[0.06]">
+                {backfillResult.creditedReferrers.map((r, i) => (
+                  <div
+                    key={`credited-${i}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-white font-medium truncate">{r.referrer}</p>
+                      <p className="text-white/40 text-xs truncate">
+                        for {r.referredFriend}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[#00E676] font-bold">
+                      +${r.amount}
+                    </span>
+                  </div>
+                ))}
+                {backfillResult.skippedReferrals.map((r, i) => (
+                  <div
+                    key={`skipped-${i}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-white/70 font-medium truncate">{r.referrer}</p>
+                      <p className="text-white/40 text-xs truncate">
+                        for {r.referredFriend}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-white/40 text-xs font-semibold uppercase tracking-wide">
+                      Skipped
+                    </span>
+                  </div>
+                ))}
+                {backfillResult.failedReferrals.map((r, i) => (
+                  <div
+                    key={`failed-${i}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-red-400 font-medium truncate">{r.referrer}</p>
+                      <p className="text-white/40 text-xs truncate">
+                        for {r.referredFriend}
+                        {r.error ? ` — ${r.error}` : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-red-400 text-xs font-semibold uppercase tracking-wide">
+                      Failed
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               onClick={closeBackfill}
               className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"

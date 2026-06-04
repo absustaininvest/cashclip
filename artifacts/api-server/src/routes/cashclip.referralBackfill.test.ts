@@ -151,6 +151,31 @@ describe("POST /api/admin/referrals/backfill", () => {
     );
   });
 
+  it("returns an itemized breakdown of credited, skipped, and failed referrers", async () => {
+    mockGetReferralBackfillCandidates.mockResolvedValue([
+      { id: "u1", username: "alice", referredBy: "carol" },
+      { id: "u2", username: "bob", referredBy: "dave" },
+      { id: "u3", username: "erin", referredBy: "frank" },
+    ]);
+    mockQualifyReferral
+      .mockResolvedValueOnce({ credited: true, referrerId: "carol-id" })
+      .mockResolvedValueOnce({ credited: false })
+      .mockRejectedValueOnce(new Error("boom"));
+
+    const res = await asAdmin(request(app).post("/api/admin/referrals/backfill").send({}));
+
+    expect(res.status).toBe(200);
+    expect(res.body.creditedReferrers).toEqual([
+      { referrer: "carol", referredFriend: "alice", amount: expect.any(Number) },
+    ]);
+    expect(res.body.skippedReferrals).toEqual([
+      { referrer: "dave", referredFriend: "bob" },
+    ]);
+    expect(res.body.failedReferrals).toEqual([
+      { referrer: "frank", referredFriend: "erin", error: "boom" },
+    ]);
+  });
+
   it("returns zero counts when there are no candidates (safe re-run)", async () => {
     mockGetReferralBackfillCandidates.mockResolvedValue([]);
 
