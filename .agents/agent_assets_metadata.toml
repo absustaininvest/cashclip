@@ -1,20 +1,3 @@
 uploads = []
 generated = []
-
-[[outputs]]
-id = "vhgDedLKetW48QZAWA3CL"
-uri = "file://exports/CashClip_AppStore_Defense_Record.pdf"
-type = "pdf"
-title = "CashClip — App Store Defense & Compliance Record"
-
-[[outputs]]
-id = "44E3U27IiV0bNu6kRKP2d"
-uri = "file://exports/CashClip_Secrets_Checklist.pdf"
-type = "pdf"
-title = "CashClip Secrets Checklist (printable)"
-
-[[outputs]]
-id = "JcyZRHwttj_pG8qZPXdVo"
-uri = "file://exports/CashClip_GoLive_Revenue_Checklist.pdf"
-type = "pdf"
-title = "CashClip — Go-Live Revenue Checklist (printable)"
+outputs = []
