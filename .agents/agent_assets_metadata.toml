@@ -1,8 +1,67 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "bkAtKKt24ojAEqyTeFG_Z"
+uri = "file://attached_assets/generated_images/chip-wave.png"
+type = "image"
+title = "chip wave"
+
+[[generated]]
+id = "M8xtfcndPUQKwfNcGc7NB"
+uri = "file://attached_assets/generated_images/chip-celebrate.png"
+type = "image"
+title = "chip celebrate"
+
+[[generated]]
+id = "WD0IzNj1vVPUCUw1ifEBE"
+uri = "file://attached_assets/generated_images/chip-thinking.png"
+type = "image"
+title = "chip thinking"
+
+[[generated]]
+id = "n1EPMZi9MXoKjxJjyxl55"
+uri = "file://attached_assets/generated_images/chip-sad.png"
+type = "image"
+title = "chip sad empty"
+
+[[generated]]
+id = "tG39FyVSgL52g9EFWggdR"
+uri = "file://attached_assets/generated_images/chip-sleeping.png"
+type = "image"
+title = "chip sleeping"
 
 [[outputs]]
 id = "vuj1JMHRsMvoGT5TnUusG"
 uri = "file://exports/CashClip_AB_Project_Overview.mp4"
 type = "video"
 title = "Project Overview — Animated Video (v3, friendlier wording)"
+
+[[outputs]]
+id = "hxiuF_Tl2BIrN2B72P-aw"
+uri = "file://attached_assets/generated_images/chip-wave.png"
+type = "image"
+title = "Chip — Waving (home greeting)"
+
+[[outputs]]
+id = "DbKFr3LVOqPqyoU0QfqFh"
+uri = "file://attached_assets/generated_images/chip-celebrate.png"
+type = "image"
+title = "Chip — Celebrating / raining coins (reward & success moments)"
+
+[[outputs]]
+id = "9YTglR5g53z-GRLqJFbN3"
+uri = "file://attached_assets/generated_images/chip-thinking.png"
+type = "image"
+title = "Chip — Thinking / idle (loading)"
+
+[[outputs]]
+id = "AFs_1fIBD0e7piJjOLLnM"
+uri = "file://attached_assets/generated_images/chip-sad.png"
+type = "image"
+title = "Chip — Sad (empty states)"
+
+[[outputs]]
+id = "7wUl9165Ad3OhObh5aklF"
+uri = "file://attached_assets/generated_images/chip-sleeping.png"
+type = "image"
+title = "Chip — Sleeping / nothing here yet"
