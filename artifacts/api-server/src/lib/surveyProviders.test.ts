@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 
 let verifyProviderCompletion: typeof import("./surveyProviders").verifyProviderCompletion;
+let fetchExternalSurveys: typeof import("./surveyProviders").fetchExternalSurveys;
+let sanitizeSurveyUrl: typeof import("./surveyProviders").sanitizeSurveyUrl;
 
 // Provider API-key env vars that mark a provider as "configured". We clear them
 // up front so the deterministic, no-network tests below exercise the
@@ -27,6 +29,8 @@ beforeAll(async () => {
   clearProviderEnv();
   const mod = await import("./surveyProviders");
   verifyProviderCompletion = mod.verifyProviderCompletion;
+  fetchExternalSurveys = mod.fetchExternalSurveys;
+  sanitizeSurveyUrl = mod.sanitizeSurveyUrl;
 });
 
 afterEach(() => {
@@ -44,6 +48,10 @@ function fakeResponse(opts: { ok?: boolean; status?: number; body?: unknown }): 
     ok,
     status,
     text: async () => text,
+    json: async () => {
+      if (body === undefined) return {};
+      return typeof body === "string" ? JSON.parse(body) : body;
+    },
   } as unknown as Response;
 }
 
@@ -331,6 +339,348 @@ describe.each(STRICT_PROVIDERS)(
     });
   },
 );
+
+// --- Fetch side: building the survey list shown to users -------------------
+// fetchExternalSurveys only runs the per-provider fetch* helper for providers
+// that are "configured". By configuring exactly one provider's env vars at a
+// time we exercise each fetch* helper in isolation through the public API
+// (the helpers themselves are not exported). Each test stubs global fetch with
+// the raw provider JSON and asserts the mapped ExternalSurvey shape.
+
+function surveysFor(results: Awaited<ReturnType<typeof fetchExternalSurveys>>, provider: string) {
+  const entry = results.find((r) => r.provider === provider);
+  return entry?.surveys ?? [];
+}
+
+describe("fetchExternalSurveys — no providers configured", () => {
+  it("returns an empty array when nothing is configured (no network call)", async () => {
+    const fetchSpy = stubFetchResolving(fakeResponse({ body: { surveys: [] } }));
+    const results = await fetchExternalSurveys("user-1");
+    expect(results).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchExternalSurveys — Pollfish mapping", () => {
+  it("maps Pollfish JSON to ExternalSurvey cards with id prefix, reward, difficulty", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          surveys: [
+            // easy: loi <= 5, numeric reward
+            { survey_id: "111", survey_name: "Quick Poll", reward_value: 0.75, loi: 4, category: "Food" },
+            // medium: loi 6..10, string reward parsed
+            { id: "222", reward_value: "1.25", loi: 8 },
+            // hard: loi > 10, missing reward -> default 0.50
+            { survey_id: "333", loi: 20 },
+          ],
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "pollfish");
+    expect(surveys).toHaveLength(3);
+
+    expect(surveys[0]).toMatchObject({
+      id: "pollfish_111",
+      provider: "pollfish",
+      providerName: "Pollfish",
+      title: "Quick Poll",
+      reward: 0.75,
+      estimatedMinutes: 4,
+      category: "Food",
+      difficulty: "easy",
+    });
+    expect(surveys[1]).toMatchObject({ id: "pollfish_222", reward: 1.25, difficulty: "medium" });
+    expect(surveys[2]).toMatchObject({ id: "pollfish_333", reward: 0.5, difficulty: "hard" });
+    // default survey URL points at a trusted Pollfish host and is kept.
+    expect(surveys[0].surveyUrl).toContain("wss.pollfish.com");
+  });
+
+  it("returns [] when the Pollfish API responds non-OK", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    stubFetchResolving(fakeResponse({ ok: false, status: 500 }));
+    const results = await fetchExternalSurveys("user-1");
+    expect(surveysFor(results, "pollfish")).toEqual([]);
+  });
+
+  it("returns [] when the Pollfish response has no surveys array", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    stubFetchResolving(fakeResponse({ body: {} }));
+    const results = await fetchExternalSurveys("user-1");
+    expect(surveysFor(results, "pollfish")).toEqual([]);
+  });
+
+  it("returns [] (without throwing) when fetch rejects", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    stubFetchRejecting();
+    const results = await fetchExternalSurveys("user-1");
+    expect(surveysFor(results, "pollfish")).toEqual([]);
+  });
+});
+
+describe("fetchExternalSurveys — Cint mapping", () => {
+  it("maps Cint JSON (items[] alias, cpi reward) to cards", async () => {
+    process.env.CINT_API_KEY = "cint-key";
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          items: [
+            { id: "c1", name: "Brand Study", cpi: 2.0, loi: 5, category: "Brands" },
+            { surveyId: "c2", cpi: "3.50", loi: 10 },
+            { id: "c3", loi: 30 },
+          ],
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cint");
+    expect(surveys).toHaveLength(3);
+    expect(surveys[0]).toMatchObject({
+      id: "cint_c1",
+      provider: "cint",
+      title: "Brand Study",
+      reward: 2.0,
+      difficulty: "easy",
+      category: "Brands",
+    });
+    expect(surveys[1]).toMatchObject({ id: "cint_c2", reward: 3.5, difficulty: "medium" });
+    // missing cpi -> default 1.00, loi 30 -> hard
+    expect(surveys[2]).toMatchObject({ id: "cint_c3", reward: 1.0, difficulty: "hard" });
+    expect(surveys[0].surveyUrl).toContain("survey.cint.com");
+  });
+
+  it("returns [] on a non-OK Cint response", async () => {
+    process.env.CINT_API_KEY = "cint-key";
+    stubFetchResolving(fakeResponse({ ok: false, status: 503 }));
+    const results = await fetchExternalSurveys("user-1");
+    expect(surveysFor(results, "cint")).toEqual([]);
+  });
+});
+
+describe("fetchExternalSurveys — Lucid mapping", () => {
+  it("maps Lucid JSON (AllSurveys[], CPI/LOI/SurveyNumber) to cards", async () => {
+    process.env.LUCID_API_KEY = "lucid-key";
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          AllSurveys: [
+            { SurveyNumber: 900, SurveyName: "Auto Survey", CPI: 1.5, LOI: 6, SurveyGroup: "Auto" },
+            { id: "901", CPI: "2.40", LOI: 12 },
+            { SurveyNumber: 902, LOI: 25 },
+          ],
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "lucid");
+    expect(surveys).toHaveLength(3);
+    expect(surveys[0]).toMatchObject({
+      id: "lucid_900",
+      provider: "lucid",
+      title: "Auto Survey",
+      reward: 1.5,
+      difficulty: "easy",
+      category: "Auto",
+    });
+    expect(surveys[1]).toMatchObject({ id: "lucid_901", reward: 2.4, difficulty: "medium" });
+    // missing CPI -> default 1.20, LOI 25 -> hard
+    expect(surveys[2]).toMatchObject({ id: "lucid_902", reward: 1.2, difficulty: "hard" });
+    expect(surveys[0].surveyUrl).toContain("samplicio.us");
+  });
+});
+
+describe("fetchExternalSurveys — BitLabs mapping", () => {
+  it("maps BitLabs JSON (data.surveys[], value reward, category.name) to cards", async () => {
+    process.env.BITLABS_API_KEY = "bl-key";
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          data: {
+            surveys: [
+              {
+                id: "b1",
+                title: "Tech Survey",
+                value: 0.9,
+                loi: 4,
+                category: { name: "Tech" },
+                link: "https://api.bitlabs.ai/v1/click?uid=user-1",
+              },
+              { network_id: "b2", value: "1.10", loi: 9, link: "https://bitlabs.ai/s/b2" },
+            ],
+          },
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "bitlabs");
+    expect(surveys).toHaveLength(2);
+    expect(surveys[0]).toMatchObject({
+      id: "bitlabs_b1",
+      provider: "bitlabs",
+      title: "Tech Survey",
+      reward: 0.9,
+      estimatedMinutes: 4,
+      category: "Tech",
+      difficulty: "easy",
+    });
+    expect(surveys[1]).toMatchObject({ id: "bitlabs_b2", reward: 1.1, difficulty: "medium" });
+    expect(surveys[0].surveyUrl).toContain("api.bitlabs.ai");
+  });
+
+  it("drops the surveyUrl when BitLabs returns an untrusted link host", async () => {
+    process.env.BITLABS_API_KEY = "bl-key";
+    stubFetchResolving(
+      fakeResponse({
+        body: { surveys: [{ id: "bx", value: 0.5, loi: 5, link: "https://evil.example.com/steal" }] },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "bitlabs");
+    expect(surveys).toHaveLength(1);
+    expect(surveys[0].surveyUrl).toBe("");
+  });
+});
+
+describe("fetchExternalSurveys — CPX mapping and fallback", () => {
+  function configureCpx() {
+    process.env.CPX_API_KEY = "cpx-key";
+    process.env.CPX_APP_ID = "app-123";
+  }
+
+  it("maps live CPX surveys to per-survey cards", async () => {
+    configureCpx();
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          surveys: [
+            { id: "501", href: "https://offers.cpx-research.com/go?survey=501", payout: "0.80", loi: "5", category: "Lifestyle" },
+            { survey_id: "502", href: "https://offers.cpx-research.com/go?survey=502", payout: "1.50", loi: "12" },
+          ],
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cpx");
+    expect(surveys).toHaveLength(2);
+    expect(surveys[0]).toMatchObject({
+      id: "cpx_501",
+      provider: "cpx",
+      reward: 0.8,
+      estimatedMinutes: 5,
+      category: "Lifestyle",
+      difficulty: "easy",
+    });
+    expect(surveys[0].title).toContain("Lifestyle");
+    expect(surveys[1]).toMatchObject({ id: "cpx_502", reward: 1.5, difficulty: "medium" });
+  });
+
+  it("skips CPX entries with a missing id or an untrusted href", async () => {
+    configureCpx();
+    stubFetchResolving(
+      fakeResponse({
+        body: {
+          surveys: [
+            { id: "", href: "https://offers.cpx-research.com/go?survey=1" },
+            { id: "600", href: "https://evil.example.com/go" },
+            { id: "601", href: "https://offers.cpx-research.com/go?survey=601", payout: "0.50", loi: "3" },
+          ],
+        },
+      }),
+    );
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cpx");
+    expect(surveys).toHaveLength(1);
+    expect(surveys[0].id).toBe("cpx_601");
+  });
+
+  it("falls back to a single offerwall card when CPX returns no surveys", async () => {
+    configureCpx();
+    stubFetchResolving(fakeResponse({ body: { surveys: [] } }));
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cpx");
+    expect(surveys).toHaveLength(1);
+    expect(surveys[0]).toMatchObject({ id: "cpx_wall", provider: "cpx", category: "Multiple Topics" });
+    expect(surveys[0].surveyUrl).toContain("offers.cpx-research.com");
+  });
+
+  it("falls back to the offerwall card on a non-OK CPX response", async () => {
+    configureCpx();
+    stubFetchResolving(fakeResponse({ ok: false, status: 500 }));
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cpx");
+    expect(surveys).toHaveLength(1);
+    expect(surveys[0].id).toBe("cpx_wall");
+  });
+
+  it("falls back to the offerwall card when fetch rejects", async () => {
+    configureCpx();
+    stubFetchRejecting();
+    const results = await fetchExternalSurveys("user-1");
+    const surveys = surveysFor(results, "cpx");
+    expect(surveys).toHaveLength(1);
+    expect(surveys[0].id).toBe("cpx_wall");
+  });
+});
+
+describe("sanitizeSurveyUrl", () => {
+  it("returns '' for empty/undefined input", () => {
+    expect(sanitizeSurveyUrl("", "k", "pollfish")).toBe("");
+    expect(sanitizeSurveyUrl(undefined, "k", "pollfish")).toBe("");
+  });
+
+  it("returns '' for a malformed URL", () => {
+    expect(sanitizeSurveyUrl("not a url", undefined, "pollfish")).toBe("");
+  });
+
+  it("drops non-https URLs", () => {
+    expect(sanitizeSurveyUrl("http://wss.pollfish.com/s/1", undefined, "pollfish")).toBe("");
+  });
+
+  it("drops URLs whose host is not on the provider allowlist", () => {
+    expect(sanitizeSurveyUrl("https://evil.example.com/s/1", undefined, "pollfish")).toBe("");
+  });
+
+  it("accepts a subdomain of a trusted host", () => {
+    const out = sanitizeSurveyUrl("https://wss.pollfish.com/link?survey_id=1", undefined, "pollfish");
+    expect(out).toBe("https://wss.pollfish.com/link?survey_id=1");
+  });
+
+  it("treats an unknown provider as having no allowlist (drops everything)", () => {
+    expect(sanitizeSurveyUrl("https://wss.pollfish.com/s/1", undefined, "nope")).toBe("");
+  });
+
+  it("skips the host check when no provider is supplied", () => {
+    const out = sanitizeSurveyUrl("https://anything.example.com/s/1", undefined);
+    expect(out).toBe("https://anything.example.com/s/1");
+  });
+
+  it("strips the API key when it appears as a query parameter value", () => {
+    const out = sanitizeSurveyUrl(
+      "https://survey.cint.com/s?api_key=SECRET123&id=9",
+      "SECRET123",
+      "cint",
+    );
+    expect(out).not.toContain("SECRET123");
+    expect(out).toContain("id=9");
+  });
+
+  it("strips the API key when it appears as a path segment", () => {
+    const out = sanitizeSurveyUrl(
+      "https://survey.cint.com/v1/SECRET123/start",
+      "SECRET123",
+      "cint",
+    );
+    expect(out).not.toContain("SECRET123");
+    expect(out).toContain("/v1/start");
+  });
+
+  it("leaves a clean trusted URL unchanged when the API key is absent from it", () => {
+    const url = "https://survey.cint.com/s?id=9";
+    expect(sanitizeSurveyUrl(url, "SECRET123", "cint")).toBe(url);
+  });
+});
 
 describe("verifyProviderCompletion — CPX configuration edge case", () => {
   it("treats CPX as not configured when CPX_APP_ID is missing (no network call)", async () => {

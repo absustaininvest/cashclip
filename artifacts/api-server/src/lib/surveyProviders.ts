@@ -102,7 +102,7 @@ function isTrustedSurveyHost(hostname: string, provider: string): boolean {
   return allowed.some((domain) => h === domain || h.endsWith(`.${domain}`));
 }
 
-function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined, provider?: string): string {
+export function sanitizeSurveyUrl(url: string | undefined, apiKey: string | undefined, provider?: string): string {
   if (!url) return "";
   let parsed: URL;
   try {
