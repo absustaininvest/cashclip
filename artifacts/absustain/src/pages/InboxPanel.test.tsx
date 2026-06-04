@@ -47,11 +47,39 @@ type RepliesBehavior =
   | { kind: "list"; replies: any[] }
   | { kind: "error" };
 
-function installFetchMock(repliesBehavior: RepliesBehavior) {
-  const fetchMock = vi.fn(async (url: string | URL) => {
-    const u = typeof url === "string" ? url : url.toString();
+type ReplyBehavior =
+  | { kind: "ok" }
+  | { kind: "error"; status?: number; error?: string };
 
-    if (u.startsWith("/api/admin/inbox/replies")) {
+function installFetchMock(
+  repliesBehavior: RepliesBehavior,
+  replyBehavior: ReplyBehavior = { kind: "ok" },
+) {
+  const fetchMock = vi.fn(async (url: string | URL, _init?: RequestInit) => {
+    const u = typeof url === "string" ? url : url.toString();
+    const path = u.split("?")[0];
+
+    // The send-reply endpoint (POST) is an exact path; it must be matched
+    // before the generic "/api/admin/inbox" branch because it shares that
+    // prefix. Note it is distinct from "/api/admin/inbox/replies" (history).
+    if (path === "/api/admin/inbox/reply") {
+      if (replyBehavior.kind === "error") {
+        return {
+          ok: false,
+          status: replyBehavior.status ?? 500,
+          json: async () => ({
+            error: replyBehavior.error ?? "Failed to send reply",
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    }
+
+    if (path === "/api/admin/inbox/replies") {
       if (repliesBehavior.kind === "error") {
         return {
           ok: false,
@@ -66,7 +94,7 @@ function installFetchMock(repliesBehavior: RepliesBehavior) {
       } as Response;
     }
 
-    if (u.startsWith("/api/admin/inbox")) {
+    if (path === "/api/admin/inbox") {
       return {
         ok: true,
         status: 200,
@@ -81,6 +109,24 @@ function installFetchMock(repliesBehavior: RepliesBehavior) {
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+function countCalls(fetchMock: ReturnType<typeof installFetchMock>, path: string) {
+  return fetchMock.mock.calls.filter((call) => {
+    const url = call[0];
+    const u = typeof url === "string" ? url : (url as URL).toString();
+    return u.split("?")[0] === path;
+  }).length;
+}
+
+async function openComposerAndType(text: string) {
+  const replyButton = screen.getByRole("button", { name: /^Reply$/ });
+  fireEvent.click(replyButton);
+  const textarea = (await screen.findByPlaceholderText(
+    "Write your reply…",
+  )) as HTMLTextAreaElement;
+  if (text) fireEvent.change(textarea, { target: { value: text } });
+  return textarea;
 }
 
 async function renderAndSelectMessage() {
@@ -173,5 +219,100 @@ describe("InboxPanel reply history", () => {
     // The Send Reply action is available and enabled with content present.
     const sendButton = screen.getByRole("button", { name: /Send Reply/ });
     expect(sendButton).toBeEnabled();
+  });
+});
+
+describe("InboxPanel sending a reply", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("on a successful send shows the confirmation and re-fetches history", async () => {
+    const fetchMock = installFetchMock(
+      { kind: "list", replies: [] },
+      { kind: "ok" },
+    );
+    await renderAndSelectMessage();
+
+    // History is fetched once when the message is selected.
+    await waitFor(() =>
+      expect(countCalls(fetchMock, "/api/admin/inbox/replies")).toBe(1),
+    );
+
+    await openComposerAndType("Thanks — your withdrawal is approved.");
+    fireEvent.click(screen.getByRole("button", { name: /Send Reply/ }));
+
+    // The send POST is issued to the reply endpoint.
+    await waitFor(() =>
+      expect(countCalls(fetchMock, "/api/admin/inbox/reply")).toBe(1),
+    );
+
+    // Success confirmation appears and the composer closes.
+    expect(
+      await screen.findByText("Reply sent to jane@example.com"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Write your reply…"),
+    ).not.toBeInTheDocument();
+
+    // History is re-fetched after a successful send (second call).
+    await waitFor(() =>
+      expect(
+        countCalls(fetchMock, "/api/admin/inbox/replies"),
+      ).toBeGreaterThanOrEqual(2),
+    );
+  });
+
+  it("on a failed send shows the inline error and keeps the composer open", async () => {
+    installFetchMock(
+      { kind: "list", replies: [] },
+      { kind: "error", status: 502, error: "SMTP server unavailable" },
+    );
+    await renderAndSelectMessage();
+
+    const textarea = await openComposerAndType("Following up on your ticket.");
+    fireEvent.click(screen.getByRole("button", { name: /Send Reply/ }));
+
+    // The server's error message is surfaced inline.
+    expect(
+      await screen.findByText("SMTP server unavailable"),
+    ).toBeInTheDocument();
+
+    // The composer stays open with the typed text preserved so the operator
+    // can retry; no success confirmation is shown.
+    expect(textarea).toBeInTheDocument();
+    expect(textarea.value).toBe("Following up on your ticket.");
+    expect(
+      screen.queryByText("Reply sent to jane@example.com"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("blocks an empty-body submission from sending a reply", async () => {
+    const fetchMock = installFetchMock(
+      { kind: "list", replies: [] },
+      { kind: "ok" },
+    );
+    await renderAndSelectMessage();
+
+    // Open the composer but leave the body empty.
+    const textarea = await openComposerAndType("");
+    const sendButton = screen.getByRole("button", { name: /Send Reply/ });
+
+    // With no content the Send Reply action is disabled, guarding against the
+    // empty submission the "Reply message cannot be empty." validation backs.
+    expect(sendButton).toBeDisabled();
+
+    // Whitespace-only content is treated the same as empty.
+    fireEvent.change(textarea, { target: { value: "   " } });
+    expect(sendButton).toBeDisabled();
+
+    // Attempting to send does not issue a request to the reply endpoint.
+    fireEvent.click(sendButton);
+    expect(countCalls(fetchMock, "/api/admin/inbox/reply")).toBe(0);
   });
 });
