@@ -1838,7 +1838,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ messages, fetchedAt: new Date().toISOString() });
     } catch (err) {
       req.log.error({ err }, "Failed to fetch inbox");
-      res.status(500).json({ error: "Failed to connect to mail server. Check ZOHO_SMTP_PASSWORD." });
+      res.status(500).json({
+        error:
+          "Failed to connect to mail server. Enable IMAP on the Zoho mailbox and set the ZOHO_IMAP_PASSWORD secret (a separate app-specific password from the SMTP one).",
+      });
     }
   });
 
