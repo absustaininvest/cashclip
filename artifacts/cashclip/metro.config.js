@@ -15,6 +15,10 @@ config.resolver.blockList = [
   /\/\.git\/.*/,
   /\/attached_assets\/.*/,
   /\/scripts\/node_modules\/.*/,
+  // Never bundle test/spec files into the app. expo-router's require.context
+  // globs everything under app/, so a stray *.test.tsx there would otherwise
+  // pull vitest/vite into the production bundle and crash Metro.
+  /\.(test|spec)\.[jt]sx?$/,
 ];
 
 config.resolver.nodeModulesPaths = [
