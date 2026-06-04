@@ -2133,6 +2133,8 @@ function CashClipUsersPanel({ token }: { token: string }) {
   >([]);
   const [auditLoading, setAuditLoading] = useState(true);
   const [showAudit, setShowAudit] = useState(true);
+  const [auditActorFilter, setAuditActorFilter] = useState("");
+  const [auditActors, setAuditActors] = useState<string[]>([]);
 
   const PAGE_SIZE = 25;
 
@@ -2202,18 +2204,31 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const fetchAdjustments = useCallback(async () => {
     setAuditLoading(true);
     try {
-      const res = await fetch(`/api/admin/adjustments?limit=100`, {
+      const params = new URLSearchParams({ limit: "100" });
+      if (auditActorFilter) params.set("actor", auditActorFilter);
+      const res = await fetch(`/api/admin/adjustments?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setAuditRows(data.adjustments ?? []);
+      const rows = data.adjustments ?? [];
+      setAuditRows(rows);
+      if (!auditActorFilter) {
+        const names = Array.from(
+          new Set(
+            rows
+              .map((r: { actorUsername: string | null; actorUserId: string | null }) => r.actorUsername ?? r.actorUserId)
+              .filter((n: string | null): n is string => !!n),
+          ),
+        ).sort((a, b) => (a as string).localeCompare(b as string)) as string[];
+        setAuditActors(names);
+      }
     } catch {
       setAuditRows([]);
     } finally {
       setAuditLoading(false);
     }
-  }, [token]);
+  }, [token, auditActorFilter]);
 
   useEffect(() => {
     fetchAdjustments();
@@ -2903,29 +2918,58 @@ function CashClipUsersPanel({ token }: { token: string }) {
 
       {/* Manual credit audit log — every admin credit & correction */}
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
-        <button
-          onClick={() => setShowAudit((s) => !s)}
-          className="w-full px-5 py-4 border-b border-white/[0.06] flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
-        >
-          <div>
-            <h3 className="text-white text-sm font-semibold">
-              Manual Credit Audit Log
-            </h3>
-            <p className="text-white/30 text-xs mt-0.5">
-              Every admin credit &amp; correction — who, how much, why, and when. A receipt is emailed to the user and support@absustaininvest.com on each one.
-            </p>
-          </div>
-          <span className="text-white/30 text-xs whitespace-nowrap">
-            {showAudit ? "Hide" : "Show"} ({auditRows.length})
-          </span>
-        </button>
+        <div className="border-b border-white/[0.06]">
+          <button
+            onClick={() => setShowAudit((s) => !s)}
+            className="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
+          >
+            <div>
+              <h3 className="text-white text-sm font-semibold">
+                Manual Credit Audit Log
+              </h3>
+              <p className="text-white/30 text-xs mt-0.5">
+                Every admin credit &amp; correction — who, how much, why, and when. A receipt is emailed to the user and support@absustaininvest.com on each one.
+              </p>
+            </div>
+            <span className="text-white/30 text-xs whitespace-nowrap">
+              {showAudit ? "Hide" : "Show"} ({auditRows.length})
+            </span>
+          </button>
+          {showAudit && (
+            <div className="px-5 pb-4 flex items-center gap-2 flex-wrap">
+              <label className="text-white/40 text-xs">Issued by</label>
+              <select
+                value={auditActorFilter}
+                onChange={(e) => setAuditActorFilter(e.target.value)}
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-white/80 text-xs focus:outline-none focus:border-white/20"
+              >
+                <option value="">All admins</option>
+                {auditActors.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+              {auditActorFilter && (
+                <button
+                  onClick={() => setAuditActorFilter("")}
+                  className="text-white/40 hover:text-white/70 text-xs underline underline-offset-2 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         {showAudit && (
           <div className="max-h-80 overflow-y-auto">
             {auditLoading ? (
               <div className="px-5 py-6 text-white/30 text-sm">Loading audit log…</div>
             ) : auditRows.length === 0 ? (
               <div className="px-5 py-6 text-white/30 text-sm">
-                No manual credits or corrections recorded yet.
+                {auditActorFilter
+                  ? `No manual credits or corrections issued by ${auditActorFilter}.`
+                  : "No manual credits or corrections recorded yet."}
               </div>
             ) : (
               <table className="w-full text-sm">

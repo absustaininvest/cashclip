@@ -22,7 +22,7 @@ import {
   type InsertSupportReply,
 } from "@workspace/db";
 import { db } from "@workspace/db";
-import { eq, ne, desc, and, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
+import { eq, ne, desc, and, or, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -832,8 +832,18 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getAdjustmentLedger(limit: number = 100): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>> {
-    const actor = alias(users, "actor");
+  async getAdjustmentLedger(limit: number = 100, actor?: string): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>> {
+    const actorAlias = alias(users, "actor");
+    const conditions = [eq(earningsLedger.type, "adjustment")];
+    const actorFilter = actor?.trim();
+    if (actorFilter) {
+      conditions.push(
+        or(
+          eq(earningsLedger.actorUserId, actorFilter),
+          eq(actorAlias.username, actorFilter),
+        )!,
+      );
+    }
     return db
       .select({
         id: earningsLedger.id,
@@ -843,13 +853,13 @@ export class DatabaseStorage implements IStorage {
         amount: earningsLedger.amount,
         description: earningsLedger.description,
         actorUserId: earningsLedger.actorUserId,
-        actorUsername: actor.username,
+        actorUsername: actorAlias.username,
         createdAt: earningsLedger.createdAt,
       })
       .from(earningsLedger)
       .innerJoin(users, eq(earningsLedger.userId, users.id))
-      .leftJoin(actor, eq(earningsLedger.actorUserId, actor.id))
-      .where(eq(earningsLedger.type, "adjustment"))
+      .leftJoin(actorAlias, eq(earningsLedger.actorUserId, actorAlias.id))
+      .where(and(...conditions))
       .orderBy(desc(earningsLedger.createdAt))
       .limit(limit);
   }

@@ -1477,7 +1477,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = Number(req.query["limit"] ?? 100);
       const limit = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 100;
-      const adjustments = await storage.getAdjustmentLedger(limit);
+      const actorRaw = req.query["actor"];
+      const actor = typeof actorRaw === "string" && actorRaw.trim().length > 0 ? actorRaw.trim() : undefined;
+      const adjustments = await storage.getAdjustmentLedger(limit, actor);
       res.json({ adjustments });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to load adjustments" });
