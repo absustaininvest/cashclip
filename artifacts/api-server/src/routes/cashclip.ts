@@ -29,7 +29,7 @@ import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
-import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd } from "../withdrawalTiers";
+import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
@@ -939,6 +939,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).catch(() => {});
       }
 
+      // Referral qualification: if THIS user was referred and just completed a
+      // cash-out of at least the qualifying amount ($3), credit their referrer
+      // once. All offered tiers are >= $3, but we gate on the constant so the
+      // rule stays explicit and survives any future tier change. Idempotent and
+      // best-effort — never blocks or fails the user's withdrawal response.
+      if (user.referredBy && tier.amount >= REFERRAL_QUALIFY_USD - 1e-9) {
+        storage
+          .qualifyReferral({ referredUserId: req.userId!, bonusUsd: REFERRAL_BONUS_USD })
+          .then((r) => {
+            if (r.credited) {
+              req.log.info({ referredUserId: req.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited");
+            }
+          })
+          .catch((err) => {
+            req.log.error({ err, referredUserId: req.userId }, "Referral qualification failed");
+          });
+      }
+
       // Velocity flag (operator only): alert when a user makes their 2nd (or any
       // further) withdrawal in the same day — the realistic "more than twice a
       // day" signal under the current $7/day cap.
@@ -963,6 +981,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ withdrawals: withdrawalList });
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch withdrawals" });
+    }
+  });
+
+  // Server-authoritative referral status. The user's referral "code" is their
+  // username (referred friends enter it at sign-up). A friend only counts —
+  // and only earns the referrer the bonus — once they've cashed out $3+
+  // (qualified); until then they're shown as pending. Friend usernames are
+  // masked so a referrer can track progress without learning full identities.
+  app.get("/api/referrals", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) { res.status(404).json({ error: "User not found" }); return; }
+      const stats = await storage.getReferralStats(user.username);
+      const mask = (u: string): string => {
+        if (u.length <= 2) return `${u[0] ?? "?"}***`;
+        return `${u.slice(0, 2)}${"*".repeat(Math.max(2, u.length - 2))}`;
+      };
+      res.json({
+        code: user.username,
+        totalReferrals: stats.totalReferrals,
+        qualifiedReferrals: stats.qualifiedReferrals,
+        pendingReferrals: stats.pendingReferrals,
+        referralEarnings: parseFloat((stats.qualifiedReferrals * REFERRAL_BONUS_USD).toFixed(2)),
+        bonusPerReferral: REFERRAL_BONUS_USD,
+        qualifyAmount: REFERRAL_QUALIFY_USD,
+        referrals: stats.referrals.map((r) => ({
+          name: mask(r.username),
+          joinedAt: r.joinedAt,
+          qualified: r.qualified,
+          qualifiedAt: r.qualifiedAt,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load referrals" });
     }
   });
 

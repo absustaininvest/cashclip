@@ -71,6 +71,7 @@ export type LedgerType =
   | "withdrawal"
   | "withdrawal_refund"
   | "bonus"
+  | "referral"
   | "adjustment";
 
 export interface IStorage {
@@ -112,6 +113,16 @@ export interface IStorage {
     description: string;
     refId?: string;
   }): Promise<{ balance: number; totalEarned: number }>;
+  qualifyReferral(args: {
+    referredUserId: string;
+    bonusUsd: number;
+  }): Promise<{ credited: boolean; referrerId?: string }>;
+  getReferralStats(username: string): Promise<{
+    totalReferrals: number;
+    qualifiedReferrals: number;
+    pendingReferrals: number;
+    referrals: { username: string; joinedAt: Date; qualified: boolean; qualifiedAt: Date | null }[];
+  }>;
   getUserLedger(userId: string, limit?: number): Promise<EarningsLedgerEntry[]>;
   createWithdrawal(data: {
     userId: string;
@@ -490,6 +501,112 @@ export class DatabaseStorage implements IStorage {
 
       return { balance: n(updated.balance), totalEarned: n(updated.totalEarned) };
     });
+  }
+
+  // Qualify a referral: the first time a REFERRED user completes a $3+ cash-out,
+  // credit their referrer exactly once. Idempotent and race-safe — the referred
+  // user's row is locked FOR UPDATE and `referralCreditedAt` is the guard, so a
+  // concurrent (or repeat) withdrawal can never double-credit. The referrer is
+  // resolved from the referred user's `referredBy` (which stores the referrer's
+  // normalized username, i.e. their shareable referral code). We always stamp
+  // `referralCreditedAt` once the gate fires — even if the referrer is missing
+  // or it would be a self-referral — so the user isn't re-scanned on every
+  // future withdrawal.
+  async qualifyReferral(args: {
+    referredUserId: string;
+    bonusUsd: number;
+  }): Promise<{ credited: boolean; referrerId?: string }> {
+    const { referredUserId, bonusUsd } = args;
+    const bonusStr = bonusUsd.toFixed(2);
+
+    return await db.transaction(async (tx: DbTx) => {
+      await tx.execute(sql`SELECT id FROM ${users} WHERE id = ${referredUserId} FOR UPDATE`);
+
+      const [referred] = await tx
+        .select({
+          id: users.id,
+          username: users.username,
+          referredBy: users.referredBy,
+          referralCreditedAt: users.referralCreditedAt,
+        })
+        .from(users)
+        .where(eq(users.id, referredUserId))
+        .limit(1);
+
+      // Already credited (idempotent) or no referrer on record — nothing to do.
+      if (!referred || referred.referralCreditedAt || !referred.referredBy) {
+        return { credited: false as const };
+      }
+
+      // Stamp first so this user is never re-evaluated, regardless of outcome.
+      await tx
+        .update(users)
+        .set({ referralCreditedAt: new Date() })
+        .where(eq(users.id, referredUserId));
+
+      const [referrer] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.username, referred.referredBy))
+        .limit(1);
+
+      // Unknown code or self-referral: gate is closed, but no payout.
+      if (!referrer || referrer.id === referredUserId) {
+        return { credited: false as const };
+      }
+
+      await tx
+        .update(users)
+        .set({
+          balance: sql`${users.balance} + ${bonusStr}`,
+          totalEarned: sql`${users.totalEarned} + ${bonusStr}`,
+        })
+        .where(eq(users.id, referrer.id));
+
+      await tx.insert(earningsLedger).values({
+        userId: referrer.id,
+        amount: bonusStr,
+        type: "referral" as const,
+        description: `Referral bonus — ${referred.username} cashed out`,
+        refId: referredUserId,
+      });
+
+      return { credited: true as const, referrerId: referrer.id };
+    });
+  }
+
+  // Referral stats for a referrer, keyed by their username (== their referral
+  // code). A referred friend is "qualified" once they've completed a $3+ cash-out
+  // (referralCreditedAt set); otherwise they are "pending".
+  async getReferralStats(username: string): Promise<{
+    totalReferrals: number;
+    qualifiedReferrals: number;
+    pendingReferrals: number;
+    referrals: { username: string; joinedAt: Date; qualified: boolean; qualifiedAt: Date | null }[];
+  }> {
+    const rows = await db
+      .select({
+        username: users.username,
+        joinedAt: users.createdAt,
+        qualifiedAt: users.referralCreditedAt,
+      })
+      .from(users)
+      .where(eq(users.referredBy, username))
+      .orderBy(desc(users.createdAt));
+
+    const referrals = rows.map((r) => ({
+      username: r.username,
+      joinedAt: r.joinedAt,
+      qualified: !!r.qualifiedAt,
+      qualifiedAt: r.qualifiedAt ?? null,
+    }));
+    const qualifiedReferrals = referrals.filter((r) => r.qualified).length;
+    return {
+      totalReferrals: referrals.length,
+      qualifiedReferrals,
+      pendingReferrals: referrals.length - qualifiedReferrals,
+      referrals,
+    };
   }
 
   async debitUser({

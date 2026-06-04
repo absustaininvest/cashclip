@@ -198,6 +198,53 @@ export async function fetchServerBalance(): Promise<{ balance: number; totalEarn
   }
 }
 
+// ── REFERRAL STATUS (server-authoritative) ───────────────────────────────────
+// The referral relationship is set at sign-up (a friend enters your username as
+// the code). A friend only counts — and only earns you the bonus — once they
+// cash out the qualifying amount ($3). Until then they show as "pending".
+export interface ReferralFriend {
+  name: string;        // masked username, e.g. "jo****"
+  joinedAt: number;    // unix ms
+  qualified: boolean;  // true once they cashed out $3+
+  qualifiedAt: number | null;
+}
+
+export interface ReferralStats {
+  code: string;              // your referral code (== your username)
+  totalReferrals: number;    // friends who signed up with your code
+  qualifiedReferrals: number;// friends who cashed out $3+
+  pendingReferrals: number;  // signed up but not yet cashed out $3
+  referralEarnings: number;  // qualified × bonus
+  bonusPerReferral: number;
+  qualifyAmount: number;     // $ a friend must cash out to qualify
+  referrals: ReferralFriend[];
+}
+
+export async function fetchReferralStats(): Promise<ReferralStats | null> {
+  try {
+    const res = await apiRequest("GET", "/api/referrals");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      code: String(data.code ?? ""),
+      totalReferrals: Number(data.totalReferrals) || 0,
+      qualifiedReferrals: Number(data.qualifiedReferrals) || 0,
+      pendingReferrals: Number(data.pendingReferrals) || 0,
+      referralEarnings: Number(data.referralEarnings) || 0,
+      bonusPerReferral: Number(data.bonusPerReferral) || 0,
+      qualifyAmount: Number(data.qualifyAmount) || 3,
+      referrals: (data.referrals ?? []).map((r: any): ReferralFriend => ({
+        name: String(r.name ?? ""),
+        joinedAt: r.joinedAt ? new Date(r.joinedAt).getTime() : Date.now(),
+        qualified: !!r.qualified,
+        qualifiedAt: r.qualifiedAt ? new Date(r.qualifiedAt).getTime() : null,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── SURVEY PROFILE COMPLETENESS ──────────────────────────────────────────────
 // Whether the user has finished their survey demographic profile (required to
 // withdraw and to unlock higher-paying surveys). Returns null when offline/unknown

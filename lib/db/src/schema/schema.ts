@@ -14,6 +14,9 @@ export const users = pgTable("users", {
   balance: numeric("balance", { precision: 12, scale: 2 }).notNull().default("0"),
   totalEarned: numeric("total_earned", { precision: 12, scale: 2 }).notNull().default("0"),
   referredBy: text("referred_by"),
+  // Set the first time this (referred) user completes a qualifying $3+ cash-out.
+  // Acts as the idempotency guard so the referrer is credited at most once.
+  referralCreditedAt: timestamp("referral_credited_at"),
   emailVerified: boolean("email_verified").notNull().default(false),
   emailVerificationToken: text("email_verification_token"),
   emailVerificationExpiresAt: timestamp("email_verification_expires_at"),

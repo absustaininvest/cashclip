@@ -67,13 +67,6 @@ export interface UserStats {
   dailyAdsWatched: number;
 }
 
-export interface Referral {
-  id: string;
-  name: string;
-  joinedAt: number;
-  earningsFromThem: number;
-}
-
 export interface AppNotification {
   id: string;
   title: string;
@@ -274,20 +267,10 @@ export async function toggleLikeVideo(videoId: string): Promise<boolean> {
   return !isLiked;
 }
 
-export async function getReferralCode(): Promise<string> {
-  let code = await AsyncStorage.getItem(KEYS.REFERRAL_CODE);
-  if (!code) {
-    code = "CC" + Math.random().toString(36).slice(2, 8).toUpperCase();
-    await AsyncStorage.setItem(KEYS.REFERRAL_CODE, code);
-  }
-  return code;
-}
-
-export async function getReferrals(): Promise<Referral[]> {
-  const raw = await AsyncStorage.getItem(KEYS.REFERRALS);
-  return raw ? JSON.parse(raw) : [];
-}
-
+// Referral totals shown on the Profile screen. These are read-only caches of
+// server-authoritative numbers (see cacheReferralStats), NOT a local economy —
+// the only place a referral bonus is ever granted is the server, once a referred
+// friend cashes out $3+. We deliberately no longer mint anything client-side.
 export async function getTotalReferrals(): Promise<number> {
   return getNumber(KEYS.TOTAL_REFERRALS, 0);
 }
@@ -296,51 +279,11 @@ export async function getReferralEarnings(): Promise<number> {
   return getNumber(KEYS.REFERRAL_EARNINGS, 0);
 }
 
-export async function redeemReferralCode(code: string): Promise<{ success: boolean; message: string }> {
-  const myCode = await getReferralCode();
-  if (code.toUpperCase() === myCode) {
-    return { success: false, message: "You cannot use your own referral code." };
-  }
-
-  if (code.length < 4) {
-    return { success: false, message: "Invalid referral code." };
-  }
-
-  const referrals = await getReferrals();
-  const already = referrals.find((r) => r.id === code.toUpperCase());
-  if (already) {
-    return { success: false, message: "This code has already been redeemed." };
-  }
-
-  const names = ["Alex", "Jordan", "Sam", "Taylor", "Morgan", "Casey", "Riley", "Quinn"];
-  const newReferral: Referral = {
-    id: code.toUpperCase(),
-    name: names[Math.floor(Math.random() * names.length)],
-    joinedAt: Date.now(),
-    earningsFromThem: 0.50,
-  };
-
-  referrals.push(newReferral);
-  await AsyncStorage.setItem(KEYS.REFERRALS, JSON.stringify(referrals));
-
-  const totalRefs = await getNumber(KEYS.TOTAL_REFERRALS, 0);
-  await setNumber(KEYS.TOTAL_REFERRALS, totalRefs + 1);
-
-  const refEarnings = await getNumber(KEYS.REFERRAL_EARNINGS, 0);
-  await setNumber(KEYS.REFERRAL_EARNINGS, refEarnings + 0.50);
-
-  await addEarnings(0.50, `Referral bonus from ${newReferral.name}`, "referral");
-
-  await addNotification({
-    title: "New Referral!",
-    message: `${newReferral.name} joined using a referral code. You earned $0.50!`,
-    type: "referral",
-  });
-
-  await updateMissionProgress("refer_friends", 1);
-  await updateWeeklyMissionProgress("weekly_referrals", 1);
-
-  return { success: true, message: `Referral successful! You earned $0.50 bonus.` };
+// Cache the server's referral numbers so screens that don't fetch live data
+// (e.g. Profile) still reflect reality. Never credits the balance.
+export async function cacheReferralStats(totalJoined: number, earnings: number): Promise<void> {
+  await setNumber(KEYS.TOTAL_REFERRALS, Math.max(0, Math.round(totalJoined)));
+  await setNumber(KEYS.REFERRAL_EARNINGS, Math.max(0, earnings));
 }
 
 // ── DISPLAY / RESET HELPERS ───────────────────────────────────────────────────
@@ -607,6 +550,40 @@ async function updateWeeklyMissionProgress(missionId: string, increment: number)
     }
     await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
   }
+}
+
+// Start (unix ms) of the current week, using the SAME week boundary as
+// getWeekNumber() (calendar-year weeks, Sunday-agnostic 7-day buckets from Jan 1)
+// so weekly-mission progress and qualified-referral counting stay aligned.
+export function getCurrentWeekStartMs(): number {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1).getTime();
+  const oneWeek = 604800000;
+  const weekIndex = Math.ceil((now.getTime() - start) / oneWeek);
+  return start + Math.max(0, weekIndex - 1) * oneWeek;
+}
+
+// Set a weekly mission's progress to an absolute, server-derived value (vs the
+// increment-based updateWeeklyMissionProgress). Used for "weekly_referrals"
+// (Social Butterfly): progress mirrors how many referred friends cashed out $3+
+// this week, as reported by the server — never a local guess. Only ever moves
+// progress forward so a transient offline read can't undo it.
+export async function setWeeklyMissionProgress(missionId: string, value: number): Promise<void> {
+  const missions = await getWeeklyMissions();
+  const mission = missions.find((m) => m.id === missionId);
+  if (!mission) return;
+  const clamped = Math.min(Math.max(Math.round(value), 0), mission.target);
+  if (clamped <= mission.progress) return;
+  mission.progress = clamped;
+  if (mission.progress >= mission.target && !mission.completed) {
+    mission.completed = true;
+    await addNotification({
+      title: "Weekly Mission Complete!",
+      message: `You completed "${mission.title}". Claim your ${mission.reward.toLocaleString()} pts reward!`,
+      type: "reward",
+    });
+  }
+  await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
 }
 
 export async function claimMissionReward(missionId: string, isWeekly: boolean = false): Promise<number> {

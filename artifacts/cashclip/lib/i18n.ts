@@ -154,7 +154,7 @@ const en = {
     },
     referral: {
       referralProgram: "Referral Program",
-      inviteDescription: "Invite friends and earn $0.50 for every person who joins and watches their first 10 ads.",
+      inviteDescription: "Invite friends and earn $0.50 for every friend who joins with your code and cashes out $3.",
       yourReferralCode: "Your Referral Code",
       copy: "Copy",
       copied: "Copied!",
@@ -176,6 +176,14 @@ const en = {
       errorTitle: "Error",
       enterCode: "Please enter a referral code",
       successTitle: "Success",
+      howItWorks: "How it works",
+      howItWorksBody: "Friends enter your code when they sign up. You earn $0.50 once each friend cashes out $3.",
+      friendsJoined: "Friends Joined",
+      qualifiedFriends: "Cashed Out $3+",
+      qualified: "Qualified",
+      pending: "Pending",
+      pendingHint: "Waiting for $3 cash-out",
+      qualifiedOn: "Qualified",
     },
     surveys: {
       surveys: "Surveys",
@@ -408,7 +416,7 @@ const en = {
         },
         {
           q: "How does the referral program work?",
-          a: "Share your unique referral code with friends. When a friend signs up and watches their first 10 ads, you earn $0.50 automatically.",
+          a: "Share your referral code with friends. When a friend signs up with your code and cashes out $3, you earn $0.50 automatically.",
         },
         {
           q: "Is my account secure?",
@@ -677,7 +685,7 @@ const translations: Record<Language, Translations> = {
     },
     referral: {
       referralProgram: "Programa de Referidos",
-      inviteDescription: "Invita amigos y gana $0.50 por cada persona que se una y vea sus primeros 10 anuncios.",
+      inviteDescription: "Invita amigos y gana $0.50 por cada amigo que se una con tu codigo y retire $3.",
       yourReferralCode: "Tu Codigo de Referido",
       copy: "Copiar",
       copied: "Copiado!",
@@ -699,6 +707,14 @@ const translations: Record<Language, Translations> = {
       errorTitle: "Error",
       enterCode: "Por favor ingresa un codigo de referido",
       successTitle: "Exito",
+      howItWorks: "Como funciona",
+      howItWorksBody: "Tus amigos ingresan tu codigo al registrarse. Ganas $0.50 cuando cada amigo retira $3.",
+      friendsJoined: "Amigos Unidos",
+      qualifiedFriends: "Retiraron $3+",
+      qualified: "Calificado",
+      pending: "Pendiente",
+      pendingHint: "Esperando retiro de $3",
+      qualifiedOn: "Calificado",
     },
     surveys: {
       surveys: "Encuestas",
@@ -931,7 +947,7 @@ const translations: Record<Language, Translations> = {
         },
         {
           q: "Como funciona el programa de referidos?",
-          a: "Comparte tu codigo de referido con amigos. Cuando un amigo se registra y ve sus primeros 10 anuncios, ganas $0.50 automaticamente.",
+          a: "Comparte tu codigo de referido con amigos. Cuando un amigo se registra con tu codigo y retira $3, ganas $0.50 automaticamente.",
         },
         {
           q: "Mi cuenta es segura?",

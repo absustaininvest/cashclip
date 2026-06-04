@@ -7,57 +7,80 @@ import {
   Pressable,
   Platform,
   Alert,
-  KeyboardAvoidingView,
-  TextInput,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
-import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import {
-  getReferralCode,
-  getReferrals,
+  fetchReferralStats,
+  type ReferralStats,
+  type ReferralFriend,
+} from "@/lib/earn-client";
+import {
+  cacheReferralStats,
+  setWeeklyMissionProgress,
+  getCurrentWeekStartMs,
   getTotalReferrals,
   getReferralEarnings,
-  redeemReferralCode,
-  type Referral,
 } from "@/lib/storage";
 
 export default function ReferralScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { t } = useLanguage();
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
-  const [referralCode, setReferralCode] = useState<string>("");
-  const [referrals, setReferrals] = useState<Referral[]>([]);
-  const [totalReferrals, setTotalReferrals] = useState<number>(0);
-  const [referralEarnings, setReferralEarnings] = useState<number>(0);
-  const [redeemCode, setRedeemCode] = useState<string>("");
-  const [isRedeeming, setIsRedeeming] = useState<boolean>(false);
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const loadData = useCallback(async () => {
-    const code = await getReferralCode();
-    const refs = await getReferrals();
-    const totalRefs = await getTotalReferrals();
-    const earnings = await getReferralEarnings();
-
-    setReferralCode(code);
-    setReferrals(refs);
-    setTotalReferrals(totalRefs);
-    setReferralEarnings(earnings);
+    const live = await fetchReferralStats();
+    if (live) {
+      setStats(live);
+      // Mirror server-authoritative numbers into the local cache so other
+      // screens (e.g. Profile) stay consistent. No balance is ever minted here.
+      await cacheReferralStats(live.totalReferrals, live.referralEarnings);
+      // Social Butterfly weekly mission: progress = friends who qualified
+      // (cashed out $3+) THIS week, as derived from server records.
+      const weekStart = getCurrentWeekStartMs();
+      const qualifiedThisWeek = live.referrals.filter(
+        (r) => r.qualified && r.qualifiedAt != null && r.qualifiedAt >= weekStart,
+      ).length;
+      if (qualifiedThisWeek > 0) {
+        await setWeeklyMissionProgress("weekly_referrals", qualifiedThisWeek);
+      }
+    } else {
+      // Offline / unauthenticated: fall back to last cached totals so the
+      // screen isn't blank, but show no friend list we can't verify.
+      const totalRefs = await getTotalReferrals();
+      const earnings = await getReferralEarnings();
+      setStats((prev) =>
+        prev ?? {
+          code: "",
+          totalReferrals: totalRefs,
+          qualifiedReferrals: 0,
+          pendingReferrals: 0,
+          referralEarnings: earnings,
+          bonusPerReferral: 0.5,
+          qualifyAmount: 3,
+          referrals: [],
+        },
+      );
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+  const referralCode = stats?.code ?? "";
 
   const handleCopyCode = () => {
+    if (!referralCode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       t.referral.copyReferralCode,
@@ -67,45 +90,17 @@ export default function ReferralScreen() {
   };
 
   const handleShare = () => {
+    if (!referralCode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const shareLink = `${t.referral.joinCashClip} ${referralCode}`;
-    Alert.alert(
-      t.referral.shareYourLink,
-      shareLink,
-      [{ text: "OK", onPress: () => {} }]
-    );
-  };
-
-  const handleRedeem = async () => {
-    if (!redeemCode.trim()) {
-      Alert.alert(t.referral.errorTitle, t.referral.enterCode);
-      return;
-    }
-
-    setIsRedeeming(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    const result = await redeemReferralCode(redeemCode.trim());
-    setIsRedeeming(false);
-
-    Alert.alert(result.success ? t.referral.successTitle : t.referral.errorTitle, result.message, [
-      {
-        text: "OK",
-        onPress: async () => {
-          if (result.success) {
-            setRedeemCode("");
-            await loadData();
-          }
-        },
-      },
-    ]);
+    Alert.alert(t.referral.shareYourLink, shareLink, [{ text: "OK", onPress: () => {} }]);
   };
 
   if (!fontsLoaded) return null;
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
 
-  const renderReferralItem = ({ item }: { item: Referral }) => (
+  const renderReferralItem = ({ item }: { item: ReferralFriend }) => (
     <View style={styles.referralItem}>
       <View style={styles.referralItemContent}>
         <View style={styles.referralInfo}>
@@ -114,131 +109,125 @@ export default function ReferralScreen() {
             {t.referral.joined} {new Date(item.joinedAt).toLocaleDateString()}
           </Text>
         </View>
-        <View style={styles.referralEarning}>
-          <Text style={styles.referralEarningAmount}>${item.earningsFromThem.toFixed(2)}</Text>
-        </View>
+        {item.qualified ? (
+          <View style={[styles.badge, styles.badgeQualified]}>
+            <Feather name="check-circle" size={13} color={Colors.accent} />
+            <Text style={[styles.badgeText, { color: Colors.accent }]}>{t.referral.qualified}</Text>
+          </View>
+        ) : (
+          <View style={[styles.badge, styles.badgePending]}>
+            <Feather name="clock" size={13} color={Colors.textMuted} />
+            <Text style={[styles.badgeText, { color: Colors.textMuted }]}>{t.referral.pending}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: Colors.background }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoid}
-        keyboardVerticalOffset={90}
+      <ScrollView
+        style={[styles.scrollView, { paddingTop: webTopPad }]}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : 0 }}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={[styles.scrollView, { paddingTop: webTopPad }]}
-          contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : 0 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            <View style={styles.codeSection}>
-              <LinearGradient
-                colors={[Colors.primary, Colors.accent]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.codeCardGradient}
-              >
-                <View style={styles.codeCard}>
-                  <Text style={styles.codeLabel}>{t.referral.yourReferralCode}</Text>
-                  <Text style={styles.codeText}>{referralCode}</Text>
-                  <Pressable
-                    onPress={handleCopyCode}
-                    style={({ pressed }) => [styles.copyButton, { opacity: pressed ? 0.7 : 1 }]}
-                  >
-                    <Feather name="copy" size={18} color={Colors.background} />
-                    <Text style={styles.copyButtonText}>{t.referral.copy}</Text>
-                  </Pressable>
-                </View>
-              </LinearGradient>
-            </View>
-
-            <Pressable
-              onPress={handleShare}
-              style={({ pressed }) => [styles.shareButton, { opacity: pressed ? 0.8 : 1 }]}
+        <View style={styles.content}>
+          <View style={styles.codeSection}>
+            <LinearGradient
+              colors={[Colors.primary, Colors.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.codeCardGradient}
             >
-              <LinearGradient
-                colors={[Colors.accent, Colors.accent]}
-                style={styles.shareButtonGradient}
-              >
-                <Feather name="share-2" size={20} color={Colors.background} />
-                <Text style={styles.shareButtonText}>{t.referral.shareReferralLink}</Text>
-              </LinearGradient>
-            </Pressable>
-
-            <View style={styles.statsSection}>
-              <View style={styles.statCard}>
-                <View style={styles.statIconContainer}>
-                  <MaterialCommunityIcons name="account-multiple" size={24} color={Colors.primary} />
-                </View>
-                <View style={styles.statContent}>
-                  <Text style={styles.statValue}>{totalReferrals}</Text>
-                  <Text style={styles.statLabel}>{t.referral.totalReferrals}</Text>
-                </View>
-              </View>
-
-              <View style={styles.statCard}>
-                <View style={styles.statIconContainer}>
-                  <MaterialCommunityIcons name="cash-multiple" size={24} color={Colors.accent} />
-                </View>
-                <View style={styles.statContent}>
-                  <Text style={styles.statValue}>${referralEarnings.toFixed(2)}</Text>
-                  <Text style={styles.statLabel}>{t.referral.referralEarnings}</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.redeemSection}>
-              <Text style={styles.sectionTitle}>{t.referral.redeemACode}</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t.referral.enterReferralCode}
-                  placeholderTextColor={Colors.textMuted}
-                  value={redeemCode}
-                  onChangeText={setRedeemCode}
-                  editable={!isRedeeming}
-                  selectionColor={Colors.primary}
-                />
+              <View style={styles.codeCard}>
+                <Text style={styles.codeLabel}>{t.referral.yourReferralCode}</Text>
+                <Text style={styles.codeText}>{referralCode || "—"}</Text>
                 <Pressable
-                  onPress={handleRedeem}
-                  disabled={isRedeeming}
-                  style={({ pressed }) => [
-                    styles.redeemButton,
-                    { opacity: pressed ? 0.8 : 1 },
-                  ]}
+                  onPress={handleCopyCode}
+                  style={({ pressed }) => [styles.copyButton, { opacity: pressed ? 0.7 : 1 }]}
                 >
-                  <Text style={styles.redeemButtonText}>
-                    {isRedeeming ? t.referral.redeeming : t.referral.redeem}
-                  </Text>
+                  <Feather name="copy" size={18} color={Colors.background} />
+                  <Text style={styles.copyButtonText}>{t.referral.copy}</Text>
                 </Pressable>
               </View>
-            </View>
+            </LinearGradient>
+          </View>
 
-            <View style={styles.referralListSection}>
-              <Text style={styles.sectionTitle}>{t.referral.yourReferrals}</Text>
-              {referrals.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
-                  <Text style={styles.emptyStateText}>
-                    {t.referral.noReferralsYet}
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={referrals}
-                  renderItem={renderReferralItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                  ItemSeparatorComponent={() => <View style={styles.separator} />}
-                />
-              )}
+          <Pressable
+            onPress={handleShare}
+            style={({ pressed }) => [styles.shareButton, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <LinearGradient colors={[Colors.accent, Colors.accent]} style={styles.shareButtonGradient}>
+              <Feather name="share-2" size={20} color={Colors.background} />
+              <Text style={styles.shareButtonText}>{t.referral.shareReferralLink}</Text>
+            </LinearGradient>
+          </Pressable>
+
+          <View style={styles.howCard}>
+            <View style={styles.howIcon}>
+              <Feather name="info" size={18} color={Colors.primary} />
+            </View>
+            <View style={styles.howContent}>
+              <Text style={styles.howTitle}>{t.referral.howItWorks}</Text>
+              <Text style={styles.howBody}>{t.referral.howItWorksBody}</Text>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+          <View style={styles.statsSection}>
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <MaterialCommunityIcons name="account-multiple" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.totalReferrals ?? 0}</Text>
+                <Text style={styles.statLabel}>{t.referral.friendsJoined}</Text>
+              </View>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <MaterialCommunityIcons name="check-decagram" size={24} color={Colors.accent} />
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>{stats?.qualifiedReferrals ?? 0}</Text>
+                <Text style={styles.statLabel}>{t.referral.qualifiedFriends}</Text>
+              </View>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <MaterialCommunityIcons name="cash-multiple" size={24} color={Colors.accent} />
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statValue}>${(stats?.referralEarnings ?? 0).toFixed(2)}</Text>
+                <Text style={styles.statLabel}>{t.referral.referralEarnings}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.referralListSection}>
+            <Text style={styles.sectionTitle}>{t.referral.yourReferrals}</Text>
+            {loading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator color={Colors.primary} />
+              </View>
+            ) : (stats?.referrals.length ?? 0) === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+                <Text style={styles.emptyStateText}>{t.referral.noReferralsYet}</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={stats?.referrals ?? []}
+                renderItem={renderReferralItem}
+                keyExtractor={(item, index) => `${item.name}-${item.joinedAt}-${index}`}
+                scrollEnabled={false}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -247,9 +236,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  keyboardAvoid: {
-    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -282,10 +268,11 @@ const styles = StyleSheet.create({
   },
   codeText: {
     fontFamily: "Outfit_700Bold",
-    fontSize: 36,
+    fontSize: 32,
     color: Colors.text,
-    letterSpacing: 2,
+    letterSpacing: 1,
     marginBottom: 16,
+    textAlign: "center",
   },
   copyButton: {
     flexDirection: "row",
@@ -302,7 +289,7 @@ const styles = StyleSheet.create({
     color: Colors.background,
   },
   shareButton: {
-    marginBottom: 24,
+    marginBottom: 20,
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -318,6 +305,40 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
     fontSize: 16,
     color: Colors.background,
+  },
+  howCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 24,
+  },
+  howIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceHighlight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  howContent: {
+    flex: 1,
+  },
+  howTitle: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  howBody: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
   statsSection: {
     gap: 12,
@@ -355,44 +376,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
   },
-  redeemSection: {
-    marginBottom: 24,
-  },
   sectionTitle: {
     fontFamily: "Outfit_700Bold",
     fontSize: 18,
     color: Colors.text,
     marginBottom: 12,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: "Outfit_400Regular",
-    fontSize: 15,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  redeemButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  redeemButtonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 14,
-    color: Colors.background,
   },
   referralListSection: {
     marginBottom: 24,
@@ -435,13 +423,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
   },
-  referralEarning: {
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     marginLeft: 12,
   },
-  referralEarningAmount: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 16,
-    color: Colors.primary,
+  badgeQualified: {
+    backgroundColor: Colors.surfaceHighlight,
+  },
+  badgePending: {
+    backgroundColor: Colors.surfaceHighlight,
+  },
+  badgeText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 12,
   },
   separator: {
     height: 8,

@@ -78,3 +78,13 @@ export function getAvailableTiers(balance: number): ResolvedTier[] {
 }
 
 export const MIN_WITHDRAWAL = WITHDRAWAL_TIERS[0].amount;
+
+// Referral qualification: a referred friend only "counts" (and earns their
+// referrer the bonus) once they complete a cash-out of at least this amount.
+// Defaults to the minimum withdrawal tier ($3) so the rule matches the copy
+// shown in the app ("Invite friends who cash out $3").
+export const REFERRAL_QUALIFY_USD = readNonNegativeNumberEnv("REFERRAL_QUALIFY_USD", MIN_WITHDRAWAL);
+
+// Bonus paid to the referrer when a referral qualifies. Matches the long-standing
+// "$0.50 per referral" promise; override with REFERRAL_BONUS_USD.
+export const REFERRAL_BONUS_USD = readNonNegativeNumberEnv("REFERRAL_BONUS_USD", 0.5);
