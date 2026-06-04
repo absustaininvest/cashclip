@@ -232,13 +232,22 @@ export function registerOfferwallRoutes(app: Express): void {
       const rawReward = rewardValue ?? parseFloat(session.expectedReward);
       const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
       const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rawReward));
-      await storage.completeRewardSessionAndCredit({
+      const result = await storage.completeRewardSessionAndCredit({
         sessionToken: session.sessionToken,
         userId,
         type: "offerwall",
         description: `Offer completed via ${provider} webhook`,
         finalReward: clampedReward,
       });
+      if ("conflict" in result) {
+        // duplicate = this provider txn was already credited → settled.
+        // not_claimable = the pending session vanished between our find and the
+        // credit update. Usually a racing webhook already credited it, but it
+        // can also be a just-expired session that was never credited. Return
+        // not-settled so the guarded recorder runs hasCreditedCompletion: the
+        // racing case is suppressed, the genuine expiry case is recorded.
+        return result.conflict === "duplicate";
+      }
       return true;
     } catch (err) {
       return false;
@@ -246,14 +255,17 @@ export function registerOfferwallRoutes(app: Express): void {
   }
 
   // Persist a verified offerwall completion that could not be credited (no
-  // pending session: TTL expiry, id mismatch, dup, or user never started one)
-  // so it can be reconciled instead of silently dropped with a 200 OK.
+  // pending session: TTL expiry, id mismatch, or user never started one) so it
+  // can be reconciled instead of silently dropped with a 200 OK — unless it was
+  // already credited (webhook retry / provider resend), which would create a
+  // false-positive unsettled row that risks a double payout.
   async function recordUnsettledOffer(
     provider: OfferwallProviderKey,
     userId: string,
     offerId: string,
     rewardValue: number | undefined,
   ): Promise<void> {
+    if (await storage.hasCreditedCompletion("offerwall", userId, offerId)) return;
     await storage.recordUnsettledCompletion({
       source: "offerwall",
       provider,

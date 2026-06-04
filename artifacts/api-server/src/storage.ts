@@ -218,6 +218,12 @@ export interface IStorage {
     provider: string,
     providerTransactionId: string,
   ): Promise<RewardSession | undefined>;
+  hasCreditedCompletion(
+    source: "survey" | "offerwall",
+    userId: string,
+    externalId: string,
+    providerTransactionId?: string | null,
+  ): Promise<boolean>;
   completeRewardSessionAndCredit(args: {
     sessionToken: string;
     userId: string;
@@ -1127,6 +1133,51 @@ export class DatabaseStorage implements IStorage {
       )
       .limit(1);
     return s;
+  }
+
+  // Returns true if this completion was already credited (a completed reward
+  // session exists for the same user+externalId, or the same provider
+  // transaction id). Used to suppress false-positive "unsettled" records on
+  // webhook retries/resends of an already-paid completion. Best-effort: on a
+  // query error it returns false so a genuine lost completion is still caught.
+  async hasCreditedCompletion(
+    source: "survey" | "offerwall",
+    userId: string,
+    externalId: string,
+    providerTransactionId?: string | null,
+  ): Promise<boolean> {
+    try {
+      const [byExternal] = await db
+        .select({ id: rewardSessions.id })
+        .from(rewardSessions)
+        .where(
+          and(
+            eq(rewardSessions.source, source),
+            eq(rewardSessions.userId, userId),
+            eq(rewardSessions.externalId, externalId),
+            eq(rewardSessions.status, "completed"),
+          ),
+        )
+        .limit(1);
+      if (byExternal) return true;
+      if (providerTransactionId) {
+        const [byTxn] = await db
+          .select({ id: rewardSessions.id })
+          .from(rewardSessions)
+          .where(
+            and(
+              eq(rewardSessions.source, source),
+              eq(rewardSessions.providerTransactionId, providerTransactionId),
+              eq(rewardSessions.status, "completed"),
+            ),
+          )
+          .limit(1);
+        if (byTxn) return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   async recordUnsettledCompletion(args: {

@@ -291,17 +291,49 @@ export function registerSurveyRoutes(app: Express): void {
       const rawReward = rewardValue ?? parseFloat(session.expectedReward);
       const range = PROVIDER_REWARD_RANGES[provider] || { min: 0.10, max: 5.00 };
       const clampedReward = Math.max(range.min, Math.min(range.max, rawReward));
-      await storage.completeRewardSessionAndCredit({
+      const result = await storage.completeRewardSessionAndCredit({
         sessionToken: session.sessionToken,
         userId,
         type: "survey",
         description: `Survey completed via ${provider} webhook`,
         finalReward: clampedReward,
       });
+      if ("conflict" in result) {
+        // duplicate = this provider txn was already credited → settled.
+        // not_claimable = the pending session vanished between our find and the
+        // credit update. Usually a racing webhook already credited it, but it
+        // can also be a just-expired session that was never credited. Return
+        // not-settled so the guarded recorder runs hasCreditedCompletion: the
+        // racing case is suppressed, the genuine expiry case is recorded.
+        return result.conflict === "duplicate";
+      }
       return true;
     } catch (err) {
       return false;
     }
+  }
+
+  // Record a verified-but-uncredited survey completion for reconciliation —
+  // unless it was already credited (webhook retry / provider resend), which
+  // would otherwise create a false-positive unsettled row that risks a double
+  // payout during reconciliation.
+  async function recordUnsettledSurvey(
+    provider: string,
+    userId: string,
+    externalId: string,
+    providerTransactionId: string | null,
+    rewardValue: number | null | undefined,
+  ): Promise<void> {
+    if (await storage.hasCreditedCompletion("survey", userId, externalId, providerTransactionId)) return;
+    await storage.recordUnsettledCompletion({
+      source: "survey",
+      provider,
+      userId,
+      externalId,
+      providerTransactionId,
+      rewardValue: rewardValue ?? null,
+      reason: "no_pending_session",
+    });
   }
 
   app.get("/api/surveys/webhook/pollfish", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
@@ -321,14 +353,7 @@ export function registerSurveyRoutes(app: Express): void {
         "[Pollfish Webhook]",
       );
       if (!credited) {
-        await storage.recordUnsettledCompletion({
-          source: "survey",
-          provider: "pollfish",
-          userId: String(user_id),
-          externalId: `pollfish_${survey_id}`,
-          rewardValue: Number.isFinite(reward) ? reward : null,
-          reason: "no_pending_session",
-        });
+        await recordUnsettledSurvey("pollfish", String(user_id), `pollfish_${survey_id}`, null, Number.isFinite(reward) ? reward : null);
       }
     }
     res.status(200).send("OK");
@@ -351,14 +376,7 @@ export function registerSurveyRoutes(app: Express): void {
         "[Cint Webhook]",
       );
       if (!credited) {
-        await storage.recordUnsettledCompletion({
-          source: "survey",
-          provider: "cint",
-          userId: String(respondent_id),
-          externalId: `cint_${survey_id}`,
-          rewardValue: Number.isFinite(reward) ? reward : null,
-          reason: "no_pending_session",
-        });
+        await recordUnsettledSurvey("cint", String(respondent_id), `cint_${survey_id}`, null, Number.isFinite(reward) ? reward : null);
       }
     }
     res.status(200).json({ status: "received" });
@@ -397,14 +415,13 @@ export function registerSurveyRoutes(app: Express): void {
         );
       }
       if (!credited && !wallCredited) {
-        await storage.recordUnsettledCompletion({
-          source: "survey",
-          provider: "cpx",
-          userId: String(ext_user_id),
-          externalId: `cpx_${survey_id}`,
-          providerTransactionId: typeof trans_id === "string" ? trans_id : String(trans_id),
-          reason: "no_pending_session",
-        });
+        await recordUnsettledSurvey(
+          "cpx",
+          String(ext_user_id),
+          `cpx_${survey_id}`,
+          typeof trans_id === "string" ? trans_id : String(trans_id),
+          null,
+        );
       }
     }
     res.status(200).send("OK");
@@ -450,15 +467,13 @@ export function registerSurveyRoutes(app: Express): void {
         label,
       );
       if (!credited) {
-        await storage.recordUnsettledCompletion({
-          source: "survey",
-          provider: "bitlabs",
-          userId: String(resolvedUserId),
-          externalId: `${prefix}${resolvedRefId}`,
-          providerTransactionId: typeof tx === "string" ? tx : null,
-          rewardValue: Number.isFinite(reward) ? reward : null,
-          reason: "no_pending_session",
-        });
+        await recordUnsettledSurvey(
+          "bitlabs",
+          String(resolvedUserId),
+          `${prefix}${resolvedRefId}`,
+          typeof tx === "string" ? tx : null,
+          Number.isFinite(reward) ? reward : null,
+        );
       }
     }
     res.status(200).json({ status: "received" });
@@ -481,14 +496,7 @@ export function registerSurveyRoutes(app: Express): void {
         "[Lucid Webhook]",
       );
       if (!credited) {
-        await storage.recordUnsettledCompletion({
-          source: "survey",
-          provider: "lucid",
-          userId: String(respondentId),
-          externalId: `lucid_${SurveyNumber}`,
-          rewardValue: Number.isFinite(reward) ? reward : null,
-          reason: "no_pending_session",
-        });
+        await recordUnsettledSurvey("lucid", String(respondentId), `lucid_${SurveyNumber}`, null, Number.isFinite(reward) ? reward : null);
       }
     }
     res.status(200).json({ status: "received" });
