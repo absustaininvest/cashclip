@@ -257,6 +257,111 @@ describe("POST /api/admin/inbox/reply — send + persist", () => {
   });
 });
 
+describe("POST /api/admin/inbox/reply — dedupe guard (duplicate replies blocked)", () => {
+  // A stateful stand-in for the DB-backed login_attempts counter so two REAL
+  // requests drive the actual dedupe branch end to end, instead of us
+  // hard-coding the returned count. recordLoginAttempt increments per key and
+  // reports allowed = count <= max; decrementLoginAttempt releases a reserved
+  // slot as GREATEST(0, count - 1) — mirroring lib/dbRateLimit.ts. This is what
+  // lets the suite prove "exactly one email across two identical POSTs" and
+  // "the slot is freed for a genuine retry" with the same key the handler uses.
+  let counters: Map<string, number>;
+
+  beforeEach(() => {
+    counters = new Map<string, number>();
+    mockRecordLoginAttempt.mockImplementation(
+      async (key: string, max: number, _windowMs: number) => {
+        const next = (counters.get(key) ?? 0) + 1;
+        counters.set(key, next);
+        return { count: next, allowed: next <= max };
+      },
+    );
+    mockDecrementLoginAttempt.mockImplementation(async (key: string) => {
+      const current = counters.get(key) ?? 0;
+      counters.set(key, Math.max(0, current - 1));
+    });
+  });
+
+  const reply = {
+    to: "user@example.com",
+    subject: "Re: your message",
+    body: "Here is the answer.",
+    inReplyTo: "<orig-1@mail>",
+  };
+
+  it("two rapid identical POSTs send exactly one email; the second is 409 duplicate and never calls the mailer", async () => {
+    const first = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(first.status).toBe(200);
+    expect(first.body.ok).toBe(true);
+
+    const second = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(second.status).toBe(409);
+    expect(second.body.duplicate).toBe(true);
+
+    // Across BOTH requests: the customer gets exactly one email and exactly one
+    // history row — the duplicate is fully suppressed, not just status-flagged.
+    expect(mockSendSupportReply).toHaveBeenCalledTimes(1);
+    expect(mockCreateSupportReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a genuine retry after a failed send (the dedupe slot is released on throw)", async () => {
+    // First attempt: SMTP fails. The request 500s and the handler releases the
+    // reserved dedupe slot so the operator is not locked out of retrying.
+    mockSendSupportReply.mockRejectedValueOnce(new Error("smtp timeout"));
+    const failed = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(failed.status).toBe(500);
+    expect(mockDecrementLoginAttempt).toHaveBeenCalledTimes(1);
+    expect(mockCreateSupportReply).not.toHaveBeenCalled();
+
+    // Retry of the SAME reply now succeeds — it is NOT blocked as a duplicate,
+    // because the slot was freed when the first send threw.
+    const retry = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(retry.status).toBe(200);
+    expect(retry.body.ok).toBe(true);
+
+    // One failed + one successful send; exactly one history row (only the send
+    // that actually delivered is persisted).
+    expect(mockSendSupportReply).toHaveBeenCalledTimes(2);
+    expect(mockCreateSupportReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block a different reply (different body) sent within the window", async () => {
+    const first = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(first.status).toBe(200);
+
+    const different = await asAdmin(
+      request(app)
+        .post("/api/admin/inbox/reply")
+        .send({ ...reply, body: "A completely different answer." }),
+    );
+    expect(different.status).toBe(200);
+    expect(different.body.ok).toBe(true);
+
+    // Two distinct replies → two sends and two history rows, no 409. The guard
+    // keys on body, so a real follow-up message is never mistaken for a dupe.
+    expect(mockSendSupportReply).toHaveBeenCalledTimes(2);
+    expect(mockCreateSupportReply).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not block the same body sent to a different recipient within the window", async () => {
+    const first = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
+    expect(first.status).toBe(200);
+
+    const otherRecipient = await asAdmin(
+      request(app)
+        .post("/api/admin/inbox/reply")
+        .send({ ...reply, to: "someone-else@example.com" }),
+    );
+    expect(otherRecipient.status).toBe(200);
+    expect(otherRecipient.body.ok).toBe(true);
+
+    // The recipient is part of the dedupe key, so the same canned answer can go
+    // out to two different customers back to back.
+    expect(mockSendSupportReply).toHaveBeenCalledTimes(2);
+    expect(mockCreateSupportReply).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("GET /api/admin/inbox/replies — thread history", () => {
   it("returns the thread's replies filtered by inReplyTo", async () => {
     const rows = [
