@@ -2084,6 +2084,71 @@ interface CashClipUser {
   referredBy: string | null;
 }
 
+export type CreditAuditRow = {
+  id: string;
+  userId: string;
+  username: string;
+  email: string | null;
+  amount: string;
+  description: string | null;
+  actorUserId: string | null;
+  actorUsername: string | null;
+  createdAt: string;
+};
+
+export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-white/30 text-[10px] uppercase tracking-wider">
+          <th className="text-left font-medium px-5 py-2">User</th>
+          <th className="text-right font-medium px-3 py-2">Amount</th>
+          <th className="text-left font-medium px-3 py-2">Reason</th>
+          <th className="text-left font-medium px-3 py-2">Issued by</th>
+          <th className="text-right font-medium px-5 py-2">When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const amt = Number(r.amount);
+          const positive = amt >= 0;
+          return (
+            <tr
+              key={r.id}
+              className="border-t border-white/[0.04] align-top"
+            >
+              <td className="px-5 py-2.5">
+                <p className="text-white/80 text-xs font-medium break-all">
+                  {r.username}
+                </p>
+                <p className="text-white/25 text-[10px] break-all">
+                  {r.email ?? "—"}
+                </p>
+              </td>
+              <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                <span
+                  className={`text-xs font-semibold ${positive ? "text-[#00E676]" : "text-amber-400"}`}
+                >
+                  {positive ? "+" : "-"}${Math.abs(amt).toFixed(2)}
+                </span>
+              </td>
+              <td className="px-3 py-2.5 text-white/60 text-xs max-w-[280px] break-words">
+                {r.description ?? "—"}
+              </td>
+              <td className="px-3 py-2.5 text-white/60 text-xs break-all">
+                {r.actorUsername ?? r.actorUserId ?? "—"}
+              </td>
+              <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
+                {new Date(r.createdAt).toLocaleString()}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function CashClipUsersPanel({ token }: { token: string }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -2973,54 +3038,7 @@ function CashClipUsersPanel({ token }: { token: string }) {
                   : "No manual credits or corrections recorded yet."}
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-white/30 text-[10px] uppercase tracking-wider">
-                    <th className="text-left font-medium px-5 py-2">User</th>
-                    <th className="text-right font-medium px-3 py-2">Amount</th>
-                    <th className="text-left font-medium px-3 py-2">Reason</th>
-                    <th className="text-left font-medium px-3 py-2">Issued by</th>
-                    <th className="text-right font-medium px-5 py-2">When</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditRows.map((r) => {
-                    const amt = Number(r.amount);
-                    const positive = amt >= 0;
-                    return (
-                      <tr
-                        key={r.id}
-                        className="border-t border-white/[0.04] align-top"
-                      >
-                        <td className="px-5 py-2.5">
-                          <p className="text-white/80 text-xs font-medium break-all">
-                            {r.username}
-                          </p>
-                          <p className="text-white/25 text-[10px] break-all">
-                            {r.email ?? "—"}
-                          </p>
-                        </td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                          <span
-                            className={`text-xs font-semibold ${positive ? "text-[#00E676]" : "text-amber-400"}`}
-                          >
-                            {positive ? "+" : "-"}${Math.abs(amt).toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-white/60 text-xs max-w-[280px] break-words">
-                          {r.description ?? "—"}
-                        </td>
-                        <td className="px-3 py-2.5 text-white/60 text-xs break-all">
-                          {r.actorUsername ?? r.actorUserId ?? "—"}
-                        </td>
-                        <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
-                          {new Date(r.createdAt).toLocaleString()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <CreditAuditTable rows={auditRows} />
             )}
           </div>
         )}
