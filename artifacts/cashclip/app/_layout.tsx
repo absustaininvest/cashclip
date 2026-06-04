@@ -15,6 +15,7 @@ import { initializeAdMob, preloadRewardedAd } from "@/lib/admob";
 import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics";
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
+import { OtaUpdateGate } from "@/components/OtaUpdateGate";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -141,7 +142,9 @@ export default function RootLayout() {
                       if (initialized) preloadRewardedAd();
                     });
                   }}>
-                    <RootLayoutNav />
+                    <OtaUpdateGate>
+                      <RootLayoutNav />
+                    </OtaUpdateGate>
                   </TrackingConsentGate>
                 </ForceUpdateGate>
               </View>

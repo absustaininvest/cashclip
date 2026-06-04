@@ -5,9 +5,20 @@ import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { rateLimit } from "express-rate-limit";
+import {
+  DEFAULT_REGION,
+  getCurrentRate,
+  snapshotRateString,
+  tokenUsd,
+  tokenUsdSumSql,
+  LEGACY_USD_PER_POINT,
+} from "../lib/pointsEconomy";
+import { withAdvisoryLock } from "../lib/advisoryLock";
 
 // ── CONVERSION & LIMITS ───────────────────────────────────────────────────────
-const POINTS_PER_DOLLAR       = 1000;
+// Point→cash value is now server-authoritative and floats with ad ARPU; see
+// lib/pointsEconomy.ts. Each token snapshots its rate at earn time so a later
+// rate change never devalues points already earned.
 const PENDING_WINDOW_MS       = 3 * 60 * 60 * 1000;  // 3-hour lock
 const SPIN_COOLDOWN_MS        = 2 * 60 * 60 * 1000;  // server-side 2h spin gate
 const DAILY_CLAIM_CAP_USD     = 5;                   // $5.00/day hard ceiling
@@ -244,6 +255,7 @@ export function registerEarningsRoutes(app: Express): void {
           else                            pts = pickRandom(GAME_POOL);
 
           const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const snapshot = await snapshotRateString();
 
           const [token] = await tx.insert(earnTokens).values({
             userId:      req.userId!,
@@ -253,6 +265,7 @@ export function registerEarningsRoutes(app: Express): void {
             earnedAt:    now,
             claimableAt,
             status:      "pending",
+            usdPerPointSnapshot: snapshot,
           }).returning();
 
           return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
@@ -390,6 +403,7 @@ export function registerEarningsRoutes(app: Express): void {
 
           const pts = pickRandom(SPIN_POOL);
           const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const snapshot = await snapshotRateString();
           const [token] = await tx.insert(earnTokens).values({
             userId:      req.userId!,
             points:      pts,
@@ -398,6 +412,7 @@ export function registerEarningsRoutes(app: Express): void {
             earnedAt:    now,
             claimableAt,
             status:      "pending",
+            usdPerPointSnapshot: snapshot,
           }).returning();
 
           return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
@@ -459,9 +474,12 @@ export function registerEarningsRoutes(app: Express): void {
             logger.info({ userId: req.userId, expiredCount: expired.length }, "earn tokens expired");
           }
 
-          // ── Daily cap check ────────────────────────────────────────────────
-          const [{ claimedPts }] = await tx
-            .select({ claimedPts: sql<string>`COALESCE(SUM(points), 0)` })
+          // ── Daily cap check (USD) ──────────────────────────────────────────
+          // Each token's value = points × its own snapshot rate (legacy floor
+          // for pre-variable-rate / NULL tokens), so the cap and credit are
+          // summed in dollars server-side — never from client-supplied values.
+          const [{ claimedUsd }] = await tx
+            .select({ claimedUsd: tokenUsdSumSql() })
             .from(earnTokens)
             .where(and(
               eq(earnTokens.userId, req.userId!),
@@ -469,11 +487,10 @@ export function registerEarningsRoutes(app: Express): void {
               gte(earnTokens.claimedAt, dayStart),
             ));
 
-          const alreadyPts      = parseInt(claimedPts ?? "0", 10);
-          const dailyCapPts     = DAILY_CLAIM_CAP_USD * POINTS_PER_DOLLAR;
-          const remainingCapPts = dailyCapPts - alreadyPts;
+          const alreadyUsd      = parseFloat(claimedUsd ?? "0");
+          const remainingCapUsd = DAILY_CLAIM_CAP_USD - alreadyUsd;
 
-          if (remainingCapPts <= 0) {
+          if (remainingCapUsd <= 0) {
             return { ok: false as const, reason: "DAILY_CAP" as const };
           }
 
@@ -491,11 +508,14 @@ export function registerEarningsRoutes(app: Express): void {
             return { ok: true as const, claimed: 0, creditedUsd: 0, creditedPts: 0, newBalance: 0 };
           }
 
-          // ── Apply daily cap — take tokens until ceiling ────────────────────
+          // ── Apply daily cap — take tokens until the USD ceiling ────────────
           let totalPts = 0;
+          let totalUsd = 0;
           const tokenIds: string[] = [];
           for (const t of ready) {
-            if (totalPts + t.points > remainingCapPts) break;
+            const value = tokenUsd(t.points, t.usdPerPointSnapshot);
+            if (totalUsd + value > remainingCapUsd + 1e-9) break;
+            totalUsd += value;
             totalPts += t.points;
             tokenIds.push(t.id);
           }
@@ -504,7 +524,7 @@ export function registerEarningsRoutes(app: Express): void {
             return { ok: false as const, reason: "DAILY_CAP" as const };
           }
 
-          const creditUsd = parseFloat((totalPts / POINTS_PER_DOLLAR).toFixed(4));
+          const creditUsd = parseFloat(totalUsd.toFixed(4));
           const creditStr = creditUsd.toFixed(4);
 
           // ── Mark claimed — only the capped subset, not all claimable ─────────
@@ -580,6 +600,12 @@ export function registerEarningsRoutes(app: Express): void {
         const pending   = tokens.filter((t: EarnTokenRow) => t.claimableAt > now);
         const claimable = tokens.filter((t: EarnTokenRow) => t.claimableAt <= now);
 
+        // Current rate that NEWLY earned points lock in at (display only).
+        const rate = await getCurrentRate(DEFAULT_REGION);
+        const round4 = (n: number) => parseFloat(n.toFixed(4));
+        const sumUsd = (arr: EarnTokenRow[]) =>
+          round4(arr.reduce((s, t) => s + tokenUsd(t.points, t.usdPerPointSnapshot), 0));
+
         res.json({
           pending: pending.map((t: EarnTokenRow) => ({
             id:          t.id,
@@ -588,6 +614,7 @@ export function registerEarningsRoutes(app: Express): void {
             description: t.description,
             earnedAt:    t.earnedAt,
             claimableAt: t.claimableAt,
+            estimatedUsd: round4(tokenUsd(t.points, t.usdPerPointSnapshot)),
           })),
           claimable: claimable.map((t: EarnTokenRow) => ({
             id:          t.id,
@@ -595,13 +622,45 @@ export function registerEarningsRoutes(app: Express): void {
             actionType:  t.actionType,
             description: t.description,
             claimableAt: t.claimableAt,
+            estimatedUsd: round4(tokenUsd(t.points, t.usdPerPointSnapshot)),
           })),
           pendingPoints:   pending.reduce((s: number, t: EarnTokenRow) => s + t.points, 0),
           claimablePoints: claimable.reduce((s: number, t: EarnTokenRow) => s + t.points, 0),
+          pendingUsd:      sumUsd(pending),
+          claimableUsd:    sumUsd(claimable),
+          usdPerPoint:      rate.usdPerPoint,
+          floorUsdPerPoint: rate.floorUsdPerPoint,
+          pointsPerDollar:  rate.usdPerPoint > 0 ? Math.round(1 / rate.usdPerPoint) : null,
         });
       } catch (err) {
         logger.error({ err }, "earnings/pending error");
         res.status(500).json({ error: "Failed to fetch pending earnings" });
+      }
+    },
+  );
+
+  // ── GET /api/economy/rate ───────────────────────────────────────────────────
+  // The current server-authoritative points→cash conversion rate (read-only).
+  // There is intentionally NO write counterpart: the rate is set only by the
+  // recompute job from code constants, never by any client or admin request.
+  app.get(
+    "/api/economy/rate",
+    authMiddleware,
+    async (_req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const rate = await getCurrentRate(DEFAULT_REGION);
+        res.json({
+          usdPerPoint:       rate.usdPerPoint,
+          floorUsdPerPoint:  rate.floorUsdPerPoint,
+          legacyUsdPerPoint: LEGACY_USD_PER_POINT,
+          pointsPerDollar:   rate.usdPerPoint > 0 ? Math.round(1 / rate.usdPerPoint) : null,
+          method:            rate.method,
+          region:            rate.region,
+          updatedAt:         rate.computedAt,
+        });
+      } catch (err) {
+        logger.error({ err }, "economy/rate error");
+        res.status(500).json({ error: "Failed to load conversion rate" });
       }
     },
   );
@@ -694,6 +753,7 @@ export function registerEarningsRoutes(app: Express): void {
 
       // ── 7. Issue earn token ─────────────────────────────────────────────
       const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+      const snapshot = await snapshotRateString();
       await db.insert(earnTokens).values({
         userId:        user_id,
         points:        ACTION_CONFIG.rewarded_ad.points!,
@@ -703,6 +763,7 @@ export function registerEarningsRoutes(app: Express): void {
         claimableAt,
         status:        "pending",
         transactionId: transaction_id ?? null,
+        usdPerPointSnapshot: snapshot,
       });
 
       logger.info(
@@ -722,9 +783,15 @@ export function registerEarningsRoutes(app: Express): void {
   // balances automatically every 2 hours. Respects the daily $5 cap per user.
   // The manual /api/earnings/claim endpoint still exists for instant conversion.
   const AUTO_CONVERT_INTERVAL_MS = 2 * 60 * 60 * 1000;
+  const AUTO_CONVERT_LOCK_KEY = 260001; // singleton-job advisory-lock key
 
   async function runAutoConvert(): Promise<void> {
     try {
+      // Only one replica runs the sweep at a time. Per-user FOR UPDATE + the
+      // token status transition already make crediting idempotent (no
+      // double-credit across restarts/replicas); this lock just avoids
+      // redundant duplicate sweeps on the autoscaled fleet.
+      const ran = await withAdvisoryLock(AUTO_CONVERT_LOCK_KEY, async () => {
       const now = new Date();
       const expiryThreshold = new Date(now.getTime() - TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
@@ -756,8 +823,8 @@ export function registerEarningsRoutes(app: Express): void {
             const dayStart = new Date(now);
             dayStart.setUTCHours(0, 0, 0, 0);
 
-            const [{ claimedPts }] = await tx
-              .select({ claimedPts: sql<string>`COALESCE(SUM(${earnTokens.points}), 0)` })
+            const [{ claimedUsd }] = await tx
+              .select({ claimedUsd: tokenUsdSumSql() })
               .from(earnTokens)
               .where(and(
                 eq(earnTokens.userId, userId),
@@ -765,10 +832,9 @@ export function registerEarningsRoutes(app: Express): void {
                 gte(earnTokens.claimedAt, dayStart),
               ));
 
-            const alreadyPts = parseInt(claimedPts ?? "0", 10);
-            const dailyCapPts = DAILY_CLAIM_CAP_USD * POINTS_PER_DOLLAR;
-            const remainingCapPts = dailyCapPts - alreadyPts;
-            if (remainingCapPts <= 0) return;
+            const alreadyUsd = parseFloat(claimedUsd ?? "0");
+            const remainingCapUsd = DAILY_CLAIM_CAP_USD - alreadyUsd;
+            if (remainingCapUsd <= 0) return;
 
             const ready = await tx.select().from(earnTokens)
               .where(and(
@@ -779,15 +845,18 @@ export function registerEarningsRoutes(app: Express): void {
             if (ready.length === 0) return;
 
             let totalPts = 0;
+            let totalUsd = 0;
             const tokenIds: string[] = [];
             for (const tok of ready) {
-              if (totalPts + tok.points > remainingCapPts) break;
+              const value = tokenUsd(tok.points, tok.usdPerPointSnapshot);
+              if (totalUsd + value > remainingCapUsd + 1e-9) break;
+              totalUsd += value;
               totalPts += tok.points;
               tokenIds.push(tok.id);
             }
             if (totalPts === 0) return;
 
-            const creditUsd = parseFloat((totalPts / POINTS_PER_DOLLAR).toFixed(4));
+            const creditUsd = parseFloat(totalUsd.toFixed(4));
             const creditStr = creditUsd.toFixed(4);
 
             await tx.update(earnTokens)
@@ -816,6 +885,10 @@ export function registerEarningsRoutes(app: Express): void {
       }
 
       logger.info({ userCount: usersWithTokens.length }, "auto-convert: batch complete");
+      });
+      if (!ran) {
+        logger.debug("auto-convert: another replica holds the lock — skipping");
+      }
     } catch (err) {
       logger.error({ err }, "auto-convert: job error");
     }

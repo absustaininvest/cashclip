@@ -113,6 +113,8 @@ const en = {
       pointsConvertedMsg: "{{pts}} pts → ${{usd}} added to balance",
       noPendingPoints: "No pending points yet",
       holdFor3h: "Held 3h before converting",
+      estCashValue: "Est. cash value",
+      valueGrowsWithRevenue: "Cash value grows with ad revenue",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -471,6 +473,12 @@ const en = {
       back: "Back",
       ok: "OK",
     },
+    update: {
+      title: "Update Available",
+      message: "A new version of CashClip is ready, including updated cash values. Reload now to get the latest.",
+      reloadNow: "Reload Now",
+      later: "Later",
+    },
     notFound: {
       title: "Oops!",
       message: "This screen doesn't exist.",
@@ -628,6 +636,8 @@ const translations: Record<Language, Translations> = {
       pointsConvertedMsg: "{{pts}} pts → ${{usd}} añadido al saldo",
       noPendingPoints: "Sin puntos pendientes aún",
       holdFor3h: "Retenidos 3h antes de convertir",
+      estCashValue: "Valor estimado",
+      valueGrowsWithRevenue: "El valor crece con los ingresos por anuncios",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
@@ -985,6 +995,12 @@ const translations: Record<Language, Translations> = {
     common: {
       back: "Volver",
       ok: "OK",
+    },
+    update: {
+      title: "Actualización Disponible",
+      message: "Una nueva versión de CashClip está lista, con valores en efectivo actualizados. Recarga ahora para obtener lo último.",
+      reloadNow: "Recargar Ahora",
+      later: "Más Tarde",
     },
     notFound: {
       title: "Oops!",

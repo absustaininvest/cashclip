@@ -846,6 +846,11 @@ export default function EarnScreen() {
                 {formatPoints((pendingState?.pendingPoints ?? 0) + (pendingState?.claimablePoints ?? 0))}
               </Text>
             </Animated.View>
+            {((pendingState?.pendingUsd ?? 0) + (pendingState?.claimableUsd ?? 0)) > 0 && (
+              <Text style={styles.earningsLabel}>
+                {t.wallet.estCashValue} · ${((pendingState?.pendingUsd ?? 0) + (pendingState?.claimableUsd ?? 0)).toFixed(2)}
+              </Text>
+            )}
             {(pendingState?.claimablePoints ?? 0) > 0 && (
               <Pressable
                 onPress={handleClaimAll}

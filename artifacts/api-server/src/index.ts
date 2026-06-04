@@ -6,6 +6,7 @@ import { RESERVED_ADMIN_USERNAMES } from "./auth";
 import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
 import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
 import { startSecurityAuditCleanupJob } from "./jobs/securityAuditCleanup";
+import { startConversionRateJob } from "./jobs/conversionRateJob";
 import bcrypt from "bcryptjs";
 
 loadPersistedIntegrationKeys();
@@ -77,6 +78,7 @@ const server = app.listen(port, (err) => {
   seedAdmins().catch((e) => logger.error({ err: e }, "Admin seed failed"));
   startWebhookAuditCleanupJob();
   startSecurityAuditCleanupJob();
+  startConversionRateJob();
 });
 
 // ── GRACEFUL SHUTDOWN ────────────────────────────────────────────────────────

@@ -400,10 +400,15 @@ export default function WalletScreen() {
                   {isConverting
                     ? t.wallet.converting
                     : (pendingState?.claimablePoints ?? 0) > 0
-                      ? `${t.wallet.convertNow} · $${pointsToUsd(pendingState!.claimablePoints).toFixed(2)}`
+                      ? `${t.wallet.convertNow} · $${(
+                          (pendingState?.claimableUsd ?? 0) > 0
+                            ? pendingState!.claimableUsd
+                            : pointsToUsd(pendingState!.claimablePoints)
+                        ).toFixed(2)}`
                       : t.wallet.convertNow}
                 </Text>
               </Pressable>
+              <Text style={styles.pointsAutoNote}>{t.wallet.valueGrowsWithRevenue}</Text>
             </View>
 
             {nextTierAmount && (

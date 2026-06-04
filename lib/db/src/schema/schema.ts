@@ -417,6 +417,12 @@ export const earnTokens = pgTable("earn_tokens", {
   // Populated only for AdMob SSV tokens — used to prevent replay attacks.
   // PostgreSQL UNIQUE allows multiple NULLs, so non-SSV tokens are unaffected.
   transactionId: varchar("transaction_id"),
+  // Cash value (USD) per point locked in at the moment this token was earned.
+  // Each point converts at its own snapshot so a later rate change can never
+  // retroactively devalue points already earned. NULL = legacy token issued
+  // before variable rates existed; treated as the legacy floor (0.001 $/pt)
+  // at conversion time.
+  usdPerPointSnapshot: numeric("usd_per_point_snapshot", { precision: 12, scale: 8 }),
 }, (t) => ({
   userIdx: index("earn_tokens_user_idx").on(t.userId),
   userStatusIdx: index("earn_tokens_user_status_idx").on(t.userId, t.status),
@@ -425,3 +431,31 @@ export const earnTokens = pgTable("earn_tokens", {
 }));
 
 export type EarnToken = typeof earnTokens.$inferSelect;
+
+// ── CONVERSION RATES ──────────────────────────────────────────────────────────
+// Append-only history of the server-authoritative cash value per point. The
+// rate floats with ad ARPU but is clamped to a published floor it never drops
+// below. Scoped by region so a per-geo rate can be rolled out later without a
+// schema change — for now only "GLOBAL" rows are written. The "current" rate
+// for a region is simply its most recent row by createdAt.
+export const conversionRates = pgTable("conversion_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  region: text("region").notNull().default("GLOBAL"),
+  // Cash value (USD) of one point. High precision so sub-cent rates are exact.
+  usdPerPoint: numeric("usd_per_point", { precision: 12, scale: 8 }).notNull(),
+  // The published floor this rate was clamped against.
+  floorUsdPerPoint: numeric("floor_usd_per_point", { precision: 12, scale: 8 }).notNull(),
+  // How the rate was derived: "seed" (initial), "arpu" (revenue-driven),
+  // "floor" (ARPU fell below floor, clamped up).
+  method: text("method").notNull().default("seed"),
+  // Inputs that produced this rate — kept for auditability / debugging.
+  windowDays: integer("window_days"),
+  revenueUsd: numeric("revenue_usd", { precision: 14, scale: 4 }),
+  pointsIssued: numeric("points_issued", { precision: 18, scale: 0 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  regionCreatedIdx: index("conversion_rates_region_created_idx").on(t.region, t.createdAt),
+}));
+
+export type ConversionRate = typeof conversionRates.$inferSelect;
+export type InsertConversionRate = typeof conversionRates.$inferInsert;

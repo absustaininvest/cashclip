@@ -16,6 +16,7 @@ export interface EarnToken {
   description: string;
   earnedAt:    number; // unix ms
   claimableAt: number; // unix ms
+  estimatedUsd?: number; // server estimate at this token's snapshot rate
 }
 
 export interface PendingState {
@@ -23,6 +24,23 @@ export interface PendingState {
   claimable:       EarnToken[];
   pendingPoints:   number;
   claimablePoints: number;
+  // Server-estimated cash value (points × each token's snapshot rate). Cash
+  // value floats with ad revenue, so these come from the server, not points/1000.
+  pendingUsd:      number;
+  claimableUsd:    number;
+  // Rate that NEWLY earned points lock in at (display only); may be null offline.
+  usdPerPoint?:      number;
+  floorUsdPerPoint?: number;
+  pointsPerDollar?:  number;
+}
+
+export interface ConversionRate {
+  usdPerPoint:       number;
+  floorUsdPerPoint:  number;
+  legacyUsdPerPoint: number;
+  pointsPerDollar:   number | null;
+  method:            string;
+  region:            string;
 }
 
 // ── RECORD AN EARN ACTION ─────────────────────────────────────────────────────
@@ -125,6 +143,7 @@ export async function refreshPendingFromServer(): Promise<PendingState | null> {
       description: t.description,
       earnedAt:    new Date(t.earnedAt).getTime(),
       claimableAt: new Date(t.claimableAt).getTime(),
+      estimatedUsd: typeof t.estimatedUsd === "number" ? t.estimatedUsd : undefined,
     });
 
     return {
@@ -132,6 +151,31 @@ export async function refreshPendingFromServer(): Promise<PendingState | null> {
       claimable:       (data.claimable ?? []).map(mapToken),
       pendingPoints:   data.pendingPoints   ?? 0,
       claimablePoints: data.claimablePoints ?? 0,
+      pendingUsd:      Number(data.pendingUsd)   || 0,
+      claimableUsd:    Number(data.claimableUsd) || 0,
+      usdPerPoint:      typeof data.usdPerPoint === "number" ? data.usdPerPoint : undefined,
+      floorUsdPerPoint: typeof data.floorUsdPerPoint === "number" ? data.floorUsdPerPoint : undefined,
+      pointsPerDollar:  typeof data.pointsPerDollar === "number" ? data.pointsPerDollar : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── FETCH CURRENT CONVERSION RATE ────────────────────────────────────────────
+// The server-authoritative points→cash rate (read-only; clients never set it).
+export async function fetchConversionRate(): Promise<ConversionRate | null> {
+  try {
+    const res = await apiRequest("GET", "/api/economy/rate");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      usdPerPoint:       Number(data.usdPerPoint)       || 0,
+      floorUsdPerPoint:  Number(data.floorUsdPerPoint)  || 0,
+      legacyUsdPerPoint: Number(data.legacyUsdPerPoint) || 0,
+      pointsPerDollar:   typeof data.pointsPerDollar === "number" ? data.pointsPerDollar : null,
+      method:            String(data.method ?? ""),
+      region:            String(data.region ?? "GLOBAL"),
     };
   } catch {
     return null;
@@ -184,6 +228,10 @@ export async function getLocalPendingState(): Promise<PendingState> {
     claimable,
     pendingPoints:   pending.reduce((s, t) => s + t.points, 0),
     claimablePoints: claimable.reduce((s, t) => s + t.points, 0),
+    // Offline cache can't know the live rate; leave cash estimates at 0 and let
+    // the next server refresh fill them in. Display falls back to points only.
+    pendingUsd:      0,
+    claimableUsd:    0,
   };
 }
 
