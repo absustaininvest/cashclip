@@ -31,3 +31,10 @@ real per-impression ad revenue (proxy retired). Then get explicit owner
 approval and re-confirm the $5/day cap + floating-rate backstop still bind at
 the new amounts (at the ceiling rate, middle/restore would otherwise exceed
 $5/day and lean entirely on the cap).
+
+**Fast precondition check (use prod read-only):** the tell that the proxy is
+STILL live is that `conversion_rates.revenue_usd` equals exactly
+`count(ad_events where event='reward_earned' in window) × 0.012`. When that
+identity holds, precondition (2) is unmet — do not raise. Re-verified on a
+prod replica and it still held (revenue_usd 4.344 = 362 × 0.012) with only ~5
+lifetime earners / ~12 users, so the HOLD stands unchanged.
