@@ -39,6 +39,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Start Backend"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Project Video"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -63,6 +67,18 @@ task = "shell.exec"
 args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
 
+[[workflows.workflow]]
+name = "Project Video"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5173 pnpm --filter @workspace/intro-video run dev"
+waitForPort = 5173
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 3001
 externalPort = 3001
@@ -76,16 +92,16 @@ localPort = 8080
 externalPort = 8080
 
 [[ports]]
-localPort = 22757
-externalPort = 3000
-
-[[ports]]
 localPort = 25937
 externalPort = 80
 
 [[ports]]
 localPort = 25938
 externalPort = 3003
+
+[[ports]]
+localPort = 5173
+externalPort = 5173
 
 [deployment]
 deploymentTarget = "autoscale"
