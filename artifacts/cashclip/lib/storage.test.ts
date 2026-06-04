@@ -31,6 +31,9 @@ import {
   getWithdrawalTiers,
   withdraw,
   getTransactions,
+  canWithdraw,
+  recordWithdrawalAttempt,
+  getFraudProtectionConfig,
 } from "./storage";
 import { displayPointsToDollars } from "./points";
 
@@ -232,5 +235,135 @@ describe("withdraw enforces limits, deducts the balance, and records transaction
     const txns = await getTransactions();
     expect(txns).toHaveLength(1);
     expect(txns.some((t) => t.type === "bonus")).toBe(false);
+  });
+});
+
+// These are the anti-abuse guards that decide whether a cash-out is even allowed
+// to start: a multi-day new-account hold and a per-day withdrawal-count cap. They
+// are enforced by canWithdraw() reading the account-creation timestamp and the
+// per-day withdrawal counter that recordWithdrawalAttempt() maintains. A silent
+// break here lets an abusive account cash out before the hold ends or more often
+// than the daily cap allows, so each branch is pinned below.
+const ACCOUNT_CREATED_KEY = "cashclip_account_created";
+const WITHDRAWAL_COUNT_KEY = "cashclip_withdrawal_count";
+const LAST_WITHDRAWAL_DATE_KEY = "cashclip_last_withdrawal_date";
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+// Pin the account's creation timestamp so getAccountAge() returns exactly
+// `ageDays` whole days. We back-date by a few extra hours so floor() can't land
+// a hair short of the intended day boundary.
+function setAccountAgeDays(ageDays: number): void {
+  store.set(ACCOUNT_CREATED_KEY, (Date.now() - ageDays * DAY_MS - 60 * 60 * 1000).toString());
+}
+
+const { withdrawalHoldDays: HOLD_DAYS, maxDailyWithdrawals: MAX_DAILY } = getFraudProtectionConfig();
+
+describe("canWithdraw enforces the new-account hold period", () => {
+  it("denies a brand-new account (age 0) until the hold elapses", async () => {
+    setAccountAgeDays(0);
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(`hold_period:${HOLD_DAYS}`);
+  });
+
+  it("denies an account one day short of the hold and reports the days left", async () => {
+    setAccountAgeDays(HOLD_DAYS - 1);
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("hold_period:1");
+  });
+
+  it("allows an account exactly at the hold boundary", async () => {
+    setAccountAgeDays(HOLD_DAYS);
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBeUndefined();
+  });
+
+  it("allows an account well past the hold", async () => {
+    setAccountAgeDays(HOLD_DAYS + 30);
+    expect((await canWithdraw()).allowed).toBe(true);
+  });
+});
+
+describe("canWithdraw enforces the daily withdrawal-count cap", () => {
+  it("allows a withdrawal when no withdrawals have happened today", async () => {
+    setAccountAgeDays(HOLD_DAYS + 1);
+    expect((await canWithdraw()).allowed).toBe(true);
+  });
+
+  it("denies once today's withdrawal count has reached the cap", async () => {
+    setAccountAgeDays(HOLD_DAYS + 1);
+    store.set(LAST_WITHDRAWAL_DATE_KEY, new Date().toDateString());
+    store.set(WITHDRAWAL_COUNT_KEY, MAX_DAILY.toString());
+
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("daily_limit");
+  });
+
+  it("resets the cap on a new day even if yesterday hit the limit", async () => {
+    setAccountAgeDays(HOLD_DAYS + 1);
+    const yesterday = new Date(Date.now() - DAY_MS).toDateString();
+    store.set(LAST_WITHDRAWAL_DATE_KEY, yesterday);
+    store.set(WITHDRAWAL_COUNT_KEY, MAX_DAILY.toString());
+
+    expect((await canWithdraw()).allowed).toBe(true);
+  });
+
+  it("denies only after recordWithdrawalAttempt pushes today's count to the cap", async () => {
+    setAccountAgeDays(HOLD_DAYS + 1);
+
+    // Before any attempt today, withdrawal is allowed.
+    expect((await canWithdraw()).allowed).toBe(true);
+
+    // Record attempts up to the cap; the last one should flip eligibility off.
+    for (let i = 0; i < MAX_DAILY; i++) {
+      await recordWithdrawalAttempt();
+    }
+
+    expect(store.get(WITHDRAWAL_COUNT_KEY)).toBe(MAX_DAILY.toString());
+    expect(store.get(LAST_WITHDRAWAL_DATE_KEY)).toBe(new Date().toDateString());
+
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("daily_limit");
+  });
+
+  it("the hold check takes precedence over the daily cap for a new account", async () => {
+    // Even with no withdrawals today, a too-new account is held first.
+    setAccountAgeDays(0);
+    store.set(LAST_WITHDRAWAL_DATE_KEY, new Date().toDateString());
+    store.set(WITHDRAWAL_COUNT_KEY, MAX_DAILY.toString());
+
+    const result = await canWithdraw();
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(`hold_period:${HOLD_DAYS}`);
+  });
+});
+
+describe("recordWithdrawalAttempt maintains the per-day counter", () => {
+  it("starts the count at 1 on the first attempt of a day", async () => {
+    await recordWithdrawalAttempt();
+    expect(store.get(WITHDRAWAL_COUNT_KEY)).toBe("1");
+    expect(store.get(LAST_WITHDRAWAL_DATE_KEY)).toBe(new Date().toDateString());
+  });
+
+  it("increments the count on repeated same-day attempts", async () => {
+    await recordWithdrawalAttempt();
+    await recordWithdrawalAttempt();
+    expect(store.get(WITHDRAWAL_COUNT_KEY)).toBe("2");
+  });
+
+  it("resets the count to 1 when the day rolls over", async () => {
+    const yesterday = new Date(Date.now() - DAY_MS).toDateString();
+    store.set(LAST_WITHDRAWAL_DATE_KEY, yesterday);
+    store.set(WITHDRAWAL_COUNT_KEY, "5");
+
+    await recordWithdrawalAttempt();
+
+    expect(store.get(WITHDRAWAL_COUNT_KEY)).toBe("1");
+    expect(store.get(LAST_WITHDRAWAL_DATE_KEY)).toBe(new Date().toDateString());
   });
 });
