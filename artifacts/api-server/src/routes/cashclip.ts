@@ -25,7 +25,8 @@ import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
 import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
-import { recordLoginAttempt, decrementLoginAttempt } from "../lib/dbRateLimit";
+import { recordLoginAttempt } from "../lib/dbRateLimit";
+import { reserveDedupeSlot, releaseDedupeSlot } from "../lib/dedupe";
 import { createHash } from "node:crypto";
 import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
@@ -1937,8 +1938,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Dedupe guard: prevent the same reply being sent twice in quick
       // succession (double-click, retry on a slow SMTP response, impatient
       // operator). Keyed on admin + Message-ID (or recipient/subject) + body
-      // hash. Backed by the shared login_attempts table so it holds across
-      // autoscaled replicas, per threat_model.md.
+      // hash. Backed by the dedicated dedupe_slots table so it holds across
+      // autoscaled replicas, per threat_model.md — and stays decoupled from the
+      // login throttle so tuning one can't silently affect the other.
       const dedupeBasis = [
         req.userId ?? "",
         inReplyTo || "",
@@ -1951,8 +1953,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .digest("hex")
         .slice(0, 40)}`;
       const DEDUPE_WINDOW_MS = 30_000;
-      const { count } = await recordLoginAttempt(dedupeKey, 1, DEDUPE_WINDOW_MS);
-      if (count > 1) {
+      const { duplicate } = await reserveDedupeSlot(dedupeKey, DEDUPE_WINDOW_MS);
+      if (duplicate) {
         req.log?.warn(
           {
             action: "inbox_reply_duplicate_suppressed",
@@ -1975,7 +1977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (sendErr) {
         // Release the reserved slot so a genuine retry after a failed send
         // is not blocked by the dedupe window.
-        await decrementLoginAttempt(dedupeKey).catch(() => {});
+        await releaseDedupeSlot(dedupeKey).catch(() => {});
         throw sendErr;
       }
 

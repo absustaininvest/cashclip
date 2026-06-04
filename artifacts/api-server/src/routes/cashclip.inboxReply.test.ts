@@ -14,7 +14,8 @@
  * exercised: handler-logic tests present a real admin Bearer JWT (signed with
  * the test JWT_ACCESS_SECRET, with storage.getUser returning an admin), while
  * the auth-enforcement tests send no token and expect 401. storage, the mailer,
- * and the DB-backed dedupe counter are mocked so the suite needs no DB or SMTP.
+ * and the DB-backed dedupe store (lib/dedupe) are mocked so the suite needs no
+ * DB or SMTP.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
@@ -29,8 +30,8 @@ const mockGetUser = vi.fn();
 const mockCreateSupportReply = vi.fn();
 const mockGetSupportRepliesByThread = vi.fn();
 const mockSendSupportReply = vi.fn();
-const mockRecordLoginAttempt = vi.fn();
-const mockDecrementLoginAttempt = vi.fn();
+const mockReserveDedupeSlot = vi.fn();
+const mockReleaseDedupeSlot = vi.fn();
 
 vi.mock("../storage", () => ({
   storage: {
@@ -42,11 +43,17 @@ vi.mock("../storage", () => ({
 }));
 
 vi.mock("../lib/dbRateLimit", () => ({
-  recordLoginAttempt: (...args: unknown[]) => mockRecordLoginAttempt(...args),
+  recordLoginAttempt: vi.fn().mockResolvedValue({ count: 1, allowed: true }),
   checkLoginAttempts: vi.fn().mockResolvedValue({ count: 0, allowed: true }),
   clearLoginAttempts: vi.fn().mockResolvedValue(undefined),
-  decrementLoginAttempt: (...args: unknown[]) => mockDecrementLoginAttempt(...args),
+  decrementLoginAttempt: vi.fn().mockResolvedValue(undefined),
   pruneExpiredLoginAttempts: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../lib/dedupe", () => ({
+  reserveDedupeSlot: (...args: unknown[]) => mockReserveDedupeSlot(...args),
+  releaseDedupeSlot: (...args: unknown[]) => mockReleaseDedupeSlot(...args),
+  pruneExpiredDedupeSlots: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../lib/secretsPassphrase", () => ({
@@ -108,8 +115,8 @@ beforeEach(() => {
   // adminMiddleware resolves the acting admin via storage.getUser.
   mockGetUser.mockResolvedValue({ id: ADMIN_ID, role: "admin", tokenVersion: 0 });
   // Defaults: not a duplicate, send + persist succeed.
-  mockRecordLoginAttempt.mockResolvedValue({ count: 1, allowed: true });
-  mockDecrementLoginAttempt.mockResolvedValue(undefined);
+  mockReserveDedupeSlot.mockResolvedValue({ count: 1, duplicate: false });
+  mockReleaseDedupeSlot.mockResolvedValue(undefined);
   mockSendSupportReply.mockResolvedValue(undefined);
   mockCreateSupportReply.mockResolvedValue({
     id: "reply-1",
@@ -218,7 +225,7 @@ describe("POST /api/admin/inbox/reply — send + persist", () => {
     // No history row should be written for a reply that never sent.
     expect(mockCreateSupportReply).not.toHaveBeenCalled();
     // The reserved dedupe slot is released for a genuine retry.
-    expect(mockDecrementLoginAttempt).toHaveBeenCalledTimes(1);
+    expect(mockReleaseDedupeSlot).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a missing recipient with 400 and never sends or persists", async () => {
@@ -240,7 +247,7 @@ describe("POST /api/admin/inbox/reply — send + persist", () => {
   });
 
   it("suppresses a duplicate reply (409) without sending or persisting again", async () => {
-    mockRecordLoginAttempt.mockResolvedValue({ count: 2, allowed: false });
+    mockReserveDedupeSlot.mockResolvedValue({ count: 2, duplicate: true });
     const res = await asAdmin(
       request(app).post("/api/admin/inbox/reply").send({
         to: "user@example.com",
@@ -258,25 +265,25 @@ describe("POST /api/admin/inbox/reply — send + persist", () => {
 });
 
 describe("POST /api/admin/inbox/reply — dedupe guard (duplicate replies blocked)", () => {
-  // A stateful stand-in for the DB-backed login_attempts counter so two REAL
+  // A stateful stand-in for the DB-backed dedupe_slots store so two REAL
   // requests drive the actual dedupe branch end to end, instead of us
-  // hard-coding the returned count. recordLoginAttempt increments per key and
-  // reports allowed = count <= max; decrementLoginAttempt releases a reserved
-  // slot as GREATEST(0, count - 1) — mirroring lib/dbRateLimit.ts. This is what
-  // lets the suite prove "exactly one email across two identical POSTs" and
-  // "the slot is freed for a genuine retry" with the same key the handler uses.
+  // hard-coding the returned count. reserveDedupeSlot increments per key and
+  // reports duplicate = count > 1; releaseDedupeSlot frees a reserved slot as
+  // GREATEST(0, count - 1) — mirroring lib/dedupe.ts. This is what lets the
+  // suite prove "exactly one email across two identical POSTs" and "the slot is
+  // freed for a genuine retry" with the same key the handler uses.
   let counters: Map<string, number>;
 
   beforeEach(() => {
     counters = new Map<string, number>();
-    mockRecordLoginAttempt.mockImplementation(
-      async (key: string, max: number, _windowMs: number) => {
+    mockReserveDedupeSlot.mockImplementation(
+      async (key: string, _windowMs: number) => {
         const next = (counters.get(key) ?? 0) + 1;
         counters.set(key, next);
-        return { count: next, allowed: next <= max };
+        return { count: next, duplicate: next > 1 };
       },
     );
-    mockDecrementLoginAttempt.mockImplementation(async (key: string) => {
+    mockReleaseDedupeSlot.mockImplementation(async (key: string) => {
       const current = counters.get(key) ?? 0;
       counters.set(key, Math.max(0, current - 1));
     });
@@ -310,7 +317,7 @@ describe("POST /api/admin/inbox/reply — dedupe guard (duplicate replies blocke
     mockSendSupportReply.mockRejectedValueOnce(new Error("smtp timeout"));
     const failed = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
     expect(failed.status).toBe(500);
-    expect(mockDecrementLoginAttempt).toHaveBeenCalledTimes(1);
+    expect(mockReleaseDedupeSlot).toHaveBeenCalledTimes(1);
     expect(mockCreateSupportReply).not.toHaveBeenCalled();
 
     // Retry of the SAME reply now succeeds — it is NOT blocked as a duplicate,
