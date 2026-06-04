@@ -6,6 +6,7 @@ import {
   Filter,
   RefreshCw,
   Mail,
+  Send,
   User,
   Calendar,
   Tag,
@@ -1294,6 +1295,7 @@ function ChangePasswordPanel({ token }: { token: string }) {
 
 interface InboxMessage {
   uid: number;
+  messageId: string;
   subject: string;
   from: string;
   fromEmail: string;
@@ -1347,6 +1349,57 @@ function InboxPanel({ token }: { token: string }) {
     InboxMessage["category"] | "all"
   >("all");
   const [selected, setSelected] = useState<InboxMessage | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState("");
+  const [replySent, setReplySent] = useState(false);
+
+  const openReply = useCallback(() => {
+    setReplyOpen(true);
+    setReplyBody("");
+    setReplyError("");
+    setReplySent(false);
+  }, []);
+
+  const sendReply = useCallback(async () => {
+    if (!selected) return;
+    if (!replyBody.trim()) {
+      setReplyError("Reply message cannot be empty.");
+      return;
+    }
+    setReplySending(true);
+    setReplyError("");
+    try {
+      const subject = selected.subject.toLowerCase().startsWith("re:")
+        ? selected.subject
+        : `Re: ${selected.subject}`;
+      const res = await fetch("/api/admin/inbox/reply", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: selected.fromEmail,
+          subject,
+          body: replyBody,
+          inReplyTo: selected.messageId || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).error || "Failed to send reply");
+      }
+      setReplySent(true);
+      setReplyOpen(false);
+      setReplyBody("");
+    } catch (err: any) {
+      setReplyError(err.message);
+    } finally {
+      setReplySending(false);
+    }
+  }, [selected, replyBody, token]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -1494,9 +1547,13 @@ function InboxPanel({ token }: { token: string }) {
                 {filtered.map((msg) => (
                   <button
                     key={msg.uid}
-                    onClick={() =>
-                      setSelected(selected?.uid === msg.uid ? null : msg)
-                    }
+                    onClick={() => {
+                      setSelected(selected?.uid === msg.uid ? null : msg);
+                      setReplyOpen(false);
+                      setReplyBody("");
+                      setReplyError("");
+                      setReplySent(false);
+                    }}
                     className={`w-full text-left flex items-start gap-3 px-5 py-4 hover:bg-white/[0.04] transition-colors ${
                       selected?.uid === msg.uid ? "bg-white/[0.06]" : ""
                     }`}
@@ -1600,14 +1657,76 @@ function InboxPanel({ token }: { token: string }) {
                   {selected.body || selected.preview || "(No body content)"}
                 </p>
               </div>
-              <div className="px-5 py-3 border-t border-white/[0.06] flex items-center gap-3">
-                <a
-                  href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  Reply via Email
-                </a>
+              <div className="px-5 py-3 border-t border-white/[0.06] space-y-3">
+                {replySent && !replyOpen && (
+                  <div className="flex items-center gap-2 text-[#00E676] text-xs">
+                    <Check className="w-3.5 h-3.5" />
+                    Reply sent to {selected.fromEmail}
+                  </div>
+                )}
+                {!replyOpen ? (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={openReply}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      {replySent ? "Reply Again" : "Reply"}
+                    </button>
+                    <a
+                      href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
+                      className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 text-white/60 rounded-xl text-xs font-medium hover:text-white hover:bg-white/[0.08] transition-colors"
+                    >
+                      Open in Webmail
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-1.5 text-white/40 text-xs">
+                      <span>Replying to</span>
+                      <span className="text-white/70 font-medium">{selected.fromEmail}</span>
+                    </div>
+                    <textarea
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      placeholder="Write your reply…"
+                      rows={6}
+                      autoFocus
+                      disabled={replySending}
+                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40 resize-y disabled:opacity-50"
+                    />
+                    {replyError && (
+                      <div className="flex items-start gap-2 text-red-400 text-xs">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span>{replyError}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={sendReply}
+                        disabled={replySending || !replyBody.trim()}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {replySending ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        {replySending ? "Sending…" : "Send Reply"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReplyOpen(false);
+                          setReplyError("");
+                        }}
+                        disabled={replySending}
+                        className="px-4 py-2 text-white/40 hover:text-white transition-colors text-xs disabled:opacity-40"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

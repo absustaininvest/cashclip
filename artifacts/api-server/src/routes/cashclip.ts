@@ -30,7 +30,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import {
   getRecentRejections,
@@ -1842,6 +1842,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error:
           "Failed to connect to mail server. Enable IMAP on the Zoho mailbox and set the ZOHO_IMAP_PASSWORD secret (a separate app-specific password from the SMTP one).",
       });
+    }
+  });
+
+  app.post("/api/admin/inbox/reply", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const to = typeof req.body?.to === "string" ? req.body.to.trim() : "";
+      const rawSubject = typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
+      const body = typeof req.body?.body === "string" ? req.body.body : "";
+      const inReplyTo = typeof req.body?.inReplyTo === "string" ? req.body.inReplyTo.trim() : undefined;
+
+      if (!to) {
+        res.status(400).json({ error: "A recipient address is required." });
+        return;
+      }
+      if (!body.trim()) {
+        res.status(400).json({ error: "Reply message cannot be empty." });
+        return;
+      }
+
+      const subject = rawSubject || "Re: your message";
+
+      await sendSupportReply({ to, subject, body, inReplyTo: inReplyTo || undefined });
+
+      req.log.info(
+        {
+          action: "inbox_reply_sent",
+          adminUserId: req.userId,
+          to,
+          subject,
+          inReplyTo: inReplyTo || null,
+        },
+        "Admin sent inbox reply",
+      );
+
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err, adminUserId: req.userId }, "Failed to send inbox reply");
+      const message = err instanceof Error ? err.message : "Failed to send reply";
+      res.status(500).json({ error: message });
     }
   });
 

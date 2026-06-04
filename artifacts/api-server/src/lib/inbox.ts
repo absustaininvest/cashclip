@@ -3,6 +3,7 @@ import { logger } from "./logger";
 
 export interface InboxMessage {
   uid: number;
+  messageId: string;
   subject: string;
   from: string;
   fromEmail: string;
@@ -103,6 +104,7 @@ export async function fetchInbox(folder = "INBOX"): Promise<InboxMessage[]> {
 
         messages.push({
           uid: msg.uid,
+          messageId: env.messageId ?? "",
           subject: env.subject ?? "(no subject)",
           from: fromName,
           fromEmail: fromAddr,

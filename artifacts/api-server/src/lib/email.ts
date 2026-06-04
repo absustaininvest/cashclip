@@ -652,3 +652,47 @@ export async function sendWithdrawalVelocityAdmin(alert: {
       </div>`,
   });
 }
+
+/**
+ * Send an admin reply to an inbound support email.
+ *
+ * Unlike the notification helpers above (fire-and-forget), this throws on
+ * failure so the calling admin route can report whether the reply actually
+ * went out. Threading headers (In-Reply-To / References) are set from the
+ * original message's Message-ID so the reply lands in the same Zoho thread.
+ */
+export async function sendSupportReply(options: {
+  to: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string;
+}): Promise<void> {
+  const { to, subject, body, inReplyTo } = options;
+  const transport = createTransport();
+  if (!transport) {
+    throw new Error("Email not configured — ZOHO_SMTP_PASSWORD missing");
+  }
+  if (!isValidEmail(to)) {
+    throw new Error("Invalid recipient address");
+  }
+
+  const safeBody = escapeHtml(body).replace(/\n/g, "<br>");
+  const references = inReplyTo ? inReplyTo : undefined;
+
+  await transport.sendMail({
+    from: FROM_MAIN,
+    to,
+    replyTo: ADMIN_EMAIL,
+    subject,
+    text: body,
+    // nosemgrep: javascript.lang.security.html-in-template-string — body is escaped via escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:auto;color:#1a1a1a;font-size:15px;line-height:1.6">
+        <div style="white-space:pre-wrap">${safeBody}</div>
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <p style="font-size:12px;color:#999">CashClip Support · cash-clip.app · support@absustaininvest.com</p>
+      </div>`,
+    ...(inReplyTo ? { inReplyTo, references } : {}),
+  });
+  logger.info({ to, subject }, "Support reply sent");
+}
