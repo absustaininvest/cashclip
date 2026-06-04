@@ -3,11 +3,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    // Several suites import the large routes/cashclip module inside beforeAll.
-    // Under parallel CPU contention that import can exceed vitest's default
-    // 10s hook timeout, producing flaky "Hook timed out" failures (and
-    // cascading skipped tests) on otherwise-passing files. Give hooks and
-    // tests more headroom so the suite is deterministic.
+    // Some test files import the large `src/routes/cashclip.ts` route module
+    // inside a `beforeAll` hook. Under full-suite parallel load, transforming
+    // that 4,000+ line file can exceed vitest's default 10s hook timeout,
+    // causing flaky "Hook timed out" failures. Raise the global hook/test
+    // timeouts so individual files don't need ad-hoc per-hook timeouts.
     hookTimeout: 30000,
     testTimeout: 30000,
     // Tolerate test files that currently contain no test cases (e.g. an

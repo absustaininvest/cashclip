@@ -173,9 +173,7 @@ beforeAll(async () => {
   app = express();
   app.use(express.json());
   registerRoutes(app);
-  // Importing the large cashclip route module can exceed the default 10s hook
-  // timeout when the full suite transforms files in parallel; give it headroom.
-}, 30000);
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

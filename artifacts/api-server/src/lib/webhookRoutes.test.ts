@@ -420,9 +420,7 @@ describe("admin webhook-audit route", () => {
       next();
     });
     await registerRoutes(adminApp);
-    // Importing the large cashclip route module can exceed the default 10s hook
-    // timeout when the full suite transforms files in parallel; give it headroom.
-  }, 30000);
+  });
 
   beforeEach(() => {
     getUserMock.mockReset();
