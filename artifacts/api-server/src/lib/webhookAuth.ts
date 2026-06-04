@@ -354,18 +354,20 @@ export function logWebhookVerificationFailure(
   recordWebhookRejection(event);
 
   // Fire-and-forget: check per-IP write cap then maybe persist.
-  // Best-effort — do not let DB issues affect the request response path.
+  // Best-effort — do not let DB issues affect the request response path. The
+  // entire body is wrapped so that no failure (a rejected promise OR a non-
+  // thenable/throwing mock) can ever surface as an unhandled rejection.
   void (async () => {
-    const allowed = await permitAuditWrite(canonicalIp, log);
-    if (!allowed) {
-      log.debug(
-        { provider, ip: canonicalIp },
-        "webhook_audit DB write suppressed: per-IP write cap reached for this window",
-      );
-      return;
-    }
-    await storage
-      .insertWebhookAudit({
+    try {
+      const allowed = await permitAuditWrite(canonicalIp, log);
+      if (!allowed) {
+        log.debug(
+          { provider, ip: canonicalIp },
+          "webhook_audit DB write suppressed: per-IP write cap reached for this window",
+        );
+        return;
+      }
+      await storage.insertWebhookAudit({
         provider: event.provider,
         reason: event.reason,
         ip: canonicalIp,
@@ -376,14 +378,17 @@ export function logWebhookVerificationFailure(
         hasSignatureHeader: event.hasSignatureHeader,
         secretConfigured: event.secretConfigured,
         statusCode: 401,
-      })
-      .catch((err: unknown) => {
-        log.warn(
-          { err: err instanceof Error ? err.message : String(err), provider, ip: canonicalIp },
-          "Failed to persist webhook audit entry",
-        );
       });
-  })();
+    } catch (err: unknown) {
+      log.warn(
+        { err: err instanceof Error ? err.message : String(err), provider, ip: canonicalIp },
+        "Failed to persist webhook audit entry",
+      );
+    }
+  })().catch(() => {
+    /* unreachable — the IIFE body already swallows all errors; this is a
+       belt-and-braces guard so a future edit can never leak a rejection. */
+  });
 
   return event;
 }

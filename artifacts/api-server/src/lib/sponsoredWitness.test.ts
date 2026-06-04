@@ -51,7 +51,7 @@ const dbMocks = vi.hoisted(() => {
     witnessedAt:     null as Date | null,
     witnessNonce:    WITNESS_NONCE as string | null,
     settledAt:       null as Date | null,
-    deviceHash:      "hash-abc",
+    deviceHash:      "hash-abc" as string | null,
   };
 
   const campaign = {
