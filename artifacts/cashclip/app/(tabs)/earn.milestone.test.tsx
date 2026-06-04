@@ -167,6 +167,19 @@ vi.mock("@/lib/earn-client", () => ({
 }));
 
 import EarnScreen from "./earn";
+import { fetchCheckinStatus } from "@/lib/earn-client";
+
+const fetchCheckinStatusMock = fetchCheckinStatus as unknown as ReturnType<
+  typeof vi.fn
+>;
+const CHECKIN_STATUS_BASE = {
+  checkinStreak: 6,
+  ladder: [100, 120, 140, 160, 180, 200, 240],
+  milestoneEvery: 7,
+  milestoneBonus: 500,
+  nextReward: 240,
+  nextIsMilestone: true,
+};
 
 // Collect every plain-string text rendered anywhere in the tree.
 function allText(node: TestRenderer.ReactTestInstance): string[] {
@@ -194,6 +207,21 @@ function pressCheckIn(root: TestRenderer.ReactTestInstance) {
   while (cur && typeof cur.props?.onPress !== "function") cur = cur.parent;
   if (!cur) throw new Error("Check-in pressable not found");
   return cur.props.onPress();
+}
+
+// Find the check-in Pressable regardless of whether it currently reads
+// "Check In" (active) or "Checked In" (locked). The label sits inside the
+// Pressable, so we walk up to the element that owns the onPress handler — that
+// element also carries the `disabled` prop the lock relies on.
+function getCheckInButton(root: TestRenderer.ReactTestInstance) {
+  const label = root.findAll(
+    (n) => n.props.children === "Check In" || n.props.children === "Checked In",
+  )[0];
+  if (!label) throw new Error("Check-in label not found");
+  let cur: any = label;
+  while (cur && typeof cur.props?.onPress !== "function") cur = cur.parent;
+  if (!cur) throw new Error("Check-in pressable not found");
+  return cur;
 }
 
 async function flush() {
@@ -250,5 +278,52 @@ describe("Earn screen 7-day milestone celebration", () => {
     expect(text).not.toContain("7-day streak!");
     expect(text).not.toContain("3-day streak!");
     expect(text).not.toContain("bonus pts");
+  });
+});
+
+describe("Earn screen check-in button locks after checking in", () => {
+  it("disables the button, flips it to 'Checked In', and won't call recordCheckin twice", async () => {
+    recordCheckin.mockResolvedValue({ points: 120, checkinStreak: 7, milestoneBonus: 0 });
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(EarnScreen));
+    });
+    await flush(); // let loadAll() settle so the screen renders
+
+    // Before any check-in: button is active, labeled "Check In", not disabled.
+    let btn = getCheckInButton(tr.root);
+    expect(btn.props.disabled).toBeFalsy();
+    expect(allText(tr.root)).toContain("Check In");
+    expect(allText(tr.root)).not.toContain("Checked In");
+
+    // handleCheckin's final loadAll() re-reads the server status; once checked
+    // in the server reports checkedInToday: true, which keeps the lock latched.
+    fetchCheckinStatusMock.mockResolvedValue({
+      ...CHECKIN_STATUS_BASE,
+      checkedInToday: true,
+    });
+
+    // Press the button once.
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+
+    expect(recordCheckin).toHaveBeenCalledTimes(1);
+
+    // After check-in: the button is now disabled and shows "Checked In".
+    btn = getCheckInButton(tr.root);
+    expect(btn.props.disabled).toBe(true);
+    expect(allText(tr.root)).toContain("Checked In");
+    expect(allText(tr.root)).not.toContain("Check In");
+
+    // Pressing the (now locked) button again must NOT fire a second check-in.
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+
+    expect(recordCheckin).toHaveBeenCalledTimes(1);
   });
 });
