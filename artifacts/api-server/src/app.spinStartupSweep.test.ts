@@ -5,87 +5,54 @@ const { mockInfo, mockWarn } = vi.hoisted(() => ({
   mockWarn: vi.fn(),
 }));
 
+const { mockExecute } = vi.hoisted(() => ({
+  mockExecute: vi.fn(),
+}));
+
 vi.mock("./lib/logger.js", () => ({
   logger: { info: mockInfo, warn: mockWarn, error: vi.fn() },
 }));
 
-import {
-  runSpinChallengeSweep,
-  type SpinChallenge,
-} from "./lib/spinChallengeSweep";
+vi.mock("@workspace/db", async () => {
+  const actual = await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
+  return { ...actual, db: { execute: mockExecute } };
+});
 
-const TTL_MS = 60_000;
-const NOW = 1_000_000_000;
+import { runSpinChallengeSweep } from "./lib/spinChallengeSweep";
 
-function challengeStore(
-  entries: Record<string, number>,
-): Map<string, SpinChallenge> {
-  const store = new Map<string, SpinChallenge>();
-  for (const [token, issuedAt] of Object.entries(entries)) {
-    store.set(token, { userId: `user-${token}`, issuedAt });
-  }
-  return store;
+// Each returned row represents one expired spin-challenge token deleted by the
+// DB-backed sweep (DELETE ... RETURNING token).
+function rows(n: number): { rows: Array<{ token: string }> } {
+  return { rows: Array.from({ length: n }, (_, i) => ({ token: `t${i}` })) };
 }
 
-describe("runSpinChallengeSweep", () => {
+describe("runSpinChallengeSweep (DB-backed)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("deletes expired rows", () => {
-    const store = challengeStore({
-      a: NOW - TTL_MS - 1,
-      b: NOW - TTL_MS - 5_000,
-    });
+  it("returns the number of expired rows the DB deleted", async () => {
+    mockExecute.mockResolvedValueOnce(rows(2));
 
-    const removed = runSpinChallengeSweep(store, TTL_MS, NOW);
+    const removed = await runSpinChallengeSweep();
 
     expect(removed).toBe(2);
-    expect(store.size).toBe(0);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves non-expired rows untouched", () => {
-    const store = challengeStore({
-      fresh: NOW - 1_000,
-      onEdge: NOW - TTL_MS, // exactly at cutoff is NOT expired (strict <)
-    });
+  it("returns 0 and does not log when nothing was expired", async () => {
+    mockExecute.mockResolvedValueOnce(rows(0));
 
-    const removed = runSpinChallengeSweep(store, TTL_MS, NOW);
+    const removed = await runSpinChallengeSweep();
 
     expect(removed).toBe(0);
-    expect(store.size).toBe(2);
-    expect(store.has("fresh")).toBe(true);
-    expect(store.has("onEdge")).toBe(true);
     expect(mockInfo).not.toHaveBeenCalled();
   });
 
-  it("removes only expired rows from a mixed set", () => {
-    const store = challengeStore({
-      expired1: NOW - TTL_MS - 10,
-      fresh1: NOW - 2_000,
-      expired2: NOW - TTL_MS - 90_000,
-      fresh2: NOW - 30_000,
-    });
+  it('emits an INFO "spin challenge startup sweep complete" log with the removed count', async () => {
+    mockExecute.mockResolvedValueOnce(rows(3));
 
-    const removed = runSpinChallengeSweep(store, TTL_MS, NOW);
-
-    expect(removed).toBe(2);
-    expect(store.size).toBe(2);
-    expect(store.has("expired1")).toBe(false);
-    expect(store.has("expired2")).toBe(false);
-    expect(store.has("fresh1")).toBe(true);
-    expect(store.has("fresh2")).toBe(true);
-  });
-
-  it('emits an INFO "spin challenge startup sweep complete" log with the removed count', () => {
-    const store = challengeStore({
-      a: NOW - TTL_MS - 1,
-      b: NOW - TTL_MS - 1,
-      c: NOW - TTL_MS - 1,
-      keep: NOW - 1_000,
-    });
-
-    runSpinChallengeSweep(store, TTL_MS, NOW);
+    await runSpinChallengeSweep();
 
     expect(mockInfo).toHaveBeenCalledTimes(1);
     expect(mockInfo).toHaveBeenCalledWith(
@@ -94,18 +61,15 @@ describe("runSpinChallengeSweep", () => {
     );
   });
 
-  it("catches a sweep failure, logs a WARN, and does not throw", () => {
-    // A store whose iterator throws simulates an unexpected failure mid-sweep.
-    const exploding = {
-      [Symbol.iterator]() {
-        throw new Error("store iteration blew up");
-      },
-    } as unknown as Map<string, SpinChallenge>;
+  it("catches a DB failure, logs a WARN, and does not throw", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("connection reset"));
 
     let removed: number | undefined;
-    expect(() => {
-      removed = runSpinChallengeSweep(exploding, TTL_MS, NOW);
-    }).not.toThrow();
+    await expect(
+      (async () => {
+        removed = await runSpinChallengeSweep();
+      })(),
+    ).resolves.toBeUndefined();
 
     expect(removed).toBe(0);
     expect(mockWarn).toHaveBeenCalledTimes(1);

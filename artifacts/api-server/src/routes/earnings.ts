@@ -4,7 +4,8 @@ import { authMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { runSpinChallengeSweep, type SpinChallenge } from "../lib/spinChallengeSweep";
+import { runSpinChallengeSweep } from "../lib/spinChallengeSweep";
+import { issueSpinChallenge, consumeSpinChallenge } from "../lib/spinChallengeStore";
 import { rateLimit } from "express-rate-limit";
 import {
   DEFAULT_REGION,
@@ -152,11 +153,13 @@ const SERVER_ONLY_ACTIONS = new Set([
 // Server-issued single-use challenge tokens for the spin wheel.
 // /begin issues a token; /complete requires it before crediting the earn token.
 // This ensures the client called /begin (server-observed) before earning points.
+// Tokens live in the shared `spin_challenges` DB table (see lib/spinChallengeStore)
+// so a token issued by one autoscaled replica can be validated/consumed by any
+// other — the begin/complete pair no longer has to land on the same replica.
 const SPIN_CHALLENGE_TTL_MS  = 60_000;  // challenge valid for 60 s
 const SPIN_CHALLENGE_MIN_MS  = 3_000;   // must wait ≥3 s between begin→complete
-const spinChallenges = new Map<string, SpinChallenge>();
 setInterval(() => {
-  runSpinChallengeSweep(spinChallenges, SPIN_CHALLENGE_TTL_MS);
+  runSpinChallengeSweep();
 }, 30_000);
 
 // ── ADMOB SSV KEY CACHE ───────────────────────────────────────────────────────
@@ -398,7 +401,7 @@ export function registerEarningsRoutes(app: Express): void {
       try {
         const { randomBytes } = await import("node:crypto");
         const challengeToken = randomBytes(32).toString("hex");
-        spinChallenges.set(challengeToken, { userId: req.userId!, issuedAt: Date.now() });
+        await issueSpinChallenge(challengeToken, req.userId!, SPIN_CHALLENGE_TTL_MS);
         logger.info({ userId: req.userId }, "spin challenge issued");
         res.status(201).json({ challengeToken });
       } catch (err) {
@@ -424,27 +427,30 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(400).json({ error: "challengeToken is required" }); return;
         }
 
-        const challenge = spinChallenges.get(challengeToken);
-        if (!challenge) {
+        // Validate + atomically consume the challenge from the shared DB store.
+        // Single-use is enforced at the DB level so the begin/complete pair can
+        // land on different autoscaled replicas and concurrent /complete calls
+        // for the same token can't both succeed.
+        const consumed = await consumeSpinChallenge(
+          challengeToken,
+          req.userId!,
+          SPIN_CHALLENGE_MIN_MS,
+        );
+        if (consumed.status === "not_found") {
           res.status(403).json({ error: "Invalid or expired spin challenge" }); return;
         }
-        if (challenge.userId !== req.userId) {
+        if (consumed.status === "wrong_user") {
           res.status(403).json({ error: "Spin challenge does not belong to this user" }); return;
         }
-        const age = Date.now() - challenge.issuedAt;
-        if (age > SPIN_CHALLENGE_TTL_MS) {
-          spinChallenges.delete(challengeToken);
+        if (consumed.status === "expired") {
           res.status(403).json({ error: "Spin challenge expired — please spin again" }); return;
         }
-        if (age < SPIN_CHALLENGE_MIN_MS) {
+        if (consumed.status === "too_early") {
           res.status(425).json({
             error: "Spin completed too quickly",
-            retryAfterMs: SPIN_CHALLENGE_MIN_MS - age,
+            retryAfterMs: consumed.retryAfterMs,
           }); return;
         }
-
-        // Consume challenge — single use (in-memory, done before the transaction)
-        spinChallenges.delete(challengeToken);
 
         const config = ACTION_CONFIG.spin;
 

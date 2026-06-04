@@ -1,28 +1,18 @@
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { logger } from "./logger";
 
-// A single server-issued spin-challenge token kept in the in-memory store.
-export interface SpinChallenge {
-  userId: string;
-  issuedAt: number;
-}
-
-// Sweeps expired spin-challenge tokens out of the in-memory store.
-// Mirrors the search-challenge sweep treatment: removes expired entries,
-// logs how many were removed, and never throws (errors -> WARN, no crash).
-export function runSpinChallengeSweep(
-  store: Map<string, SpinChallenge>,
-  ttlMs: number,
-  now: number = Date.now(),
-): number {
+// DB-backed expiry sweep for the shared `spin_challenges` table.
+// Deletes rows whose expires_at is in the past so the shared store doesn't
+// accumulate stale challenge tokens across the autoscaled fleet. Mirrors the
+// login_attempts prune treatment: logs how many were removed (INFO) and never
+// throws (errors -> WARN, returns 0).
+export async function runSpinChallengeSweep(): Promise<number> {
   try {
-    const cutoff = now - ttlMs;
-    let removed = 0;
-    for (const [token, challenge] of store) {
-      if (challenge.issuedAt < cutoff) {
-        store.delete(token);
-        removed++;
-      }
-    }
+    const result = await db.execute(sql`
+      DELETE FROM spin_challenges WHERE expires_at < NOW() RETURNING token
+    `);
+    const removed = result.rows.length;
     if (removed > 0) {
       logger.info({ removed }, "spin challenge startup sweep complete");
     }
