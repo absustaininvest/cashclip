@@ -587,14 +587,20 @@ export async function setWeeklyMissionProgress(missionId: string, value: number)
   await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
 }
 
-export async function claimMissionReward(missionId: string, isWeekly: boolean = false): Promise<number> {
+// Marks a completed mission as claimed in LOCAL UI state only (flips the card to
+// "claimed"). It deliberately does NOT credit the balance: mission rewards are
+// now issued server-side via POST /api/missions/claim (earn-client.claimMission),
+// which verifies completion from trusted records and adds a real pending token.
+// Returns the mission's display-point reward figure (for UI), or 0 if there was
+// nothing to claim (already claimed / not completed / not found) — keeping the
+// idempotent "claim once" contract.
+export async function markMissionClaimed(missionId: string, isWeekly: boolean = false): Promise<number> {
   if (isWeekly) {
     const missions = await getWeeklyMissions();
     const mission = missions.find((m) => m.id === missionId);
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.WEEKLY_MISSIONS, JSON.stringify(missions));
-      await addEarnings(displayPointsToDollars(mission.reward), `Weekly mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   } else {
@@ -603,7 +609,6 @@ export async function claimMissionReward(missionId: string, isWeekly: boolean = 
     if (mission && mission.completed && !mission.claimed) {
       mission.claimed = true;
       await AsyncStorage.setItem(KEYS.MISSIONS, JSON.stringify(missions));
-      await addEarnings(displayPointsToDollars(mission.reward), `Mission: ${mission.title}`, "mission");
       return mission.reward;
     }
   }

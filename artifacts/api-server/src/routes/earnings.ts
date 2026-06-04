@@ -63,6 +63,22 @@ function utcDayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// ── WEEKLY PERIOD KEYS ────────────────────────────────────────────────────────
+// Weekly missions reset on calendar-year week buckets (7-day windows counted
+// from Jan 1 UTC), matching the client's getCurrentWeekStartMs so server
+// verification and the on-screen weekly cards agree on where "this week" starts.
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+function weekStartUtc(now: Date): Date {
+  const jan1 = Date.UTC(now.getUTCFullYear(), 0, 1);
+  const weekIndex = Math.max(1, Math.ceil((now.getTime() - jan1) / ONE_WEEK_MS));
+  return new Date(jan1 + (weekIndex - 1) * ONE_WEEK_MS);
+}
+function weekKey(now: Date): string {
+  const jan1 = Date.UTC(now.getUTCFullYear(), 0, 1);
+  const weekIndex = Math.max(1, Math.ceil((now.getTime() - jan1) / ONE_WEEK_MS));
+  return `${now.getUTCFullYear()}-W${weekIndex}`;
+}
+
 // Given the previous check-in time + stored streak, returns the streak value
 // THIS check-in should produce. Continues the streak only when the last check-in
 // was the immediately preceding UTC day; otherwise restarts at 1.
@@ -132,10 +148,11 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
 // Clients submitting these via POST /api/earnings/record are rejected with 403.
 //
 // rewarded_ad  — only via GET /api/admob/ssv (ECDSA-SHA256 verified by Google)
-// mission_daily/mission_weekly — no server-side mission state exists yet; block
-//   until a proper /api/missions/claim endpoint with server-tracked mission
-//   completion is implemented. Clients currently call claimMissionReward() which
-//   only updates AsyncStorage, providing no server-verifiable proof.
+// mission_daily/mission_weekly — only via POST /api/missions/claim, which
+//   recomputes mission completion from trusted server records (issued checkin /
+//   rewarded_ad / spin earn tokens, credited referrals) and issues an earn token
+//   at most once per mission per period. Accepting them through /record would
+//   trust an unverifiable client claim, so they stay blocked here.
 // game/video — no server-verifiable proof exists for these action types.
 //   Neither action type is currently issued by any mobile app code path.
 const SERVER_ONLY_ACTIONS = new Set([
@@ -149,6 +166,92 @@ const SERVER_ONLY_ACTIONS = new Set([
   // direct-minting bypass; the spin wheel calls the begin/complete flow.
   "spin",
 ]);
+
+// ── DAILY / WEEKLY MISSIONS (server-verified) ─────────────────────────────────
+// Mission completion is derived from TRUSTED server records only — never from a
+// client claim — so a tampered/rooted device can't mint mission points. Each
+// mission's progress is recomputed at claim time from durable signals (issued
+// checkin / rewarded_ad / spin earn tokens, credited referrals). Missions with
+// no server-verifiable signal (browsing videos, sharing a code) have verify=null:
+// they can't be credited server-side (and were never credited server-side
+// before — /record already rejected them).
+//
+// Reward per claimed mission is the Phase-3 server-authoritative amount from
+// ACTION_CONFIG (mission_daily = 100 pts, mission_weekly = 500 pts). Idempotency
+// is enforced by a per-mission, per-period transactionId on the earn token
+// (UNIQUE earn_tokens_txn_id_idx), so claiming the same mission twice in a period
+// credits exactly once — mirroring the survey_profile one-time bonus pattern.
+type MissionTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+interface MissionVerifyCtx { tx: MissionTx; userId: string; periodStart: Date; }
+interface MissionSpec {
+  period: "daily" | "weekly";
+  target: number;
+  actionType: "mission_daily" | "mission_weekly";
+  // Verified progress from trusted records, or null if not server-verifiable.
+  verify: ((ctx: MissionVerifyCtx) => Promise<number>) | null;
+}
+
+async function countActionTokensSince(
+  tx: MissionTx,
+  userId: string,
+  actionType: string,
+  since: Date,
+): Promise<number> {
+  const [row] = await tx
+    .select({ c: count() })
+    .from(earnTokens)
+    .where(and(
+      eq(earnTokens.userId, userId),
+      eq(earnTokens.actionType, actionType),
+      gte(earnTokens.earnedAt, since),
+    ));
+  return Number(row?.c ?? 0);
+}
+
+// Friends referred by this user who became CREDITED (cashed out the qualifying
+// amount) within the current week — the same trusted signal that pays the
+// referral bonus, never a client guess.
+async function verifyWeeklyReferrals(ctx: MissionVerifyCtx): Promise<number> {
+  const [me] = await ctx.tx
+    .select({ username: users.username })
+    .from(users)
+    .where(eq(users.id, ctx.userId));
+  if (!me?.username) return 0;
+  const [row] = await ctx.tx
+    .select({ c: count() })
+    .from(users)
+    .where(and(
+      eq(users.referredBy, me.username),
+      gte(users.referralCreditedAt, ctx.periodStart),
+    ));
+  return Number(row?.c ?? 0);
+}
+
+// Distinct UTC days this week on which the user earned a (server-issued) check-in
+// token — the streak signal is the durable token record, not a local counter.
+async function verifyWeeklyStreak(ctx: MissionVerifyCtx): Promise<number> {
+  const [row] = await ctx.tx
+    .select({ days: sql<string>`COUNT(DISTINCT ((${earnTokens.earnedAt} AT TIME ZONE 'UTC')::date))` })
+    .from(earnTokens)
+    .where(and(
+      eq(earnTokens.userId, ctx.userId),
+      eq(earnTokens.actionType, "checkin"),
+      gte(earnTokens.earnedAt, ctx.periodStart),
+    ));
+  return Number(row?.days ?? 0);
+}
+
+const MISSION_CONFIG: Record<string, MissionSpec> = {
+  daily_checkin:    { period: "daily",  target: 1,  actionType: "mission_daily",  verify: (c) => countActionTokensSince(c.tx, c.userId, "checkin", c.periodStart) },
+  watch_ads:        { period: "daily",  target: 5,  actionType: "mission_daily",  verify: (c) => countActionTokensSince(c.tx, c.userId, "rewarded_ad", c.periodStart) },
+  daily_spin:       { period: "daily",  target: 1,  actionType: "mission_daily",  verify: (c) => countActionTokensSince(c.tx, c.userId, "spin", c.periodStart) },
+  watch_videos:     { period: "daily",  target: 10, actionType: "mission_daily",  verify: null },
+  refer_friends:    { period: "daily",  target: 1,  actionType: "mission_daily",  verify: null },
+  weekly_ads:       { period: "weekly", target: 50, actionType: "mission_weekly", verify: (c) => countActionTokensSince(c.tx, c.userId, "rewarded_ad", c.periodStart) },
+  weekly_videos:    { period: "weekly", target: 50, actionType: "mission_weekly", verify: null },
+  weekly_referrals: { period: "weekly", target: 3,  actionType: "mission_weekly", verify: verifyWeeklyReferrals },
+  weekly_streak:    { period: "weekly", target: 7,  actionType: "mission_weekly", verify: verifyWeeklyStreak },
+};
 
 // ── SPIN CHALLENGE STORE ──────────────────────────────────────────────────────
 // Server-issued single-use challenge tokens for the spin wheel.
@@ -244,6 +347,17 @@ export function registerEarningsRoutes(app: Express): void {
     legacyHeaders: false,
     keyGenerator: (req) => (req as AuthRequest).userId ?? "anon",
     message: { error: "Too many claim requests — try again later" },
+  });
+
+  // 30 mission-claim requests per hour per user — enough to claim every daily +
+  // weekly mission (and retry) without allowing claim-hammering.
+  const missionLimit = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => (req as AuthRequest).userId ?? "anon",
+    message: { error: "Too many mission claims — try again later" },
   });
 
   // ── POST /api/earnings/record ───────────────────────────────────────────────
@@ -814,6 +928,134 @@ export function registerEarningsRoutes(app: Express): void {
       } catch (err) {
         logger.error({ err }, "earnings/checkin-status error");
         res.status(500).json({ error: "Failed to load check-in status" });
+      }
+    },
+  );
+
+  // ── POST /api/missions/claim ────────────────────────────────────────────────
+  // Server-verified daily/weekly mission claim. Mission completion is recomputed
+  // from trusted server records (issued earn tokens, credited referrals) — never
+  // trusted from the client — and an earn token is issued at most once per mission
+  // per period (idempotent via a per-mission/period transactionId). Missions with
+  // no server-verifiable signal return 422 and never credit.
+  app.post(
+    "/api/missions/claim",
+    authMiddleware,
+    missionLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { missionId } = req.body as { missionId?: unknown };
+        if (typeof missionId !== "string" || !(missionId in MISSION_CONFIG)) {
+          res.status(400).json({ error: "Unknown mission" });
+          return;
+        }
+        const spec = MISSION_CONFIG[missionId];
+        if (!spec.verify) {
+          res.status(422).json({
+            error: "This mission isn't server-verifiable, so it can't be claimed for points.",
+            verifiable: false,
+          });
+          return;
+        }
+        const config = ACTION_CONFIG[spec.actionType];
+
+        type MissionResult =
+          | { ok: true; alreadyClaimed: boolean; tokenId: string; points: number; actionType: string; claimableAt: string }
+          | { ok: false; status: number; body: Record<string, unknown> };
+
+        const result: MissionResult = await db.transaction(async (tx: MissionTx) => {
+          // Serialize concurrent claims for this user so the idempotency check and
+          // insert can't race into a duplicate token.
+          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
+
+          const now = new Date();
+          const dayStart = new Date(now);
+          dayStart.setUTCHours(0, 0, 0, 0);
+          const periodStart = spec.period === "weekly" ? weekStartUtc(now) : dayStart;
+          const periodKey = spec.period === "weekly" ? weekKey(now) : utcDayKey(now);
+          const claimKey = `mission:${missionId}:${req.userId!}:${periodKey}`;
+
+          // Idempotency: already claimed this mission this period?
+          const [existing] = await tx
+            .select({ id: earnTokens.id, points: earnTokens.points, claimableAt: earnTokens.claimableAt })
+            .from(earnTokens)
+            .where(eq(earnTokens.transactionId, claimKey))
+            .limit(1);
+          if (existing) {
+            return {
+              ok: true,
+              alreadyClaimed: true,
+              tokenId: existing.id,
+              points: existing.points,
+              actionType: spec.actionType,
+              claimableAt: existing.claimableAt.toISOString(),
+            };
+          }
+
+          // Verify genuine completion from trusted records.
+          const progress = await spec.verify!({ tx, userId: req.userId!, periodStart });
+          if (progress < spec.target) {
+            return {
+              ok: false,
+              status: 409,
+              body: { error: "Mission not completed yet", progress, target: spec.target },
+            };
+          }
+
+          // Daily cap on the mission action type (defence in depth).
+          const todayCount = await countActionTokensSince(tx, req.userId!, spec.actionType, dayStart);
+          if (todayCount >= config.dailyCap) {
+            return {
+              ok: false,
+              status: 429,
+              body: { error: `Daily limit reached for ${spec.actionType}`, cap: config.dailyCap, used: todayCount },
+            };
+          }
+
+          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+          const snapshot = await snapshotRateString();
+          const [token] = await tx
+            .insert(earnTokens)
+            .values({
+              userId:              req.userId!,
+              points:              config.points!,
+              actionType:          spec.actionType,
+              description:         `Mission: ${missionId}`,
+              earnedAt:            now,
+              claimableAt,
+              status:              "pending",
+              transactionId:       claimKey,
+              usdPerPointSnapshot: snapshot,
+            })
+            .returning();
+
+          return {
+            ok: true,
+            alreadyClaimed: false,
+            tokenId: token.id,
+            points: config.points!,
+            actionType: spec.actionType,
+            claimableAt: claimableAt.toISOString(),
+          };
+        });
+
+        if (!result.ok) {
+          res.status(result.status).json(result.body);
+          return;
+        }
+        if (!result.alreadyClaimed) {
+          logger.info({ userId: req.userId, missionId, points: result.points }, "mission claim earn token issued");
+        }
+        res.status(result.alreadyClaimed ? 200 : 201).json({
+          tokenId:        result.tokenId,
+          points:         result.points,
+          actionType:     result.actionType,
+          claimableAt:    result.claimableAt,
+          alreadyClaimed: result.alreadyClaimed,
+        });
+      } catch (err) {
+        logger.error({ err }, "missions/claim error");
+        res.status(500).json({ error: "Failed to claim mission" });
       }
     },
   );

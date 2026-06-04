@@ -79,6 +79,48 @@ export async function recordEarnAction(
   }
 }
 
+// ── CLAIM A DAILY / WEEKLY MISSION (server-verified) ──────────────────────────
+// The server recomputes mission completion from trusted records and issues the
+// earn token (server sets the amount). On success the token is stored locally so
+// it shows up in the pending wallet, exactly like every other earn action. The
+// client no longer credits mission rewards on its own.
+//   ok=true,  token        → a new server-issued token (real, pending credit)
+//   ok=true,  alreadyClaimed→ already claimed this period (idempotent, no token)
+//   ok=false, verifiable=false → mission has no server-verifiable signal
+//   ok=false                → not completed yet / capped / offline
+export interface ClaimMissionResult {
+  ok: boolean;
+  token?: EarnToken;
+  alreadyClaimed?: boolean;
+  verifiable?: boolean;
+  error?: string;
+}
+
+export async function claimMission(missionId: string): Promise<ClaimMissionResult> {
+  try {
+    const res = await apiRequest("POST", "/api/missions/claim", { missionId });
+    const data = await res.json().catch(() => ({} as any));
+    if (!res.ok) {
+      return { ok: false, verifiable: data?.verifiable, error: data?.error };
+    }
+    if (data.alreadyClaimed) {
+      return { ok: true, alreadyClaimed: true };
+    }
+    const token: EarnToken = {
+      id:          data.tokenId,
+      points:      data.points,
+      actionType:  data.actionType ?? "mission",
+      description: `Mission: ${missionId}`,
+      earnedAt:    Date.now(),
+      claimableAt: new Date(data.claimableAt).getTime(),
+    };
+    await storeTokenLocally(token);
+    return { ok: true, token };
+  } catch {
+    return { ok: false };
+  }
+}
+
 // ── DAILY CHECK-IN (server-authoritative streak) ─────────────────────────────
 // The check-in streak and its scaled reward live entirely on the server. The
 // client records the check-in and reads the resulting streak/ladder back so the

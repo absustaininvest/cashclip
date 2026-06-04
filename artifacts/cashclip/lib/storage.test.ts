@@ -24,7 +24,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 vi.mock("./admob", () => ({ maybeShowInterstitial: vi.fn(async () => {}) }));
 
 import {
-  claimMissionReward,
+  markMissionClaimed,
   recordGamePlay,
   getUserStats,
   getDailyMissions,
@@ -60,8 +60,8 @@ beforeEach(() => {
 // but the optimistic local dollar balance must be credited via displayPointsToDollars
 // — NOT the cash adapter. If someone swaps the adapter, the dollar amounts below
 // move by 10x and these tests fail.
-describe("mission reward stored in display points credits the right local dollars", () => {
-  it("credits a claimed daily mission's display-point reward as its dollar-equivalent", async () => {
+describe("marking a mission claimed flips local UI state without crediting the balance", () => {
+  it("flips a completed daily mission to claimed but never moves the local balance", async () => {
     // Seed today's missions with a completed-but-unclaimed mission worth 1000 display pts.
     const today = new Date().toDateString();
     const missions = await getDailyMissions();
@@ -74,16 +74,19 @@ describe("mission reward stored in display points credits the right local dollar
 
     expect(await getBalance()).toBe(0);
 
-    const returnedPoints = await claimMissionReward("daily_checkin", false);
+    const returnedPoints = await markMissionClaimed("daily_checkin", false);
 
-    // claimMissionReward returns the DISPLAY points figure...
+    // It returns the DISPLAY points figure for the UI...
     expect(returnedPoints).toBe(1000);
-    // ...but the local cash balance moves by the dollar-equivalent (1000 / 10000 = $0.10).
-    expect(await getBalance()).toBeCloseTo(displayPointsToDollars(1000), 10);
-    expect(await getBalance()).toBeCloseTo(0.1, 10);
+    // ...but the balance is server-authoritative now, so the local mark must NOT
+    // move it. Real credit arrives via POST /api/missions/claim (a pending token).
+    expect(await getBalance()).toBe(0);
+    // The card is flipped to claimed in local storage.
+    const after = await getDailyMissions();
+    expect(after.find((m) => m.id === "daily_checkin")!.claimed).toBe(true);
   });
 
-  it("does not credit a mission that is not completed", async () => {
+  it("does not flip a mission that is not completed", async () => {
     const today = new Date().toDateString();
     const missions = await getDailyMissions();
     const target = missions.find((m) => m.id === "daily_checkin")!;
@@ -93,12 +96,14 @@ describe("mission reward stored in display points credits the right local dollar
     store.set(MISSIONS_DATE_KEY, today);
     store.set(MISSIONS_KEY, JSON.stringify(missions));
 
-    const returnedPoints = await claimMissionReward("daily_checkin", false);
+    const returnedPoints = await markMissionClaimed("daily_checkin", false);
     expect(returnedPoints).toBe(0);
     expect(await getBalance()).toBe(0);
+    const after = await getDailyMissions();
+    expect(after.find((m) => m.id === "daily_checkin")!.claimed).toBe(false);
   });
 
-  it("is idempotent — claiming twice only credits once", async () => {
+  it("is idempotent — marking twice flips once and never credits", async () => {
     const today = new Date().toDateString();
     const missions = await getDailyMissions();
     const target = missions.find((m) => m.id === "watch_ads")!;
@@ -108,13 +113,13 @@ describe("mission reward stored in display points credits the right local dollar
     store.set(MISSIONS_DATE_KEY, today);
     store.set(MISSIONS_KEY, JSON.stringify(missions));
 
-    const first = await claimMissionReward("watch_ads", false);
-    const second = await claimMissionReward("watch_ads", false);
+    const first = await markMissionClaimed("watch_ads", false);
+    const second = await markMissionClaimed("watch_ads", false);
 
     expect(first).toBe(1500);
     expect(second).toBe(0);
-    expect(await getBalance()).toBeCloseTo(displayPointsToDollars(1500), 10);
-    expect(await getBalance()).toBeCloseTo(0.15, 10);
+    // No local crediting in either call.
+    expect(await getBalance()).toBe(0);
   });
 });
 

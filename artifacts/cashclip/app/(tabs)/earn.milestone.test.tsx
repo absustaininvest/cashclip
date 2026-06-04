@@ -135,13 +135,14 @@ vi.mock("@/lib/storage", () => ({
   getDailyCheckinInfo: vi.fn(async () => ({ checkedInToday: false, checkinStreak: 6 })),
   getDailyMissions: vi.fn(async () => []),
   getWeeklyMissions: vi.fn(async () => []),
-  claimMissionReward: vi.fn(async () => 0),
+  markMissionClaimed: vi.fn(async () => 0),
 }));
 
 // recordCheckin is the lever the tests pull: its milestoneBonus decides the modal.
 const recordCheckin = vi.fn();
 vi.mock("@/lib/earn-client", () => ({
   recordEarnAction: vi.fn(async () => null),
+  claimMission: vi.fn(async () => ({ ok: true })),
   recordCheckin: (...args: any[]) => recordCheckin(...args),
   fetchCheckinStatus: vi.fn(async () => ({
     checkinStreak: 6,
@@ -167,7 +168,39 @@ vi.mock("@/lib/earn-client", () => ({
 }));
 
 import EarnScreen from "./earn";
-import { fetchCheckinStatus } from "@/lib/earn-client";
+import { fetchCheckinStatus, claimMission } from "@/lib/earn-client";
+import { getDailyMissions, markMissionClaimed } from "@/lib/storage";
+import { Alert } from "react-native";
+
+const claimMissionMock = claimMission as unknown as ReturnType<typeof vi.fn>;
+const getDailyMissionsMock = getDailyMissions as unknown as ReturnType<typeof vi.fn>;
+const markMissionClaimedMock = markMissionClaimed as unknown as ReturnType<typeof vi.fn>;
+const alertMock = Alert.alert as unknown as ReturnType<typeof vi.fn>;
+
+const COMPLETED_DAILY_MISSION = {
+  id: "daily_checkin",
+  title: "Daily Check-in",
+  description: "Check in today",
+  icon: "check",
+  reward: 1000,
+  progress: 1,
+  target: 1,
+  completed: true,
+  claimed: false,
+};
+
+// Press the daily mission's "+N pts" claim button (the only element wired to the
+// mission claim handler). Find its Text and walk up to the pressable owner.
+function pressMissionClaim(root: TestRenderer.ReactTestInstance) {
+  const label = root.findAll(
+    (n) => Array.isArray(n.props.children) && n.props.children[0] === "+",
+  )[0];
+  if (!label) throw new Error("Mission claim button not found");
+  let cur: any = label;
+  while (cur && typeof cur.props?.onPress !== "function") cur = cur.parent;
+  if (!cur) throw new Error("Mission claim pressable not found");
+  return cur.props.onPress();
+}
 
 const fetchCheckinStatusMock = fetchCheckinStatus as unknown as ReturnType<
   typeof vi.fn
@@ -371,5 +404,58 @@ describe("Earn screen check-in button locks after checking in", () => {
     await flush();
 
     expect(recordCheckin).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Earn screen mission claim is gated on the server", () => {
+  beforeEach(() => {
+    claimMissionMock.mockReset();
+    markMissionClaimedMock.mockReset();
+    markMissionClaimedMock.mockResolvedValue(undefined);
+    alertMock.mockClear();
+    getDailyMissionsMock.mockResolvedValue([{ ...COMPLETED_DAILY_MISSION }]);
+  });
+
+  it("does NOT flip the mission to claimed when the server rejects the claim", async () => {
+    claimMissionMock.mockResolvedValue({
+      ok: false,
+      error: "Mission not completed yet.",
+    });
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(EarnScreen));
+    });
+    await flush();
+
+    await act(async () => {
+      await pressMissionClaim(tr.root);
+    });
+    await flush();
+
+    expect(claimMissionMock).toHaveBeenCalledWith("daily_checkin");
+    // The regression guard: a rejected claim must never mark the card claimed.
+    expect(markMissionClaimedMock).not.toHaveBeenCalled();
+    // And the user is told why.
+    expect(alertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the mission claimed only after the server accepts the claim", async () => {
+    claimMissionMock.mockResolvedValue({ ok: true, alreadyClaimed: false });
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(EarnScreen));
+    });
+    await flush();
+
+    await act(async () => {
+      await pressMissionClaim(tr.root);
+    });
+    await flush();
+
+    expect(claimMissionMock).toHaveBeenCalledWith("daily_checkin");
+    expect(markMissionClaimedMock).toHaveBeenCalledWith("daily_checkin", false);
+    expect(alertMock).not.toHaveBeenCalled();
   });
 });

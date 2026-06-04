@@ -51,13 +51,14 @@ import {
   getDailyCheckinInfo,
   getDailyMissions,
   getWeeklyMissions,
-  claimMissionReward,
+  markMissionClaimed,
   type UserStats,
   type DailyMission,
   type WeeklyMission,
 } from "@/lib/storage";
 import {
   recordEarnAction,
+  claimMission,
   recordCheckin,
   fetchCheckinStatus,
   beginSpin,
@@ -71,10 +72,27 @@ import {
   formatCountdown,
   pointsToUsd,
   type PendingState,
+  type ClaimMissionResult,
 } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DAILY_GOAL = 20;
+
+// Explain to the user why a server-rejected mission claim didn't credit, so a
+// failed claim is visible rather than silently swallowed.
+function notifyMissionClaimFailed(result: ClaimMissionResult): void {
+  if (result.verifiable === false) {
+    Alert.alert(
+      "Not claimable",
+      "This mission can't be claimed for a points reward.",
+    );
+    return;
+  }
+  Alert.alert(
+    "Couldn't claim yet",
+    result.error ?? "This mission isn't ready to claim yet — keep going!",
+  );
+}
 
 // Visual-only wheel segments — actual reward is server-issued after spin
 const WHEEL_SEGMENTS = [
@@ -876,11 +894,16 @@ export default function EarnScreen() {
   const handleClaimDaily = useCallback(
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await claimMissionReward(id, false);
-      // Mission server credit is pending a proper /api/missions/claim endpoint
-      // that validates server-side mission completion state before crediting.
-      // recordEarnAction("mission_daily") is intentionally removed — the server
-      // now rejects it (no verifiable proof) to prevent fraudulent minting.
+      // Real credit is server-verified: the API recomputes completion from trusted
+      // records and issues a pending earn token (or rejects it). Only flip the card
+      // to "claimed" when the server accepts the claim — never optimistically — so a
+      // rejected claim stays claimable and the user sees why.
+      const result = await claimMission(id);
+      if (result.ok) {
+        await markMissionClaimed(id, false);
+      } else {
+        notifyMissionClaimFailed(result);
+      }
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),
@@ -893,11 +916,16 @@ export default function EarnScreen() {
   const handleClaimWeekly = useCallback(
     async (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await claimMissionReward(id, true);
-      // Mission server credit is pending a proper /api/missions/claim endpoint
-      // that validates server-side mission completion state before crediting.
-      // recordEarnAction("mission_weekly") is intentionally removed — the server
-      // now rejects it (no verifiable proof) to prevent fraudulent minting.
+      // Real credit is server-verified: the API recomputes completion from trusted
+      // records and issues a pending earn token (or rejects it). Only flip the card
+      // to "claimed" when the server accepts the claim — never optimistically — so a
+      // rejected claim stays claimable and the user sees why.
+      const result = await claimMission(id);
+      if (result.ok) {
+        await markMissionClaimed(id, true);
+      } else {
+        notifyMissionClaimFailed(result);
+      }
       await loadAll();
       balancePulse.value = withSequence(
         withSpring(1.1, { damping: 4 }),
