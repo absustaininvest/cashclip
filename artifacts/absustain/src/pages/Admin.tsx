@@ -1368,6 +1368,8 @@ function InboxPanel({ token }: { token: string }) {
   const [replySent, setReplySent] = useState(false);
   const [replyHistory, setReplyHistory] = useState<SupportReplyRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const openReply = useCallback(() => {
     setReplyOpen(true);
@@ -1380,9 +1382,12 @@ function InboxPanel({ token }: { token: string }) {
     async (messageId: string) => {
       if (!messageId) {
         setReplyHistory([]);
+        setHistoryError("");
+        setHistoryLoaded(true);
         return;
       }
       setHistoryLoading(true);
+      setHistoryError("");
       try {
         const res = await fetch(
           `/api/admin/inbox/replies?inReplyTo=${encodeURIComponent(messageId)}`,
@@ -1391,8 +1396,10 @@ function InboxPanel({ token }: { token: string }) {
         if (!res.ok) throw new Error("Failed to load reply history");
         const data = await res.json();
         setReplyHistory(data.replies ?? []);
+        setHistoryLoaded(true);
       } catch {
         setReplyHistory([]);
+        setHistoryError("Couldn't load prior replies for this thread.");
       } finally {
         setHistoryLoading(false);
       }
@@ -1401,10 +1408,12 @@ function InboxPanel({ token }: { token: string }) {
   );
 
   useEffect(() => {
+    setHistoryLoaded(false);
     if (selected?.messageId) {
       fetchReplyHistory(selected.messageId);
     } else {
       setReplyHistory([]);
+      setHistoryError("");
     }
   }, [selected?.messageId, fetchReplyHistory]);
 
@@ -1704,8 +1713,7 @@ function InboxPanel({ token }: { token: string }) {
                 <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">
                   {selected.body || selected.preview || "(No body content)"}
                 </p>
-                {(historyLoading || replyHistory.length > 0) && (
-                  <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
+                <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
                     <div className="flex items-center gap-2 text-white/40 text-xs font-semibold uppercase tracking-wide">
                       <Mail className="w-3.5 h-3.5" />
                       Reply History
@@ -1719,6 +1727,15 @@ function InboxPanel({ token }: { token: string }) {
                       <div className="flex items-center gap-2 text-white/30 text-xs">
                         <RefreshCw className="w-3 h-3 animate-spin" />
                         Loading prior replies…
+                      </div>
+                    ) : historyError ? (
+                      <div className="flex items-start gap-2 text-amber-400/80 text-xs">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span>{historyError}</span>
+                      </div>
+                    ) : historyLoaded && replyHistory.length === 0 ? (
+                      <div className="text-white/30 text-xs">
+                        No prior replies to this thread yet.
                       </div>
                     ) : (
                       replyHistory.map((r) => (
@@ -1746,7 +1763,6 @@ function InboxPanel({ token }: { token: string }) {
                       ))
                     )}
                   </div>
-                )}
               </div>
               <div className="px-5 py-3 border-t border-white/[0.06] space-y-3">
                 {replySent && !replyOpen && (
