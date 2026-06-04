@@ -117,6 +117,40 @@ export const rewardSessions = pgTable(
   })
 );
 
+// Verified-but-uncredited provider completions. When a survey/offerwall
+// webhook passes signature verification but no matching pending reward session
+// exists (TTL expiry, id mismatch, duplicate, or the user never started a
+// session), the completion would otherwise be silently dropped with a 200 OK.
+// We persist it here instead so earnings can be reconciled and the user made
+// whole. NEVER stores secrets — only the provider-supplied completion metadata.
+export const unsettledCompletions = pgTable(
+  "unsettled_completions",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    source: text("source").notNull(), // 'survey' | 'offerwall'
+    provider: text("provider").notNull(),
+    // Provider-supplied external user id. Stored as plain text (NOT a FK) so an
+    // unmatched/garbage id never throws away the audit record.
+    userId: text("user_id").notNull(),
+    externalId: text("external_id").notNull(),
+    providerTransactionId: text("provider_transaction_id"),
+    rewardValue: numeric("reward_value", { precision: 8, scale: 2 }),
+    reason: text("reason").notNull(),
+    resolved: boolean("resolved").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    createdAtIdx: index("unsettled_completions_created_at_idx").on(t.createdAt),
+    providerIdx: index("unsettled_completions_provider_idx").on(t.provider, t.createdAt),
+    unresolvedIdx: index("unsettled_completions_unresolved_idx").on(t.resolved, t.createdAt),
+  })
+);
+
+export type UnsettledCompletion = typeof unsettledCompletions.$inferSelect;
+export type InsertUnsettledCompletion = typeof unsettledCompletions.$inferInsert;
+
 export const leads = pgTable(
   "leads",
   {

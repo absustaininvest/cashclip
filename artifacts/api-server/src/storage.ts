@@ -14,6 +14,7 @@ import {
   earningsLedger,
   earnTokens,
   rewardSessions,
+  unsettledCompletions,
   adEvents,
   webhookAudit,
   securityAuditLog,
@@ -229,6 +230,16 @@ export interface IStorage {
     totalEarned: number;
     reward: number;
   } | { conflict: "duplicate" } | { conflict: "not_claimable" }>;
+
+  recordUnsettledCompletion(args: {
+    source: "survey" | "offerwall";
+    provider: string;
+    userId: string;
+    externalId: string;
+    providerTransactionId?: string | null;
+    rewardValue?: number | null;
+    reason: string;
+  }): Promise<void>;
 
   insertWebhookAudit(entry: InsertWebhookAuditEntry): Promise<WebhookAuditEntry>;
   countWebhookAuditByIp(ip: string, since: Date): Promise<number>;
@@ -1116,6 +1127,34 @@ export class DatabaseStorage implements IStorage {
       )
       .limit(1);
     return s;
+  }
+
+  async recordUnsettledCompletion(args: {
+    source: "survey" | "offerwall";
+    provider: string;
+    userId: string;
+    externalId: string;
+    providerTransactionId?: string | null;
+    rewardValue?: number | null;
+    reason: string;
+  }): Promise<void> {
+    try {
+      const reward =
+        args.rewardValue != null && Number.isFinite(args.rewardValue)
+          ? args.rewardValue.toFixed(2)
+          : null;
+      await db.insert(unsettledCompletions).values({
+        source: args.source,
+        provider: args.provider,
+        userId: args.userId,
+        externalId: args.externalId,
+        providerTransactionId: args.providerTransactionId ?? null,
+        rewardValue: reward,
+        reason: args.reason,
+      });
+    } catch {
+      // Best-effort reconciliation record — never throw from the webhook path.
+    }
   }
 
   async completeRewardSessionAtomic(sessionToken: string, userId: string): Promise<RewardSession | undefined> {

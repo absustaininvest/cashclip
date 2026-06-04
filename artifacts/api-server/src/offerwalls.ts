@@ -223,11 +223,11 @@ export function registerOfferwallRoutes(app: Express): void {
     offerId: string,
     rewardValue: number | undefined,
     logPrefix: string,
-  ) {
+  ): Promise<boolean> {
     try {
       const session = await storage.findPendingRewardSession(userId, "offerwall", offerId);
       if (!session) {
-        return;
+        return false;
       }
       const rawReward = rewardValue ?? parseFloat(session.expectedReward);
       const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
@@ -239,8 +239,29 @@ export function registerOfferwallRoutes(app: Express): void {
         description: `Offer completed via ${provider} webhook`,
         finalReward: clampedReward,
       });
+      return true;
     } catch (err) {
+      return false;
     }
+  }
+
+  // Persist a verified offerwall completion that could not be credited (no
+  // pending session: TTL expiry, id mismatch, dup, or user never started one)
+  // so it can be reconciled instead of silently dropped with a 200 OK.
+  async function recordUnsettledOffer(
+    provider: OfferwallProviderKey,
+    userId: string,
+    offerId: string,
+    rewardValue: number | undefined,
+  ): Promise<void> {
+    await storage.recordUnsettledCompletion({
+      source: "offerwall",
+      provider,
+      userId,
+      externalId: offerId,
+      rewardValue: typeof rewardValue === "number" && Number.isFinite(rewardValue) ? rewardValue : null,
+      reason: "no_pending_session",
+    });
   }
 
   app.get("/api/offerwalls/webhook/tapjoy", webhookRateLimiter, async (req: Request, res: Response) => {
@@ -256,13 +277,16 @@ export function registerOfferwallRoutes(app: Express): void {
     if (offerId && userId) {
       // Do not use Tapjoy's `currency` field as a USD reward — it's virtual currency points.
       // Fall back to session.expectedReward (server-set USD value from offer listing).
-      await creditOfferViaWebhook(
+      const credited = await creditOfferViaWebhook(
         "tapjoy",
         String(userId),
         `tapjoy_${String(offerId)}`,
         undefined,
         "[Tapjoy Webhook]",
       );
+      if (!credited) {
+        await recordUnsettledOffer("tapjoy", String(userId), `tapjoy_${String(offerId)}`, undefined);
+      }
     }
     res.status(200).send("1");
   });
@@ -276,13 +300,16 @@ export function registerOfferwallRoutes(app: Express): void {
     const { offer_id, user_id, payout, status } = req.body;
     if (status === "completed" && offer_id && user_id) {
       const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
-      await creditOfferViaWebhook(
+      const credited = await creditOfferViaWebhook(
         "adgate",
         String(user_id),
         `adgate_${offer_id}`,
         Number.isFinite(reward) ? reward : undefined,
         "[AdGate Webhook]",
       );
+      if (!credited) {
+        await recordUnsettledOffer("adgate", String(user_id), `adgate_${offer_id}`, Number.isFinite(reward) ? reward : undefined);
+      }
     }
     res.status(200).json({ status: "received" });
   });
@@ -296,13 +323,16 @@ export function registerOfferwallRoutes(app: Express): void {
     const { offer_id, user_id, payout } = req.body;
     if (offer_id && user_id) {
       const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
-      await creditOfferViaWebhook(
+      const credited = await creditOfferViaWebhook(
         "offertoro",
         String(user_id),
         `offertoro_${offer_id}`,
         Number.isFinite(reward) ? reward : undefined,
         "[OfferToro Webhook]",
       );
+      if (!credited) {
+        await recordUnsettledOffer("offertoro", String(user_id), `offertoro_${offer_id}`, Number.isFinite(reward) ? reward : undefined);
+      }
     }
     res.status(200).json({ status: "1" });
   });
