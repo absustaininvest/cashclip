@@ -2149,7 +2149,7 @@ export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
   );
 }
 
-function CashClipUsersPanel({ token }: { token: string }) {
+export function CashClipUsersPanel({ token }: { token: string }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
