@@ -6,85 +6,77 @@ export function Scene1() {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 200), // First text
-      setTimeout(() => setPhase(2), 800), // Main text stagger
-      setTimeout(() => setPhase(3), 1800), // Subtext
-      setTimeout(() => setPhase(4), 3000), // Exit start
+      setTimeout(() => setPhase(1), 100),  // "REAL"
+      setTimeout(() => setPhase(2), 800),  // "CASH."
+      setTimeout(() => setPhase(3), 1600), // Subtext
+      setTimeout(() => setPhase(4), 2800), // Exit start
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
-
-  const headline = "Two Worlds.".split('');
 
   return (
     <motion.div
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.1, filter: 'blur(20px)' }}
+      exit={{ opacity: 0, scale: 1.15, filter: 'blur(25px)' }}
       transition={{ duration: 0.8 }}
     >
-      {/* Decorative large numbers/letters in background */}
-      <motion.div 
-        className="absolute left-[10vw] top-[10vh] text-[30vw] font-black text-white/5 select-none"
-        initial={{ y: 100, opacity: 0 }}
-        animate={phase >= 1 ? { y: 0, opacity: 1 } : { y: 100, opacity: 0 }}
-        transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-      >
-        01
-      </motion.div>
-
       <div className="relative z-10 w-full flex flex-col items-center">
-        {/* Animated line/badge */}
+        {/* Animated badge */}
         <motion.div 
-          className="flex items-center gap-4 mb-8"
-          initial={{ opacity: 0, x: -50 }}
-          animate={phase >= 1 ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex items-center gap-4 mb-6"
+          initial={{ opacity: 0, scale: 0.8, y: -20 }}
+          animate={phase >= 1 ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.8, y: -20 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="h-[1px] w-[5vw] bg-sky-400" />
-          <p className="text-[1.5vw] text-sky-400 font-semibold tracking-[0.3em] uppercase">
-            One Team
+          <div className="h-[2px] w-[6vw] bg-[#00f260]" />
+          <p className="text-[1.5vw] text-[#00f260] font-bold tracking-[0.4em] uppercase shadow-sm">
+            Stop Wasting Time
           </p>
-          <div className="h-[1px] w-[5vw] bg-sky-400" />
+          <div className="h-[2px] w-[6vw] bg-[#00f260]" />
         </motion.div>
 
-        {/* Character stagger headline */}
-        <div className="overflow-hidden flex pt-4 pb-2">
-          {headline.map((char, i) => (
-            <motion.span
-              key={i}
-              className="text-[10vw] font-black leading-none text-white tracking-tighter"
-              style={{ display: 'inline-block' }}
-              initial={{ y: "120%", rotateX: 45, opacity: 0 }}
-              animate={phase >= 2 ? { y: "0%", rotateX: 0, opacity: 1 } : { y: "120%", rotateX: 45, opacity: 0 }}
-              transition={{ 
-                duration: 0.8, 
-                ease: [0.16, 1, 0.3, 1],
-                delay: phase >= 2 ? i * 0.05 : 0 
-              }}
+        <div className="flex flex-col items-center leading-none">
+          <div className="overflow-hidden">
+            <motion.h1
+              className="text-[14vw] font-black text-white tracking-tighter uppercase drop-shadow-2xl"
+              initial={{ y: "100%", opacity: 0, rotateX: -30, scale: 0.9 }}
+              animate={phase >= 1 ? { y: "0%", opacity: 1, rotateX: 0, scale: 1 } : { y: "100%", opacity: 0, rotateX: -30, scale: 0.9 }}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
             >
-              {char === " " ? "\u00A0" : char}
-            </motion.span>
-          ))}
+              REAL
+            </motion.h1>
+          </div>
+          <div className="overflow-hidden mt-[-3vw]">
+            <motion.h1
+              className="text-[14vw] font-black text-transparent bg-clip-text tracking-tighter uppercase pb-[1vw]"
+              style={{ backgroundImage: 'linear-gradient(90deg, #00f260, #00b84c)', filter: 'drop-shadow(0 10px 20px rgba(0,242,96,0.3))' }}
+              initial={{ y: "100%", opacity: 0, rotateX: -30, scale: 0.9 }}
+              animate={phase >= 2 ? { y: "0%", opacity: 1, rotateX: 0, scale: 1 } : { y: "100%", opacity: 0, rotateX: -30, scale: 0.9 }}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            >
+              CASH.
+            </motion.h1>
+          </div>
         </div>
 
         <motion.p
-          className="mt-6 text-[1.8vw] text-slate-400 font-light tracking-wide"
-          initial={{ opacity: 0, filter: 'blur(10px)', y: 20 }}
-          animate={phase >= 3 ? { opacity: 1, filter: 'blur(0px)', y: 0 } : { opacity: 0, filter: 'blur(10px)', y: 20 }}
+          className="mt-6 text-[2.5vw] text-slate-200 font-light tracking-widest uppercase"
+          initial={{ opacity: 0, filter: 'blur(15px)', y: 20 }}
+          animate={phase >= 3 ? { opacity: 1, filter: 'blur(0px)', y: 0 } : { opacity: 0, filter: 'blur(15px)', y: 20 }}
           transition={{ duration: 0.8 }}
         >
-          Shared Foundation. Boundless Scale.
+          Not points. <span className="font-bold text-white">Not gift cards.</span>
         </motion.p>
       </div>
 
       {/* Wipe element for transition out */}
       <motion.div 
-        className="absolute inset-0 bg-emerald-500 z-50 origin-left"
-        initial={{ scaleX: 0 }}
-        animate={phase >= 4 ? { scaleX: 1 } : { scaleX: 0 }}
-        transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+        className="absolute inset-0 bg-[#0052ff] z-50 origin-bottom"
+        initial={{ scaleY: 0 }}
+        animate={phase >= 4 ? { scaleY: 1 } : { scaleY: 0 }}
+        transition={{ duration: 0.7, ease: [0.76, 0, 0.24, 1] }}
       />
     </motion.div>
   );

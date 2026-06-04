@@ -1,13 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Space+Grotesk:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
   --font-display: 'Plus Jakarta Sans', sans-serif;
   --font-body: 'Space Grotesk', sans-serif;
 
-  --primary: 160 84% 39%; /* Emerald */
-  --accent: 217 91% 60%; /* Blue */
-  --bg: 222 47% 11%; /* Slate */
+  --primary: 150 100% 40%; /* Vibrant Emerald / Cash Green */
+  --accent: 210 100% 50%; /* Electric Blue */
+  --bg: 240 20% 4%; /* Deep dark blue/black */
 }
 
 * {
