@@ -1,6 +1,19 @@
-const PAYPAL_API_BASE = process.env.PAYPAL_MODE === "live"
-  ? "https://api-m.paypal.com"
-  : "https://api-m.sandbox.paypal.com";
+/**
+ * Resolve the PayPal API base URL from `PAYPAL_MODE` at call time.
+ *
+ * This is intentionally a function rather than a module-level constant: a
+ * constant is evaluated once when the module is first imported, so if anything
+ * (e.g. a test harness) imports this module before setting `PAYPAL_MODE`, a
+ * cached constant would be stuck on the wrong base URL for the lifetime of the
+ * module cache. Reading the env var on every call keeps the base in sync with
+ * the current `PAYPAL_MODE` without requiring a module re-import or process
+ * restart.
+ */
+function getPayPalApiBase(): string {
+  return process.env.PAYPAL_MODE === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
+}
 
 interface PayPalAccessToken {
   access_token: string;
@@ -36,7 +49,7 @@ async function getAccessToken(): Promise<string> {
 
   const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
 
-  const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+  const res = await fetch(`${getPayPalApiBase()}/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${auth}`,
@@ -99,7 +112,7 @@ export async function sendPayPalPayout(
     };
 
     requestDispatched = true;
-    const res = await fetch(`${PAYPAL_API_BASE}/v1/payments/payouts`, {
+    const res = await fetch(`${getPayPalApiBase()}/v1/payments/payouts`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -226,7 +239,7 @@ export async function verifyPayPalWebhook(
 
   try {
     const accessToken = await getAccessToken();
-    const verifyRes = await fetch(`${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`, {
+    const verifyRes = await fetch(`${getPayPalApiBase()}/v1/notifications/verify-webhook-signature`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
