@@ -13,6 +13,24 @@ import { sql } from "drizzle-orm";
  */
 
 /**
+ * Raised when a spin-challenge DB query fails (e.g. a brief database blip).
+ *
+ * This lets the begin/complete routes distinguish an *infrastructure* failure
+ * — which should surface as a friendly, retryable 503 — from a genuine
+ * validation rejection (not_found / wrong_user / expired / too_early), which
+ * is a deliberate 4xx. The original error is preserved as `cause` for logging.
+ */
+export class SpinChallengeStoreError extends Error {
+  constructor(
+    public readonly op: "issue" | "consume",
+    cause: unknown,
+  ) {
+    super(`spin challenge store ${op} failed`, { cause });
+    this.name = "SpinChallengeStoreError";
+  }
+}
+
+/**
  * Persist a freshly issued challenge token. `issuedAt` is stamped by the DB
  * (NOW()) and the row expires `ttlMs` later.
  */
@@ -22,15 +40,19 @@ export async function issueSpinChallenge(
   ttlMs: number,
 ): Promise<void> {
   const ttlSecs = Math.ceil(ttlMs / 1000);
-  await db.execute(sql`
-    INSERT INTO spin_challenges (token, user_id, issued_at, expires_at)
-    VALUES (
-      ${token},
-      ${userId},
-      NOW(),
-      NOW() + (${ttlSecs} * INTERVAL '1 second')
-    )
-  `);
+  try {
+    await db.execute(sql`
+      INSERT INTO spin_challenges (token, user_id, issued_at, expires_at)
+      VALUES (
+        ${token},
+        ${userId},
+        NOW(),
+        NOW() + (${ttlSecs} * INTERVAL '1 second')
+      )
+    `);
+  } catch (err) {
+    throw new SpinChallengeStoreError("issue", err);
+  }
 }
 
 export type SpinChallengeConsumeResult =
@@ -64,42 +86,46 @@ export async function consumeSpinChallenge(
   minMs: number,
 ): Promise<SpinChallengeConsumeResult> {
   const minSecs = minMs / 1000;
-  const sel = await db.execute(sql`
-    SELECT
-      user_id,
-      (NOW() > expires_at)                                AS expired,
-      EXTRACT(EPOCH FROM (NOW() - issued_at)) < ${minSecs} AS too_early,
-      GREATEST(0, EXTRACT(EPOCH FROM (issued_at + (${minSecs} * INTERVAL '1 second') - NOW()))) AS retry_after_secs
-    FROM spin_challenges
-    WHERE token = ${token}
-  `);
+  try {
+    const sel = await db.execute(sql`
+      SELECT
+        user_id,
+        (NOW() > expires_at)                                AS expired,
+        EXTRACT(EPOCH FROM (NOW() - issued_at)) < ${minSecs} AS too_early,
+        GREATEST(0, EXTRACT(EPOCH FROM (issued_at + (${minSecs} * INTERVAL '1 second') - NOW()))) AS retry_after_secs
+      FROM spin_challenges
+      WHERE token = ${token}
+    `);
 
-  if (sel.rows.length === 0) return { status: "not_found" };
+    if (sel.rows.length === 0) return { status: "not_found" };
 
-  const row = sel.rows[0] as {
-    user_id: string;
-    expired: boolean;
-    too_early: boolean;
-    retry_after_secs: string | number;
-  };
+    const row = sel.rows[0] as {
+      user_id: string;
+      expired: boolean;
+      too_early: boolean;
+      retry_after_secs: string | number;
+    };
 
-  if (row.user_id !== userId) return { status: "wrong_user" };
+    if (row.user_id !== userId) return { status: "wrong_user" };
 
-  if (row.expired) {
-    await db.execute(sql`DELETE FROM spin_challenges WHERE token = ${token}`);
-    return { status: "expired" };
+    if (row.expired) {
+      await db.execute(sql`DELETE FROM spin_challenges WHERE token = ${token}`);
+      return { status: "expired" };
+    }
+
+    if (row.too_early) {
+      const retryAfterMs = Math.ceil(Number(row.retry_after_secs) * 1000);
+      return { status: "too_early", retryAfterMs };
+    }
+
+    // Atomic single-use consume — only the winner of the delete proceeds.
+    const del = await db.execute(sql`
+      DELETE FROM spin_challenges WHERE token = ${token} RETURNING token
+    `);
+    if (del.rows.length === 0) return { status: "not_found" };
+
+    return { status: "ok" };
+  } catch (err) {
+    throw new SpinChallengeStoreError("consume", err);
   }
-
-  if (row.too_early) {
-    const retryAfterMs = Math.ceil(Number(row.retry_after_secs) * 1000);
-    return { status: "too_early", retryAfterMs };
-  }
-
-  // Atomic single-use consume — only the winner of the delete proceeds.
-  const del = await db.execute(sql`
-    DELETE FROM spin_challenges WHERE token = ${token} RETURNING token
-  `);
-  if (del.rows.length === 0) return { status: "not_found" };
-
-  return { status: "ok" };
 }

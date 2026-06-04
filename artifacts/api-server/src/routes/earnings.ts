@@ -5,7 +5,7 @@ import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { runSpinChallengeSweep } from "../lib/spinChallengeSweep";
-import { issueSpinChallenge, consumeSpinChallenge } from "../lib/spinChallengeStore";
+import { issueSpinChallenge, consumeSpinChallenge, SpinChallengeStoreError } from "../lib/spinChallengeStore";
 import { rateLimit } from "express-rate-limit";
 import {
   DEFAULT_REGION,
@@ -405,6 +405,17 @@ export function registerEarningsRoutes(app: Express): void {
         logger.info({ userId: req.userId }, "spin challenge issued");
         res.status(201).json({ challengeToken });
       } catch (err) {
+        // A brief DB blip while issuing the challenge surfaces as a friendly,
+        // retryable 503 (consistent with the sponsored-visit fail-closed policy)
+        // rather than a bare 500, so the spin wheel self-heals on retry.
+        if (err instanceof SpinChallengeStoreError) {
+          logger.error({ err, userId: req.userId }, "earn/spin/begin store unavailable — failing retryable");
+          res.status(503).json({
+            error: "Spin is temporarily unavailable. Please try again in a moment.",
+            retryable: true,
+          });
+          return;
+        }
         logger.error({ err }, "earn/spin/begin error");
         res.status(500).json({ error: "Failed to begin spin" });
       }
@@ -531,6 +542,17 @@ export function registerEarningsRoutes(app: Express): void {
           dailyCap:    result.dailyCap,
         });
       } catch (err) {
+        // A brief DB blip while validating/consuming the challenge surfaces as a
+        // friendly, retryable 503 rather than a bare 500. The challenge token is
+        // left intact when the consume query throws, so a retry can succeed.
+        if (err instanceof SpinChallengeStoreError) {
+          logger.error({ err, userId: req.userId }, "earn/spin/complete store unavailable — failing retryable");
+          res.status(503).json({
+            error: "Spin is temporarily unavailable. Please try again in a moment.",
+            retryable: true,
+          });
+          return;
+        }
         logger.error({ err }, "earn/spin/complete error");
         res.status(500).json({ error: "Failed to complete spin" });
       }
