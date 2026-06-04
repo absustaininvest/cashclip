@@ -37,6 +37,52 @@ function pickRandom(pool: number[]): number {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ── DAILY CHECK-IN STREAK LADDER ──────────────────────────────────────────────
+// Server-authoritative streak rewards. The flat 150-pt check-in is replaced by a
+// bounded ladder: longer consecutive streaks pay more, capped at the final rung
+// so the daily cost stays bounded. A milestone bonus is added on every Nth day.
+// These are the single source of truth — the client renders the same numbers via
+// GET /api/earnings/checkin-status so the on-screen ladder reflects real awards.
+//
+// Cost at the published floor ($0.0002/pt), a full 7-day cycle:
+//   base 100+120+140+160+180+200+240 = 1140 pts = $0.228 (avg $0.0326/day)
+//   + milestone 200 pts on day 7      =  200 pts = $0.040 (avg $0.0057/day)
+// ≈ $0.038/user/day for a perfect streak — a modest, streak-weighted shift from
+// the old flat 150 ($0.030/day): day 1 now pays LESS (100) and only long streaks
+// exceed the old flat rate, keeping payout economics conservative.
+const CHECKIN_REWARD_LADDER = [100, 120, 140, 160, 180, 200, 240];
+const CHECKIN_MILESTONE_DAY = 7;    // bonus paid every Nth consecutive day
+const CHECKIN_MILESTONE_BONUS = 200; // extra pts added on a milestone day
+
+// UTC calendar-day key (YYYY-MM-DD). The daily cap and streak both key off UTC
+// days so the check-in window and streak math always agree.
+function utcDayKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Given the previous check-in time + stored streak, returns the streak value
+// THIS check-in should produce. Continues the streak only when the last check-in
+// was the immediately preceding UTC day; otherwise restarts at 1.
+function nextCheckinStreak(lastCheckinAt: Date | null, storedStreak: number, now: Date): number {
+  if (!lastCheckinAt) return 1;
+  const todayKey = utcDayKey(now);
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayKey = utcDayKey(yesterday);
+  const lastKey = utcDayKey(lastCheckinAt);
+  if (lastKey === todayKey) return Math.max(1, storedStreak); // shouldn't happen (daily cap), be safe
+  if (lastKey === yesterdayKey) return Math.max(1, storedStreak) + 1;
+  return 1; // a day (or more) was missed — streak resets
+}
+
+// Reward (base ladder rung + optional milestone bonus) for a given streak day.
+function checkinReward(streak: number): { points: number; base: number; milestone: boolean; milestoneBonus: number } {
+  const idx = Math.min(Math.max(streak, 1), CHECKIN_REWARD_LADDER.length) - 1;
+  const base = CHECKIN_REWARD_LADDER[idx];
+  const milestone = streak > 0 && streak % CHECKIN_MILESTONE_DAY === 0;
+  const milestoneBonus = milestone ? CHECKIN_MILESTONE_BONUS : 0;
+  return { points: base + milestoneBonus, base, milestone, milestoneBonus };
+}
+
 // ── PHASE 3 REWARD REBALANCE (Jun 2026) ──────────────────────────────────────
 // Phase 2 lowered the published FLOOR to 5,000 pts = $1 ($0.0002/pt) but left
 // these point AMOUNTS unchanged, so at the floor each action paid ~1/5 of its
@@ -67,6 +113,8 @@ interface ActionConfig {
 }
 
 const ACTION_CONFIG: Record<string, ActionConfig> = {
+  // checkin's `points` is a legacy fallback only — the actual award is
+  // streak-scaled server-side (see checkinReward / CHECKIN_REWARD_LADDER).
   checkin:        { points: 150,  dailyCap: 1  },
   rewarded_ad:    { points: 50,   dailyCap: 30 },
   spin:           { points: null, dailyCap: 12 },
@@ -226,7 +274,7 @@ export function registerEarningsRoutes(app: Express): void {
         // prevents concurrent requests from observing pre-insert state and
         // racing past the caps.
         type RecordResult =
-          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
+          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number; checkinStreak?: number; milestoneBonus?: number }
           | { ok: false; status: number; error: string; cap?: number; used?: number; nextAvailableAt?: string };
 
         const result: RecordResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
@@ -273,9 +321,32 @@ export function registerEarningsRoutes(app: Express): void {
 
           // ── Points are always server-determined ───────────────────────────
           let pts: number;
-          if (config.points !== null)    pts = config.points;
-          else if (actionType === "spin") pts = pickRandom(SPIN_POOL);
-          else                            pts = pickRandom(GAME_POOL);
+          let tokenDesc = desc;
+          let newStreak: number | undefined;
+          let milestoneBonus: number | undefined;
+          if (actionType === "checkin") {
+            // Streak is server-authoritative: advance it under the same row lock
+            // the daily cap is checked under, so concurrent check-ins can't both
+            // advance it. The daily cap (1/day) means reaching here is a genuinely
+            // new check-in for this UTC day.
+            const [u] = await tx
+              .select({ checkinStreak: users.checkinStreak, lastCheckinAt: users.lastCheckinAt })
+              .from(users)
+              .where(eq(users.id, req.userId!));
+            newStreak = nextCheckinStreak(u?.lastCheckinAt ?? null, u?.checkinStreak ?? 0, now);
+            const reward = checkinReward(newStreak);
+            pts = reward.points;
+            milestoneBonus = reward.milestoneBonus;
+            tokenDesc = reward.milestone
+              ? `Day ${newStreak} check-in + ${CHECKIN_MILESTONE_DAY}-day streak bonus`
+              : `Day ${newStreak} check-in`;
+            await tx
+              .update(users)
+              .set({ checkinStreak: newStreak, lastCheckinAt: now })
+              .where(eq(users.id, req.userId!));
+          } else if (config.points !== null) pts = config.points;
+          else if (actionType === "spin")    pts = pickRandom(SPIN_POOL);
+          else                               pts = pickRandom(GAME_POOL);
 
           const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
           const snapshot = await snapshotRateString();
@@ -284,14 +355,14 @@ export function registerEarningsRoutes(app: Express): void {
             userId:      req.userId!,
             points:      pts,
             actionType,
-            description: desc,
+            description: tokenDesc,
             earnedAt:    now,
             claimableAt,
             status:      "pending",
             usdPerPointSnapshot: snapshot,
           }).returning();
 
-          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
+          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap, checkinStreak: newStreak, milestoneBonus };
         });
 
         if (!result.ok) {
@@ -299,7 +370,7 @@ export function registerEarningsRoutes(app: Express): void {
           res.status(status).json({ error, ...rest }); return;
         }
 
-        logger.info({ userId: req.userId, actionType, pts: result.points }, "earn token issued");
+        logger.info({ userId: req.userId, actionType, pts: result.points, checkinStreak: result.checkinStreak }, "earn token issued");
 
         res.status(201).json({
           tokenId:     result.tokenId,
@@ -307,6 +378,8 @@ export function registerEarningsRoutes(app: Express): void {
           claimableAt: result.claimableAt,
           dailyUsed:   result.dailyUsed,
           dailyCap:    result.dailyCap,
+          ...(result.checkinStreak !== undefined ? { checkinStreak: result.checkinStreak } : {}),
+          ...(result.milestoneBonus ? { milestoneBonus: result.milestoneBonus } : {}),
         });
       } catch (err) {
         logger.error({ err }, "earnings/record error");
@@ -658,6 +731,57 @@ export function registerEarningsRoutes(app: Express): void {
       } catch (err) {
         logger.error({ err }, "earnings/pending error");
         res.status(500).json({ error: "Failed to fetch pending earnings" });
+      }
+    },
+  );
+
+  // ── GET /api/earnings/checkin-status ────────────────────────────────────────
+  // Server-authoritative daily check-in state for the Earn screen. Returns the
+  // user's live streak, whether they've already checked in today (UTC), the full
+  // reward ladder + milestone config (so the on-screen day circles show the REAL
+  // awards), and the points the next check-in will grant.
+  app.get(
+    "/api/earnings/checkin-status",
+    authMiddleware,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const now = new Date();
+        const [u] = await db
+          .select({ checkinStreak: users.checkinStreak, lastCheckinAt: users.lastCheckinAt })
+          .from(users)
+          .where(eq(users.id, req.userId!));
+
+        const storedStreak = u?.checkinStreak ?? 0;
+        const lastCheckinAt = u?.lastCheckinAt ?? null;
+
+        const todayKey = utcDayKey(now);
+        const yesterdayKey = utcDayKey(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+        const lastKey = lastCheckinAt ? utcDayKey(lastCheckinAt) : null;
+
+        const checkedInToday = lastKey === todayKey;
+        // Effective current streak for display: alive if checked in today or
+        // yesterday, otherwise the streak has lapsed and reads as 0.
+        const effectiveStreak =
+          checkedInToday || lastKey === yesterdayKey ? Math.max(0, storedStreak) : 0;
+
+        // What the NEXT check-in produces (today's, if not yet done; otherwise
+        // tomorrow's projected reward continuing the streak).
+        const projectedStreak = checkedInToday ? storedStreak + 1 : effectiveStreak + 1;
+        const next = checkinReward(projectedStreak);
+
+        res.json({
+          checkinStreak:   effectiveStreak,
+          checkedInToday,
+          ladder:          CHECKIN_REWARD_LADDER,
+          milestoneEvery:  CHECKIN_MILESTONE_DAY,
+          milestoneBonus:  CHECKIN_MILESTONE_BONUS,
+          nextReward:      next.points,
+          nextRewardBase:  next.base,
+          nextIsMilestone: next.milestone,
+        });
+      } catch (err) {
+        logger.error({ err }, "earnings/checkin-status error");
+        res.status(500).json({ error: "Failed to load check-in status" });
       }
     },
   );

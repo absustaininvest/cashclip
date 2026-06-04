@@ -73,6 +73,72 @@ export async function recordEarnAction(
   }
 }
 
+// ── DAILY CHECK-IN (server-authoritative streak) ─────────────────────────────
+// The check-in streak and its scaled reward live entirely on the server. The
+// client records the check-in and reads the resulting streak/ladder back so the
+// Earn screen shows the REAL awarded amounts rather than display-only numbers.
+export interface CheckinStatus {
+  checkinStreak:   number;   // effective live streak (0 if lapsed)
+  checkedInToday:  boolean;
+  ladder:          number[]; // base points per streak day (rung values)
+  milestoneEvery:  number;   // milestone bonus paid every Nth day
+  milestoneBonus:  number;   // extra points on a milestone day
+  nextReward:      number;   // points the next check-in will grant
+  nextIsMilestone: boolean;
+}
+
+export async function fetchCheckinStatus(): Promise<CheckinStatus | null> {
+  try {
+    const res = await apiRequest("GET", "/api/earnings/checkin-status");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      checkinStreak:   Number(data.checkinStreak) || 0,
+      checkedInToday:  !!data.checkedInToday,
+      ladder:          Array.isArray(data.ladder) ? data.ladder.map((n: any) => Number(n) || 0) : [],
+      milestoneEvery:  Number(data.milestoneEvery) || 0,
+      milestoneBonus:  Number(data.milestoneBonus) || 0,
+      nextReward:      Number(data.nextReward) || 0,
+      nextIsMilestone: !!data.nextIsMilestone,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Records today's check-in. The server advances the streak and returns the
+// scaled points + new streak. Returns null when offline / already checked in.
+export async function recordCheckin(): Promise<{
+  points: number;
+  checkinStreak: number;
+  milestoneBonus: number;
+} | null> {
+  try {
+    const res = await apiRequest("POST", "/api/earnings/record", {
+      actionType: "checkin",
+      description: "Daily check-in",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const token: EarnToken = {
+      id:          data.tokenId,
+      points:      data.points,
+      actionType:  "checkin",
+      description: "Daily check-in",
+      earnedAt:    Date.now(),
+      claimableAt: new Date(data.claimableAt).getTime(),
+    };
+    await storeTokenLocally(token);
+    return {
+      points:         Number(data.points) || 0,
+      checkinStreak:  Number(data.checkinStreak) || 0,
+      milestoneBonus: Number(data.milestoneBonus) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── SPIN CHALLENGE / COMPLETE ─────────────────────────────────────────────────
 // Two-step spin flow: /begin issues a server challenge, /complete consumes it.
 // The server rejects /complete without a valid challenge from /begin, ensuring

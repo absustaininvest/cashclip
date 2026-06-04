@@ -31,6 +31,12 @@ export const users = pgTable("users", {
   educationLevel: text("education_level"),
   ethnicity: text("ethnicity"),
   profileComplete: boolean("profile_complete").notNull().default(false),
+  // Server-authoritative daily check-in streak. `checkinStreak` is the number of
+  // consecutive UTC days the user has checked in (resets to 1 on a new check-in
+  // after a missed day); `lastCheckinAt` is when the streak was last advanced and
+  // is used to decide whether the next check-in continues or resets the streak.
+  checkinStreak: integer("checkin_streak").notNull().default(0),
+  lastCheckinAt: timestamp("last_checkin_at", { withTimezone: true }),
   tokenVersion: integer("token_version").notNull().default(0),
   isPublisher: boolean("is_publisher").notNull().default(false),
   publisherGrantedAt: timestamp("publisher_granted_at"),

@@ -58,6 +58,8 @@ import {
 } from "@/lib/storage";
 import {
   recordEarnAction,
+  recordCheckin,
+  fetchCheckinStatus,
   beginSpin,
   completeSpin,
   claimAllReady,
@@ -86,9 +88,10 @@ const WHEEL_SEGMENTS = [
   { value: 500, label: "500 pts", color: "#D81B60" },
 ];
 
-// Check-in streak visual rewards (pts) — server awards a flat 150 pts per
-// check-in (no server-side streak); these values are display-only.
-const DAY_REWARDS = [100, 120, 140, 160, 180, 200, 240];
+// Fallback check-in streak ladder (pts per consecutive day). The server is
+// authoritative — these values mirror CHECKIN_REWARD_LADDER in the API and are
+// only shown until GET /api/earnings/checkin-status returns the live ladder.
+const DAY_REWARDS_FALLBACK = [100, 120, 140, 160, 180, 200, 240];
 
 function AdCard({
   ad,
@@ -582,6 +585,7 @@ export default function EarnScreen() {
   const [showModal, setShowModal] = useState(false);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [checkinStreak, setCheckinStreak] = useState(0);
+  const [dayRewards, setDayRewards] = useState<number[]>(DAY_REWARDS_FALLBACK);
   const [spinAvailable, setSpinAvailable] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinReward, setSpinReward] = useState(0); // pts from server
@@ -604,9 +608,10 @@ export default function EarnScreen() {
   const wheelSize = Math.min(SCREEN_WIDTH - 64, 280);
 
   const loadAll = useCallback(async () => {
-    const [s, checkinInfo, spinReady, dm, wm, pending, spinNext] = await Promise.all([
+    const [s, checkinInfo, checkinServer, spinReady, dm, wm, pending, spinNext] = await Promise.all([
       getUserStats(),
       getDailyCheckinInfo(),
+      fetchCheckinStatus(),
       canSpinNow(),
       getDailyMissions(),
       getWeeklyMissions(),
@@ -614,8 +619,16 @@ export default function EarnScreen() {
       getNextSpinTime(),
     ]);
     setStats(s);
-    setCheckedInToday(checkinInfo.checkedInToday);
-    setCheckinStreak(checkinInfo.checkinStreak);
+    // Server is the source of truth for the streak + reward ladder; fall back to
+    // the local cache only when offline so the UI still renders something.
+    if (checkinServer) {
+      setCheckedInToday(checkinServer.checkedInToday);
+      setCheckinStreak(checkinServer.checkinStreak);
+      if (checkinServer.ladder.length > 0) setDayRewards(checkinServer.ladder);
+    } else {
+      setCheckedInToday(checkinInfo.checkedInToday);
+      setCheckinStreak(checkinInfo.checkinStreak);
+    }
     setSpinAvailable(spinReady);
     setDailyMissions(dm);
     setWeeklyMissions(wm);
@@ -636,18 +649,26 @@ export default function EarnScreen() {
   }, [user?.id]);
 
   const handleCheckin = useCallback(async () => {
+    if (checkedInToday) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const result = await performDailyCheckin();
+    // Optimistic local UI (also keeps the offline streak cache warm).
+    await performDailyCheckin();
     setCheckedInToday(true);
-    setCheckinStreak(result.streak);
-    // Issue server earn token — non-blocking, UI optimistic
-    recordEarnAction("checkin", "Daily check-in");
+    // Server is authoritative: it advances the streak and returns the scaled
+    // reward. Reflect the real streak it reports before the full refresh.
+    const server = await recordCheckin();
+    if (server) {
+      setCheckinStreak(server.checkinStreak);
+      if (server.milestoneBonus > 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),
       withSpring(1, { damping: 8 })
     );
     await loadAll();
-  }, []);
+  }, [checkedInToday]);
 
   const handleSpin = useCallback(async () => {
     if (!spinAvailable || isSpinning) return;
@@ -900,7 +921,7 @@ export default function EarnScreen() {
           </View>
 
           <View style={styles.dayRow}>
-            {DAY_REWARDS.map((reward, i) => {
+            {dayRewards.map((reward, i) => {
               const dayNum = i + 1;
               const isActive = dayNum <= checkinStreak;
               const isCurrent = dayNum === checkinStreak + 1 && !checkedInToday;
