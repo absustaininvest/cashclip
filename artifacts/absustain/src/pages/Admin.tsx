@@ -1352,7 +1352,7 @@ function timeAgoShort(dateStr: string) {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-function InboxPanel({ token }: { token: string }) {
+export function InboxPanel({ token }: { token: string }) {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
