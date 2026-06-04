@@ -1,3 +1,8 @@
 uploads = []
 generated = []
-outputs = []
+
+[[outputs]]
+id = "vuj1JMHRsMvoGT5TnUusG"
+uri = "file://exports/CashClip_AB_Project_Overview.mp4"
+type = "video"
+title = "Project Overview — Animated Video"
