@@ -2107,6 +2107,22 @@ function CashClipUsersPanel({ token }: { token: string }) {
   const [factoryResult, setFactoryResult] = useState<{ username: string; password: string } | null>(null);
   const [factoryLoading, setFactoryLoading] = useState(false);
   const [factoryError, setFactoryError] = useState("");
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfillPassphrase, setBackfillPassphrase] = useState("");
+  const [backfillLoading, setBackfillLoading] = useState<"preview" | "run" | null>(null);
+  const [backfillError, setBackfillError] = useState("");
+  const [backfillPreview, setBackfillPreview] = useState<{
+    candidates: number;
+    qualifyAmount: number;
+    bonusPerReferral: number;
+  } | null>(null);
+  const [backfillResult, setBackfillResult] = useState<{
+    candidates: number;
+    credited: number;
+    skipped: number;
+    failed: number;
+    bonusPerReferral: number;
+  } | null>(null);
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
@@ -2374,6 +2390,58 @@ function CashClipUsersPanel({ token }: { token: string }) {
     }
   }
 
+  async function runBackfill(dryRun: boolean) {
+    if (!backfillPassphrase) {
+      setBackfillError("Enter your master passphrase to continue.");
+      return;
+    }
+    setBackfillLoading(dryRun ? "preview" : "run");
+    setBackfillError("");
+    try {
+      const res = await fetch("/api/admin/referrals/backfill", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "x-secrets-passphrase": backfillPassphrase,
+        },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Referral backfill failed");
+      if (dryRun) {
+        setBackfillPreview({
+          candidates: data.candidates ?? 0,
+          qualifyAmount: data.qualifyAmount ?? 0,
+          bonusPerReferral: data.bonusPerReferral ?? 0,
+        });
+      } else {
+        setBackfillResult({
+          candidates: data.candidates ?? 0,
+          credited: data.credited ?? 0,
+          skipped: data.skipped ?? 0,
+          failed: data.failed ?? 0,
+          bonusPerReferral: data.bonusPerReferral ?? 0,
+        });
+        setBackfillPreview(null);
+        fetchUsers(search, page);
+        fetchAdjustments();
+      }
+    } catch (err: any) {
+      setBackfillError(err.message);
+    } finally {
+      setBackfillLoading(null);
+    }
+  }
+
+  function closeBackfill() {
+    setBackfillOpen(false);
+    setBackfillPassphrase("");
+    setBackfillError("");
+    setBackfillPreview(null);
+    setBackfillResult(null);
+  }
+
   function fmt(dateStr: string | null) {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleDateString("en-US", {
@@ -2549,6 +2617,133 @@ function CashClipUsersPanel({ token }: { token: string }) {
         </div>
       )}
 
+      {/* Referral backfill — passphrase prompt + preview/run */}
+      {backfillOpen && !backfillResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-amber-500/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Credit Past Referrers
+            </h3>
+            <p className="text-white/50 text-sm mb-1">
+              This pays the referral bonus to referrers whose friend cashed out the
+              qualifying amount before the feature went live. It's{" "}
+              <span className="text-white font-semibold">safe to re-run</span> —
+              anyone already credited is skipped.
+            </p>
+            <p className="text-amber-400 text-xs mb-4">
+              Preview first to see how many referrers would be credited. Nothing is
+              paid until you press Run.
+            </p>
+            <input
+              type="password"
+              value={backfillPassphrase}
+              onChange={(e) => setBackfillPassphrase(e.target.value)}
+              placeholder="Master passphrase"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
+            />
+            {backfillPreview && (
+              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 mb-2 text-sm">
+                <p className="text-white/80">
+                  <span className="text-amber-400 font-bold">
+                    {backfillPreview.candidates}
+                  </span>{" "}
+                  referrer{backfillPreview.candidates === 1 ? "" : "s"} would be
+                  credited{" "}
+                  <span className="text-white font-semibold">
+                    ${backfillPreview.bonusPerReferral}
+                  </span>{" "}
+                  each.
+                </p>
+                <p className="text-white/40 text-xs mt-1">
+                  Based on referred users who cashed out $
+                  {backfillPreview.qualifyAmount}+ before the feature shipped.
+                </p>
+              </div>
+            )}
+            {backfillError && (
+              <p className="text-red-400 text-xs mb-2">{backfillError}</p>
+            )}
+            <div className="flex gap-3 mt-3">
+              <button
+                onClick={closeBackfill}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => runBackfill(true)}
+                disabled={backfillLoading !== null}
+                className="flex-1 py-2.5 rounded-xl border border-amber-500/30 text-amber-400 font-bold text-sm hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+              >
+                {backfillLoading === "preview" ? "Checking…" : "Preview"}
+              </button>
+              <button
+                onClick={() => runBackfill(false)}
+                disabled={backfillLoading !== null || !backfillPreview}
+                title={
+                  backfillPreview
+                    ? undefined
+                    : "Preview first to enable Run"
+                }
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#06060E] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+              >
+                {backfillLoading === "run" ? "Running…" : "Run"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Referral backfill — result */}
+      {backfillResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Backfill Complete ✓
+            </h3>
+            <p className="text-white/50 text-sm mb-4">
+              Credited{" "}
+              <span className="text-[#00E676] font-bold">
+                {backfillResult.credited}
+              </span>{" "}
+              referrer{backfillResult.credited === 1 ? "" : "s"}{" "}
+              <span className="text-white font-semibold">
+                ${backfillResult.bonusPerReferral}
+              </span>{" "}
+              each.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mb-5 text-sm">
+              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
+                <p className="text-white/40 text-xs">Candidates</p>
+                <p className="text-white font-bold">{backfillResult.candidates}</p>
+              </div>
+              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
+                <p className="text-white/40 text-xs">Credited</p>
+                <p className="text-[#00E676] font-bold">{backfillResult.credited}</p>
+              </div>
+              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
+                <p className="text-white/40 text-xs">Skipped</p>
+                <p className="text-white/70 font-bold">{backfillResult.skipped}</p>
+              </div>
+              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
+                <p className="text-white/40 text-xs">Failed</p>
+                <p
+                  className={`font-bold ${backfillResult.failed > 0 ? "text-red-400" : "text-white/70"}`}
+                >
+                  {backfillResult.failed}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={closeBackfill}
+              className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white flex items-center gap-2">
@@ -2665,6 +2860,38 @@ function CashClipUsersPanel({ token }: { token: string }) {
             These values will be enforced when users request withdrawals.
           </p>
         </div>
+      </div>
+
+      {/* Referral Backfill Card */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Users className="w-4 h-4 text-amber-400" />
+          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+            Credit Past Referrers
+          </h3>
+          <span className="text-white/30 text-xs ml-auto">
+            One-time, safe to re-run
+          </span>
+        </div>
+        <p className="text-white/40 text-xs mb-4 max-w-2xl">
+          Referral bonuses only started paying out automatically when the feature
+          shipped. This finds users who were referred and already cashed out the
+          qualifying amount <span className="text-white/60">before</span> then, and
+          pays their referrer the bonus they missed. Preview first to see how many
+          referrers would be credited — nothing is paid until you run it.
+        </p>
+        <button
+          onClick={() => {
+            setBackfillOpen(true);
+            setBackfillPassphrase("");
+            setBackfillError("");
+            setBackfillPreview(null);
+            setBackfillResult(null);
+          }}
+          className="px-5 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-sm font-medium hover:bg-amber-500/20 transition-colors"
+        >
+          Credit Past Referrers…
+        </button>
       </div>
 
       {error && (
