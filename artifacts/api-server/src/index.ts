@@ -7,6 +7,7 @@ import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
 import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
 import { startSecurityAuditCleanupJob } from "./jobs/securityAuditCleanup";
 import { startConversionRateJob } from "./jobs/conversionRateJob";
+import { startDedupeCleanupJob } from "./jobs/dedupeCleanup";
 import bcrypt from "bcryptjs";
 
 loadPersistedIntegrationKeys();
@@ -79,6 +80,7 @@ const server = app.listen(port, (err) => {
   startWebhookAuditCleanupJob();
   startSecurityAuditCleanupJob();
   startConversionRateJob();
+  startDedupeCleanupJob();
 });
 
 // ── GRACEFUL SHUTDOWN ────────────────────────────────────────────────────────

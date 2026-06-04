@@ -6,7 +6,6 @@ import { storage } from "./storage";
 import { logger } from "./lib/logger";
 import { sendEmailVerification, sendPasswordResetOTP, sendBackupCodeUsedAlert, sendTwoFactorActiveNotice, sendTwoFactorDisabledNotice, sendPasswordChangedNotice } from "./lib/email";
 import { recordLoginAttempt, checkLoginAttempts, clearLoginAttempts, pruneExpiredLoginAttempts } from "./lib/dbRateLimit";
-import { pruneExpiredDedupeSlots } from "./lib/dedupe";
 import { getClientIp } from "./lib/clientIp";
 import { validateRegistrationEmail } from "./lib/emailValidation";
 import type { InsertUser } from "@workspace/db";
@@ -168,9 +167,9 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 // Periodically prune expired rows from the shared login_attempts table.
 setInterval(() => { pruneExpiredLoginAttempts(); }, 5 * 60 * 1000);
 
-// Likewise prune the dedupe_slots table so short-lived dedupe reservations
-// (e.g. support-reply double-send guards) don't accumulate indefinitely.
-setInterval(() => { pruneExpiredDedupeSlots(); }, 5 * 60 * 1000);
+// The matching prune for the shared dedupe_slots table now runs as a dedicated,
+// test-covered scheduled job (jobs/dedupeCleanup.ts), registered at server
+// startup in index.ts.
 
 function generateToken(userId: string, role: string, tokenVersion: number): string {
   return jwt.sign({ userId, role, tokenVersion }, getJwtSecret(), { expiresIn: TOKEN_EXPIRY });
