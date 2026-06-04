@@ -26,7 +26,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import express from "express";
 import request from "supertest";
-import { createHmac } from "crypto";
+import { createHmac, createHash } from "crypto";
 import type { Express } from "express";
 
 const TEST_JWT_SECRET = "test-jwt-secret-for-sponsored-witness-tests-padded-to-64-chars-xy";
@@ -142,8 +142,9 @@ vi.mock("../lib/dbRateLimit", () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function makeAckToken(token: string, nonce: string): string {
+  // Mirror the /c handler: ackToken = HMAC-SHA256(token + ":" + witnessNonce).
   return createHmac("sha256", TEST_JWT_SECRET)
-    .update("completion:" + token)
+    .update(token + ":" + nonce)
     .digest("hex");
 }
 
@@ -172,7 +173,9 @@ beforeAll(async () => {
   app = express();
   app.use(express.json());
   registerRoutes(app);
-});
+  // Importing the large cashclip route module can exceed the default 10s hook
+  // timeout when the full suite transforms files in parallel; give it headroom.
+}, 30000);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -524,12 +527,13 @@ describe("Adversarial: full scripted chain without advertiser postback", () => {
     dbMocks.attemptRows[0]!.witnessNonce = null; // nonce burned by /c
     dbMocks.attemptRows[0]!.redirectedAt = new Date(Date.now() - 60_000);
 
+    // /visit loads the attempt row FIRST (idx 0), then the install record.
     let idx = 0;
     dbMocks.db.select.mockImplementation(() => ({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockImplementation(() => {
-          if (idx === 0) { idx++; return Promise.resolve([{ tokenHash: "hash", userId: "user-1", deviceHash: "dhash" }]); }
-          if (idx === 1) { idx++; return Promise.resolve([...dbMocks.attemptRows]); }
+          if (idx === 0) { idx++; return Promise.resolve([...dbMocks.attemptRows]); }
+          if (idx === 1) { idx++; return Promise.resolve([{ tokenHash: "hash", userId: "user-1", deviceHash: "dhash" }]); }
           return Promise.resolve([...dbMocks.campaignRows]);
         }),
       }),
@@ -548,16 +552,22 @@ describe("Adversarial: full scripted chain without advertiser postback", () => {
   it("POST /visit succeeds when witnessedAt is set by valid advertiser postback", async () => {
     // Legitimate path: advertiser's server called /postback with correct
     // callbackKey → witnessedAt set → /visit succeeds.
+    // The /visit cross-step check requires the install-token hash presented now
+    // to match the hash stored on the attempt at /begin. Compute it from the
+    // install token the request sends below so the legitimate path is exercised.
+    const installTokenHash = createHash("sha256").update("a".repeat(64)).digest("hex");
     dbMocks.attemptRows[0]!.witnessedAt  = new Date(Date.now() - 15_000);
     dbMocks.attemptRows[0]!.witnessNonce = null;
     dbMocks.attemptRows[0]!.redirectedAt = new Date(Date.now() - 30_000);
+    dbMocks.attemptRows[0]!.deviceHash   = installTokenHash;
 
+    // /visit loads the attempt row FIRST (idx 0), then the install record.
     let idx = 0;
     dbMocks.db.select.mockImplementation(() => ({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockImplementation(() => {
-          if (idx === 0) { idx++; return Promise.resolve([{ tokenHash: "hash", userId: "user-1", deviceHash: "dhash" }]); }
-          if (idx === 1) { idx++; return Promise.resolve([...dbMocks.attemptRows]); }
+          if (idx === 0) { idx++; return Promise.resolve([...dbMocks.attemptRows]); }
+          if (idx === 1) { idx++; return Promise.resolve([{ tokenHash: installTokenHash, userId: "user-1", deviceHash: installTokenHash }]); }
           return Promise.resolve([...dbMocks.campaignRows]);
         }),
       }),

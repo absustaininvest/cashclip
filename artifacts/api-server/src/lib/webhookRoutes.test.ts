@@ -14,7 +14,11 @@ const storageMocks = vi.hoisted(() => ({
   getWebhookAudits: vi.fn(),
   getWebhookAuditOffenders: vi.fn(),
   getWebhookAuditProviders: vi.fn(),
-  insertWebhookAudit: vi.fn(),
+  // Must return a resolved promise: logWebhookVerificationFailure (in
+  // webhookAuth.ts) fires this best-effort and calls `.catch(...)` on the
+  // result. A bare vi.fn() returns undefined, so `.catch` throws an unhandled
+  // rejection that fails the whole suite.
+  insertWebhookAudit: vi.fn().mockResolvedValue(undefined),
   countWebhookAuditByIp: vi.fn().mockResolvedValue(0),
   // Stubs for additional storage methods referenced by the route bundle at
   // registration time. Returning undefined is safe — they are not invoked by
@@ -416,7 +420,9 @@ describe("admin webhook-audit route", () => {
       next();
     });
     await registerRoutes(adminApp);
-  });
+    // Importing the large cashclip route module can exceed the default 10s hook
+    // timeout when the full suite transforms files in parallel; give it headroom.
+  }, 30000);
 
   beforeEach(() => {
     getUserMock.mockReset();
