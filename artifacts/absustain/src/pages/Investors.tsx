@@ -2,6 +2,7 @@ import { useState } from "react";
 import { TrendingUp, PieChart, Activity, CheckCircle, DollarSign, BarChart3, Zap, ArrowUpRight, Monitor, Smartphone, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { useLang } from "../lib/i18n";
 import { Seo } from "../components/Seo";
+import { trackEvent } from "../lib/analytics";
 
 const PRE_MONEY = 1_000_000;
 
@@ -32,6 +33,7 @@ export default function Investors() {
         body: JSON.stringify({ ...form, type: "investor", source: "website-investors" }),
       });
       if (!res.ok) throw new Error();
+      trackEvent("lead_submit", { type: "investor" });
       setStatus("sent");
       setForm({ name: "", email: "" });
     } catch {

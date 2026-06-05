@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, numeric, integer, boolean, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, numeric, integer, boolean, index, uniqueIndex, check, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -167,6 +167,45 @@ export const leads = pgTable(
   (t) => ({
     emailIdx: index("leads_email_idx").on(t.email),
     typeIdx: index("leads_type_idx").on(t.type),
+  })
+);
+
+// First-party, cookieless web analytics events for the public web surfaces
+// (the absustain corporate site and the API-served CashClip landing page).
+// Append-only. Stores no IP address and sets no cookie — see
+// docs/web-analytics.md for the event taxonomy.
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    // Named event, e.g. 'pageview', 'app_store_click', 'download_click',
+    // 'referral_click', 'lead_submit'. Allowlisted server-side.
+    eventName: text("event_name").notNull(),
+    // Which web surface emitted it: 'absustain' or 'cashclip-landing'.
+    surface: text("surface").notNull(),
+    // Page path the event fired on (no query string).
+    path: text("path"),
+    // Document referrer captured at first page load (traffic source).
+    referrer: text("referrer"),
+    // UTM campaign parameters for channel attribution (paid/social/organic).
+    utmSource: text("utm_source"),
+    utmMedium: text("utm_medium"),
+    utmCampaign: text("utm_campaign"),
+    utmTerm: text("utm_term"),
+    utmContent: text("utm_content"),
+    // Extra structured properties (e.g. { store: 'ios' }). No PII.
+    props: jsonb("props"),
+    // User-agent string for device/browser breakdown. Never an IP — this
+    // collector is cookieless and stores no personally identifying network data.
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    eventIdx: index("analytics_events_event_idx").on(t.eventName, t.createdAt),
+    surfaceIdx: index("analytics_events_surface_idx").on(t.surface, t.createdAt),
+    utmSourceIdx: index("analytics_events_utm_source_idx").on(t.utmSource, t.createdAt),
   })
 );
 

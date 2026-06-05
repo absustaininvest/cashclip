@@ -1,5 +1,6 @@
-import { Suspense, lazy } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Suspense, lazy, useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { trackPageview, initAnalyticsClickTracking } from "./lib/analytics";
 import NotFound from "@/pages/not-found";
 import { PageLayout } from "./components/layout/PageLayout";
 import Home from "./pages/Home";
@@ -14,6 +15,18 @@ import CashClipTerms from "./pages/CashClipTerms";
 import { LanguageProvider } from "./lib/i18n";
 
 const AdminGate = lazy(() => import("./pages/AdminGate"));
+
+function AnalyticsTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    initAnalyticsClickTracking();
+  }, []);
+  // Fire a page view on the initial load and on every client-side route change.
+  useEffect(() => {
+    trackPageview();
+  }, [location]);
+  return null;
+}
 
 function Router() {
   return (
@@ -47,6 +60,7 @@ function App() {
   return (
     <LanguageProvider>
       <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+        <AnalyticsTracker />
         <Router />
       </WouterRouter>
     </LanguageProvider>

@@ -3,6 +3,7 @@ import { Mail, Globe, MapPin, Send, CheckCircle } from "lucide-react";
 import { SOCIALS } from "../lib/socials";
 import { useLang } from "../lib/i18n";
 import { Seo } from "../components/Seo";
+import { trackEvent } from "../lib/analytics";
 
 export default function Contact() {
   const { t } = useLang();
@@ -26,6 +27,7 @@ export default function Contact() {
         body: JSON.stringify({ ...form, type: "contact", source: "website-contact" }),
       });
       if (!res.ok) throw new Error();
+      trackEvent("lead_submit", { type: "contact" });
       setStatus("sent");
       setForm({ name: "", email: "", message: "" });
     } catch {

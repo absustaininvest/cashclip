@@ -1079,5 +1079,49 @@
         }
       })();
     </script>
+
+    <!-- First-party, cookieless web analytics. Sends fire-and-forget events to
+         the same-origin API collector. No cookies, no consent banner, and no
+         external scripts — so the existing CSP needs no loosening. See
+         docs/web-analytics.md for the event taxonomy. -->
+    <script>
+      (function () {
+        var ENDPOINT = '/api/analytics/collect';
+        var SURFACE = 'cashclip-landing';
+        var params = new URLSearchParams(window.location.search);
+        function pick(k) { var v = params.get(k); return v ? v.slice(0, 256) : undefined; }
+        var source = {
+          referrer: document.referrer ? document.referrer.slice(0, 1024) : undefined,
+          utmSource: pick('utm_source'),
+          utmMedium: pick('utm_medium'),
+          utmCampaign: pick('utm_campaign'),
+          utmTerm: pick('utm_term'),
+          utmContent: pick('utm_content')
+        };
+        function send(name, props) {
+          try {
+            var body = { eventName: name, surface: SURFACE, path: window.location.pathname };
+            for (var k in source) { if (source[k] !== undefined) body[k] = source[k]; }
+            if (props) body.props = props;
+            var payload = JSON.stringify(body);
+            var blob = new Blob([payload], { type: 'application/json' });
+            if (navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, blob)) return;
+            fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(function () {});
+          } catch (e) {}
+        }
+        send('pageview');
+        document.addEventListener('click', function (ev) {
+          var a = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+          if (!a || !a.href) return;
+          var url; try { url = new URL(a.href, window.location.href); } catch (e) { return; }
+          var host = url.hostname.replace(/^www\./, '');
+          var ref = url.searchParams.get('ref');
+          if (host === 'apps.apple.com') send('app_store_click', { store: 'ios' });
+          else if (host === 'play.google.com') send('app_store_click', { store: 'android' });
+          else if (host === 'cash-clip.app') send('download_click', {});
+          if (ref) send('referral_click', { ref: ref.slice(0, 128) });
+        }, true);
+      })();
+    </script>
   </body>
 </html>
