@@ -125,3 +125,15 @@ id = "w8swPsf_J_t5LCEOjU8r3"
 uri = "file://artifacts/cashclip/assets/images/chip/chip-sad.png"
 type = "image"
 title = "Sad — reserved for error/disappointment moments"
+
+[[outputs]]
+id = "I3Ob2jCfSxZ6N6CNRbZ6v"
+uri = "file://exports/CashClip_expo20-llc_artifacts.zip"
+type = "unspecified"
+title = "expo20/llc account — 15 builds (incl. LIVE build 29) — 324 MB"
+
+[[outputs]]
+id = "H9rUZmcBxH1-cXGnZijzt"
+uri = "file://exports/CashClip_absustaininvest_artifacts.zip"
+type = "unspecified"
+title = "absustaininvest/support account — 16 builds (33–38 + Android) — 656 MB"
