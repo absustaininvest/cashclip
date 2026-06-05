@@ -1,5 +1,6 @@
 import { ShieldCheck, Target, Zap } from "lucide-react";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 export default function About() {
   const { t } = useLang();
@@ -7,6 +8,11 @@ export default function About() {
 
   return (
     <div className="pt-32 pb-24 px-6 max-w-4xl mx-auto">
+      <Seo
+        title="About | AB Sustainability Investments"
+        description="Learn about AB Sustainability Investments LLC — a diversified holding company founded by Jorge Ballen that builds, operates, and invests in sustainable business models for long-term value."
+        path="/about"
+      />
 
       {/* Hero */}
       <div className="text-center mb-20">

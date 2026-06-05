@@ -1,9 +1,15 @@
 import { ArrowUpRight, UtensilsCrossed, MapPin, Clock, Mail, ExternalLink, Star } from "lucide-react";
 import { Link } from "wouter";
+import { Seo } from "../components/Seo";
 
 export default function Solera() {
   return (
     <div className="pt-32 pb-24 px-6 max-w-6xl mx-auto">
+      <Seo
+        title="Solera Restaurant | AB Sustainability Investments"
+        description="Solera Restaurant — aged in tradition, served with soul. A modern hospitality and food service venture in Lake Worth Beach, FL, part of AB Sustainability Investments."
+        path="/ventures/solera"
+      />
 
       {/* Hero */}
       <div className="text-center mb-24">

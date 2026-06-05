@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { TrendingUp, PieChart, Activity, CheckCircle, DollarSign, BarChart3, Zap, ArrowUpRight, Monitor, Smartphone, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 const PRE_MONEY = 1_000_000;
 
@@ -10,6 +11,13 @@ function calcEquity(investment: number) {
 
 export default function Investors() {
   const { t } = useLang();
+  const seo = (
+    <Seo
+      title="Investor Relations | AB Sustainability Investments"
+      description="Investor relations for AB Sustainability Investments LLC — explore investment opportunities, equity details, and the growth strategy behind our sustainable venture portfolio."
+      path="/investors"
+    />
+  );
   const [form, setForm] = useState({ name: "", email: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [customAmount, setCustomAmount] = useState(100000);
@@ -48,6 +56,7 @@ export default function Investors() {
 
   return (
     <div className="pt-32 pb-24 px-6 max-w-6xl mx-auto">
+      {seo}
 
       {/* Hero */}
       <div className="text-center mb-20">

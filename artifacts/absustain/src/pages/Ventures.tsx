@@ -1,11 +1,17 @@
 import { ArrowUpRight, Smartphone, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor } from "lucide-react";
 import { Link } from "wouter";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 export default function Ventures() {
   const { t } = useLang();
   return (
     <div className="pt-32 pb-24 px-6 max-w-6xl mx-auto">
+      <Seo
+        title="Ventures & Portfolio | AB Sustainability Investments"
+        description="Explore the AB Sustainability Investments portfolio across technology, retail, and food service — including the CashClip mobile rewards app and Solera Restaurant."
+        path="/ventures"
+      />
       <div className="text-center mb-20">
         <div className="section-label">{t.ventures.label}</div>
         <h1 className="font-serif italic font-bold text-5xl md:text-6xl text-white mb-6">{t.ventures.title}</h1>

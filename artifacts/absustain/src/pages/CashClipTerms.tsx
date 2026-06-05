@@ -1,6 +1,13 @@
+import { Seo } from "../components/Seo";
+
 export default function CashClipTerms() {
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 24px", fontFamily: "system-ui, sans-serif", color: "#1a1a1a", lineHeight: 1.7 }}>
+      <Seo
+        title="CashClip Terms of Service | AB Sustainability Investments"
+        description="The CashClip terms of service govern your use of the CashClip mobile rewards app operated by AB Sustainability Investments LLC, including rewards, withdrawals, and account rules."
+        path="/cashclip/terms"
+      />
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <img src="/cashclip-icon.png" alt="CashClip" style={{ width: 48, height: 48, borderRadius: 12 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />

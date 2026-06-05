@@ -439,6 +439,28 @@ export default function AdminGate() {
   const [validating, setValidating] = useState(true);
 
   useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "Operator Portal";
+    let robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const hadRobots = !!robots;
+    const prevRobots = robots?.getAttribute("content") ?? null;
+    if (!robots) {
+      robots = document.createElement("meta");
+      robots.setAttribute("name", "robots");
+      document.head.appendChild(robots);
+    }
+    robots.setAttribute("content", "noindex, nofollow");
+    return () => {
+      document.title = prevTitle;
+      if (hadRobots && prevRobots !== null) {
+        robots!.setAttribute("content", prevRobots);
+      } else if (robots && robots.parentNode) {
+        robots.parentNode.removeChild(robots);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const stored = localStorage.getItem("admin_token");
     if (!stored) {
       setValidating(false);

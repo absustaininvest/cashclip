@@ -2,11 +2,19 @@ import { useState } from "react";
 import { Mail, Globe, MapPin, Send, CheckCircle } from "lucide-react";
 import { SOCIALS } from "../lib/socials";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 export default function Contact() {
   const { t } = useLang();
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const seo = (
+    <Seo
+      title="Contact | AB Sustainability Investments"
+      description="Get in touch with AB Sustainability Investments LLC for corporate inquiries, partnerships, and investor relations, or reach support for the CashClip rewards app."
+      path="/contact"
+    />
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,6 +35,7 @@ export default function Contact() {
 
   return (
     <div className="pt-32 pb-24 px-6 max-w-5xl mx-auto min-h-[80vh] flex flex-col justify-center">
+      {seo}
       <div className="text-center mb-16">
         <div className="section-label">{t.contact.label}</div>
         <h1 className="font-serif italic font-bold text-5xl md:text-6xl text-white mb-6">{t.contact.title}</h1>

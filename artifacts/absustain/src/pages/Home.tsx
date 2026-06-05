@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ArrowRight, ChevronRight, BarChart3, Building2, ShoppingCart, Smartphone, FileText } from "lucide-react";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 export default function Home() {
   const { t } = useLang();
@@ -8,6 +9,11 @@ export default function Home() {
 
   return (
     <>
+      <Seo
+        title="AB Sustainability Investments LLC — Building Enduring Enterprises"
+        description="AB Sustainability Investments LLC is a diversified holding company building sustainable technology, retail, and food service ventures, including the CashClip rewards app and Solera Restaurant."
+        path="/"
+      />
       <section className="hero">
         <div className="hero-badge">
           <div className="dot" />

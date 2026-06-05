@@ -1,10 +1,16 @@
 import { Download, Mail, Globe, Briefcase, Smartphone, Users, BarChart3, Building2 } from "lucide-react";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 export default function PressKit() {
   const { t } = useLang();
   return (
     <div className="pt-32 pb-24 px-6 max-w-5xl mx-auto min-h-[80vh]">
+      <Seo
+        title="Press Kit | AB Sustainability Investments"
+        description="Press and media resources for AB Sustainability Investments LLC — company background, brand assets, leadership, and information about CashClip and our venture portfolio."
+        path="/press"
+      />
 
       <div className="text-center mb-20">
         <div className="section-label">{t.press.label}</div>
