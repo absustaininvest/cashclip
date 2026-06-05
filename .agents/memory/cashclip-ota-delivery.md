@@ -29,3 +29,10 @@ To publish an OTA onto build 29:
 
 ## For all builds: small, JS-only groups only
 runtimeVersion `"1.0.0"` is one static label shared across builds whose NATIVE code differs. OTA carries only JS + assets. Ship small, self-contained JS/content changes verified compatible with the OLDEST reachable native layer; never bundle native changes (new SDK/module, new permission, plugin/`expo-build-properties`/`newArchEnabled` changes) into an OTA — those need a new App Store build. Get explicit owner approval before any publish.
+
+## Publishing an OTA from an ISOLATED out-of-tree build (ship SOME of HEAD, exclude held/uncommitted work)
+When only part of HEAD should ship to build 29 (e.g. a mascot but NOT a held economy rebalance), build an isolated tree from the live base commit: `git archive <livebase> | tar -x` into a dir OUTSIDE the workspace, add only the wanted files there, publish from it. Gotchas (all hit June 2026):
+- The `read`/`edit` tools ONLY operate inside the workspace root — they SILENTLY read/write the workspace HEAD copy, NOT your out-of-tree build dir. Edit build-dir files via bash (python/sed) only; verify by line counts. Usefully, this means `read` still shows you HEAD's version of each render site = a ready map of where the wanted edits go.
+- `eas update` REQUIRES a git repo; an archived tree has none and `git init` is sandbox-blocked. Set `EAS_NO_VCS=1` to bypass (eas warns, falls back to cwd as project root).
+- A backgrounded `eas update` (nohup/disown/&) gets REAPED when the bash tool call returns. Must run as a managed workflow (configureWorkflow outputType console, tee to /tmp log), poll the log for an exit marker, then removeWorkflow. Confirms the existing "plain bash eas gets KILLED" note.
+- `eas update` bundles BOTH platforms by default → ships ios+android in one group (the `expo export --platform ios` dry-run is iOS-only, so it under-reports). Fine for build 29 since runtime 1.0.0 is shared.
