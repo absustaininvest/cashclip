@@ -39,3 +39,11 @@ wallet withdraw (`handleWithdraw`). SKIP spin/scratch/missions on base-29 — th
 have no genuine-win signal and would celebrate fake/local wins. Also: base-29 root
 has NO `OtaUpdateGate`; mount `CelebrationProvider` inside `TrackingConsentGate`
 wrapping `RootLayoutNav` instead.
+
+**Incident (Jun 5 2026):** the first build-29 celebration OTA accidentally wired the
+spin `celebrate()` (modal onClose), violating the SKIP-spin rule above — it shipped
+LIVE and celebrated fallback/non-credited spins (wheel lands on a random segment,
+credits the server amount, but still partied). Owner approved a corrective OTA that
+removed the spin `celebrate()`; live-correct trigger set on base-29 is now wallet
+convert + withdraw + earn claim-all only. **Before publishing any build-29
+celebration OTA, `grep celebrate(` and confirm NO spin/scratch/mission call site.**
