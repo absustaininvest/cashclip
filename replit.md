@@ -34,6 +34,9 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `ADJOE_SDK_KEY` | Adjoe offerwall SDK key |
 | `ADJOE_APP_ID` | Adjoe offerwall app ID |
 | `APP_VISIT_PROOF_KEY` | Sponsored-visit app attestation key. Must be a 32-byte random hex string. Set as an EAS secret (not `EXPO_PUBLIC_APP_VISIT_PROOF_KEY` — it must NOT be EXPO_PUBLIC so it is not intentionally client-exposed). app.config.js reads this and embeds it in `extra.appVisitProofKey`; the app reads it via `Constants.expoConfig.extra.appVisitProofKey`. The server reads it from this env var to validate HMAC-SHA256 attestations at `/api/earn/sponsored/:id/visit`. Must match on both sides. |
+| `SENTRY_TOKEN` | Sentry **build-time auth token** (uploads source maps during the EAS build so crash stack traces are readable). NOT the DSN. Owner added Jun 5 2026. Sentry org: `ab-sustainability-investments`. |
+| `EXPO_PUBLIC_SENTRY_DSN` | Sentry **DSN** — the client key that actually lets the app *send* crash/error reports. Client-exposed by design (lives in the app), so EXPO_PUBLIC so Expo inlines it into build 39. Found in Sentry → Settings → Projects → CashClip → Client Keys (DSN). |
+| `EXPO_PUBLIC_VEXO_API_KEY` | Vexo Analytics client API key (Vexo app "Cash-Clip", repo `absustaininvest/cashclip`). Client-exposed by design; EXPO_PUBLIC so Expo inlines it into build 39. From the Vexo dashboard → App Settings → API KEY. |
 
 ## Apps / Artifacts
 
