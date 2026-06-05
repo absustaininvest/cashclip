@@ -38,6 +38,11 @@ export const users = pgTable("users", {
   checkinStreak: integer("checkin_streak").notNull().default(0),
   lastCheckinAt: timestamp("last_checkin_at", { withTimezone: true }),
   tokenVersion: integer("token_version").notNull().default(0),
+  // Last time this user made an authenticated request. Updated (throttled, at
+  // most ~once/min per user) from the auth middleware so the admin Integration
+  // Hub can count "users online in the last 5 minutes". Nullable for users who
+  // have never been seen since this column was introduced.
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   isPublisher: boolean("is_publisher").notNull().default(false),
   publisherGrantedAt: timestamp("publisher_granted_at"),
   adCredits: numeric("ad_credits", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -48,6 +53,7 @@ export const users = pgTable("users", {
 (t) => ({
   balanceNonNegative: check("users_balance_non_negative", sql`${t.balance} >= 0`),
   adCreditsNonNegative: check("users_ad_credits_non_negative", sql`${t.adCredits} >= 0`),
+  lastSeenIdx: index("users_last_seen_idx").on(t.lastSeenAt),
 }));
 
 export const withdrawals = pgTable("withdrawals", {

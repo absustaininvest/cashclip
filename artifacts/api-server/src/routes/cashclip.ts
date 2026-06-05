@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import jwt from "jsonwebtoken";
 import { getIntegrationStatuses, getIntegrationSummary, integrations } from "../integrations";
+import { checkIntegrationsHealth } from "../lib/integrationHealth";
 import {
   persistIntegrationKey,
   deletePersistedIntegrationKey,
@@ -67,21 +68,6 @@ interface FundingMetrics {
   monthlyProjected: number;
   userPayoutRate: number;
   selfSufficiencyScore: number;
-}
-
-function getHealthCheckUrl(integrationId: string): string | null {
-  const urls: Record<string, string> = {
-    paypal: process.env.PAYPAL_MODE === "live"
-      ? "https://api-m.paypal.com/v1/oauth2/token"
-      : "https://api-m.sandbox.paypal.com/v1/oauth2/token",
-    pollfish: "https://api.pollfish.com/v2",
-    cint: "https://api.cint.com/v1",
-    lucid: "https://api.samplicio.us/supply/v1",
-    tapjoy: "https://app.tapjoy.com/publisher/v1",
-    adgate: "https://wall.adgaterewards.com/api/v1",
-    offertoro: "https://www.offertoro.com/api/v1",
-  };
-  return urls[integrationId] ?? null;
 }
 
 // Normalize a client-reported per-impression ad revenue figure (AdMob
@@ -337,16 +323,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  interface HealthCheckResult {
-    id: string;
-    name: string;
-    category: string;
-    reachable: boolean;
-    httpStatus: number | undefined;
-    latencyMs: number;
-    error: string | undefined;
-  }
-
   app.get("/api/integrations/health", adminMiddleware, async (_req, res) => {
     const statuses = getIntegrationStatuses();
     const configured = statuses.filter((s) => s.connected);
@@ -358,49 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }); return;
     }
 
-    const checks = await Promise.allSettled(
-      configured.map(async (integration): Promise<HealthCheckResult> => {
-        const start = Date.now();
-        let reachable = false;
-        let error: string | undefined;
-        let httpStatus: number | undefined;
-
-        try {
-          const testUrl = getHealthCheckUrl(integration.id);
-          if (testUrl) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
-            const resp = await fetch(testUrl, {
-              method: "HEAD",
-              signal: controller.signal,
-            }).catch(() => null);
-            clearTimeout(timeout);
-            if (resp) {
-              httpStatus = resp.status;
-              reachable = resp.status < 500;
-            }
-          } else {
-            reachable = true;
-          }
-        } catch (err: unknown) {
-          error = err instanceof Error ? err.message : "Connection failed";
-        }
-
-        return {
-          id: integration.id,
-          name: integration.name,
-          category: integration.category,
-          reachable,
-          httpStatus,
-          latencyMs: Date.now() - start,
-          error,
-        };
-      }),
-    );
-
-    const results: HealthCheckResult[] = checks
-      .filter((r): r is PromiseFulfilledResult<HealthCheckResult> => r.status === "fulfilled")
-      .map((r) => r.value);
+    const results = await checkIntegrationsHealth(configured);
 
     res.json({
       checkedAt: new Date().toISOString(),
@@ -408,6 +342,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reachable: results.filter((r) => r.reachable).length,
       unreachable: results.filter((r) => !r.reachable).length,
       results,
+    });
+  });
+
+  /**
+   * GET /api/admin/integration-hub
+   *
+   * One consolidated payload for the admin Integration Hub:
+   *   - every integration with a green/red status (configured + live-reachable),
+   *     plus when it was last checked
+   *   - API + website service health
+   *   - current app version and the last deploy/build timestamp
+   *   - count of users seen in the last 5 minutes ("users online")
+   *
+   * Each section degrades gracefully: a failed sub-check is reported as
+   * down/unknown rather than failing the whole request.
+   */
+  app.get("/api/admin/integration-hub", adminMiddleware, async (_req, res) => {
+    const checkedAt = new Date().toISOString();
+    const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+    const statuses = getIntegrationStatuses();
+    const configured = statuses.filter((s) => s.connected);
+
+    // Live reachability for the configured integrations. Never throws — degrades
+    // to an empty result set so the rest of the hub still renders.
+    const healthResults = await checkIntegrationsHealth(configured).catch(
+      () => [] as Awaited<ReturnType<typeof checkIntegrationsHealth>>,
+    );
+    const healthById = new Map(healthResults.map((r) => [r.id, r]));
+
+    const integrationViews = statuses.map((s) => {
+      const health = healthById.get(s.id);
+      // green only when configured AND (no probe, or probe reachable).
+      // amber when configured but provider unreachable; red when not configured.
+      let status: "green" | "amber" | "red";
+      if (!s.connected) {
+        status = "red";
+      } else if (health && !health.reachable) {
+        status = "amber";
+      } else {
+        status = "green";
+      }
+      return {
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        configured: s.connected,
+        reachable: health ? health.reachable : null,
+        httpStatus: health?.httpStatus ?? null,
+        latencyMs: health?.latencyMs ?? null,
+        status,
+        lastCheckedAt: checkedAt,
+      };
+    });
+
+    // ── Service health ────────────────────────────────────────────────────
+    // API: this request is being served, so the process is up. We also probe
+    // the DB (the online-user count below) — if that throws we mark API down.
+    let onlineUsers: number | null = null;
+    let apiUp = true;
+    try {
+      onlineUsers = await storage.countOnlineUsers(ONLINE_WINDOW_MS);
+    } catch (err) {
+      apiUp = false;
+      _req.log?.warn({ err }, "integration-hub: online-user count failed");
+    }
+
+    // Website: probe the public marketing site. Configurable so dev/preview can
+    // point at a reachable host; defaults to the production corporate site.
+    const websiteUrl = process.env.HUB_WEBSITE_URL ?? "https://absustaininvest.com";
+    let websiteUp = false;
+    let websiteStatus: number | null = null;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(websiteUrl, {
+        method: "HEAD",
+        signal: controller.signal,
+        redirect: "follow",
+      }).catch(() => null);
+      clearTimeout(timeout);
+      if (resp) {
+        websiteStatus = resp.status;
+        websiteUp = resp.status < 500;
+      }
+    } catch {
+      websiteUp = false;
+    }
+
+    const services = [
+      {
+        id: "api",
+        name: "API Server",
+        up: apiUp,
+        detail: apiUp ? "Responding" : "Database unreachable",
+      },
+      {
+        id: "website",
+        name: "Website",
+        up: websiteUp,
+        url: websiteUrl,
+        httpStatus: websiteStatus,
+        detail: websiteUp
+          ? "Reachable"
+          : websiteStatus
+            ? `HTTP ${websiteStatus}`
+            : "Unreachable",
+      },
+    ];
+
+    // ── Deploy / version ──────────────────────────────────────────────────
+    // BUILD_TIME is injected at build time by build.mjs (esbuild define), so it
+    // reflects the latest deploy/build in production and the last restart in dev.
+    const buildTime =
+      typeof process.env.BUILD_TIME === "string" && process.env.BUILD_TIME
+        ? process.env.BUILD_TIME
+        : null;
+    const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.1.0";
+
+    res.json({
+      checkedAt,
+      onlineWindowMinutes: ONLINE_WINDOW_MS / 60000,
+      usersOnline: onlineUsers,
+      version: {
+        current: currentVersion,
+        lastDeployedAt: buildTime,
+      },
+      services,
+      integrations: {
+        total: integrationViews.length,
+        green: integrationViews.filter((i) => i.status === "green").length,
+        items: integrationViews,
+      },
     });
   });
 

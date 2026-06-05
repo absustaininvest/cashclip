@@ -42,6 +42,10 @@ import {
   ChevronLeft,
   Globe,
   Search,
+  Activity,
+  Server,
+  Wifi,
+  Rocket,
 } from "lucide-react";
 
 interface Lead {
@@ -3824,8 +3828,334 @@ function SecurityLogPanel({
   );
 }
 
+interface HubIntegration {
+  id: string;
+  name: string;
+  category: string;
+  configured: boolean;
+  reachable: boolean | null;
+  httpStatus: number | null;
+  latencyMs: number | null;
+  status: "green" | "amber" | "red";
+  lastCheckedAt: string;
+}
+
+interface HubService {
+  id: string;
+  name: string;
+  up: boolean;
+  url?: string;
+  httpStatus?: number | null;
+  detail?: string;
+}
+
+interface HubData {
+  checkedAt: string;
+  onlineWindowMinutes: number;
+  usersOnline: number | null;
+  version: { current: string; lastDeployedAt: string | null };
+  services: HubService[];
+  integrations: { total: number; green: number; items: HubIntegration[] };
+}
+
+const HUB_REFRESH_MS = 45_000;
+
+function StatusDot({ status }: { status: "green" | "amber" | "red" }) {
+  const color =
+    status === "green"
+      ? "bg-[#00E676]"
+      : status === "amber"
+        ? "bg-amber-400"
+        : "bg-red-500";
+  return (
+    <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+      {status === "green" && (
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00E676]/60" />
+      )}
+      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${color}`} />
+    </span>
+  );
+}
+
+function hubTimeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return "just now";
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+const HUB_CATEGORY_LABELS: Record<string, string> = {
+  ads: "Ad Networks",
+  surveys: "Surveys",
+  affiliates: "Offerwalls & Affiliates",
+  payments: "Payments",
+  investments: "Investments",
+};
+
+function IntegrationHubPanel({
+  token,
+  onLogout,
+}: {
+  token: string;
+  onLogout: () => void;
+}) {
+  const [data, setData] = useState<HubData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const fetchHub = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/integration-hub", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        onLogout();
+        return;
+      }
+      if (!res.ok) throw new Error("Failed to load status");
+      const json = (await res.json()) as HubData;
+      setData(json);
+      setLastRefreshed(new Date());
+    } catch (err: any) {
+      setError(err.message || "Failed to load status");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, onLogout]);
+
+  useEffect(() => {
+    fetchHub();
+    const interval = setInterval(fetchHub, HUB_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [fetchHub]);
+
+  const grouped = (data?.integrations.items ?? []).reduce<
+    Record<string, HubIntegration[]>
+  >((acc, item) => {
+    (acc[item.category] ??= []).push(item);
+    return acc;
+  }, {});
+
+  const usersOnline = data?.usersOnline ?? null;
+  const allServicesUp = (data?.services ?? []).every((s) => s.up);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
+            <Activity className="w-5 h-5 text-[#00E676]" />
+          </div>
+          <div>
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+              Integration Hub
+            </h2>
+            <p className="text-white/40 text-sm">
+              Live health of every service, integration, and user session
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-white/30 text-xs">
+            {lastRefreshed
+              ? `Last refreshed ${lastRefreshed.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}`
+              : "Loading…"}
+          </span>
+          <button
+            onClick={fetchHub}
+            disabled={loading}
+            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            title="Refresh now"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error} — showing the last known values where available.
+        </div>
+      )}
+
+      {/* Top status row: services + users online + last deploy */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Users online */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Wifi className="w-4 h-4 text-[#00E676]" />
+            <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+              Users Online
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <StatusDot status={usersOnline && usersOnline > 0 ? "green" : "amber"} />
+            <span className="text-3xl font-bold text-white tabular-nums">
+              {usersOnline == null ? "—" : usersOnline}
+            </span>
+          </div>
+          <p className="text-white/30 text-xs mt-2">
+            Active in the last {data?.onlineWindowMinutes ?? 5} minutes
+          </p>
+        </div>
+
+        {/* Services */}
+        {(data?.services ?? []).map((svc) => (
+          <div
+            key={svc.id}
+            className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              {svc.id === "website" ? (
+                <Globe className="w-4 h-4 text-white/50" />
+              ) : (
+                <Server className="w-4 h-4 text-white/50" />
+              )}
+              <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+                {svc.name}
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <StatusDot status={svc.up ? "green" : "red"} />
+              <span
+                className={`text-lg font-bold ${svc.up ? "text-[#00E676]" : "text-red-400"}`}
+              >
+                {svc.up ? "Operational" : "Down"}
+              </span>
+            </div>
+            <p className="text-white/30 text-xs mt-2 truncate">
+              {svc.detail ?? (svc.up ? "Reachable" : "Unreachable")}
+            </p>
+          </div>
+        ))}
+
+        {/* Last deployed */}
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Rocket className="w-4 h-4 text-white/50" />
+            <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+              Last Deployed
+            </span>
+          </div>
+          <div className="text-lg font-bold text-white">
+            {data?.version.lastDeployedAt
+              ? hubTimeAgo(data.version.lastDeployedAt)
+              : "Unknown"}
+          </div>
+          <p className="text-white/30 text-xs mt-2">
+            App v{data?.version.current ?? "—"}
+            {data?.version.lastDeployedAt && (
+              <>
+                {" · "}
+                {new Date(data.version.lastDeployedAt).toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" },
+                )}
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Integrations grid */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+              Integrations
+            </h3>
+            {data && (
+              <span className="text-white/30 text-sm">
+                {data.integrations.green}/{data.integrations.total} healthy
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-white/40">
+            <span className="flex items-center gap-1.5">
+              <StatusDot status="green" /> Connected
+            </span>
+            <span className="flex items-center gap-1.5">
+              <StatusDot status="amber" /> Unreachable
+            </span>
+            <span className="flex items-center gap-1.5">
+              <StatusDot status="red" /> Not set up
+            </span>
+          </div>
+        </div>
+
+        {loading && !data ? (
+          <div className="text-center py-12 text-white/30 text-sm">
+            Loading integration status…
+          </div>
+        ) : !data || data.integrations.items.length === 0 ? (
+          <div className="text-center py-12 text-white/30 text-sm">
+            No integrations to display.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([category, items]) => (
+              <div key={category}>
+                <p className="text-white/30 text-xs font-semibold uppercase tracking-wider mb-2.5">
+                  {HUB_CATEGORY_LABELS[category] ?? category}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {items.map((it) => (
+                    <div
+                      key={it.id}
+                      className="flex items-center justify-between gap-3 bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <StatusDot status={it.status} />
+                        <div className="min-w-0">
+                          <p className="text-white text-sm font-medium truncate">
+                            {it.name}
+                          </p>
+                          <p className="text-white/30 text-[11px]">
+                            {it.configured
+                              ? it.status === "amber"
+                                ? "Configured · provider unreachable"
+                                : "Connected"
+                              : "Credentials missing"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-white/20 text-[10px] flex-shrink-0">
+                        {hubTimeAgo(it.lastCheckedAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <p className="text-white/20 text-xs text-center">
+        Auto-refreshes every {HUB_REFRESH_MS / 1000}s ·{" "}
+        {allServicesUp ? "All core services operational" : "Service issue detected"}
+      </p>
+    </div>
+  );
+}
+
 type Tab =
   | "submissions"
+  | "hub"
   | "ventures"
   | "inbox"
   | "account"
@@ -3908,6 +4238,7 @@ function Dashboard({
 
   const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "submissions", label: "Submissions", icon: MessageSquare },
+    { id: "hub", label: "Integration Hub", icon: Activity },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
@@ -4129,6 +4460,7 @@ function Dashboard({
           </>
         )}
 
+        {tab === "hub" && <IntegrationHubPanel token={token} onLogout={onLogout} />}
         {tab === "cashclip" && <CashClipUsersPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}

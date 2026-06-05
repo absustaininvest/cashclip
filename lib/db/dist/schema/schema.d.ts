@@ -430,6 +430,23 @@ export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        lastSeenAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "last_seen_at";
+            tableName: "users";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         isPublisher: import("drizzle-orm/pg-core").PgColumn<{
             name: "is_publisher";
             tableName: "users";

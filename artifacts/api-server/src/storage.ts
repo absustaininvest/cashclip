@@ -100,6 +100,8 @@ export interface IStorage {
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
+  touchUserLastSeen(id: string): Promise<void>;
+  countOnlineUsers(withinMs: number): Promise<number>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
   recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }): Promise<void>;
   getSecurityAuditEntries(opts?: {
@@ -332,6 +334,37 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`incrementTokenVersion: no row updated for user ${id}`);
     }
     return { tokenVersion: updated.tokenVersion };
+  }
+
+  // Mark a user as recently active. Guarded by a SQL WHERE so it only writes
+  // when the stored value is stale (>50s old), which keeps writes bounded even
+  // across replicas (the in-process throttle in the auth middleware is just an
+  // optimization on top of this). Best-effort: callers swallow errors so a DB
+  // blip never breaks an authenticated request.
+  async touchUserLastSeen(id: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastSeenAt: sql`now()` })
+      .where(
+        and(
+          eq(users.id, id),
+          or(
+            sql`${users.lastSeenAt} IS NULL`,
+            sql`${users.lastSeenAt} < now() - interval '50 seconds'`,
+          ),
+        ),
+      );
+  }
+
+  // Count distinct users whose last authenticated request was within the given
+  // window (used for the "users online (last 5 min)" indicator).
+  async countOnlineUsers(withinMs: number): Promise<number> {
+    const since = new Date(Date.now() - withinMs);
+    const [row] = await db
+      .select({ total: count() })
+      .from(users)
+      .where(gte(users.lastSeenAt, since));
+    return Number(row?.total ?? 0);
   }
 
   async setTotpBackupCodes(userId: string, hashes: string[], executor: Executor = db): Promise<void> {

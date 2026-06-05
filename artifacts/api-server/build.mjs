@@ -23,6 +23,12 @@ async function buildAll() {
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
+    // Stamp the build/deploy time into the bundle so the admin Integration Hub
+    // can show an accurate "last deployed" value in production (the Publish flow
+    // runs this build). Replaces `process.env.BUILD_TIME` at build time.
+    define: {
+      "process.env.BUILD_TIME": JSON.stringify(new Date().toISOString()),
+    },
     // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
     // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
     // Examples of unbundleable packages:

@@ -266,7 +266,36 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   }
   req.userId = user.id;
   req.userRole = user.role;
+  // Refresh the online-presence signal used by the admin Integration Hub.
+  // Fire-and-forget and throttled per-replica so it never delays or fails the
+  // request; the storage layer also guards the write with a staleness check.
+  touchLastSeen(user.id);
   next();
+}
+
+// Per-replica throttle so we don't issue an UPDATE on every authenticated
+// request — at most one touch per user per THROTTLE window. The DB write is
+// additionally guarded by a staleness WHERE clause (see storage.touchUserLastSeen)
+// so correctness holds even across multiple replicas with independent caches.
+const LAST_SEEN_THROTTLE_MS = 60_000;
+const lastSeenTouchedAt = new Map<string, number>();
+
+function touchLastSeen(userId: string): void {
+  const now = Date.now();
+  const prev = lastSeenTouchedAt.get(userId);
+  if (prev && now - prev < LAST_SEEN_THROTTLE_MS) return;
+  lastSeenTouchedAt.set(userId, now);
+  // Opportunistically bound the map so it can't grow without limit on a
+  // long-lived replica serving many distinct users.
+  if (lastSeenTouchedAt.size > 10_000) {
+    const cutoff = now - LAST_SEEN_THROTTLE_MS;
+    for (const [id, ts] of lastSeenTouchedAt) {
+      if (ts < cutoff) lastSeenTouchedAt.delete(id);
+    }
+  }
+  void storage.touchUserLastSeen(userId).catch((err) => {
+    logger.warn({ err, userId }, "failed to update lastSeenAt");
+  });
 }
 
 export async function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
