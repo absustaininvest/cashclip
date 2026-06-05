@@ -12,7 +12,7 @@ import {
   Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -50,6 +50,20 @@ export default function RegisterScreen() {
   useEffect(() => {
     if (error) setError("");
   }, [username, email, password, confirmPassword, agreedToTerms]);
+
+  // Prefill the referral code from a ?ref=<code> link (e.g. cash-clip.app/r/<code>)
+  // and reveal the field so the friend doesn't have to type it. Format is
+  // validated server-side at registration; this only normalizes/prefills.
+  const params = useLocalSearchParams<{ ref?: string | string[] }>();
+  useEffect(() => {
+    const raw = Array.isArray(params.ref) ? params.ref[0] : params.ref;
+    if (!raw) return;
+    const code = raw.trim().slice(0, 30);
+    if (code && /^[\p{L}\p{N}_-]+$/u.test(code)) {
+      setReferralCode((prev) => (prev ? prev : code));
+      setShowReferral(true);
+    }
+  }, [params.ref]);
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
 

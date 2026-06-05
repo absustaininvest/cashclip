@@ -201,6 +201,21 @@ const corporateHtml = loadTemplate("corporate-page.html");
 const privacyHtml = loadTemplate("privacy-page.html");
 const supportHtml = loadTemplate("support-page.html");
 const surveyDoneHtml = loadTemplate("survey-done.html");
+const referralHtml = loadTemplate("referral-landing.html");
+
+// Referral codes are normalized usernames (3–30 chars, letters/numbers/_/-),
+// matching the registration rule. Only the format is validated — never whether
+// the user exists — to avoid account enumeration from this public route.
+const REFERRAL_USERNAME_RE = /^[\p{L}\p{N}_-]{3,30}$/u;
+
+function escapeHtmlAttr(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // ── HOST-BASED ROUTING: absustaininvest.com → corporate site ─────────────────
 // When the request hostname matches the corporate domain, serve the absustain
@@ -235,6 +250,34 @@ if (landingHtml) {
   app.get("/api/", (_req, res) => {
     res.type("html").send(landingHtml);
   });
+}
+
+// Shareable referral landing: cash-clip.app/r/<username>. The public site is
+// normally served by the standalone web host, but mirroring the route here
+// keeps it working on the API host and lets it be exercised in dev/preview.
+// Analytics beacons go same-origin to /api/analytics/collect.
+if (referralHtml) {
+  const renderReferral = (rawUsername: string, res: express.Response) => {
+    const username = (rawUsername ?? "").trim();
+    if (!REFERRAL_USERNAME_RE.test(username)) {
+      // Fall back to the generic landing rather than a broken referral page.
+      if (landingHtml) {
+        res.type("html").send(landingHtml);
+      } else {
+        res.redirect(302, "https://cash-clip.app/");
+      }
+      return;
+    }
+    const canonical = escapeHtmlAttr(`https://cash-clip.app/r/${encodeURIComponent(username)}`);
+    const html = referralHtml
+      .replace(/CANONICAL_URL_PLACEHOLDER/g, canonical)
+      .replace(/REF_CODE_HTML_PLACEHOLDER/g, escapeHtmlAttr(username))
+      .replace(/REF_CODE_JS_PLACEHOLDER/g, JSON.stringify(username))
+      .replace(/ANALYTICS_ENDPOINT_JS_PLACEHOLDER/g, JSON.stringify("/api/analytics/collect"));
+    res.type("html").send(html);
+  };
+  app.get("/r/:username", (req, res) => renderReferral(req.params.username, res));
+  app.get("/api/r/:username", (req, res) => renderReferral(req.params.username, res));
 }
 
 if (corporateHtml) {

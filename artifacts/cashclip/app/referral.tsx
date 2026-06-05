@@ -7,6 +7,7 @@ import {
   Pressable,
   Platform,
   Alert,
+  Share,
   FlatList,
   ActivityIndicator,
 } from "react-native";
@@ -90,11 +91,20 @@ export default function ReferralScreen() {
     );
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (!referralCode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const shareLink = `${t.referral.joinCashClip} ${referralCode}`;
-    Alert.alert(t.referral.shareYourLink, shareLink, [{ text: "OK", onPress: () => {} }]);
+    // Smart link lands friends on cash-clip.app/r/<code>: it detects their
+    // platform, points them to the store, and shows the code ready to paste.
+    // The code is included inline as a fallback in case the link is stripped.
+    const referralUrl = `https://cash-clip.app/r/${encodeURIComponent(referralCode)}`;
+    const message = `${t.referral.joinCashClip} ${referralCode}\n${referralUrl}`;
+    try {
+      await Share.share({ message, title: t.referral.shareYourLink });
+    } catch {
+      // Sharing dismissed/unavailable — show the link so it can be copied.
+      Alert.alert(t.referral.shareYourLink, message, [{ text: "OK", onPress: () => {} }]);
+    }
   };
 
   if (!fontsLoaded) return null;

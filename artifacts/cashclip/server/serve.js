@@ -17,6 +17,7 @@ const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
 const PRIVACY_PATH = path.resolve(__dirname, "templates", "privacy.html");
 const SUPPORT_PATH = path.resolve(__dirname, "templates", "support.html");
+const REFERRAL_PATH = path.resolve(__dirname, "templates", "referral-landing.html");
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
 const MIME_TYPES = {
@@ -117,7 +118,39 @@ function serveStaticFile(urlPath, res) {
 const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, "utf-8");
 const privacyPageHtml = fs.readFileSync(PRIVACY_PATH, "utf-8");
 const supportPageHtml = fs.readFileSync(SUPPORT_PATH, "utf-8");
+const referralPageTemplate = fs.readFileSync(REFERRAL_PATH, "utf-8");
 const appName = getAppName();
+
+// Referral codes are normalized usernames (3–30 chars, letters/numbers/_/-),
+// matching the server-side registration rule. We only validate the *format*
+// here — never whether the user exists — so the static web host stays DB-free
+// and can't be used to enumerate accounts.
+const REFERRAL_PATH_RE = /^\/r\/([^/]+)\/?$/;
+const USERNAME_RE = /^[\p{L}\p{N}_-]{3,30}$/u;
+
+// Public referral landing. The analytics collector lives on the API host, so
+// the page beacons cross-origin to the registered legal API domain (allowed by
+// the collector's CORS policy). Never a Replit subdomain (per project rules).
+const REFERRAL_ANALYTICS_ENDPOINT = "https://api.cash-clip.app/api/analytics/collect";
+
+function serveReferralPage(rawUsername, res) {
+  const username = typeof rawUsername === "string" ? rawUsername.trim() : "";
+  // Invalid/oddly-shaped codes get the generic marketing page rather than a
+  // broken referral page — the link still converts to a download.
+  if (!USERNAME_RE.test(username)) {
+    return serveLandingPage(res, landingPageTemplate, appName);
+  }
+
+  const canonical = htmlEscape(`https://${CASHCLIP_DOMAIN}/r/${encodeURIComponent(username)}`);
+  const html = referralPageTemplate
+    .replace(/CANONICAL_URL_PLACEHOLDER/g, canonical)
+    .replace(/REF_CODE_HTML_PLACEHOLDER/g, htmlEscape(username))
+    .replace(/REF_CODE_JS_PLACEHOLDER/g, JSON.stringify(username))
+    .replace(/ANALYTICS_ENDPOINT_JS_PLACEHOLDER/g, JSON.stringify(REFERRAL_ANALYTICS_ENDPOINT));
+
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...ANTI_FRAMING_HEADERS });
+  res.end(html);
+}
 
 function serveStaticHtml(html, res) {
   res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...ANTI_FRAMING_HEADERS });
@@ -206,6 +239,17 @@ const server = http.createServer((req, res) => {
     if (pathname === "/") {
       return serveLandingPage(res, landingPageTemplate, appName);
     }
+  }
+
+  const referralMatch = REFERRAL_PATH_RE.exec(pathname);
+  if (referralMatch && !expoPlatform) {
+    let refUser = referralMatch[1];
+    try {
+      refUser = decodeURIComponent(refUser);
+    } catch {
+      // Leave undecoded; the format check below will reject malformed input.
+    }
+    return serveReferralPage(refUser, res);
   }
 
   if (pathname === "/privacy" || pathname === "/privacy/") {
