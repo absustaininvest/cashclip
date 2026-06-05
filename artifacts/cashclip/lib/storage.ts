@@ -786,7 +786,18 @@ const GAME_COOLDOWN_KEYS: Record<string, string> = {
 // it lands roughly every couple of games without nagging on every round).
 const GAMES_PER_INTERSTITIAL = 2;
 
-export async function recordGamePlay(gameId: string, points: number, description: string): Promise<void> {
+export async function recordGamePlay(
+  gameId: string,
+  points: number,
+  description: string,
+  opts: { creditLocally?: boolean } = {},
+): Promise<void> {
+  // creditLocally defaults to true for legacy local-only games. Server-backed
+  // games (e.g. scratch card via /api/earn/game/complete) pass false: the reward
+  // is already issued into the server pending wallet, so adding a local optimistic
+  // balance here would double-count and show cash the server doesn't know about.
+  const { creditLocally = true } = opts;
+
   const today = new Date().toDateString();
   const cooldownKey = GAME_COOLDOWN_KEYS[gameId];
   if (cooldownKey) {
@@ -796,15 +807,17 @@ export async function recordGamePlay(gameId: string, points: number, description
   const gamesPlayed = await getNumber(KEYS.GAMES_PLAYED, 0);
   await setNumber(KEYS.GAMES_PLAYED, gamesPlayed + 1);
 
-  // Games award POINTS (display currency, 10,000 pts = $1), not direct dollars.
-  // Mirror the mission pattern: convert points to their dollar-equivalent for
-  // the optimistic local balance. The authoritative economy is server-side.
-  const dollars = displayPointsToDollars(points);
+  if (creditLocally) {
+    // Games award POINTS (display currency, 10,000 pts = $1), not direct dollars.
+    // Mirror the mission pattern: convert points to their dollar-equivalent for
+    // the optimistic local balance. The authoritative economy is server-side.
+    const dollars = displayPointsToDollars(points);
 
-  const gameEarnings = await getNumber(KEYS.GAME_EARNINGS, 0);
-  await setNumber(KEYS.GAME_EARNINGS, gameEarnings + dollars);
+    const gameEarnings = await getNumber(KEYS.GAME_EARNINGS, 0);
+    await setNumber(KEYS.GAME_EARNINGS, gameEarnings + dollars);
 
-  await addEarnings(dollars, description, "game");
+    await addEarnings(dollars, description, "game");
+  }
 
   // Interstitials fire at a natural transition (finishing a game) but only once
   // every Nth finished game so they stay non-annoying — not after every single

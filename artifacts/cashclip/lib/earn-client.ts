@@ -275,6 +275,77 @@ export async function completeSpin(challengeToken: string): Promise<SpinComplete
   return { ok: false, retryable: true };
 }
 
+// ── SERVER-AUTHORITATIVE MINI-GAME REWARD (begin → complete) ──────────────────
+// Mirrors the spin wheel. The client calls beginGame() when the game starts to
+// get a server challenge token, then completeGame(token) when the player wins.
+// The SERVER decides the reward amount (from its GAME_POOL) and drops it into
+// the pending wallet — the game's on-screen symbols/outcome are cosmetic and are
+// never trusted for the amount. This is the only path that credits game rewards;
+// the old local-only credit never reached the withdrawable server balance.
+export type GameBeginResult =
+  | { ok: true;  challengeToken: string }
+  | { ok: false; retryable: boolean };
+
+export async function beginGame(): Promise<GameBeginResult> {
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/game/begin", {});
+      if (res.ok) {
+        const data = await res.json() as { challengeToken?: string };
+        return data.challengeToken
+          ? { ok: true, challengeToken: data.challengeToken }
+          : { ok: false, retryable: false };
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
+  }
+  return { ok: false, retryable: true };
+}
+
+export type GameCompleteResult =
+  | { ok: true;  token: EarnToken }
+  | { ok: false; retryable: boolean };
+
+export async function completeGame(
+  challengeToken: string,
+  description: string,
+): Promise<GameCompleteResult> {
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/game/complete", { challengeToken, description });
+      if (res.ok) {
+        const data = await res.json() as { tokenId: string; points: number; claimableAt: string };
+        const token: EarnToken = {
+          id:          data.tokenId,
+          points:      data.points,
+          actionType:  "game",
+          description,
+          earnedAt:    Date.now(),
+          claimableAt: new Date(data.claimableAt).getTime(),
+        };
+        await storeTokenLocally(token);
+        return { ok: true, token };
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
+  }
+  return { ok: false, retryable: true };
+}
+
 // ── CLAIM ALL READY TOKENS ────────────────────────────────────────────────────
 // Calls server — only tokens past the 3-hour window are credited.
 export async function claimAllReady(): Promise<{

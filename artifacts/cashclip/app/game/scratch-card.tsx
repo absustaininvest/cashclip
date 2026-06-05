@@ -7,6 +7,7 @@ import {
   Animated,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -14,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -156,6 +158,14 @@ export default function ScratchCardGame() {
   const [revealCount, setRevealCount] = useState(0);
   const [canPlay, setCanPlay] = useState(true);
 
+  // Server-authoritative reward flow (mirrors the spin wheel): a challenge token
+  // is issued at game start, then redeemed on a win. The SERVER decides the prize
+  // and drops it into the pending wallet — the on-screen symbols are cosmetic.
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [startError, setStartError] = useState(false);
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
+
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
 
@@ -163,12 +173,29 @@ export default function ScratchCardGame() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
-    canPlayGame("scratch-card").then((available) => {
+    let cancelled = false;
+    canPlayGame("scratch-card").then(async (available) => {
+      if (cancelled) return;
       if (!available) {
         setCanPlay(false);
         setGameState("cooldown");
+        return;
       }
+      // Reserve the reward server-side before the player can win, so the prize
+      // is bankable. Without a challenge, a win can't be credited.
+      const begin = await beginGame();
+      if (cancelled) return;
+      if (begin.ok) setChallengeToken(begin.challengeToken);
+      else setStartError(true);
     });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleRetryStart = useCallback(async () => {
+    setStartError(false);
+    const begin = await beginGame();
+    if (begin.ok) setChallengeToken(begin.challengeToken);
+    else setStartError(true);
   }, []);
 
   const showResult = useCallback(() => {
@@ -186,6 +213,28 @@ export default function ScratchCardGame() {
     ]).start();
   }, []);
 
+  // Redeem the win against the server-issued challenge. The server decides the
+  // actual prize (cosmetic symbols are not trusted) and credits it into the
+  // pending wallet; we then mark the play locally WITHOUT crediting a phantom
+  // local balance (creditLocally:false), since the server is the source of truth.
+  const bankReward = useCallback(
+    async (symbol: SymbolType) => {
+      const desc = `Scratch Card: matched 3 ${symbol}s`;
+      if (!challengeToken) {
+        setBankFailed(true);
+        return;
+      }
+      const result = await completeGame(challengeToken, desc);
+      if (result.ok) {
+        setServerPoints(result.token.points);
+        await recordGamePlay("scratch-card", result.token.points, desc, { creditLocally: false });
+      } else {
+        setBankFailed(true);
+      }
+    },
+    [challengeToken]
+  );
+
   const handleReveal = useCallback(
     (index: number) => {
       if (gameState !== "playing") return;
@@ -202,15 +251,14 @@ export default function ScratchCardGame() {
       if (matched && symbol) {
         setMatchedSymbol(symbol);
         setGameState("won");
-        const reward = SYMBOL_CONFIG[symbol].reward;
-        recordGamePlay("scratch-card", dollarsToPoints(reward), `Scratch Card: matched 3 ${symbol}s`);
+        void bankReward(symbol);
         setTimeout(showResult, 500);
       } else if (newCount >= 9) {
         setGameState("lost");
         setTimeout(showResult, 500);
       }
     },
-    [cells, gameState, revealCount, showResult]
+    [cells, gameState, revealCount, showResult, bankReward]
   );
 
   const handlePlayAgain = useCallback(() => {
@@ -221,9 +269,10 @@ export default function ScratchCardGame() {
     setCanPlay(false);
     setMatchedSymbol(null);
     setRevealCount(0);
+    setChallengeToken(null);
+    setServerPoints(null);
+    setBankFailed(false);
   }, []);
-
-  const reward = matchedSymbol ? SYMBOL_CONFIG[matchedSymbol].reward : 0;
 
   return (
     <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
@@ -248,6 +297,22 @@ export default function ScratchCardGame() {
             <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
             <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
             <Text style={styles.cooldownSubtitle}>{t.games.dailyPlaysLeft}: 0</Text>
+          </View>
+        ) : startError ? (
+          <View style={styles.cooldownContainer}>
+            <Ionicons name="cloud-offline-outline" size={64} color={Colors.textMuted} />
+            <Text style={styles.cooldownTitle}>Couldn&apos;t start the game</Text>
+            <Text style={styles.cooldownSubtitle}>
+              Check your connection and try again.
+            </Text>
+            <TouchableOpacity testID="retry-start-button" style={styles.resultButton} onPress={handleRetryStart}>
+              <Text style={styles.resultButtonText}>{t.games.playAgain}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !challengeToken ? (
+          <View style={styles.cooldownContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.cooldownSubtitle}>Getting your card ready…</Text>
           </View>
         ) : (
           <>
@@ -288,16 +353,37 @@ export default function ScratchCardGame() {
         >
           <Animated.View style={[styles.resultCard, { transform: [{ scale: resultScale }] }]}>
             {gameState === "won" ? (
-              <>
-                <View style={styles.resultIconWin}>
-                  <Ionicons name="trophy" size={48} color={Colors.accent} />
-                </View>
-                <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
-                <Text style={styles.resultSubtext}>
-                  {t.games.matched} 3x {matchedSymbol}
-                </Text>
-              </>
+              bankFailed ? (
+                <>
+                  <View style={styles.resultIconLose}>
+                    <Ionicons name="cloud-offline-outline" size={48} color={Colors.error} />
+                  </View>
+                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
+                  <Text style={styles.resultSubtext}>
+                    We couldn&apos;t add your reward right now. Please try again later.
+                  </Text>
+                </>
+              ) : serverPoints === null ? (
+                <>
+                  <View style={styles.resultIconWin}>
+                    <Ionicons name="trophy" size={48} color={Colors.accent} />
+                  </View>
+                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
+                  <Text style={styles.resultSubtext}>Adding your reward…</Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.resultIconWin}>
+                    <Ionicons name="trophy" size={48} color={Colors.accent} />
+                  </View>
+                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
+                  <Text style={styles.resultReward}>{formatPoints(serverPoints)}</Text>
+                  <Text style={styles.resultSubtext}>
+                    Added to pending — claim after 3 hours
+                  </Text>
+                </>
+              )
             ) : (
               <>
                 <View style={styles.resultIconLose}>
