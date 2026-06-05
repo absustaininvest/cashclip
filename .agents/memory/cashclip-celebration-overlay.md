@@ -28,3 +28,14 @@ Store build. The overlay uses only Reanimated primitives already in the bundle.
 streak (Modals) and Alert-based wins (claim-all, convert, withdraw) fire
 `celebrate` from the modal close handler / Alert OK `onPress`, not while open.
 In-tree successes (mission claims, scratch-card) celebrate immediately.
+
+**Build-29 (live base) trigger set differs from HEAD.** The live base JS lacks the
+`spinWasGenuine` gate, the `MilestoneRewardModal`, and server-confirmed scratch-card
+(base-29 scratch credits LOCALLY via `recordGamePlay`, no `completeGame` token).
+So when grafting the overlay onto a build-29 OTA, wire celebrate ONLY into the
+genuinely server-confirmed wins that exist there: rewarded-ad complete
+(`handleComplete`), claim-all (`handleClaimAll`), wallet convert (`handleConvertNow`),
+wallet withdraw (`handleWithdraw`). SKIP spin/scratch/missions on base-29 — they
+have no genuine-win signal and would celebrate fake/local wins. Also: base-29 root
+has NO `OtaUpdateGate`; mount `CelebrationProvider` inside `TrackingConsentGate`
+wrapping `RootLayoutNav` instead.
