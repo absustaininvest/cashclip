@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -370,7 +371,7 @@ export default function MemoryMatchGame() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity
           testID="back-button"
@@ -383,36 +384,45 @@ export default function MemoryMatchGame() {
         <View style={styles.backButton} />
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Ionicons name="swap-horizontal" size={18} color={Colors.primary} />
-          <Text style={styles.statLabel}>{t.games.moves}</Text>
-          <Text style={styles.statValue}>{moves}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomInset + 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Ionicons name="swap-horizontal" size={18} color={Colors.primary} />
+            <Text style={styles.statLabel}>{t.games.moves}</Text>
+            <Text style={styles.statValue}>{moves}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
+            <Text style={styles.statLabel}>{t.games.matched}</Text>
+            <Text style={styles.statValue}>
+              {matchedPairs}/{PAIRS}
+            </Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="timer-outline" size={18} color={Colors.textSecondary} />
+            <Text style={styles.statLabel}>{t.games.time}</Text>
+            <Text style={styles.statValue}>{formatTime(timer)}</Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
-          <Text style={styles.statLabel}>{t.games.matched}</Text>
-          <Text style={styles.statValue}>
-            {matchedPairs}/{PAIRS}
-          </Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="timer-outline" size={18} color={Colors.textSecondary} />
-          <Text style={styles.statLabel}>{t.games.time}</Text>
-          <Text style={styles.statValue}>{formatTime(timer)}</Text>
-        </View>
-      </View>
 
-      <View style={styles.grid}>
-        {cards.map((card) => (
-          <MemoryCard
-            key={card.id}
-            card={card}
-            onPress={() => handleCardPress(card.id)}
-            disabled={checking || gameOver}
-          />
-        ))}
-      </View>
+        <View style={styles.grid}>
+          {cards.map((card) => (
+            <MemoryCard
+              key={card.id}
+              card={card}
+              onPress={() => handleCardPress(card.id)}
+              disabled={checking || gameOver}
+            />
+          ))}
+        </View>
+      </ScrollView>
 
       {showResult && (
         <Animated.View
@@ -490,6 +500,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     flexDirection: "row",
