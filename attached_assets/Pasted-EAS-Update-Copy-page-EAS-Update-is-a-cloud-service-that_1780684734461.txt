@@ -1,0 +1,121 @@
+EAS Update
+
+
+Copy page
+
+EAS Update is a cloud service that serves updates for projects using the expo-updates library.
+For the complete documentation index, see llms.txt. Use this file to discover all available pages.
+EAS Update is a cloud service from EAS (Expo Application Services) that serves updates for projects using the expo-updates library.
+
+EAS Update makes fixing small bugs and pushing quick fixes a snap in between app store submissions. It accomplishes this by enabling an app to update its own non-native pieces (such as JS, styling, and images) over-the-air. All apps that include the expo-updates library have the ability to receive updates.
+
+Quick start
+
+The eas commands below require EAS CLI. See How to install EAS CLI for more information.
+Install the expo-updates library and configure EAS Update:
+
+
+Terminal
+npm
+yarn
+pnpm
+bun
+npx expo install expo-updates
+eas update:configure
+You need to create a new build for Android or iOS to include the expo-updates library in your build. After that, you can push an update to the production channel:
+
+
+Terminal
+
+Copy
+eas update --channel production --message "Fix login button alignment"
+This command publishes your JavaScript bundle and assets so users receive the new version on their next app launch.
+
+For complete steps to start using EAS Update, see Get started with EAS Update.
+
+Key features
+
+JS API for update management
+
+Updates JavaScript API example
+The updates JavaScript API includes a React hook called useUpdates(). This hook provides detailed information about the currently running update and any new updates that are available or have been downloaded. In addition, you can view any errors that were encountered during the update process to help you debug any issues while the app is attempting to update.
+
+The API also provides methods such as checkForUpdateAsync() and fetchUpdateAsync() which allow you to control when your app checks for and downloads updates.
+
+Insight tracking
+
+Website dashboard deployment insights
+You'll get a deployments dashboard that helps visualize which updates are being sent to builds. Updates work in concert with insights to provide data on the adoption rates of your updates with your users.
+
+Republish for reverting mistakes
+
+Republishing button on an update
+If an update isn't performing as expected, you can republish a previous, stable version on top of the problematic one, much like a new "commit" in version control systems.
+
+When to use EAS Update
+
+Scenario	Recommendation
+Fix a bug or crash in JavaScript code and deploy updates in minutes	
+Update copy, translations, UI styling, or screen layouts	
+Roll out changes to a percentage of users using rollouts	
+Publish updates from CI or automated workflows	
+Test updates with internal teams before production release	
+Change to native code or native dependencies	
+Change to app permissions (camera, location, and others)	
+Update the Expo SDK version	
+Anything that requires a new app binary version	
+For scenarios marked with , use EAS Build to create and submit a new app binary.
+
+Frequently asked questions (FAQ)
+
+
+What guidelines must I follow when publishing updates?
+One of the rules of EAS Update is that you need to follow the rules of the platforms and app stores you are building for. This means your updates need to follow the App Store and Play Store guidelines, including the content of the updates and how you use them. This usually means changes to your app's behavior need to be reviewed.
+
+App Store rules regularly change and just as you need to follow them if you were writing an app without Expo, you need to follow them when you are using Expo and EAS Update.
+
+EAS Update is a great way to quickly deliver improvements to the people who use your apps. For example, consider an app that has a critical bug that needs to be fixed. With EAS Update, you can quickly get the fix out and later follow up with a new submission that includes the fix built in.
+
+How are "monthly active users" counted for a billing cycle?
+
+How can I implement a custom update strategy for my app?
+
+Can I use EAS Update with my existing React Native project?
+
+Do my app users need to reinstall the app to receive updates?
+
+How does EAS Update handle native code compatibility?
+
+Can I use EAS Update inside EAS Workflows or from other CI/CD pipelines?
+
+
+
+What's the difference between EAS Update and CodePush?
+
+Are Classic Updates still supported?
+
+Get started
+
+
+Get started with EAS Update
+Learn how to get started with the setup required to configure and use EAS Update in your project.
+
+
+Publish an update
+Learn how to publish an update to a specific branch with EAS Update.
+
+
+Preview updates
+View your teammate's changes with EAS Update.
+
+
+Use GitHub Actions
+Publish an update and preview with a QR code after a commit.
+
+
+Migrate from CodePush
+Learn how to migrate from CodePush to EAS Update.
+
+
+Using EAS Update with other EAS services
+For a complete tutorial of using EAS Update with other EAS services, refer to this EAS tutorial.
