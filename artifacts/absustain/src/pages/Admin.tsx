@@ -46,6 +46,12 @@ import {
   Server,
   Wifi,
   Rocket,
+  Gift,
+  UserMinus,
+  UserPlus,
+  Play,
+  Pause,
+  Ban,
 } from "lucide-react";
 
 interface Lead {
@@ -4197,6 +4203,25 @@ export function PublisherProgramPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [creditTarget, setCreditTarget] = useState<PublisherRow | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [creditError, setCreditError] = useState("");
+  const [revokeTarget, setRevokeTarget] = useState<PublisherRow | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<AdminCampaign | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
+  const [grantOpen, setGrantOpen] = useState(false);
+  const [grantSearchInput, setGrantSearchInput] = useState("");
+  const [grantResults, setGrantResults] = useState<CashClipUser[]>([]);
+  const [grantSearchLoading, setGrantSearchLoading] = useState(false);
+  const [grantSearched, setGrantSearched] = useState(false);
+  const [grantGiftCredits, setGrantGiftCredits] = useState("");
+
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -4228,6 +4253,183 @@ export function PublisherProgramPanel({ token }: { token: string }) {
     fetchData();
   }, [fetchData]);
 
+  async function handleAddCredits() {
+    if (!creditTarget) return;
+    const amt = Number(creditAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setCreditError("Enter an amount greater than 0");
+      return;
+    }
+    if (amt > 500) {
+      setCreditError("Amount must be 500 or less");
+      return;
+    }
+    setActionLoading(`credit-${creditTarget.id}`);
+    setCreditError("");
+    try {
+      const res = await fetch(
+        `/api/admin/users/${creditTarget.id}/add-credits`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: amt }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      showToast(`Added ${money(amt)} in ad credits to ${creditTarget.username}`);
+      setCreditTarget(null);
+      setCreditAmount("");
+      fetchData();
+    } catch (err: any) {
+      setCreditError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRevoke() {
+    if (!revokeTarget) return;
+    setActionLoading(`revoke-${revokeTarget.id}`);
+    try {
+      const res = await fetch(
+        `/api/admin/users/${revokeTarget.id}/publisher`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ grant: false }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      showToast(`Publisher access revoked for ${revokeTarget.username}`);
+      setRevokeTarget(null);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message, false);
+      setRevokeTarget(null);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function searchGrantUsers() {
+    const term = grantSearchInput.trim();
+    if (!term) {
+      setGrantResults([]);
+      setGrantSearched(false);
+      return;
+    }
+    setGrantSearchLoading(true);
+    setGrantSearched(true);
+    try {
+      const params = new URLSearchParams({ limit: "10", search: term });
+      const res = await fetch(`/api/admin/users?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Search failed");
+      const data = await res.json();
+      setGrantResults(data.users ?? []);
+    } catch (err: any) {
+      showToast(err.message ?? "Search failed", false);
+      setGrantResults([]);
+    } finally {
+      setGrantSearchLoading(false);
+    }
+  }
+
+  async function handleGrant(u: CashClipUser) {
+    setActionLoading(`grant-${u.id}`);
+    try {
+      const gift = grantGiftCredits.trim();
+      const giftNum = Number(gift);
+      const body: { grant: boolean; giftCredits?: number } = { grant: true };
+      if (gift && Number.isFinite(giftNum) && giftNum >= 0) {
+        body.giftCredits = giftNum;
+      }
+      const res = await fetch(`/api/admin/users/${u.id}/publisher`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      const added = Number(data.creditsAdded ?? 0);
+      showToast(
+        `${u.username} is now a publisher${added > 0 ? ` — gifted ${money(added)} in credits` : ""}`,
+      );
+      closeGrant();
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message, false);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function closeGrant() {
+    setGrantOpen(false);
+    setGrantSearchInput("");
+    setGrantResults([]);
+    setGrantSearched(false);
+    setGrantGiftCredits("");
+  }
+
+  async function handleCampaignStatus(
+    c: AdminCampaign,
+    status: string,
+    adminNote?: string,
+  ) {
+    setActionLoading(`camp-${c.id}`);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${c.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          ...(adminNote ? { adminNote } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      const verb =
+        status === "active"
+          ? "approved"
+          : status === "paused"
+            ? "paused"
+            : status === "rejected"
+              ? "rejected"
+              : "updated";
+      showToast(`Campaign "${c.title}" ${verb}`);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message, false);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function confirmReject() {
+    if (!rejectTarget) return;
+    const c = rejectTarget;
+    const note = rejectNote.trim();
+    setRejectTarget(null);
+    setRejectNote("");
+    handleCampaignStatus(c, "rejected", note || undefined);
+  }
+
   const money = (v: string | number) => `$${Number(v ?? 0).toFixed(2)}`;
   const fmtDate = (s: string) =>
     new Date(s).toLocaleDateString("en-US", {
@@ -4244,6 +4446,264 @@ export function PublisherProgramPanel({ token }: { token: string }) {
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#06060E]" : "bg-red-500 text-white"}`}
+        >
+          {toast.ok ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <AlertCircle className="w-4 h-4" />
+          )}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Grant publisher access modal */}
+      {grantOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-md w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Grant Publisher Access
+            </h3>
+            <p className="text-white/50 text-sm mb-4">
+              Find a CashClip user and grant them publisher status so they can
+              create and run ad campaigns.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                searchGrantUsers();
+              }}
+              className="flex items-center gap-2 mb-3"
+            >
+              <input
+                type="text"
+                value={grantSearchInput}
+                onChange={(e) => setGrantSearchInput(e.target.value)}
+                placeholder="Search by username or email"
+                className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={grantSearchLoading}
+                className="px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white/70 text-sm font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-50"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+            <div className="mb-3">
+              <label className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+                Gift ad credits (optional)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={grantGiftCredits}
+                onChange={(e) => setGrantGiftCredits(e.target.value)}
+                placeholder="Defaults to $5.00 starter credits"
+                className="w-full mt-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {grantSearchLoading ? (
+                <p className="text-white/30 text-sm text-center py-6">
+                  Searching…
+                </p>
+              ) : grantSearched && grantResults.length === 0 ? (
+                <p className="text-white/30 text-sm text-center py-6">
+                  No users found.
+                </p>
+              ) : (
+                grantResults.map((u) => {
+                  const already = publishers.some((p) => p.id === u.id);
+                  return (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-white text-sm font-medium truncate">
+                          {u.username}
+                        </div>
+                        <div className="text-white/30 text-xs truncate">
+                          {u.email ?? "—"}
+                        </div>
+                      </div>
+                      {already ? (
+                        <span className="text-white/30 text-xs whitespace-nowrap">
+                          Already a publisher
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleGrant(u)}
+                          disabled={actionLoading === `grant-${u.id}`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          {actionLoading === `grant-${u.id}`
+                            ? "Granting…"
+                            : "Grant"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <button
+              onClick={closeGrant}
+              className="w-full mt-4 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add ad credits modal */}
+      {creditTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Add Ad Credits
+            </h3>
+            <p className="text-white/50 text-sm mb-1">
+              Top up the ad-credit balance for{" "}
+              <span className="text-white font-semibold">
+                {creditTarget.username}
+              </span>
+              . Current balance{" "}
+              <span className="text-[#00E676] font-semibold">
+                {money(creditTarget.adCredits)}
+              </span>
+              .
+            </p>
+            <p className="text-white/30 text-xs mb-4">
+              Credits fund their campaigns. Max $500 per top-up.
+            </p>
+            <input
+              type="number"
+              min="0"
+              max="500"
+              step="0.01"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              placeholder="Amount in USD"
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors mb-2"
+            />
+            {creditError && (
+              <p className="text-red-400 text-xs mb-2">{creditError}</p>
+            )}
+            <div className="flex gap-3 mt-3">
+              <button
+                onClick={() => {
+                  setCreditTarget(null);
+                  setCreditAmount("");
+                  setCreditError("");
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCredits}
+                disabled={actionLoading === `credit-${creditTarget.id}`}
+                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+              >
+                {actionLoading === `credit-${creditTarget.id}`
+                  ? "Adding…"
+                  : "Add Credits"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke publisher confirm modal */}
+      {revokeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-white/10 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Revoke Publisher Access?
+            </h3>
+            <p className="text-white/50 text-sm mb-1">
+              This removes publisher status from{" "}
+              <span className="text-white font-semibold">
+                {revokeTarget.username}
+              </span>
+              . They will no longer be able to create or run campaigns.
+            </p>
+            <p className="text-white/30 text-xs mb-6">
+              Their existing ad credits stay on the account and you can grant
+              access again later.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRevokeTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRevoke}
+                disabled={actionLoading === `revoke-${revokeTarget.id}`}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {actionLoading === `revoke-${revokeTarget.id}`
+                  ? "Revoking…"
+                  : "Revoke"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject campaign confirm modal */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="bg-[#111118] border border-red-500/20 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+              Reject Campaign?
+            </h3>
+            <p className="text-white/50 text-sm mb-3">
+              Reject{" "}
+              <span className="text-white font-semibold">
+                {rejectTarget.title}
+              </span>
+              . You can add an optional note explaining why — the publisher sees
+              it on their campaign.
+            </p>
+            <textarea
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              placeholder="Reason (optional)"
+              rows={3}
+              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-red-500/40 transition-colors mb-2 resize-none"
+            />
+            <div className="flex gap-3 mt-3">
+              <button
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectNote("");
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmReject}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-[#00E676]/10">
@@ -4258,12 +4718,20 @@ export function PublisherProgramPanel({ token }: { token: string }) {
             </p>
           </div>
         </div>
-        <button
-          onClick={fetchData}
-          className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setGrantOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl text-[#00E676] text-sm font-medium hover:bg-[#00E676]/20 transition-colors"
+          >
+            <UserPlus className="w-4 h-4" /> Grant Publisher
+          </button>
+          <button
+            onClick={fetchData}
+            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -4322,7 +4790,8 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                 <th className="text-right font-medium px-3 py-3">Budget</th>
                 <th className="text-right font-medium px-3 py-3">Spent</th>
                 <th className="text-right font-medium px-3 py-3">Clicks</th>
-                <th className="text-right font-medium px-5 py-3">Joined Program</th>
+                <th className="text-right font-medium px-3 py-3">Joined Program</th>
+                <th className="text-right font-medium px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -4365,15 +4834,39 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                       <td className="px-3 py-3 text-right text-white/70">
                         {Number(p.totalClicks ?? 0)}
                       </td>
-                      <td className="px-5 py-3 text-right text-white/40 text-xs">
+                      <td className="px-3 py-3 text-right text-white/40 text-xs">
                         {p.publisherGrantedAt
                           ? fmtDate(p.publisherGrantedAt)
                           : "—"}
                       </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCreditTarget(p);
+                              setCreditAmount("");
+                              setCreditError("");
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors whitespace-nowrap"
+                          >
+                            <Gift className="w-3.5 h-3.5" /> Credits
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRevokeTarget(p);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors whitespace-nowrap"
+                          >
+                            <UserMinus className="w-3.5 h-3.5" /> Revoke
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                     {open && (
                       <tr className="bg-white/[0.015]">
-                        <td colSpan={7} className="px-5 py-4">
+                        <td colSpan={8} className="px-5 py-4">
                           {userCampaigns.length === 0 ? (
                             <p className="text-white/30 text-xs py-2">
                               No campaigns created yet.
@@ -4422,6 +4915,48 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                                     <div>
                                       <div className="text-white/30 text-[9px] uppercase">Clicks</div>
                                       <div className="text-white/70 text-xs">{Number(c.clicks ?? 0)}</div>
+                                    </div>
+                                    <div
+                                      className="flex items-center gap-1.5 border-l border-white/10 pl-4"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {c.status !== "active" && (
+                                        <button
+                                          onClick={() =>
+                                            handleCampaignStatus(c, "active")
+                                          }
+                                          disabled={actionLoading === `camp-${c.id}`}
+                                          title="Approve / activate"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                          <Play className="w-3.5 h-3.5" /> Approve
+                                        </button>
+                                      )}
+                                      {c.status === "active" && (
+                                        <button
+                                          onClick={() =>
+                                            handleCampaignStatus(c, "paused")
+                                          }
+                                          disabled={actionLoading === `camp-${c.id}`}
+                                          title="Pause"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                          <Pause className="w-3.5 h-3.5" /> Pause
+                                        </button>
+                                      )}
+                                      {c.status !== "rejected" && (
+                                        <button
+                                          onClick={() => {
+                                            setRejectTarget(c);
+                                            setRejectNote(c.adminNote ?? "");
+                                          }}
+                                          disabled={actionLoading === `camp-${c.id}`}
+                                          title="Reject"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                          <Ban className="w-3.5 h-3.5" /> Reject
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
