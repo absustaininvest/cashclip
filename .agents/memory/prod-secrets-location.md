@@ -15,4 +15,15 @@ The live/deployed CashClip **API** uses the **deployment's Production app secret
 - Symptom this explains: integrations are wired in code and work in dev, but production shows $0 / "not configured" because the keys were only in the workspace Secrets tab. Owner hit exactly this in June 2026.
 - Separate concern from OTA app updates (which deliver JS to the phone). This is server-side env on the deployed API.
 
+**Integration Hub green/red is ENV-derived, not DB-backed.** Status is computed in-memory from
+`process.env` (`integrations.ts` `envOk` = all of `envKey` + `additionalEnvKeys` present);
+keys persist in a file-based encrypted store (`.data/integration-keys.enc.json`), NOT Postgres.
+So "turn integration X green in production" = ensure ALL its required env vars are present, then
+**re-publish** — never a database change/migration. (e.g. Unity Ads needs all 4:
+`UNITY_ADS_GAME_ID_IOS`, `UNITY_ADS_GAME_ID_ANDROID`, `UNITY_MONETIZATION_API_KEY`,
+`UNITY_ORGANIZATION_ID` — a missing Game ID keeps it red even if reporting works.)
+
+**Before any production re-publish:** confirm `SEED_ADMIN_FORCE_RESET` and
+`SEED_ADMIN_NUKE_RECREATE` are unset/false, or a restart will rewrite admin credentials.
+
 Cross-ref: `cashclip-login-failure-diagnosis.md` (stale secret snapshot until republish).
