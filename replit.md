@@ -82,6 +82,7 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 - All integrations must follow the same setup pattern as CPX Research: one secret per credential (API key, app ID, webhook secret each get their own named secret). No shared or bundled secrets across integrations.
 - All domains must use registered legal domains (absustaininvest.com, cash-clip.app) — never Replit subdomains — in any production-facing configuration, links, or API references.
 - Every fix requires explicit user approval before execution. No unsolicited changes.
+- During integration/ad-network setup, give ONE step at a time and wait for confirmation — never a multi-step list at once. This is the highest-stakes part of the project (ad-revenue wiring); rushing it means money never flows.
 - Deliver app changes as small, frequent, self-contained over-the-air (OTA) update groups that actually land on the live in-distribution build (29) — never big bundled update packs. Native-level changes can't ride OTA and need a new App Store build.
 
 ## Footnote (agent memory — context only)
