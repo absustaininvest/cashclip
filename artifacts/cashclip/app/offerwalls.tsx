@@ -161,7 +161,7 @@ export default function OfferwallsScreen() {
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
-  const { data: offersData, isLoading } = useQuery({
+  const { data: offersData, isLoading, isError: offersError, refetch: refetchOffers } = useQuery({
     queryKey: ["/api/offerwalls/available"],
     staleTime: 5 * 60 * 1000,
   });
@@ -337,6 +337,19 @@ export default function OfferwallsScreen() {
             <Chipley pose="think" size={80} />
             <ActivityIndicator color={Colors.primary} size="large" />
             <Text style={styles.loadingText}>Loading offers…</Text>
+          </View>
+        ) : offersError ? (
+          <View style={styles.errorCard}>
+            <Chipley pose="sad" size={96} />
+            <Text style={styles.errorTitle}>Couldn't Load Offers</Text>
+            <Text style={styles.errorText}>Something went wrong while fetching offers. Check your connection and try again.</Text>
+            <Pressable
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); refetchOffers(); }}
+              style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Feather name="refresh-cw" size={16} color={Colors.background} />
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </Pressable>
           </View>
         ) : (
           <>
@@ -607,6 +620,14 @@ const styles = StyleSheet.create({
   loadingText: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textMuted },
   emptyCard: { alignItems: "center", paddingVertical: 40, gap: 10 },
   emptyText: { fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.textMuted },
+  errorCard: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  errorTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text },
+  errorText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, textAlign: "center" },
+  retryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 6,
+  },
+  retryBtnText: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.background },
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: "flex-end" },
   modalContent: {
     backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,

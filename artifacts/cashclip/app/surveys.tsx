@@ -136,7 +136,7 @@ export default function SurveysScreen() {
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
-  const { data: externalData, isLoading: externalLoading, refetch: refetchExternal } = useQuery({
+  const { data: externalData, isLoading: externalLoading, isError: externalError, refetch: refetchExternal } = useQuery({
     queryKey: ["/api/surveys/available"],
     enabled: true,
     staleTime: 5 * 60 * 1000,
@@ -316,6 +316,19 @@ export default function SurveysScreen() {
               <Chipley pose="think" size={80} />
               <ActivityIndicator color={Colors.primary} size="large" />
               <Text style={styles.loadingText}>Fetching surveys…</Text>
+            </View>
+          ) : externalError ? (
+            <View style={styles.errorCard}>
+              <Chipley pose="sad" size={96} />
+              <Text style={styles.errorTitle}>Couldn't Load Surveys</Text>
+              <Text style={styles.errorText}>Something went wrong while fetching surveys. Check your connection and try again.</Text>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); refetchExternal(); }}
+                style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Feather name="refresh-cw" size={16} color={Colors.background} />
+                <Text style={styles.retryBtnText}>Try Again</Text>
+              </Pressable>
             </View>
           ) : externalSurveys.length === 0 ? (
             <View style={styles.allDoneCard}>
@@ -508,6 +521,14 @@ const styles = StyleSheet.create({
   diffBadgeText: { fontFamily: "Outfit_600SemiBold", fontSize: 11 },
   completedBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
   completedBadgeText: { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: Colors.primary },
+  errorCard: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  errorTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text },
+  errorText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, textAlign: "center" },
+  retryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 6,
+  },
+  retryBtnText: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.background },
   allDoneCard: { alignItems: "center", paddingVertical: 40, gap: 8 },
   allDoneTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text },
   allDoneText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, textAlign: "center" },

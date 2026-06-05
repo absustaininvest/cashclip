@@ -175,6 +175,7 @@ export default function WalletScreen() {
   const [tiers, setTiers] = useState<WithdrawalTier[]>([]);
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
@@ -264,6 +265,7 @@ export default function WalletScreen() {
     setTiers(getWithdrawalTiers(effective));
     setSelectedTier(null);
     setPaypalEmail("");
+    setWithdrawError(null);
     setShowWithdrawModal(true);
   }, [t]);
 
@@ -285,6 +287,7 @@ export default function WalletScreen() {
     }
 
     setSubmitting(true);
+    setWithdrawError(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
@@ -302,7 +305,8 @@ export default function WalletScreen() {
     } catch (err: unknown) {
       const fallback = "Failed to submit withdrawal request";
       const rawMsg = err instanceof Error ? err.message : fallback;
-      Alert.alert("Error", extractApiErrorMessage(rawMsg, fallback));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setWithdrawError(extractApiErrorMessage(rawMsg, fallback));
     } finally {
       setSubmitting(false);
     }
@@ -504,6 +508,22 @@ export default function WalletScreen() {
                 <Feather name="x" size={24} color={Colors.textSecondary} />
               </Pressable>
             </View>
+
+            {withdrawError ? (
+              <View style={styles.withdrawErrorState}>
+                <Chipley pose="sad" size={96} />
+                <Text style={styles.withdrawErrorTitle}>Withdrawal Failed</Text>
+                <Text style={styles.withdrawErrorText}>{withdrawError}</Text>
+                <Pressable
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setWithdrawError(null); }}
+                  style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <Feather name="refresh-cw" size={16} color={Colors.background} />
+                  <Text style={styles.retryBtnText}>Try Again</Text>
+                </Pressable>
+              </View>
+            ) : (
+            <>
             <Text style={styles.modalSubtitle}>
               {t.wallet.higherAmountsBiggerBonuses}
             </Text>
@@ -600,6 +620,8 @@ export default function WalletScreen() {
                 )}
               </LinearGradient>
             </Pressable>
+            </>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -709,6 +731,14 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: "center", paddingVertical: 48, gap: 8 },
   emptyTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 16, color: Colors.textSecondary },
   emptySubtitle: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted },
+  withdrawErrorState: { alignItems: "center", paddingVertical: 24, gap: 10 },
+  withdrawErrorTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text },
+  withdrawErrorText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, textAlign: "center", paddingHorizontal: 12 },
+  retryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 6,
+  },
+  retryBtnText: { fontFamily: "Outfit_700Bold", fontSize: 14, color: Colors.background },
   modalOverlay: {
     flex: 1, backgroundColor: Colors.overlay,
     justifyContent: "flex-end",
