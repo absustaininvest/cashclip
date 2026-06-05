@@ -16,6 +16,7 @@ import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics"
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { OtaUpdateGate } from "@/components/OtaUpdateGate";
+import { CelebrationProvider } from "@/lib/CelebrationContext";
 import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
 
 SplashScreen.preventAutoHideAsync();
@@ -156,7 +157,9 @@ export default function RootLayout() {
                     });
                   }}>
                     <OtaUpdateGate>
-                      <RootLayoutNav />
+                      <CelebrationProvider>
+                        <RootLayoutNav />
+                      </CelebrationProvider>
                     </OtaUpdateGate>
                   </TrackingConsentGate>
                 </ForceUpdateGate>

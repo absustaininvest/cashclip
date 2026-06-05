@@ -39,6 +39,7 @@ import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
 import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
 import { useAuth } from "@/lib/AuthContext";
+import { useCelebration } from "@/lib/CelebrationContext";
 import {
   trackAdImpression,
   trackAdCompletion,
@@ -660,6 +661,7 @@ export default function EarnScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { celebrate } = useCelebration();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [watchingAd, setWatchingAd] = useState<(typeof adVideos)[0] | null>(
     null
@@ -678,6 +680,9 @@ export default function EarnScreen() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinReward, setSpinReward] = useState(0); // pts from server
   const [showSpinReward, setShowSpinReward] = useState(false);
+  // Only celebrate when the spin reward was server-confirmed — a network/DB blip
+  // can fall back to a local display value, which is NOT a genuine win.
+  const [spinWasGenuine, setSpinWasGenuine] = useState(false);
   const [spinRetryNotice, setSpinRetryNotice] = useState(false); // gentle "try again in a moment" after a transient 503
   const [dailyMissions, setDailyMissions] = useState<DailyMission[]>([]);
   const [weeklyMissions, setWeeklyMissions] = useState<WeeklyMission[]>([]);
@@ -811,6 +816,7 @@ export default function EarnScreen() {
       const token = result && result.ok ? result.token : null;
       const pts = token?.points ?? WHEEL_SEGMENTS[segmentIndex].value;
       setSpinReward(pts);
+      setSpinWasGenuine(!!token);
       setIsSpinning(false);
       setShowSpinReward(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -919,6 +925,12 @@ export default function EarnScreen() {
       const result = await claimMission(id);
       if (result.ok) {
         await markMissionClaimed(id, false);
+        const reward = dailyMissions.find((m) => m.id === id)?.reward ?? 0;
+        celebrate({
+          tier: reward >= 1000 ? "epic" : "nice",
+          label: `+${reward.toLocaleString()} pts`,
+          title: "Mission Complete!",
+        });
       } else {
         notifyMissionClaimFailed(result);
       }
@@ -928,7 +940,7 @@ export default function EarnScreen() {
         withSpring(1, { damping: 8 })
       );
     },
-    []
+    [dailyMissions, celebrate]
   );
 
   const handleClaimWeekly = useCallback(
@@ -941,6 +953,12 @@ export default function EarnScreen() {
       const result = await claimMission(id);
       if (result.ok) {
         await markMissionClaimed(id, true);
+        const reward = weeklyMissions.find((m) => m.id === id)?.reward ?? 0;
+        celebrate({
+          tier: "epic",
+          label: `+${reward.toLocaleString()} pts`,
+          title: "Weekly Goal!",
+        });
       } else {
         notifyMissionClaimFailed(result);
       }
@@ -950,7 +968,7 @@ export default function EarnScreen() {
         withSpring(1, { damping: 8 })
       );
     },
-    []
+    [weeklyMissions, celebrate]
   );
 
   const handleClaimAll = useCallback(async () => {
@@ -966,7 +984,18 @@ export default function EarnScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         "Earnings Claimed!",
-        `$${result.creditedUsd.toFixed(2)} has been added to your verified balance.`
+        `$${result.creditedUsd.toFixed(2)} has been added to your verified balance.`,
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              celebrate({
+                tier: result.creditedUsd >= 1 ? "epic" : "nice",
+                label: `+$${result.creditedUsd.toFixed(2)}`,
+                title: "Earnings Claimed!",
+              }),
+          },
+        ],
       );
       await loadAll();
       balancePulse.value = withSequence(
@@ -976,7 +1005,7 @@ export default function EarnScreen() {
     } finally {
       setIsClaiming(false);
     }
-  }, [isClaiming, loadAll]);
+  }, [isClaiming, loadAll, celebrate]);
 
   const balanceStyle = useAnimatedStyle(() => ({
     transform: [{ scale: balancePulse.value }],
@@ -1500,7 +1529,16 @@ export default function EarnScreen() {
       <SpinRewardModal
         visible={showSpinReward}
         reward={spinReward}
-        onClose={() => setShowSpinReward(false)}
+        onClose={() => {
+          setShowSpinReward(false);
+          if (spinWasGenuine) {
+            celebrate({
+              tier: spinReward >= 200 ? "epic" : "nice",
+              label: `+${formatPoints(spinReward)} pts`,
+              title: "You Won!",
+            });
+          }
+        }}
         t={t}
       />
 
@@ -1508,7 +1546,14 @@ export default function EarnScreen() {
         visible={showMilestone}
         streak={milestoneCelebration.streak}
         bonus={milestoneCelebration.bonus}
-        onClose={() => setShowMilestone(false)}
+        onClose={() => {
+          setShowMilestone(false);
+          celebrate({
+            tier: "epic",
+            label: `+${formatPoints(milestoneCelebration.bonus)} pts`,
+            title: `${milestoneCelebration.streak}-Day Streak!`,
+          });
+        }}
         t={t}
       />
 

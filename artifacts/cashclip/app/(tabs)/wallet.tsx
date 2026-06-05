@@ -39,6 +39,7 @@ import {
 } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
+import { useCelebration } from "@/lib/CelebrationContext";
 import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { t as tFn, type Translations } from "@/lib/i18n";
@@ -165,6 +166,7 @@ export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { token } = useAuth();
+  const { celebrate } = useCelebration();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [serverBalance, setServerBalance] = useState<number>(0);
   const [serverTotalEarned, setServerTotalEarned] = useState<number>(0);
@@ -213,6 +215,17 @@ export default function WalletScreen() {
           t.wallet.pointsConvertedMsg
             .replace("{{pts}}", String(Math.round(result.creditedUsd * 1000)))
             .replace("{{usd}}", result.creditedUsd.toFixed(2)),
+          [
+            {
+              text: "OK",
+              onPress: () =>
+                celebrate({
+                  tier: result.creditedUsd >= 1 ? "epic" : "nice",
+                  label: `+$${result.creditedUsd.toFixed(2)}`,
+                  title: "Points Converted!",
+                }),
+            },
+          ],
         );
         await loadData();
       }
@@ -221,7 +234,7 @@ export default function WalletScreen() {
     } finally {
       setIsConverting(false);
     }
-  }, [isConverting, pendingState, t, loadData]);
+  }, [isConverting, pendingState, t, loadData, celebrate]);
 
   useEffect(() => {
     loadData();
@@ -297,9 +310,21 @@ export default function WalletScreen() {
       });
 
       setShowWithdrawModal(false);
+      const payout = selectedTier.totalPayout;
       Alert.alert(
         t.wallet.withdrawalSuccessful,
-        `$${selectedTier.totalPayout.toFixed(2)} is on its way to ${paypalEmail.trim()} via PayPal — you'll receive it within minutes.`
+        `$${payout.toFixed(2)} is on its way to ${paypalEmail.trim()} via PayPal — you'll receive it within minutes.`,
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              celebrate({
+                tier: "epic",
+                label: `$${payout.toFixed(2)}`,
+                title: "Cashing Out!",
+              }),
+          },
+        ],
       );
       await loadData();
     } catch (err: unknown) {
@@ -310,7 +335,7 @@ export default function WalletScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedTier, paypalEmail, t, loadData]);
+  }, [selectedTier, paypalEmail, t, loadData, celebrate]);
 
   if (!fontsLoaded || !stats) return null;
 

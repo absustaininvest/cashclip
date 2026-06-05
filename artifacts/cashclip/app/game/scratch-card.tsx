@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useCelebration } from "@/lib/CelebrationContext";
 import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 import { beginGame, completeGame } from "@/lib/earn-client";
 
@@ -151,6 +152,7 @@ export default function ScratchCardGame() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { celebrate } = useCelebration();
 
   const [cells, setCells] = useState<CellData[]>(generateGrid);
   const [gameState, setGameState] = useState<"playing" | "won" | "lost" | "cooldown">("playing");
@@ -251,11 +253,16 @@ export default function ScratchCardGame() {
       if (result.ok) {
         setServerPoints(result.token.points);
         await recordGamePlay("scratch-card", result.token.points, desc, { creditLocally: false });
+        celebrate({
+          tier: "epic",
+          label: `+${formatPoints(result.token.points)} pts`,
+          title: "You Won!",
+        });
       } else {
         setBankFailed(true);
       }
     },
-    [challengeToken, ensureChallenge]
+    [challengeToken, ensureChallenge, celebrate]
   );
 
   const handleReveal = useCallback(
