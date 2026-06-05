@@ -12,18 +12,24 @@ import Animated, {
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
+import { useAudioPlayer } from "expo-audio";
 
 /**
  * CelebrationOverlay — a full-screen, touch-transparent celebration that sends
  * Chipley sprinting across the screen with confetti (and fireworks on the EPIC
- * tier) at genuine win moments. Pure JS/Reanimated (no native module), so it can
- * ride an OTA update onto the live build.
+ * tier) at genuine win moments. Chipley also calls out his own name with a short
+ * voice clip via expo-audio. Because that audio is a native module, this overlay
+ * can no longer ride an OTA onto build 29 — it ships in a new native App Store
+ * build whose runtimeVersion must differ from 1.0.0 (so the audio bundle never
+ * lands on the audio-less live build).
  *
  * It is mounted once at the app root by CelebrationProvider and is remounted on
  * every run (keyed by runId), so all animations fire fresh from useEffect.
  */
 
 export type CelebrationTier = "nice" | "epic";
+
+const CHIPLEY_VOICE = require("@/assets/audio/chipley-voice.mp3");
 
 const PALETTE = [
   Colors.primary,
@@ -195,6 +201,8 @@ export default function CelebrationOverlay({
   const { width, height } = useWindowDimensions();
   const isEpic = tier === "epic";
 
+  const voice = useAudioPlayer(CHIPLEY_VOICE);
+
   const chipSize = isEpic ? 132 : 104;
   const chipY = height * 0.4;
   const startX = -chipSize - 40;
@@ -259,6 +267,9 @@ export default function CelebrationOverlay({
   }, [isEpic, width, height, runId]);
 
   useEffect(() => {
+    voice.seekTo(0);
+    voice.play();
+
     bob.value = withRepeat(
       withSequence(
         withTiming(-16, { duration: 150, easing: Easing.inOut(Easing.quad) }),
