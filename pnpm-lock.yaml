@@ -415,6 +415,9 @@ importers:
 
   artifacts/cashclip:
     dependencies:
+      '@logrocket/react-native':
+        specifier: ^3.1.1
+        version: 3.1.1(expo-build-properties@1.0.10(expo@54.0.34))(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       '@react-native-firebase/analytics':
         specifier: ^24.0.0
         version: 24.0.0(@react-native-firebase/app@24.0.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))
@@ -2126,6 +2129,17 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@logrocket/react-native@3.1.1':
+    resolution: {integrity: sha512-I6hQkX614JyS9qu2IXCiWgH5gPY0ZCdforCiSM7Iw4Xx8yE766M2BzREIqaeGH05EMl7k8Gv9Z8yeMA/5EOpCQ==}
+    peerDependencies:
+      expo: '>=45.0.0'
+      expo-build-properties: '*'
+      react: '*'
+      react-native: '>=0.60.0-rc.0 <1.0.x'
+    peerDependenciesMeta:
+      expo:
+        optional: true
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -10249,6 +10263,14 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@logrocket/react-native@3.1.1(expo-build-properties@1.0.10(expo@54.0.34))(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      expo-build-properties: 1.0.10(expo@54.0.34)
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+    optionalDependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(graphql@16.8.1)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
 
   '@noble/ciphers@1.3.0': {}
 

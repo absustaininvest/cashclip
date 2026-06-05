@@ -88,6 +88,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@logrocket/react-native": "^3.1.1",
     "@react-native-firebase/analytics": "^24.0.0",
     "@react-native-firebase/app": "^24.0.0",
     "babel-preset-expo": "~54.0.10",
