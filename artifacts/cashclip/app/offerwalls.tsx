@@ -20,6 +20,7 @@ import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
+import RewardSuccessModal from "@/components/RewardSuccessModal";
 import { addEarnings } from "@/lib/storage";
 import { getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -158,6 +159,7 @@ export default function OfferwallsScreen() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [selectedFilter, setSelectedFilter] = useState<"all" | OfferType>("all");
+  const [successAmount, setSuccessAmount] = useState<number | null>(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -207,7 +209,7 @@ export default function OfferwallsScreen() {
       setPendingOffer(null);
       setSessionToken(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Offer Complete!", `You earned $${reward.toFixed(2)}! It has been added to your balance.`);
+      setSuccessAmount(Number.isFinite(reward) ? reward : 0);
     },
     onError: (err: Error) => {
       Alert.alert("Error", err.message || "Could not verify offer completion.");
@@ -531,6 +533,14 @@ export default function OfferwallsScreen() {
           </View>
         </View>
       </Modal>
+
+      <RewardSuccessModal
+        visible={successAmount !== null}
+        amount={successAmount ?? 0}
+        title="Offer Complete!"
+        subtitle="It has been added to your balance."
+        onClose={() => setSuccessAmount(null)}
+      />
     </View>
   );
 }

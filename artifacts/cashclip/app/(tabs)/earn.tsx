@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -58,10 +58,11 @@ import {
   type WeeklyMission,
 } from "@/lib/storage";
 import {
-  recordEarnAction,
   claimMission,
   recordCheckin,
   fetchCheckinStatus,
+  beginAdView,
+  completeAdView,
   beginSpin,
   completeSpin,
   claimAllReady,
@@ -664,6 +665,9 @@ export default function EarnScreen() {
     null
   );
   const [showModal, setShowModal] = useState(false);
+  // Server-issued challenge token for an in-progress fallback ad watch, so
+  // completeAdView() can prove the watch began on the server (anti-fraud).
+  const adChallengeRef = useRef<string | null>(null);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [dayRewards, setDayRewards] = useState<number[]>(DAY_REWARDS_FALLBACK);
@@ -839,8 +843,8 @@ export default function EarnScreen() {
         setAdPreloaded(isRewardedAdPreloaded());
         if (result.rewarded) {
           await recordAdWatch();
-          // Issue server earn token for watching a rewarded ad
-          recordEarnAction("rewarded_ad", "Watched rewarded ad");
+          // Real ad payout comes via Google's verified SSV callback server-side,
+          // so we don't credit on the client here — just refresh the balance.
           await loadAll();
           balancePulse.value = withSequence(
             withSpring(1.1, { damping: 4 }),
@@ -863,7 +867,23 @@ export default function EarnScreen() {
       return;
     }
 
-    // AdMob not yet initialized — show mock ad for dev/simulator
+    // AdMob isn't filling — fall back to the in-app ad. It still pays a small
+    // server-decided reward via the secure begin→complete flow. Get the challenge
+    // first so we only show the ad if it can actually pay.
+    setAdLoading(true);
+    const begin = await beginAdView();
+    setAdLoading(false);
+    if (!begin.ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        "Try again",
+        begin.retryable
+          ? "Ads are busy right now. Please try again in a moment."
+          : "Couldn't start the ad. Please try again.",
+      );
+      return;
+    }
+    adChallengeRef.current = begin.challengeToken;
     setWatchingAd(ad);
     setShowModal(true);
   }, [adLoading, loadAll, t]);
@@ -873,16 +893,21 @@ export default function EarnScreen() {
     trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
-    // Issue server earn token for the simulated ad completion
-    recordEarnAction("rewarded_ad", "Watched rewarded ad");
-    await loadAll();
     setShowModal(false);
     setWatchingAd(null);
+    // Issue the small server-set earn token for the in-app ad completion. The
+    // server decides the amount and shares the rewarded_ad daily cap (anti-fraud).
+    const token = adChallengeRef.current;
+    adChallengeRef.current = null;
+    if (token) {
+      const res = await completeAdView(token, "Watched video");
+      if (res.ok) await loadAll();
+    }
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),
       withSpring(1, { damping: 8 })
     );
-  }, [watchingAd]);
+  }, [watchingAd, loadAll]);
 
   const handleClaimDaily = useCallback(
     async (id: string) => {

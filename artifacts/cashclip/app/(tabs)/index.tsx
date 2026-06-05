@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUnreadNotificationCount, recordAdWatch } from "@/lib/storage";
-import { recordEarnAction, fetchServerBalance, fetchProfileComplete } from "@/lib/earn-client";
+import { fetchServerBalance, fetchProfileComplete, beginAdView, completeAdView } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
@@ -179,12 +179,9 @@ export default function HomeScreen() {
     }
   }, [loadBalance, router]);
 
-  const creditAdReward = useCallback(async () => {
-    await recordAdWatch();
-    // Server-authoritative credit (same path as the Earn screen).
-    recordEarnAction("rewarded_ad", "Watched rewarded ad");
-    loadBalance();
-  }, [loadBalance]);
+  // Holds the server-issued challenge token for an in-progress fallback ad watch,
+  // so completeAdView() can prove the watch began on the server (anti-fraud).
+  const adChallengeRef = useRef<string | null>(null);
 
   const handleAdPress = useCallback(async (index: number) => {
     if (adLoading) return;
@@ -195,14 +192,15 @@ export default function HomeScreen() {
       return;
     }
 
-    // Real rewarded ad when AdMob is ready; otherwise fall back to the in-app
-    // ad experience (same behavior as the Earn screen) so the slot always works.
+    // Real rewarded ad when AdMob is ready — payout comes via Google's verified
+    // SSV callback server-side, so we don't credit on the client here.
     if (isAdMobReady()) {
       setAdLoading(true);
       try {
         const result = await showRewardedAd();
         if (result.rewarded) {
-          await creditAdReward();
+          await recordAdWatch();
+          loadBalance();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else if (result.timedOut) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -220,6 +218,24 @@ export default function HomeScreen() {
       return;
     }
 
+    // AdMob isn't filling — fall back to the in-app ad. It still pays a small
+    // server-decided reward via the secure begin→complete flow (can't be faked
+    // by the phone). Get the challenge first so we only show the ad if it can pay.
+    setAdLoading(true);
+    const begin = await beginAdView();
+    setAdLoading(false);
+    if (!begin.ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        "Try again",
+        begin.retryable
+          ? "Ads are busy right now. Please try again in a moment."
+          : "Couldn't start the ad. Please try again.",
+      );
+      return;
+    }
+    adChallengeRef.current = begin.challengeToken;
+
     const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];
     setWatching({
       brand: card.advertiser,
@@ -228,13 +244,19 @@ export default function HomeScreen() {
       reward: adSlotReward(index),
       duration: AD_DURATION_SECONDS,
     });
-  }, [adLoading, creditAdReward]);
+  }, [adLoading, loadBalance]);
 
   const handleAdComplete = useCallback(async () => {
     setWatching(null);
-    await creditAdReward();
+    const token = adChallengeRef.current;
+    adChallengeRef.current = null;
+    await recordAdWatch();
+    if (token) {
+      const res = await completeAdView(token, "Watched video");
+      if (res.ok) loadBalance();
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [creditAdReward]);
+  }, [loadBalance]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

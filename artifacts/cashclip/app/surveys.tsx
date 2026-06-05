@@ -19,6 +19,7 @@ import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
+import RewardSuccessModal from "@/components/RewardSuccessModal";
 import { useLanguage } from "@/lib/LanguageContext";
 import { t as tFn } from "@/lib/i18n";
 import { completeSurvey } from "@/lib/storage";
@@ -133,6 +134,7 @@ export default function SurveysScreen() {
   const [isLaunchingExternal, setIsLaunchingExternal] = useState(false);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [completedExternalIds, setCompletedExternalIds] = useState<Set<string>>(new Set());
+  const [successModal, setSuccessModal] = useState<{ amount: number; title: string; subtitle?: string } | null>(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -179,7 +181,11 @@ export default function SurveysScreen() {
       setExternalSessionToken(null);
       setIsClaimingReward(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Survey Complete! 🎉", `You earned $${Number.isFinite(reward) ? reward.toFixed(2) : "0.00"}!`);
+      setSuccessModal({
+        amount: Number.isFinite(reward) ? reward : 0,
+        title: "Survey Complete!",
+        subtitle: "Added to your balance.",
+      });
       refetchExternal();
     },
     onError: (err: Error) => {
@@ -231,15 +237,16 @@ export default function SurveysScreen() {
       // and shows a confusing error. Just close the modal and let the webhook land.
       const isWebhookProvider = pendingExternalSurvey.provider === "cpx" || pendingExternalSurvey.provider === "bitlabs";
       if (isWebhookProvider) {
+        const estReward = pendingExternalSurvey.reward;
         setPendingExternalSurvey(null);
         setExternalSessionToken(null);
         queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
         refetchExternal();
-        Alert.alert(
-          "Survey Submitted! 🎉",
-          "Your reward will appear in your balance within a few minutes — it's credited automatically.",
-          [{ text: "Got it" }]
-        );
+        setSuccessModal({
+          amount: Number.isFinite(estReward) ? estReward : 0,
+          title: "Survey Submitted!",
+          subtitle: "Your reward will appear in your balance within a few minutes — it's credited automatically.",
+        });
         return;
       }
 
@@ -450,6 +457,14 @@ export default function SurveysScreen() {
           </View>
         </View>
       </Modal>
+
+      <RewardSuccessModal
+        visible={!!successModal}
+        amount={successModal?.amount ?? 0}
+        title={successModal?.title}
+        subtitle={successModal?.subtitle}
+        onClose={() => setSuccessModal(null)}
+      />
     </View>
   );
 }

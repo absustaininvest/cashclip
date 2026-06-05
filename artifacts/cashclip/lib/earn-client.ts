@@ -361,6 +361,90 @@ export async function completeGame(
   return { ok: false, retryable: true };
 }
 
+// ── IN-APP REWARDED-AD FALLBACK (server-set small reward) ─────────────────────
+// Mirrors the spin/game flow. When AdMob isn't filling, the home/Earn video
+// slots still pay a SMALL server-decided amount: beginAdView() when the ad
+// starts (gets a server challenge token), completeAdView(token) when it finishes.
+// The SERVER decides the amount and shares the rewarded_ad daily cap with the
+// SSV path — the client never chooses the amount, and the generic /record path
+// still blocks "rewarded_ad" outright. Real ad revenue still pays via SSV.
+export type AdBeginResult =
+  | { ok: true;  challengeToken: string }
+  | { ok: false; retryable: boolean };
+
+export async function beginAdView(): Promise<AdBeginResult> {
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/ad/begin", {});
+      if (res.ok) {
+        const data = await res.json() as { challengeToken?: string };
+        return data.challengeToken
+          ? { ok: true, challengeToken: data.challengeToken }
+          : { ok: false, retryable: false };
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
+  }
+  return { ok: false, retryable: true };
+}
+
+export type AdCompleteResult =
+  | { ok: true;  token: EarnToken }
+  | { ok: false; retryable: boolean };
+
+export async function completeAdView(
+  challengeToken: string,
+  description: string,
+): Promise<AdCompleteResult> {
+  for (let attempt = 1; attempt <= SPIN_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await apiRequestSafe("POST", "/api/earn/ad/complete", { challengeToken, description });
+      if (res.ok) {
+        const data = await res.json() as { tokenId: string; points: number; claimableAt: string };
+        const token: EarnToken = {
+          id:          data.tokenId,
+          points:      data.points,
+          actionType:  "rewarded_ad",
+          description,
+          earnedAt:    Date.now(),
+          claimableAt: new Date(data.claimableAt).getTime(),
+        };
+        await storeTokenLocally(token);
+        return { ok: true, token };
+      }
+      // 425 Too Early: anti-instant-replay guard fired. The server leaves the
+      // challenge in place, so wait the suggested delay and retry the SAME token.
+      if (res.status === 425 && attempt < SPIN_MAX_ATTEMPTS) {
+        let waitMs = SPIN_RETRY_BASE_MS;
+        try {
+          const data = await res.json() as { retryAfterMs?: number };
+          if (typeof data.retryAfterMs === "number" && data.retryAfterMs > 0) {
+            waitMs = data.retryAfterMs;
+          }
+        } catch { /* fall back to base delay */ }
+        await sleep(waitMs + 100);
+        continue;
+      }
+      const retryable = await isRetryable503(res);
+      if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
+        await sleep(SPIN_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      return { ok: false, retryable };
+    } catch {
+      return { ok: false, retryable: false };
+    }
+  }
+  return { ok: false, retryable: true };
+}
+
 // ── CLAIM ALL READY TOKENS ────────────────────────────────────────────────────
 // Calls server — only tokens past the 3-hour window are credited.
 export async function claimAllReady(): Promise<{
