@@ -8,13 +8,15 @@ import {
   Platform,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -189,6 +191,8 @@ export default function DominoesGame() {
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [canPlay, setCanPlay] = useState(true);
   const [message, setMessage] = useState("");
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
 
   const rewardRecorded = useRef(false);
   const resultOpacity = useRef(new Animated.Value(0)).current;
@@ -222,6 +226,8 @@ export default function DominoesGame() {
     setIsPlayerTurn(true);
     setGameState("playing");
     setMessage("");
+    setServerPoints(null);
+    setBankFailed(false);
     rewardRecorded.current = false;
     resultOpacity.setValue(0);
     resultScale.setValue(0.5);
@@ -259,22 +265,40 @@ export default function DominoesGame() {
     ]).start();
   }, []);
 
+  // Server-authoritative reward: request a challenge at the reward moment, then
+  // redeem it. The SERVER decides the prize (from its GAME_POOL) and drops it
+  // into the pending wallet — the on-screen outcome is cosmetic. We mark the
+  // play locally WITHOUT crediting a phantom balance (creditLocally:false).
+  const bankReward = useCallback(async (desc: string) => {
+    const begin = await beginGame();
+    if (!begin.ok) {
+      setBankFailed(true);
+      return;
+    }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("dominoes", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
+  }, []);
+
   const endGame = useCallback(
     (result: "won" | "lost" | "draw") => {
       if (rewardRecorded.current) return;
       rewardRecorded.current = true;
       setGameState(result);
-      const reward = result === "won" ? 0.20 : 0.05;
       const desc =
         result === "won"
           ? "Dominoes: Won the game!"
           : result === "draw"
           ? "Dominoes: Draw"
           : "Dominoes: Lost";
-      recordGamePlay("dominoes", dollarsToPoints(reward), desc);
+      void bankReward(desc);
       setTimeout(showResult, 500);
     },
-    [showResult]
+    [showResult, bankReward]
   );
 
   const checkStuck = useCallback(
@@ -569,7 +593,19 @@ export default function DominoesGame() {
   const canRightPlace = selectedDomino && ends ? canPlace(selectedDomino, ends.right) : false;
   const bothEndsAvailable = canLeftPlace && canRightPlace && ends && ends.left !== ends.right;
 
-  const reward = gameState === "won" ? 0.20 : 0.05;
+  const rewardDisplay = bankFailed ? (
+    <Text style={styles.resultSubtext}>
+      We couldn&apos;t add your reward right now. Please try again later.
+    </Text>
+  ) : serverPoints === null ? (
+    <>
+      <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
+      <Text style={styles.resultSubtext}>Adding your reward…</Text>
+    </>
+  ) : (
+    <Text style={styles.resultReward}>{formatPoints(serverPoints)}</Text>
+  );
+
   const dominoSize = Math.min(30, (SCREEN_WIDTH - 100) / 10);
 
   return (
@@ -701,7 +737,7 @@ export default function DominoesGame() {
                   <Ionicons name="trophy" size={48} color={Colors.accent} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
+                {rewardDisplay}
               </>
             ) : gameState === "draw" ? (
               <>
@@ -709,7 +745,7 @@ export default function DominoesGame() {
                   <Ionicons name="remove-circle" size={48} color={Colors.warning} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.draw}</Text>
-                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
+                {rewardDisplay}
               </>
             ) : (
               <>
@@ -717,7 +753,7 @@ export default function DominoesGame() {
                   <Ionicons name="close-circle" size={48} color={Colors.error} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youLose}</Text>
-                <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(reward))}</Text>
+                {rewardDisplay}
               </>
             )}
 
@@ -957,6 +993,12 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: "800" as const,
     color: Colors.primary,
+    marginBottom: 24,
+  },
+  resultSubtext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
     marginBottom: 24,
   },
   resultButton: {

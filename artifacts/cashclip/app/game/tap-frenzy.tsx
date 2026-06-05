@@ -7,13 +7,15 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -65,6 +67,8 @@ export default function TapFrenzyScreen() {
   const [bestCombo, setBestCombo] = useState(0);
   const [canPlay, setCanPlay] = useState(true);
   const [reward, setReward] = useState(0);
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
 
   const coinsRef = useRef<Coin[]>([]);
   const [coins, setCoins] = useState<Coin[]>([]);
@@ -140,6 +144,9 @@ export default function TapFrenzyScreen() {
     setGameState("playing");
     setTimeLeft(GAME_DURATION);
     setScore(0);
+    setServerPoints(null);
+    setBankFailed(false);
+    bankedRef.current = false;
     setCombo(0);
     setBestCombo(0);
     scoreRef.current = 0;
@@ -167,6 +174,22 @@ export default function TapFrenzyScreen() {
     cleanerRef.current = setInterval(cleanExpiredCoins, 200);
   }, [spawnCoin, cleanExpiredCoins]);
 
+  const bankedRef = useRef(false);
+
+  const bankReward = useCallback(async (desc: string) => {
+    if (bankedRef.current) return;
+    bankedRef.current = true;
+    const begin = await beginGame();
+    if (!begin.ok) { setBankFailed(true); return; }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("tap-frenzy", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
+  }, []);
+
   const endGame = useCallback(() => {
     gameActiveRef.current = false;
     if (timerRef.current) clearInterval(timerRef.current);
@@ -178,9 +201,9 @@ export default function TapFrenzyScreen() {
     setReward(earnedReward);
     setGameState("finished");
 
-    recordGamePlay("tap-frenzy", dollarsToPoints(earnedReward), `Tap Frenzy: ${finalScore} taps - ${formatPoints(dollarsToPoints(earnedReward))}`);
+    void bankReward(`Tap Frenzy: ${finalScore} taps`);
     setCanPlay(false);
-  }, []);
+  }, [bankReward]);
 
   useEffect(() => {
     return () => {
@@ -353,7 +376,13 @@ export default function TapFrenzyScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.rewardValue]}>{formatPoints(dollarsToPoints(reward))}</Text>
+              {bankFailed ? (
+                <Text style={[styles.statValue, styles.rewardValue]}>—</Text>
+              ) : serverPoints === null ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={[styles.statValue, styles.rewardValue]}>{formatPoints(serverPoints)}</Text>
+              )}
               <Text style={styles.statLabel}>{t.games.earned}</Text>
             </View>
           </View>

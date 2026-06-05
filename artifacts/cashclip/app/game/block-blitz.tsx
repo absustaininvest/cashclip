@@ -7,13 +7,15 @@ import {
   Platform,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GRID_SIZE = 8;
@@ -187,6 +189,8 @@ export default function BlockBlitzGame() {
   const [gameState, setGameState] = useState<"playing" | "over" | "cooldown">("playing");
   const [canPlay, setCanPlay] = useState(true);
   const [highlightCells, setHighlightCells] = useState<Set<string>>(new Set());
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
@@ -214,15 +218,30 @@ export default function BlockBlitzGame() {
     ]).start();
   }, []);
 
+  const bankedRef = useRef(false);
+
+  const bankReward = useCallback(async (desc: string) => {
+    if (bankedRef.current) return;
+    bankedRef.current = true;
+    const begin = await beginGame();
+    if (!begin.ok) {
+      setBankFailed(true);
+      return;
+    }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("block-blitz", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
+  }, []);
+
   const endGame = useCallback(async () => {
     setGameState("over");
     showResult();
-    let reward = 0.03;
-    if (linesCleared >= 5) reward = 0.08;
-    if (linesCleared >= 12) reward = 0.15;
-    if (linesCleared >= 20) reward = 0.25;
-    await recordGamePlay("block-blitz", dollarsToPoints(reward), `Block Blitz: ${score} pts, ${linesCleared} lines`);
-  }, [score, linesCleared]);
+    await bankReward(`Block Blitz: ${score} pts, ${linesCleared} lines`);
+  }, [score, linesCleared, showResult, bankReward]);
 
   const handleCellPress = useCallback(
     (row: number, col: number) => {
@@ -325,15 +344,11 @@ export default function BlockBlitzGame() {
     setSelectedPiece(null);
     setHighlightCells(new Set());
     setPieces(generatePieceSet());
+    setServerPoints(null);
+    setBankFailed(false);
+    bankedRef.current = false;
     setGameState("playing");
   }, []);
-
-  const getReward = () => {
-    if (linesCleared >= 20) return "$0.25";
-    if (linesCleared >= 12) return "$0.15";
-    if (linesCleared >= 5) return "$0.08";
-    return "$0.03";
-  };
 
   if (gameState === "cooldown") {
     return (
@@ -463,7 +478,18 @@ export default function BlockBlitzGame() {
               <Ionicons name="cube" size={40} color="#FF6D00" />
             </View>
             <Text style={styles.resultTitle}>{t.games.gameOver}</Text>
-            <Text style={styles.resultReward}>{getReward()}</Text>
+            {bankFailed ? (
+              <Text style={styles.resultSubtext}>
+                We couldn&apos;t add your reward right now. Please try again later.
+              </Text>
+            ) : serverPoints === null ? (
+              <>
+                <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
+                <Text style={styles.resultSubtext}>Adding your reward…</Text>
+              </>
+            ) : (
+              <Text style={styles.resultReward}>{formatPoints(serverPoints)}</Text>
+            )}
             <Text style={styles.resultSubtext}>
               {score} {t.games.score} • {linesCleared} {t.games.lines}
             </Text>

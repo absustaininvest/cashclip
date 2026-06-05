@@ -7,13 +7,15 @@ import {
   Animated,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -87,6 +89,8 @@ export default function TriviaGame() {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [timeLeft, setTimeLeft] = useState(TIME_PER_QUESTION);
   const [totalReward, setTotalReward] = useState(0);
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressAnim = useRef(new Animated.Value(1)).current;
@@ -111,6 +115,9 @@ export default function TriviaGame() {
     setSelectedAnswer(null);
     setIsCorrect(null);
     setTotalReward(0);
+    setServerPoints(null);
+    setBankFailed(false);
+    bankedRef.current = false;
     setTimeLeft(TIME_PER_QUESTION);
     setGameState("playing");
 
@@ -198,6 +205,25 @@ export default function TriviaGame() {
     startTimer();
   }, [currentIndex]);
 
+  const bankedRef = useRef(false);
+
+  const bankReward = useCallback(async (desc: string) => {
+    if (bankedRef.current) return;
+    bankedRef.current = true;
+    const begin = await beginGame();
+    if (!begin.ok) {
+      setBankFailed(true);
+      return;
+    }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("trivia", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
+  }, []);
+
   const finishGame = useCallback(async (lastWasCorrect: boolean) => {
     if (timerRef.current) clearInterval(timerRef.current);
 
@@ -212,9 +238,12 @@ export default function TriviaGame() {
     setGameState("finished");
 
     if (reward > 0) {
-      await recordGamePlay("trivia", dollarsToPoints(reward), `Trivia Quiz: ${finalCorrect}/10 correct`);
+      await bankReward(`Trivia Quiz: ${finalCorrect}/10 correct`);
+    } else if (!bankedRef.current) {
+      bankedRef.current = true;
+      await recordGamePlay("trivia", 0, `Trivia Quiz: ${finalCorrect}/10 correct`, { creditLocally: false });
     }
-  }, [correctCount]);
+  }, [correctCount, bankReward]);
 
   useEffect(() => {
     return () => {
@@ -359,10 +388,21 @@ export default function TriviaGame() {
       <Text style={styles.resultScoreLabel}>{t.games.correct}</Text>
 
       {totalReward > 0 && (
-        <View style={styles.rewardBadge}>
-          <Ionicons name="cash" size={20} color={Colors.background} />
-          <Text style={styles.rewardBadgeText}>+{formatPoints(dollarsToPoints(totalReward))}</Text>
-        </View>
+        bankFailed ? (
+          <Text style={styles.bankFailedText}>
+            We couldn&apos;t add your reward right now. Please try again later.
+          </Text>
+        ) : serverPoints === null ? (
+          <View style={styles.rewardBadge}>
+            <ActivityIndicator size="small" color={Colors.background} />
+            <Text style={styles.rewardBadgeText}>Adding your reward…</Text>
+          </View>
+        ) : (
+          <View style={styles.rewardBadge}>
+            <Ionicons name="cash" size={20} color={Colors.background} />
+            <Text style={styles.rewardBadgeText}>+{formatPoints(serverPoints)}</Text>
+          </View>
+        )
       )}
 
       <View style={styles.finishedButtons}>
@@ -658,6 +698,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700" as const,
     color: Colors.background,
+  },
+  bankFailedText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    marginTop: 8,
+    marginBottom: 24,
+    paddingHorizontal: 12,
   },
   finishedButtons: {
     flexDirection: "row",

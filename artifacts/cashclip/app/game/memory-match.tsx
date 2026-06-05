@@ -7,13 +7,15 @@ import {
   Animated,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -184,6 +186,8 @@ export default function MemoryMatchGame() {
   const [canPlay, setCanPlay] = useState(true);
   const [checking, setChecking] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
@@ -220,6 +224,25 @@ export default function MemoryMatchGame() {
     },
     [t]
   );
+
+  const bankedRef = useRef(false);
+
+  const bankReward = useCallback(async (desc: string) => {
+    if (bankedRef.current) return;
+    bankedRef.current = true;
+    const begin = await beginGame();
+    if (!begin.ok) {
+      setBankFailed(true);
+      return;
+    }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("memory-match", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
+  }, []);
 
   const handleCardPress = useCallback(
     (cardId: number) => {
@@ -261,11 +284,7 @@ export default function MemoryMatchGame() {
               setGameOver(true);
               if (timerRef.current) clearInterval(timerRef.current);
 
-              recordGamePlay(
-                "memory-match",
-                dollarsToPoints(earnedReward),
-                `Memory Match - ${newMoves} moves`
-              );
+              void bankReward(`Memory Match - ${newMoves} moves`);
 
               setTimeout(() => {
                 setShowResult(true);
@@ -312,6 +331,9 @@ export default function MemoryMatchGame() {
     setGameStarted(false);
     setChecking(false);
     setShowResult(false);
+    setServerPoints(null);
+    setBankFailed(false);
+    bankedRef.current = false;
     resultOpacity.setValue(0);
     resultScale.setValue(0.5);
   }, []);
@@ -424,9 +446,20 @@ export default function MemoryMatchGame() {
               </View>
               <View style={styles.resultStatItem}>
                 <Text style={styles.resultStatLabel}>{t.games.reward}</Text>
-                <Text style={[styles.resultStatValue, { color: Colors.primary }]}>
-                  {formatPoints(dollarsToPoints(reward))}
-                </Text>
+                {bankFailed ? (
+                  <Text style={styles.bankFailedText}>
+                    We couldn&apos;t add your reward right now. Please try again later.
+                  </Text>
+                ) : serverPoints === null ? (
+                  <View style={styles.rewardPending}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                    <Text style={styles.rewardPendingText}>Adding your reward…</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.resultStatValue, { color: Colors.primary }]}>
+                    {formatPoints(serverPoints)}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -587,6 +620,19 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700" as const,
     color: Colors.text,
+  },
+  rewardPending: {
+    alignItems: "center",
+    gap: 4,
+  },
+  rewardPendingText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  bankFailedText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
   },
   playAgainButton: {
     flexDirection: "row",

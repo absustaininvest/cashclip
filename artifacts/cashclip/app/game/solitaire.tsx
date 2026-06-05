@@ -8,13 +8,15 @@ import {
   Dimensions,
   ScrollView,
   Animated,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
+import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -213,6 +215,8 @@ export default function SolitaireGame() {
   const [gameState, setGameState] = useState<"playing" | "won" | "cooldown">("playing");
   const [canPlay, setCanPlay] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
+  const [bankFailed, setBankFailed] = useState(false);
   const rewardRecorded = useRef(false);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
@@ -252,6 +256,29 @@ export default function SolitaireGame() {
       Animated.timing(resultOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.spring(resultScale, { toValue: 1, friction: 5, useNativeDriver: true }),
     ]).start();
+  }, []);
+
+  // Server-authoritative reward: request a challenge at the reward moment, then
+  // redeem it. The SERVER decides the prize (from its GAME_POOL) and drops it
+  // into the pending wallet — the on-screen outcome is cosmetic. We mark the
+  // play locally WITHOUT crediting a phantom balance (creditLocally:false).
+  const bankedRef = useRef(false);
+
+  const bankReward = useCallback(async (desc: string) => {
+    if (bankedRef.current) return;
+    bankedRef.current = true;
+    const begin = await beginGame();
+    if (!begin.ok) {
+      setBankFailed(true);
+      return;
+    }
+    const result = await completeGame(begin.challengeToken, desc);
+    if (result.ok) {
+      setServerPoints(result.token.points);
+      await recordGamePlay("solitaire", result.token.points, desc, { creditLocally: false });
+    } else {
+      setBankFailed(true);
+    }
   }, []);
 
   const flipTopCard = (cols: Card[][]) => {
@@ -297,7 +324,7 @@ export default function SolitaireGame() {
             setGameState("won");
             if (!rewardRecorded.current) {
               rewardRecorded.current = true;
-              recordGamePlay("solitaire", dollarsToPoints(0.25), "Solitaire: Won the game!");
+              void bankReward("Solitaire: Won the game!");
             }
             setTimeout(showResult, 500);
           }
@@ -306,7 +333,7 @@ export default function SolitaireGame() {
       }
       return false;
     },
-    [foundations, checkWin, showResult]
+    [foundations, checkWin, showResult, bankReward]
   );
 
   const handleTableauTap = useCallback(
@@ -448,7 +475,7 @@ export default function SolitaireGame() {
           setGameState("won");
           if (!rewardRecorded.current) {
             rewardRecorded.current = true;
-            recordGamePlay("solitaire", dollarsToPoints(0.25), "Solitaire: Won the game!");
+            void bankReward("Solitaire: Won the game!");
           }
           setTimeout(showResult, 500);
         }
@@ -456,23 +483,26 @@ export default function SolitaireGame() {
 
       setSelection(null);
     },
-    [tableau, waste, foundations, selection, gameState, checkWin, showResult]
+    [tableau, waste, foundations, selection, gameState, checkWin, showResult, bankReward]
   );
 
   const handleGiveUp = useCallback(() => {
     if (!rewardRecorded.current) {
       rewardRecorded.current = true;
-      recordGamePlay("solitaire", dollarsToPoints(0.05), "Solitaire: Played but did not win");
+      void bankReward("Solitaire: Played but did not win");
     }
     setGameState("won");
     setTimeout(showResult, 100);
-  }, [showResult]);
+  }, [showResult, bankReward]);
 
   const handleNewGame = useCallback(() => {
     resultOpacity.setValue(0);
     resultScale.setValue(0.5);
     setGameState("cooldown");
     setCanPlay(false);
+    setServerPoints(null);
+    setBankFailed(false);
+    bankedRef.current = false;
   }, []);
 
   const formatTime = (seconds: number) => {
@@ -616,9 +646,18 @@ export default function SolitaireGame() {
             <Text style={styles.resultTitle}>
               {totalFoundation === 52 ? t.games.youWon : t.games.gameOver}
             </Text>
-            <Text style={styles.resultReward}>
-              ${totalFoundation === 52 ? "0.25" : "0.05"}
-            </Text>
+            {bankFailed ? (
+              <Text style={styles.resultSubtext}>
+                We couldn&apos;t add your reward right now. Please try again later.
+              </Text>
+            ) : serverPoints === null ? (
+              <>
+                <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
+                <Text style={styles.resultSubtext}>Adding your reward…</Text>
+              </>
+            ) : (
+              <Text style={styles.resultReward}>{formatPoints(serverPoints)}</Text>
+            )}
             <Text style={styles.resultSubtext}>
               {moves} {t.games.moves} | {formatTime(timer)}
             </Text>
