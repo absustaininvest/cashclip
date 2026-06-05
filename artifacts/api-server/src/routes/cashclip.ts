@@ -2496,6 +2496,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Admin: list publishers (Publisher Program) with ad credits + campaign stats */
+  app.get("/api/admin/publishers", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { db: dbClient, users: usersTable, campaigns: campaignsTable } = await import("@workspace/db");
+      const { eq: drizzleEqLocal, desc: drizzleDesc, sql: drizzleSql } = await import("drizzle-orm");
+      const rows = await dbClient
+        .select({
+          id: usersTable.id,
+          username: usersTable.username,
+          email: usersTable.email,
+          balance: usersTable.balance,
+          adCredits: usersTable.adCredits,
+          publisherGrantedAt: usersTable.publisherGrantedAt,
+          createdAt: usersTable.createdAt,
+          campaignCount: drizzleSql<number>`count(${campaignsTable.id})::int`,
+          totalBudget: drizzleSql<string>`coalesce(sum(${campaignsTable.totalBudget}), 0)`,
+          totalSpent: drizzleSql<string>`coalesce(sum(${campaignsTable.spent}), 0)`,
+          totalClicks: drizzleSql<number>`coalesce(sum(${campaignsTable.clicks}), 0)::int`,
+        })
+        .from(usersTable)
+        .leftJoin(campaignsTable, drizzleEqLocal(campaignsTable.userId, usersTable.id))
+        .where(drizzleEqLocal(usersTable.isPublisher, true))
+        .groupBy(usersTable.id)
+        .orderBy(drizzleDesc(usersTable.publisherGrantedAt));
+      res.json({ publishers: rows });
+    } catch (err) {
+      req.log?.error({ err }, "Admin list publishers failed");
+      res.status(500).json({ error: "Failed to load publishers" });
+    }
+  });
+
   /** Admin: approve / reject / pause a campaign */
   app.patch("/api/admin/campaigns/:id", adminMiddleware, async (req: AuthRequest, res) => {
     try {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import QRCode from "qrcode";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -603,7 +603,7 @@ function StatCard({
 }: {
   icon: LucideIcon;
   label: string;
-  value: number;
+  value: number | string;
   color: string;
 }) {
   return (
@@ -4153,6 +4153,295 @@ function IntegrationHubPanel({
   );
 }
 
+interface PublisherRow {
+  id: string;
+  username: string;
+  email: string | null;
+  balance: string;
+  adCredits: string;
+  publisherGrantedAt: string | null;
+  createdAt: string;
+  campaignCount: number;
+  totalBudget: string;
+  totalSpent: string;
+  totalClicks: number;
+}
+
+interface AdminCampaign {
+  id: string;
+  title: string;
+  description: string;
+  targetUrl: string;
+  rewardPerVisit: string;
+  totalBudget: string;
+  spent: string;
+  clicks: number;
+  status: string;
+  adminNote: string | null;
+  createdAt: string;
+  userId: string;
+  username: string | null;
+}
+
+const CAMPAIGN_STATUS_STYLES: Record<string, string> = {
+  active: "bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20",
+  pending: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  paused: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+  ended: "bg-white/[0.06] text-white/40 border-white/10",
+};
+
+export function PublisherProgramPanel({ token }: { token: string }) {
+  const [publishers, setPublishers] = useState<PublisherRow[]>([]);
+  const [campaigns, setCampaigns] = useState<AdminCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [pubRes, campRes] = await Promise.all([
+        fetch("/api/admin/publishers", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/campaigns", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      if (!pubRes.ok) throw new Error("Failed to load publishers");
+      const pubData = await pubRes.json();
+      setPublishers(pubData.publishers ?? []);
+      if (campRes.ok) {
+        const campData = await campRes.json();
+        setCampaigns(campData.campaigns ?? []);
+      }
+    } catch (err: any) {
+      setError(err.message ?? "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const money = (v: string | number) => `$${Number(v ?? 0).toFixed(2)}`;
+  const fmtDate = (s: string) =>
+    new Date(s).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+  const totalCredits = publishers.reduce((s, p) => s + Number(p.adCredits ?? 0), 0);
+  const totalCampaigns = publishers.reduce((s, p) => s + Number(p.campaignCount ?? 0), 0);
+  const totalClicks = publishers.reduce((s, p) => s + Number(p.totalClicks ?? 0), 0);
+  const campaignsByUser = (userId: string) =>
+    campaigns.filter((c) => c.userId === userId);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
+            <Megaphone className="w-5 h-5 text-[#00E676]" />
+          </div>
+          <div>
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+              Publisher Program
+            </h2>
+            <p className="text-white/40 text-sm">
+              Publishers, their ad credits, and campaign performance
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={fetchData}
+          className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={Users}
+          label="Publishers"
+          value={publishers.length}
+          color="bg-[#00E676]/10 text-[#00E676]"
+        />
+        <StatCard
+          icon={Megaphone}
+          label="Ad Credits Outstanding"
+          value={money(totalCredits)}
+          color="bg-emerald-500/10 text-emerald-400"
+        />
+        <StatCard
+          icon={Layers}
+          label="Total Campaigns"
+          value={totalCampaigns}
+          color="bg-blue-500/10 text-blue-400"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Total Clicks"
+          value={totalClicks}
+          color="bg-amber-500/10 text-amber-400"
+        />
+      </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+        {loading ? (
+          <div className="text-center py-16 text-white/30">
+            Loading publishers...
+          </div>
+        ) : publishers.length === 0 ? (
+          <div className="text-center py-16">
+            <Megaphone className="w-10 h-10 text-white/10 mx-auto mb-3" />
+            <p className="text-white/30 text-sm">No publishers yet</p>
+            <p className="text-white/20 text-xs mt-1">
+              Users granted publisher access will appear here
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-white/30 text-[10px] uppercase tracking-wider border-b border-white/[0.06]">
+                <th className="text-left font-medium px-5 py-3">Publisher</th>
+                <th className="text-right font-medium px-3 py-3">Ad Credits</th>
+                <th className="text-right font-medium px-3 py-3">Campaigns</th>
+                <th className="text-right font-medium px-3 py-3">Budget</th>
+                <th className="text-right font-medium px-3 py-3">Spent</th>
+                <th className="text-right font-medium px-3 py-3">Clicks</th>
+                <th className="text-right font-medium px-5 py-3">Joined Program</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {publishers.map((p) => {
+                const open = expandedId === p.id;
+                const userCampaigns = campaignsByUser(p.id);
+                return (
+                  <Fragment key={p.id}>
+                    <tr
+                      onClick={() => setExpandedId(open ? null : p.id)}
+                      className="hover:bg-white/[0.02] transition-colors cursor-pointer"
+                    >
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 text-white/30 transition-transform ${open ? "rotate-90" : ""}`}
+                          />
+                          <div>
+                            <div className="text-white font-medium">
+                              {p.username}
+                            </div>
+                            <div className="text-white/30 text-xs">
+                              {p.email ?? "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right font-bold text-[#00E676]">
+                        {money(p.adCredits)}
+                      </td>
+                      <td className="px-3 py-3 text-right text-white/70">
+                        {Number(p.campaignCount ?? 0)}
+                      </td>
+                      <td className="px-3 py-3 text-right text-white/70">
+                        {money(p.totalBudget)}
+                      </td>
+                      <td className="px-3 py-3 text-right text-white/70">
+                        {money(p.totalSpent)}
+                      </td>
+                      <td className="px-3 py-3 text-right text-white/70">
+                        {Number(p.totalClicks ?? 0)}
+                      </td>
+                      <td className="px-5 py-3 text-right text-white/40 text-xs">
+                        {p.publisherGrantedAt
+                          ? fmtDate(p.publisherGrantedAt)
+                          : "—"}
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="bg-white/[0.015]">
+                        <td colSpan={7} className="px-5 py-4">
+                          {userCampaigns.length === 0 ? (
+                            <p className="text-white/30 text-xs py-2">
+                              No campaigns created yet.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+                                Campaigns ({userCampaigns.length})
+                              </p>
+                              {userCampaigns.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="flex items-center justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-white text-sm font-medium truncate">
+                                        {c.title}
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${CAMPAIGN_STATUS_STYLES[c.status] ?? CAMPAIGN_STATUS_STYLES["ended"]}`}
+                                      >
+                                        {c.status}
+                                      </span>
+                                    </div>
+                                    <a
+                                      href={c.targetUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[#00E676]/70 hover:text-[#00E676] text-xs flex items-center gap-1 mt-0.5 truncate"
+                                    >
+                                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                      <span className="truncate">{c.targetUrl}</span>
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-5 flex-shrink-0 text-right">
+                                    <div>
+                                      <div className="text-white/30 text-[9px] uppercase">Budget</div>
+                                      <div className="text-white/70 text-xs">{money(c.totalBudget)}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-white/30 text-[9px] uppercase">Spent</div>
+                                      <div className="text-white/70 text-xs">{money(c.spent)}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-white/30 text-[9px] uppercase">Clicks</div>
+                                      <div className="text-white/70 text-xs">{Number(c.clicks ?? 0)}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type Tab =
   | "submissions"
   | "hub"
@@ -4160,6 +4449,7 @@ type Tab =
   | "inbox"
   | "account"
   | "cashclip"
+  | "publishers"
   | "security"
   | "securitylog";
 
@@ -4240,6 +4530,7 @@ function Dashboard({
     { id: "submissions", label: "Submissions", icon: MessageSquare },
     { id: "hub", label: "Integration Hub", icon: Activity },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
+    { id: "publishers", label: "Publisher Program", icon: Megaphone },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
     { id: "account", label: "Account", icon: User },
@@ -4462,6 +4753,7 @@ function Dashboard({
 
         {tab === "hub" && <IntegrationHubPanel token={token} onLogout={onLogout} />}
         {tab === "cashclip" && <CashClipUsersPanel token={token} />}
+        {tab === "publishers" && <PublisherProgramPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
         {tab === "account" && (
