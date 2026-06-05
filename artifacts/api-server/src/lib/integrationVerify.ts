@@ -163,10 +163,25 @@ export async function verifyIntegrationKey(
     case "unity_ads": {
       const statsKey = process.env.UNITY_MONETIZATION_API_KEY;
       if (!statsKey) return unsupported("Saved. Add UNITY_MONETIZATION_API_KEY to verify credentials against Unity.");
-      const orgId = "2475979924671";
+      const orgId = process.env.UNITY_ORGANIZATION_ID;
+      if (!orgId) return unsupported("Saved. Add UNITY_ORGANIZATION_ID (your Unity Organization core ID — it changes if the project is transferred) to verify credentials against Unity.");
+      // Unity's Monetization Stats API requires fields, scale, start and end
+      // params or it returns 400 (which classify() would read as a rejected
+      // key). Use a minimal 1-day window aggregated with scale=all purely to
+      // validate the key + org against Unity's network. Unity wants ISO 8601
+      // without milliseconds (e.g. 2020-05-01T00:00:00Z).
+      const isoNoMs = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+      const end = new Date();
+      const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+      const params = new URLSearchParams({
+        fields: "revenue_sum",
+        scale: "all",
+        start: isoNoMs(start),
+        end: isoNoMs(end),
+      });
       return classify("Unity Ads", await timedFetch(
-        `https://services.api.unity.com/monetize/v1/organizations/${orgId}/reports/revenue`,
-        { method: "GET", headers: { Authorization: `Basic ${statsKey}` } }
+        `https://monetization.api.unity.com/stats/v1/operate/organizations/${encodeURIComponent(orgId)}?${params.toString()}`,
+        { method: "GET", headers: { Authorization: `Token ${statsKey}`, Accept: "application/json" } }
       ));
     }
     case "admob":

@@ -28,6 +28,8 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `TAPJOY_WEBHOOK_SECRET` | Tapjoy callback verification (MD5 verifier) |
 | `TAPJOY_APP_ID` | Tapjoy app identifier — sent as `app_id` on Tapjoy offers/verify API calls |
 | `TAPJOY_REPORTING_KEY` | Tapjoy Reporting API key — stored in config for pulling Tapjoy earnings reports |
+| `UNITY_MONETIZATION_API_KEY` | Unity Monetization Stats API key (Unity → Setup → API Access → **Monetization Stats API Access**, NOT LevelPlay or the deprecated Applifier key). Used only to pull Unity earnings reports / verify the integration; does not affect live ad revenue. Sent as `Authorization: Token <key>` to `monetization.api.unity.com/stats/v1/operate`. Per Unity, any org member's key works for the whole org. |
+| `UNITY_ORGANIZATION_ID` | Unity Organization core ID for the org that owns the Unity Game IDs (currently "AB Sustainability Investments"). Required alongside `UNITY_MONETIZATION_API_KEY`. **Changes if the project is ever transferred** — the old hardcoded value was removed because it was likely stale post-transfer. |
 | `LOOTABLY_API_KEY` | Lootably offerwall integration |
 | `ADJOE_SDK_KEY` | Adjoe offerwall SDK key |
 | `ADJOE_APP_ID` | Adjoe offerwall app ID |

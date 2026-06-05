@@ -35,7 +35,7 @@ export const integrations: Integration[] = [
     name: "Unity Ads",
     category: "ads",
     envKey: "UNITY_ADS_GAME_ID_IOS",
-    additionalEnvKeys: ["UNITY_ADS_GAME_ID_ANDROID", "UNITY_MONETIZATION_API_KEY"],
+    additionalEnvKeys: ["UNITY_ADS_GAME_ID_ANDROID", "UNITY_MONETIZATION_API_KEY", "UNITY_ORGANIZATION_ID"],
     signupUrl: "https://cloud.unity.com",
     description: "In-app bidding via AdMob mediation. Unity Ads competes with AdMob in real-time, driving up your eCPMs automatically.",
     priority: "recommended",
@@ -47,6 +47,8 @@ export const integrations: Integration[] = [
       "Complete the setup wizard to get your iOS and Android Game IDs",
       "Paste iOS Game ID as UNITY_ADS_GAME_ID_IOS and Android as UNITY_ADS_GAME_ID_ANDROID",
       "In AdMob, add Unity Ads as a bidding partner under Mediation using your Game IDs",
+      "(Optional, earnings reports) In Unity go to Setup → API Access, copy the Monetization Stats API key → paste as UNITY_MONETIZATION_API_KEY",
+      "(Optional, earnings reports) Copy your Unity Organization core ID → paste as UNITY_ORGANIZATION_ID (note: this ID changes if the project is ever transferred)",
     ],
   },
   {
