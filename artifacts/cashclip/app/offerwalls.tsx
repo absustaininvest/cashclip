@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 import { addEarnings } from "@/lib/storage";
 import { getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -333,6 +334,7 @@ export default function OfferwallsScreen() {
           </>
         ) : isLoading ? (
           <View style={styles.loadingCard}>
+            <Chipley pose="think" size={80} />
             <ActivityIndicator color={Colors.primary} size="large" />
             <Text style={styles.loadingText}>Loading offers…</Text>
           </View>
@@ -390,7 +392,7 @@ export default function OfferwallsScreen() {
               </>
             ) : (
               <View style={styles.emptyCard}>
-                <Feather name="inbox" size={36} color={Colors.textMuted} />
+                <Chipley pose="sleep" size={88} />
                 <Text style={styles.emptyText}>No offers match this filter</Text>
               </View>
             )}

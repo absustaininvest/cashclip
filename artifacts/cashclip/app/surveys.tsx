@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 import { useLanguage } from "@/lib/LanguageContext";
 import { t as tFn } from "@/lib/i18n";
 import { completeSurvey } from "@/lib/storage";
@@ -312,12 +313,13 @@ export default function SurveysScreen() {
             </View>
           ) : externalLoading ? (
             <View style={styles.loadingCard}>
+              <Chipley pose="think" size={80} />
               <ActivityIndicator color={Colors.primary} size="large" />
               <Text style={styles.loadingText}>Fetching surveys…</Text>
             </View>
           ) : externalSurveys.length === 0 ? (
             <View style={styles.allDoneCard}>
-              <Ionicons name="time-outline" size={40} color={Colors.primary} />
+              <Chipley pose="sleep" size={96} />
               <Text style={styles.allDoneTitle}>Surveys Coming Soon</Text>
               <Text style={styles.allDoneText}>We're finishing up with survey availability. New surveys will appear here automatically — check back in a day or two.</Text>
             </View>

@@ -26,6 +26,7 @@ import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
 import RewardedAdModal from "@/components/RewardedAdModal";
 import InFeedBanner from "@/components/InFeedBanner";
+import Chipley from "@/components/Chipley";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const AD_CARD_COUNT = 25;
@@ -274,9 +275,12 @@ export default function HomeScreen() {
           <View style={styles.header}>
             {/* Top row */}
             <View style={styles.topRow}>
-              <View>
-                <Text style={styles.greeting}>{t.home.title}</Text>
-                <Text style={styles.subtitle}>{t.home.subtitle}</Text>
+              <View style={styles.greetingRow}>
+                <Chipley pose="wave" size={52} style={styles.greetingChip} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.greeting}>{t.home.title}</Text>
+                  <Text style={styles.subtitle}>{t.home.subtitle}</Text>
+                </View>
               </View>
               <View style={styles.topActions}>
                 <Pressable onPress={handleShare} hitSlop={8}>
@@ -388,6 +392,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 14,
+  },
+  greetingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  greetingChip: {
+    marginLeft: -4,
   },
   greeting: {
     fontFamily: "Outfit_700Bold",

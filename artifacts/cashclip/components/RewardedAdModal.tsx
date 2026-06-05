@@ -4,6 +4,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 
 interface RewardedAdModalProps {
   visible: boolean;
@@ -67,7 +68,7 @@ export default function RewardedAdModal({
               </>
             ) : (
               <>
-                <MaterialCommunityIcons name="cash-multiple" size={64} color={Colors.accent} />
+                <Chipley pose="celebrate" size={92} />
                 <Text style={styles.rewardEarned}>+${reward.toFixed(2)}</Text>
                 <Text style={styles.rewardLabel}>Reward earned!</Text>
               </>

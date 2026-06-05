@@ -20,6 +20,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 import {
   getUserStats,
   getTransactions,
@@ -482,7 +483,7 @@ export default function WalletScreen() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Feather name="inbox" size={40} color={Colors.textMuted} />
+            <Chipley pose="sleep" size={96} />
             <Text style={styles.emptyTitle}>{t.wallet.noTransactions}</Text>
             <Text style={styles.emptySubtitle}>{t.wallet.watchAdsToStart}</Text>
           </View>

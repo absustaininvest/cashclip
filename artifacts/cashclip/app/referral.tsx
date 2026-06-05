@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 import { useLanguage } from "@/lib/LanguageContext";
 import {
   fetchReferralStats,
@@ -213,7 +214,7 @@ export default function ReferralScreen() {
               </View>
             ) : (stats?.referrals.length ?? 0) === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+                <Chipley pose="sleep" size={96} />
                 <Text style={styles.emptyStateText}>{t.referral.noReferralsYet}</Text>
               </View>
             ) : (

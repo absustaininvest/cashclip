@@ -33,6 +33,7 @@ import {
 } from "@expo-google-fonts/outfit";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import Chipley from "@/components/Chipley";
 import SponsoredSection from "@/components/SponsoredSection";
 import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -265,11 +266,7 @@ function WatchingModal({
             ) : (
               <>
                 <Animated.View style={coinStyle}>
-                  <MaterialCommunityIcons
-                    name="cash-multiple"
-                    size={64}
-                    color={Colors.accent}
-                  />
+                  <Chipley pose="celebrate" size={92} />
                 </Animated.View>
                 <Text style={styles.rewardEarned}>
                   +${ad.reward.toFixed(2)}
@@ -339,11 +336,7 @@ function SpinRewardModal({
       <View style={styles.modalOverlay}>
         <Animated.View style={celebStyle}>
           <View style={styles.spinRewardModal}>
-            <MaterialCommunityIcons
-              name="star-circle"
-              size={64}
-              color={Colors.accent}
-            />
+            <Chipley pose="celebrate" size={92} />
             <Text style={styles.spinRewardTitle}>{t.earn.congratulations}</Text>
             <Text style={styles.spinRewardAmount}>+{reward} pts</Text>
             <Text style={styles.spinRewardSubtext}>
@@ -410,7 +403,7 @@ function MilestoneRewardModal({
         <Animated.View style={celebStyle}>
           <View style={styles.milestoneModal}>
             <Animated.View style={flameStyle}>
-              <Ionicons name="flame" size={64} color={Colors.accent} />
+              <Chipley pose="celebrate" size={92} />
             </Animated.View>
             <Text style={styles.milestoneTitle}>
               {t.earn.milestoneTitle.replace("{{days}}", String(streak))}
