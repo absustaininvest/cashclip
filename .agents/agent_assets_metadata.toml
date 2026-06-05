@@ -137,3 +137,9 @@ id = "H9rUZmcBxH1-cXGnZijzt"
 uri = "file://exports/CashClip_absustaininvest_artifacts.zip"
 type = "unspecified"
 title = "absustaininvest/support account — 16 builds (33–38 + Android) — 656 MB"
+
+[[outputs]]
+id = "hkGZ1EBrzR8WXe0KRxNoq"
+uri = "file://exports/CashClip_Vision_Roadmap.pdf"
+type = "pdf"
+title = "CashClip — Vision & Roadmap (Printable)"
