@@ -22,6 +22,14 @@ dashboard identifiers, not secrets — safe to reuse so we don't re-ask the owne
 (NOT Organization Settings — that page only shows the IDs above). That token is
 `UNITY_MONETIZATION_API_KEY`. Reporting/verification only — does NOT affect live ad revenue.
 
+**Integration state (Jun 5, 2026):** Unity reporting is wired and verified end-to-end —
+`UNITY_MONETIZATION_API_KEY` is a global secret, `UNITY_ORGANIZATION_ID` is a shared env var
+(it's the public org core ID, not sensitive; do NOT also add it as a secret — that creates a
+confusing duplicate, and viewEnvVars `type:"all"` double-reports a shared env var under
+`secrets`). Both are global, but the LIVE deployment only picks them up on a **re-publish**
+(see `prod-secrets-location.md`). Reporting works; revenue is still $0 until the native
+adapter ships in a build ≥39 (`cashclip-mediation-adapters-native.md`).
+
 **Live API behavior (verified Jun 5, 2026):** calling the Stats endpoint with the org ID but
 no/invalid token returns HTTP `401` (`access token required` / `invalid access token`); a
 well-formed org ID returns neither `400` (org omitted) nor `404` (org not found), so a valid
