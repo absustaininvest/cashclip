@@ -18,6 +18,8 @@ import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { OtaUpdateGate } from "@/components/OtaUpdateGate";
 import { CelebrationProvider } from "@/lib/CelebrationContext";
 import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
+import LogRocket from "@logrocket/react-native";
+import * as Updates from "expo-updates";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -131,6 +133,44 @@ export default function RootLayout() {
   useEffect(() => {
     startAdAnalyticsFlush();
     return () => stopAdAnalyticsFlush();
+  }, []);
+
+  // Session replay (LogRocket) for debugging real-user issues. Initialized once,
+  // fire-and-forget — it must NEVER gate the splash (see prior splash-deadlock).
+  // This is a money app, so PII is stripped before anything leaves the device:
+  //  - textSanitizer "excluded": masks ALL on-screen text (balances, emails, payouts)
+  //  - enableIPCapture false: no IP addresses recorded
+  //  - console capture disabled: app logs can carry sensitive values
+  //  - network sanitizers: drop Authorization headers, all request/response bodies,
+  //    AND query strings on URLs (reset tokens / emails / ids can ride query params)
+  // The whole call is wrapped in try/catch so telemetry can never crash launch
+  // (fail-open). expoChannel/updateId tie each session to the OTA/build it came from.
+  useEffect(() => {
+    try {
+      LogRocket.init("wzfayx/cashclip", {
+        updateId: Updates.isEmbeddedLaunch ? null : Updates.updateId,
+        expoChannel: Updates.channel,
+        enableIPCapture: false,
+        textSanitizer: "excluded",
+        console: { isEnabled: false },
+        network: {
+          requestSanitizer: (request) => {
+            delete request.headers.Authorization;
+            delete request.headers.authorization;
+            request.body = undefined;
+            const q = request.url.indexOf("?");
+            if (q !== -1) request.url = request.url.slice(0, q);
+            return request;
+          },
+          responseSanitizer: (response) => {
+            response.body = undefined;
+            return response;
+          },
+        },
+      });
+    } catch (e) {
+      if (__DEV__) console.warn("LogRocket init skipped:", e);
+    }
   }, []);
 
   if (!appReady) return null;
