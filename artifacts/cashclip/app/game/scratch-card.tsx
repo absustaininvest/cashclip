@@ -162,9 +162,12 @@ export default function ScratchCardGame() {
   // is issued at game start, then redeemed on a win. The SERVER decides the prize
   // and drops it into the pending wallet — the on-screen symbols are cosmetic.
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
-  const [startError, setStartError] = useState(false);
   const [serverPoints, setServerPoints] = useState<number | null>(null);
   const [bankFailed, setBankFailed] = useState(false);
+  // The reward challenge is requested on the player's FIRST reveal (not on mount)
+  // so the 60s challenge TTL starts at real engagement, never while the screen
+  // sits idle. We keep the in-flight promise so a very fast win can await it.
+  const beginPromiseRef = useRef<ReturnType<typeof beginGame> | null>(null);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
@@ -174,28 +177,34 @@ export default function ScratchCardGame() {
 
   useEffect(() => {
     let cancelled = false;
-    canPlayGame("scratch-card").then(async (available) => {
+    canPlayGame("scratch-card").then((available) => {
       if (cancelled) return;
       if (!available) {
         setCanPlay(false);
         setGameState("cooldown");
-        return;
       }
-      // Reserve the reward server-side before the player can win, so the prize
-      // is bankable. Without a challenge, a win can't be credited.
-      const begin = await beginGame();
-      if (cancelled) return;
-      if (begin.ok) setChallengeToken(begin.challengeToken);
-      else setStartError(true);
     });
     return () => { cancelled = true; };
   }, []);
 
-  const handleRetryStart = useCallback(async () => {
-    setStartError(false);
-    const begin = await beginGame();
-    if (begin.ok) setChallengeToken(begin.challengeToken);
-    else setStartError(true);
+  // Request the server reward challenge once, lazily, on first interaction.
+  // beginGame() quietly retries transient failures; we cache the in-flight
+  // promise so the win handler can await the very-fast-win case. If a begin
+  // attempt FAILS we clear the ref so a later reveal (or the win handler) can
+  // re-attempt — otherwise a single early network blip would lose the reward.
+  const ensureChallenge = useCallback(() => {
+    if (!beginPromiseRef.current) {
+      const p = beginGame();
+      beginPromiseRef.current = p;
+      void p
+        .then((begin) => {
+          if (begin.ok) setChallengeToken(begin.challengeToken);
+          else beginPromiseRef.current = null;
+        })
+        .catch(() => {
+          beginPromiseRef.current = null;
+        });
+    }
   }, []);
 
   const showResult = useCallback(() => {
@@ -220,11 +229,25 @@ export default function ScratchCardGame() {
   const bankReward = useCallback(
     async (symbol: SymbolType) => {
       const desc = `Scratch Card: matched 3 ${symbol}s`;
-      if (!challengeToken) {
+      // Resolve the challenge. Make sure an attempt is in flight (covers the
+      // case where the first begin already failed and cleared the ref), then
+      // await it — this also handles the very-fast-win race where the win lands
+      // before /begin responds. A brand-new begin here may make the server
+      // reject as "too early", but completeGame() waits and retries that.
+      let token = challengeToken;
+      if (!token) {
+        ensureChallenge();
+        const inflight = beginPromiseRef.current;
+        if (inflight) {
+          const begin = await inflight;
+          if (begin.ok) token = begin.challengeToken;
+        }
+      }
+      if (!token) {
         setBankFailed(true);
         return;
       }
-      const result = await completeGame(challengeToken, desc);
+      const result = await completeGame(token, desc);
       if (result.ok) {
         setServerPoints(result.token.points);
         await recordGamePlay("scratch-card", result.token.points, desc, { creditLocally: false });
@@ -232,12 +255,15 @@ export default function ScratchCardGame() {
         setBankFailed(true);
       }
     },
-    [challengeToken]
+    [challengeToken, ensureChallenge]
   );
 
   const handleReveal = useCallback(
     (index: number) => {
       if (gameState !== "playing") return;
+
+      // First scratch starts the reward clock (server challenge).
+      ensureChallenge();
 
       const newCells = [...cells];
       newCells[index] = { ...newCells[index], revealed: true };
@@ -258,7 +284,7 @@ export default function ScratchCardGame() {
         setTimeout(showResult, 500);
       }
     },
-    [cells, gameState, revealCount, showResult, bankReward]
+    [cells, gameState, revealCount, showResult, bankReward, ensureChallenge]
   );
 
   const handlePlayAgain = useCallback(() => {
@@ -272,6 +298,7 @@ export default function ScratchCardGame() {
     setChallengeToken(null);
     setServerPoints(null);
     setBankFailed(false);
+    beginPromiseRef.current = null;
   }, []);
 
   return (
@@ -297,22 +324,6 @@ export default function ScratchCardGame() {
             <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
             <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
             <Text style={styles.cooldownSubtitle}>{t.games.dailyPlaysLeft}: 0</Text>
-          </View>
-        ) : startError ? (
-          <View style={styles.cooldownContainer}>
-            <Ionicons name="cloud-offline-outline" size={64} color={Colors.textMuted} />
-            <Text style={styles.cooldownTitle}>Couldn&apos;t start the game</Text>
-            <Text style={styles.cooldownSubtitle}>
-              Check your connection and try again.
-            </Text>
-            <TouchableOpacity testID="retry-start-button" style={styles.resultButton} onPress={handleRetryStart}>
-              <Text style={styles.resultButtonText}>{t.games.playAgain}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : !challengeToken ? (
-          <View style={styles.cooldownContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.cooldownSubtitle}>Getting your card ready…</Text>
           </View>
         ) : (
           <>

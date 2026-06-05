@@ -333,6 +333,21 @@ export async function completeGame(
         await storeTokenLocally(token);
         return { ok: true, token };
       }
+      // 425 Too Early: the anti-instant-replay guard fired because the player
+      // matched faster than GAME_CHALLENGE_MIN_MS. The server leaves the
+      // challenge in place, so wait the suggested delay and retry the SAME
+      // token — a fast legitimate win must still be paid.
+      if (res.status === 425 && attempt < SPIN_MAX_ATTEMPTS) {
+        let waitMs = SPIN_RETRY_BASE_MS;
+        try {
+          const data = await res.json() as { retryAfterMs?: number };
+          if (typeof data.retryAfterMs === "number" && data.retryAfterMs > 0) {
+            waitMs = data.retryAfterMs;
+          }
+        } catch { /* fall back to base delay */ }
+        await sleep(waitMs + 100);
+        continue;
+      }
       const retryable = await isRetryable503(res);
       if (retryable && attempt < SPIN_MAX_ATTEMPTS) {
         await sleep(SPIN_RETRY_BASE_MS * attempt);
