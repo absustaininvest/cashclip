@@ -1,4 +1,5 @@
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 import { logger } from "./logger";
 
 export interface InboxMessage {
@@ -77,11 +78,15 @@ export async function fetchInbox(folder = "INBOX"): Promise<InboxMessage[]> {
     const fetchFrom = Math.max(1, total - 49);
     const fetchRange = `${fetchFrom}:${total}`;
 
+    // Fetch the full raw message source and parse it with mailparser. This
+    // correctly handles MIME multipart structure, charsets, and transfer
+    // encodings (quoted-printable / base64) — none of which a naive
+    // BODY[TEXT] read + tag strip can decode, which is why bodies previously
+    // came through empty ("No body content").
     for await (const msg of client.fetch(fetchRange, {
       envelope: true,
-      bodyStructure: true,
       flags: true,
-      bodyParts: ["TEXT"],
+      source: true,
     })) {
       try {
         const env = msg.envelope;
@@ -94,10 +99,18 @@ export async function fetchInbox(folder = "INBOX"): Promise<InboxMessage[]> {
         const toAddr = to?.address ?? "";
 
         let bodyText = "";
-        const rawText = msg.bodyParts?.get("TEXT");
-        if (rawText) {
-          const raw = rawText.toString();
-          bodyText = raw.includes("<") ? stripHtml(raw) : raw;
+        if (msg.source) {
+          try {
+            const parsed = await simpleParser(msg.source);
+            const text = (parsed.text ?? "").trim();
+            if (text) {
+              bodyText = text;
+            } else if (parsed.html) {
+              bodyText = stripHtml(parsed.html);
+            }
+          } catch (parseErr) {
+            logger.warn({ parseErr, uid: msg.uid }, "Failed to parse message body");
+          }
         }
 
         const preview = bodyText.slice(0, 200).replace(/\s+/g, " ").trim();
