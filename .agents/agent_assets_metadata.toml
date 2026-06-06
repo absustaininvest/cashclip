@@ -173,3 +173,27 @@ id = "rzDv_nc3bBZimuVjIolZH"
 uri = "file://exports/ab_promo_banner_native_1600.png"
 type = "image"
 title = "Promo Banner — Native 1600×794 (2:1, edge-to-edge)"
+
+[[outputs]]
+id = "z41xeZdpPwhwambK5scFJ"
+uri = "file://exports/cashclip_icon_framed_512.png"
+type = "image"
+title = "CashClip Icon — Framed 512×512"
+
+[[outputs]]
+id = "-FuXtoBkVIpEg_wgX6gdL"
+uri = "file://exports/cashclip_icon_framed_256.png"
+type = "image"
+title = "CashClip Icon — Framed 256×256 (smaller)"
+
+[[outputs]]
+id = "JtmvDc6m-KjKRx8L04fmW"
+uri = "file://exports/cashclip_icon_flat_512.png"
+type = "image"
+title = "CashClip Icon — Flat 512×512"
+
+[[outputs]]
+id = "CcREwa9MxRSORWpoEu9o5"
+uri = "file://exports/cashclip_icon_flat_256.png"
+type = "image"
+title = "CashClip Icon — Flat 256×256 (smaller)"
