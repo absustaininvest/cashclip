@@ -35,3 +35,16 @@ no/invalid token returns HTTP `401` (`access token required` / `invalid access t
 well-formed org ID returns neither `400` (org omitted) nor `404` (org not found), so a valid
 key is the only thing needed for a `200`. Even a `200` will show ~$0 until the Unity mediation
 adapter ships in a live build ≥39 — see `cashclip-mediation-adapters-native.md`.
+
+**Account-setup dates are a RED HERRING for the $0-Unity diagnosis** (owner repeatedly suspects
+he "messed up" the Unity account): Unity ID created May 8 2026; owner's last account change
+~May 15 2026; but live iOS build 29 was COMPILED May 14 2026 (submitted ~May 13) with NO Unity
+adapter at all (proven from the build log — see `cashclip-mediation-adapters-native.md`). A
+May-15 account tweak post-dates the build, and more fundamentally NO dashboard/account change on
+ANY date can add native code to an already-compiled binary. So nothing the owner toggled caused
+or can fix the $0; the only fix is a live build ≥39 that ships the adapter. Reassure him: not his fault.
+
+**Unification note:** the Unity ID/account is under the owner's personal iCloud email, NOT the
+company identity (support@absustaininvest.com / "AB Sustainability Investments"). Account-
+Unification roadmap item #1 must align/migrate it so Unity, ironSource & Tapjoy share the one
+company identity.
