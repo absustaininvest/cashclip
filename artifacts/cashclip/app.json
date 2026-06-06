@@ -396,6 +396,7 @@
     "plugins": [
       "@react-native-firebase/app",
       "@logrocket/react-native",
+      "@sentry/react-native/expo",
       [
         "expo-router",
         {

@@ -20,6 +20,28 @@ import { CelebrationProvider } from "@/lib/CelebrationContext";
 import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
 import LogRocket from "@logrocket/react-native";
 import * as Updates from "expo-updates";
+import * as Sentry from "@sentry/react-native";
+
+// Crash & error reporting (Sentry). Initialized at module load — as early as
+// possible — so it captures the earliest startup errors. Fail-open: guarded by
+// DSN presence and wrapped in try/catch so a telemetry problem can NEVER crash
+// or delay launch (see prior splash-deadlock). PII is minimized on this money
+// app: sendDefaultPii=false means no IP address or user data is auto-attached.
+// Events are tagged with the environment and the OTA update they shipped in
+// (dist) so crashes can be traced to the exact build/OTA layer.
+try {
+  const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+  if (sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment: process.env.EXPO_PUBLIC_ENV ?? "production",
+      sendDefaultPii: false,
+      dist: Updates.isEmbeddedLaunch ? undefined : Updates.updateId ?? undefined,
+    });
+  }
+} catch (e) {
+  if (__DEV__) console.warn("Sentry init skipped:", e);
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -116,7 +138,7 @@ function RootLayoutNav() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
     Outfit_600SemiBold,
@@ -211,3 +233,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootLayout);
