@@ -23,3 +23,10 @@ copy button) and replace the array in serve.js with the google DIRECT line + tha
 full list. The list drifts over time, so replace wholesale rather than appending.
 Then the owner must PUBLISH the CashClip web deployment for the change to go live;
 republish is required (owner-approval-gated per his rule).
+
+**Confirmed working (Jun 6, 2026):** added the Insticator authorized-seller line
+(`insticator.com, …, RESELLER, …`) to the serve.js array and republished the single
+`cash-clip.app` autoscale deployment. After the republish, live `cash-clip.app/app-ads.txt`
+returned 200 with the Insticator line, and the Unity dashboard flipped to "Your app-ads.txt
+file is up-to-date. No action needed at this time." So: edit array → republish that one
+deployment → Unity's "missing entry" warning clears (crawler may lag ~24h).
