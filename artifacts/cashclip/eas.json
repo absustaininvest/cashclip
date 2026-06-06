@@ -38,6 +38,7 @@
     },
     "production": {
       "extends": "base",
+      "environment": "production",
       "distribution": "store",
       "channel": "production",
       "autoIncrement": false,
