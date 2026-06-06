@@ -143,3 +143,21 @@ id = "hkGZ1EBrzR8WXe0KRxNoq"
 uri = "file://exports/CashClip_Vision_Roadmap.pdf"
 type = "pdf"
 title = "CashClip — Vision & Roadmap (Printable)"
+
+[[outputs]]
+id = "vUG2PyOc4uv1NGJOL25_p"
+uri = "file://exports/ab_logo_square_512.png"
+type = "image"
+title = "AB Logo — Square 512×512 (best for profile pics)"
+
+[[outputs]]
+id = "YbVaOKinh4ELOvbTYKmCC"
+uri = "file://exports/ab_logo_square_1024.png"
+type = "image"
+title = "AB Logo — Square 1024×1024 (high-res)"
+
+[[outputs]]
+id = "20X7JZGFYknu-9-_SdxVD"
+uri = "file://exports/ab_logo_square_256.png"
+type = "image"
+title = "AB Logo — Square 256×256 (small/light)"
