@@ -66,7 +66,13 @@ relies on it: confirm no leftover REVERSED duplicate still lingers in the Secret
 a config with the same name could conflict in process.env). The swap did NOT cause the historical
 $0 (that's the missing native adapter) but a wrong per-platform Game ID would make Unity reject the
 app's requests, so correct mapping matters for build 39.
-**Placements state:** 0 active / 0 bidding, **8 archived** ad units — i.e. NO live Unity placement
-exists right now, so an AdMob→Unity mediation group has nothing to point at until a placement is
-un-archived or a new Rewarded ad unit is created. Also note: Unity Cloud **Project ID** (GUID
-`849af6ee-a5ba-450d-92a2-dfb400796cb7`) is NOT used for ads — only Game ID + Placement ID are.
+**Placements — LIVE set (Jun 6, 2026, all Bidding), exact Placement IDs for AdMob mapping:**
+- iOS (Game ID **6110340**): `Rewarded_IOs`, `Interstitial_iOS`, `Banner_iOS`
+- Android (Game ID **6110341**): `Rewarded_Android`, `Interstitial_Android`, `Banner_Android`
+(Casing is Unity-auto-generated and inconsistent — note `Rewarded_IOs` vs `Interstitial_iOS`; copy
+exactly when mapping into AdMob.) Owner un-archived the standard set to mirror AdMob's existing ad
+units (3 still archived). Unity Cloud **Project ID** (GUID `849af6ee-a5ba-450d-92a2-dfb400796cb7`)
+is NOT used for ads — only Game ID + Placement ID are.
+**Reminder:** wiring these into AdMob mediation is correct prep and harmless to live build 29, but
+Unity won't actually serve/earn until **build 39** (with the native Unity adapter) is approved by
+Apple — AdMob mediation config is server-side, but the adapter must be in the binary to bid.
