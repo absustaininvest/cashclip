@@ -54,10 +54,18 @@ company identity.
 already (partly) done — but CONFIRM before relying on it, since the prior note had the Unity ID
 under his personal iCloud email; a login email and the underlying Unity ID owner can differ.
 
-**Game IDs (observed from Placements page, Jun 6, 2026):** the CashClip Unity project has two
-Game IDs — **6110340** and **6110341** (one iOS, one Android; platform mapping NOT yet confirmed,
-confirm in AdMob setup). These should match the `UNITY_ADS_GAME_ID_IOS`/`UNITY_ADS_GAME_ID_ANDROID`
-secrets. Game IDs are semi-public (embedded in the app binary), not sensitive auth.
+**Game IDs — CONFIRMED mapping (Jun 6, 2026, from Unity Placements page platform icons):**
+- **iOS = `6110340`** (🍎 Apple icon) → `UNITY_ADS_GAME_ID_IOS`
+- **Android = `6110341`** (🤖 Android icon) → `UNITY_ADS_GAME_ID_ANDROID`
+Game IDs are semi-public (embedded in the app binary), not sensitive auth.
+**Swap incident:** the Secrets tab briefly had these REVERSED (ANDROID=6110340 / IOS=6110341 — the
+iOS number under the Android key and vice-versa). Owner moved them to **Configurations** (env vars,
+the right place for non-sensitive values) with the CORRECT mapping above; `.replit [userenv.shared]`
+now reads `UNITY_ADS_GAME_ID_IOS=6110340`, `UNITY_ADS_GAME_ID_ANDROID=6110341`. TODO before build 39
+relies on it: confirm no leftover REVERSED duplicate still lingers in the Secrets store (a secret +
+a config with the same name could conflict in process.env). The swap did NOT cause the historical
+$0 (that's the missing native adapter) but a wrong per-platform Game ID would make Unity reject the
+app's requests, so correct mapping matters for build 39.
 **Placements state:** 0 active / 0 bidding, **8 archived** ad units — i.e. NO live Unity placement
 exists right now, so an AdMob→Unity mediation group has nothing to point at until a placement is
 un-archived or a new Rewarded ad unit is created. Also note: Unity Cloud **Project ID** (GUID
