@@ -48,3 +48,8 @@ or can fix the $0; the only fix is a live build ≥39 that ships the adapter. Re
 company identity (support@absustaininvest.com / "AB Sustainability Investments"). Account-
 Unification roadmap item #1 must align/migrate it so Unity, ironSource & Tapjoy share the one
 company identity.
+
+**Owner-stated login (Jun 6, 2026):** owner now says his cloud.unity.com login email is
+**support@absustaininvest.com** (the company identity). This may mean the unification above is
+already (partly) done — but CONFIRM before relying on it, since the prior note had the Unity ID
+under his personal iCloud email; a login email and the underlying Unity ID owner can differ.
