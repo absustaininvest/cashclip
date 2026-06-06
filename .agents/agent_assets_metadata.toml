@@ -197,3 +197,9 @@ id = "CcREwa9MxRSORWpoEu9o5"
 uri = "file://exports/cashclip_icon_flat_256.png"
 type = "image"
 title = "CashClip Icon — Flat 256×256 (smaller)"
+
+[[outputs]]
+id = "0CRJqqDGE7lrREpaw5tzC"
+uri = "file://exports/CashClip_Session_Recap.md"
+type = "text"
+title = "CashClip — Session Recap & Status Script"
