@@ -302,6 +302,7 @@ const server = http.createServer((req, res) => {
       "improvedigital.com, 2464, RESELLER",
       "indexexchange.com, 214183, RESELLER, 50b1c356f2c5c8fc",
       "inmobi.com, 23d316d3d980453d8ea0dcf9caec4078, RESELLER, 83e75a7ae333ca9d",
+      "insticator.com, cadff748-965f-4393-a76e-a8f902512bad, RESELLER, b3511ffcafb23a32",
       "jcprog.com, pub-4518750432, RESELLER",
       "kidoz.net, 14260, RESELLER, a109366414b7335e",
       "kidoz.net, 15467, RESELLER, a109366414b7335e",
