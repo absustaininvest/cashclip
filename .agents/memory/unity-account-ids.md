@@ -53,3 +53,12 @@ company identity.
 **support@absustaininvest.com** (the company identity). This may mean the unification above is
 already (partly) done — but CONFIRM before relying on it, since the prior note had the Unity ID
 under his personal iCloud email; a login email and the underlying Unity ID owner can differ.
+
+**Game IDs (observed from Placements page, Jun 6, 2026):** the CashClip Unity project has two
+Game IDs — **6110340** and **6110341** (one iOS, one Android; platform mapping NOT yet confirmed,
+confirm in AdMob setup). These should match the `UNITY_ADS_GAME_ID_IOS`/`UNITY_ADS_GAME_ID_ANDROID`
+secrets. Game IDs are semi-public (embedded in the app binary), not sensitive auth.
+**Placements state:** 0 active / 0 bidding, **8 archived** ad units — i.e. NO live Unity placement
+exists right now, so an AdMob→Unity mediation group has nothing to point at until a placement is
+un-archived or a new Rewarded ad unit is created. Also note: Unity Cloud **Project ID** (GUID
+`849af6ee-a5ba-450d-92a2-dfb400796cb7`) is NOT used for ads — only Game ID + Placement ID are.
