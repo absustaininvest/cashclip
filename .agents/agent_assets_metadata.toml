@@ -161,3 +161,15 @@ id = "20X7JZGFYknu-9-_SdxVD"
 uri = "file://exports/ab_logo_square_256.png"
 type = "image"
 title = "AB Logo — Square 256×256 (small/light)"
+
+[[outputs]]
+id = "C-fCkpfosdEmh0TPKmQkE"
+uri = "file://exports/ab_promo_banner_wide_1920x640.png"
+type = "image"
+title = "Promo Banner — Wide 1920×640 (letterbox, recommended)"
+
+[[outputs]]
+id = "rzDv_nc3bBZimuVjIolZH"
+uri = "file://exports/ab_promo_banner_native_1600.png"
+type = "image"
+title = "Promo Banner — Native 1600×794 (2:1, edge-to-edge)"
