@@ -44,6 +44,10 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Project Video"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "EAS Update A"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -79,6 +83,17 @@ waitForPort = 5173
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "EAS Update A"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/balance-ota-build && rm -f /tmp/eas_update_A.log && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_PUBLIC_ENV=production EXPO_PUBLIC_DOMAIN=cash-clip.app node /home/runner/workspace/node_modules/.pnpm/eas-cli@18.11.0_@types+node@25.3.5_typescript@5.9.3/node_modules/eas-cli/bin/run update --branch production --message \"V29 OTA test: Home shows real server balance; celebration+spin-fix+home-taps reproduced\" --non-interactive 2>&1 | tee -a /tmp/eas_update_A.log; echo \"EAS_EXIT=${PIPESTATUS[0]}\" | tee -a /tmp/eas_update_A.log"
 
 [[ports]]
 localPort = 3001
