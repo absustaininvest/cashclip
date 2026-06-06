@@ -21,6 +21,7 @@ import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
 import LogRocket from "@logrocket/react-native";
 import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
+import { vexo } from "vexo-analytics";
 
 // Crash & error reporting (Sentry). Initialized at module load — as early as
 // possible — so it captures the earliest startup errors. Fail-open: guarded by
@@ -41,6 +42,20 @@ try {
   }
 } catch (e) {
   if (__DEV__) console.warn("Sentry init skipped:", e);
+}
+
+// Product analytics (Vexo). Initialized at module load, fail-open like Sentry:
+// guarded by API-key presence and wrapped in try/catch so analytics can NEVER
+// crash or delay launch (see prior splash-deadlock). Gated to non-dev builds so
+// local development never pollutes production analytics. Vexo auto-instruments
+// expo-router navigation for screen tracking once the router mounts.
+try {
+  const vexoKey = process.env.EXPO_PUBLIC_VEXO_API_KEY;
+  if (vexoKey && !__DEV__) {
+    vexo(vexoKey);
+  }
+} catch (e) {
+  if (__DEV__) console.warn("Vexo init skipped:", e);
 }
 
 SplashScreen.preventAutoHideAsync();
