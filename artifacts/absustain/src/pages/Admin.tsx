@@ -5074,6 +5074,12 @@ function RevenuePanel({
 }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<AdMobRevenueData | null>(null);
+  const [periods, setPeriods] = useState<{
+    today: number;
+    last7d: number;
+    last30d: number;
+    currency: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -5081,6 +5087,34 @@ function RevenuePanel({
   const fetchRevenue = useCallback(async () => {
     setLoading(true);
     setError("");
+    // Pull the today / 7d / 30d earnings trio from the same persisted store the
+    // phone admin uses (/api/admin/stats), so both surfaces show identical
+    // figures for the same periods. Best-effort: a failure here never blocks the
+    // windowed report below.
+    void (async () => {
+      try {
+        const sres = await fetch(`/api/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!sres.ok) {
+          setPeriods(null);
+          return;
+        }
+        const sjson = await sres.json();
+        if (sjson?.admob) {
+          setPeriods({
+            today: sjson.admob.today ?? 0,
+            last7d: sjson.admob.last7d ?? 0,
+            last30d: sjson.admob.last30d ?? 0,
+            currency: sjson.admob.currency || "USD",
+          });
+        } else {
+          setPeriods(null);
+        }
+      } catch {
+        setPeriods(null);
+      }
+    })();
     try {
       const res = await fetch(`/api/admin/admob/revenue?days=${days}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -5170,7 +5204,8 @@ function RevenuePanel({
               AdMob Revenue
             </h2>
             <p className="text-white/40 text-sm">
-              Live earnings pulled directly from the AdMob Reporting API
+              Official AdMob earnings, synced and reconciled against the app's
+              reported revenue
             </p>
           </div>
         </div>
@@ -5221,6 +5256,37 @@ function RevenuePanel({
                 }.`
               : `Last synced ${lastSynced ? fmtSynced(lastSynced) : "—"} · auto-updates from AdMob`}
           </span>
+        </div>
+      )}
+
+      {periods && (
+        <div>
+          <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
+            Earnings · matches the CashClip phone admin
+          </p>
+          <div className="grid grid-cols-3 gap-4">
+            <RevenueStat
+              label="Today"
+              value={new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: periods.currency || "USD",
+              }).format(periods.today || 0)}
+            />
+            <RevenueStat
+              label="Last 7 days"
+              value={new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: periods.currency || "USD",
+              }).format(periods.last7d || 0)}
+            />
+            <RevenueStat
+              label="Last 30 days"
+              value={new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: periods.currency || "USD",
+              }).format(periods.last30d || 0)}
+            />
+          </div>
         </div>
       )}
 
