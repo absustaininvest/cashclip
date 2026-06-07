@@ -56,6 +56,16 @@ type, so Native stays AdMob-only (no Unity/ironSource/Pangle bid on it).
 - Android barely wired: only `Rewarded_Android` mapped, no Banner/Interstitial;
   Android Unity store ID "Not configured".
 
+## New clean unit IDs as created (NOT in app code yet — held per guardrail)
+
+App ID (iOS): `ca-app-pub-8679658921848348~6212139107`
+
+| Unit | New ad unit ID | Status |
+|------|----------------|--------|
+| CashClip_Rewarded_iOS | `ca-app-pub-8679658921848348/6536378948` | created Jun 7; mediation group next |
+
+(Old/live Rewarded iOS still in `lib/admob.ts` = `/7282036986` — the live earner; leave it until new unit is fully built + verified, ideally shipped with build 39.)
+
 **🚨 MONEY GUARDRAIL — do NOT violate:** the live **Rewarded iOS** unit is
 actively earning on build 29 (~$37 / 7d and climbing as of Jun 7). The ad-unit
 ID strings live in `artifacts/cashclip/lib/admob.ts` (`AD_UNITS`) and are JS, so
