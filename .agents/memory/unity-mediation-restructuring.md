@@ -38,3 +38,30 @@ He already knows it. The 4 parts, in order:
 **Why this file exists:** the owner got frustrated that the plan kept getting
 re-asked/re-explained instead of executed. Treat this as the source of truth for
 the Unity effort and just drive the steps.
+
+## Units "from scratch" rebuild (decided Jun 7, 2026)
+
+Owner wants ALL AdMob ad units **remade from scratch** — one clean unit per
+format per platform, matched end-to-end: app request ("recepting") → bidding
+(Unity/ironSource/Pangle) → reporting. Target set = the 4 types the app actually
+requests (rewarded, interstitial, banner, native). Unity has **no Native** ad
+type, so Native stays AdMob-only (no Unity/ironSource/Pangle bid on it).
+
+**Current messy state (from AdMob screenshots Jun 7):**
+- Duplicate iOS units mapped to the same Unity placement: Banner = "Bees" +
+  "CashClip Ban…"; Interstitial = "CashClip Inter…" + "Set Paced"; Rewarded =
+  "CashClip Rew…" + "Viewers Choice". Strays to delete once clean set is live.
+- "App Open iOS" mediation group is empty (no source, —/— earnings); app serves
+  no app-open ads. Remove it.
+- Android barely wired: only `Rewarded_Android` mapped, no Banner/Interstitial;
+  Android Unity store ID "Not configured".
+
+**🚨 MONEY GUARDRAIL — do NOT violate:** the live **Rewarded iOS** unit is
+actively earning on build 29 (~$37 / 7d and climbing as of Jun 7). The ad-unit
+ID strings live in `artifacts/cashclip/lib/admob.ts` (`AD_UNITS`) and are JS, so
+they *can* be changed via OTA to build 29 — which makes it dangerously easy to
+break live revenue. Rule: **build the new units alongside the old, verify them,
+and only repoint the app once proven** — ideally ship the new IDs with build 39
+(which also has the Unity adapters). Never delete/repoint the working live unit
+on a guess. Unity fill itself still requires build 39 live (29 has no adapter);
+new units on build 29 serve AdMob-base only.
