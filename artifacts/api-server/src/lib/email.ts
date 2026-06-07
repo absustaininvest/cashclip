@@ -658,6 +658,71 @@ export async function sendWithdrawalVelocityAdmin(alert: {
 }
 
 /**
+ * Notify the operator that an AdMob reporting condition (stale sync or
+ * revenue divergence) just fired or resolved. Routed through the same Zoho SMTP
+ * channel used for OTPs/support so the owner reacts without watching the hub.
+ *
+ * Fire-and-forget and a no-op when SMTP is unconfigured. De-duplication is the
+ * caller's responsibility — admobAlerts only calls this once per fired/resolved
+ * transition (governed by its cooldown), so this never floods.
+ *
+ * Recipient defaults to the operator mailbox (support@absustaininvest.com); set
+ * ADMIN_ALERT_EMAIL to route operator alerts to a different address.
+ */
+export function sendAdmobReportAlert(alert: {
+  condition: "stale_sync" | "revenue_divergence";
+  status: "firing" | "resolved";
+  message: string;
+  firedAt: string;
+  detail: Record<string, unknown>;
+}): void {
+  const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const isResolved = alert.status === "resolved";
+  const conditionLabel =
+    alert.condition === "stale_sync" ? "AdMob reporting stale" : "AdMob revenue divergence";
+  const accent = isResolved ? "#00C853" : "#FB8C00";
+  const statusWord = isResolved ? "Resolved" : "Firing";
+
+  const safeMessage = escapeHtml(alert.message);
+  const safeCondition = escapeHtml(alert.condition);
+  const safeFiredAt = escapeHtml(alert.firedAt);
+
+  // Render the structured detail as readable key/value rows for the operator.
+  const detailRows = Object.entries(alert.detail)
+    .map(([k, v]) => {
+      const val = v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
+      return `<tr><td style="padding:6px 0;font-weight:600;color:#555;width:160px">${escapeHtml(k)}</td><td style="padding:6px 0;color:#333">${escapeHtml(val)}</td></tr>`;
+    })
+    .join("");
+  const detailText = Object.entries(alert.detail)
+    .map(([k, v]) => `  ${k}: ${v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+    .join("\n");
+
+  const subject = isResolved
+    ? `[CashClip] Resolved — ${conditionLabel} back to normal`
+    : `[CashClip] Alert — ${conditionLabel}`;
+
+  sendBestEffort({
+    to,
+    subject,
+    text: `AdMob reporting operator alert\n\nCondition: ${alert.condition}\nStatus: ${alert.status}\nWhen: ${alert.firedAt}\n\n${alert.message}\n\nDetail:\n${detailText}\n\n— CashClip operations`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid ${accent};padding-bottom:12px">${conditionLabel} — ${statusWord}</h2>
+        <p style="color:#333;font-size:15px;line-height:1.6">${safeMessage}</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:6px 0;font-weight:600;color:#555;width:160px">Condition</td><td style="padding:6px 0;color:#333">${safeCondition}</td></tr>
+          <tr><td style="padding:6px 0;font-weight:600;color:#555">Status</td><td style="padding:6px 0;color:#333">${escapeHtml(statusWord)}</td></tr>
+          <tr><td style="padding:6px 0;font-weight:600;color:#555">When</td><td style="padding:6px 0;color:#333">${safeFiredAt}</td></tr>
+          ${detailRows}
+        </table>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
+      </div>`,
+  });
+}
+
+/**
  * Send an admin reply to an inbound support email.
  *
  * Unlike the notification helpers above (fire-and-forget), this throws on

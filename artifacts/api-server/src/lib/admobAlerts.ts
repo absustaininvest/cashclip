@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { sendAdmobReportAlert } from "./email";
 
 /**
  * Operator alerts for the AdMob reporting pipeline.
@@ -46,6 +47,15 @@ export interface AdmobAlertConfig {
   minEarningsUsd: number;
   cooldownMs: number;
   notifyUrl?: string;
+  /** Email the operator (Zoho SMTP) on fire/resolve. On by default; set
+   * ADMOB_ALERT_EMAIL_DISABLED to a truthy value to suppress just the email. */
+  emailEnabled: boolean;
+}
+
+function envFlag(name: string): boolean {
+  const raw = process.env[name];
+  if (!raw) return false;
+  return /^(1|true|yes|on)$/i.test(raw.trim());
 }
 
 export function getAdmobAlertConfig(): AdmobAlertConfig {
@@ -61,6 +71,7 @@ export function getAdmobAlertConfig(): AdmobAlertConfig {
     })(),
     cooldownMs: Math.round(envNum("ADMOB_ALERT_COOLDOWN_MS", DEFAULT_COOLDOWN_MS)),
     notifyUrl: process.env.ADMIN_ALERT_WEBHOOK_URL || undefined,
+    emailEnabled: !envFlag("ADMOB_ALERT_EMAIL_DISABLED"),
   };
 }
 
@@ -144,6 +155,27 @@ function fireAlert(alert: AdmobAlert, cfg: AdmobAlertConfig): void {
         );
       }
     });
+  }
+
+  // Email the operator (Zoho SMTP — same channel as OTPs/support) so the owner
+  // reacts without watching the hub. fireAlert is the single chokepoint called
+  // once per fired/resolved transition, so this inherits the cooldown de-dup and
+  // never floods. Fire-and-forget + no-op when SMTP is unconfigured.
+  if (cfg.emailEnabled) {
+    try {
+      sendAdmobReportAlert({
+        condition: alert.condition,
+        status: alert.status,
+        message: alert.message,
+        firedAt: alert.firedAt,
+        detail: alert.detail,
+      });
+    } catch (err) {
+      logger.error(
+        { condition: alert.condition, err },
+        "Failed to send admob report alert email",
+      );
+    }
   }
 
   recentAlerts.push(alert);
