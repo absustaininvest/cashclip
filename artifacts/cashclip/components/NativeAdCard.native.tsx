@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getAdUnitId } from "@/lib/admob";
+import { dollarsToPoints, formatPoints } from "@/lib/points";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 export const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -129,8 +130,8 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
           <Text style={styles.sponsoredText}>Ad</Text>
         </View>
         <View style={styles.rewardBadge}>
-          <MaterialCommunityIcons name="cash" size={10} color={Colors.primary} />
-          <Text style={styles.rewardText}>+${reward.toFixed(2)}</Text>
+          <MaterialCommunityIcons name="star" size={10} color={Colors.primary} />
+          <Text style={styles.rewardText}>+{formatPoints(dollarsToPoints(reward))}</Text>
         </View>
       </View>
       <View style={styles.cardBody}>
