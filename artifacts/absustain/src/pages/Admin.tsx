@@ -3876,6 +3876,51 @@ interface HubData {
   integrations: { total: number; green: number; items: HubIntegration[] };
 }
 
+interface AdmobAlert {
+  id: string;
+  condition: "stale_sync" | "revenue_divergence";
+  status: "firing" | "resolved";
+  message: string;
+  firstSeenAt: string;
+  firedAt: string;
+  cooldownMs: number;
+  threshold: number;
+  detail: Record<string, unknown>;
+  notifyDelivered?: boolean;
+  notifyError?: string;
+}
+
+const ADMOB_ALERT_LABELS: Record<AdmobAlert["condition"], string> = {
+  stale_sync: "Reporting sync stale",
+  revenue_divergence: "Revenue divergence",
+};
+
+function admobAlertDetail(alert: AdmobAlert): string {
+  if (alert.condition === "stale_sync") {
+    const ageMs = alert.detail?.ageMs;
+    const lastSyncedAt = alert.detail?.lastSyncedAt;
+    if (typeof ageMs === "number" && Number.isFinite(ageMs)) {
+      return `Last sync ~${(ageMs / 3_600_000).toFixed(1)}h ago`;
+    }
+    if (typeof lastSyncedAt === "string") {
+      return `Last sync ${hubTimeAgo(lastSyncedAt)}`;
+    }
+    return "Reporting has never synced";
+  }
+  const pct = alert.detail?.differencePct;
+  const official = alert.detail?.officialEarnings;
+  const app = alert.detail?.appReportedEarnings;
+  const currency = typeof alert.detail?.currency === "string" ? alert.detail.currency : "USD";
+  const fmt = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v)
+      ? `${v.toLocaleString("en-US", { style: "currency", currency })}`
+      : "—";
+  if (typeof pct === "number" && Number.isFinite(pct)) {
+    return `Diverged ${pct}% · official ${fmt(official)} vs app ${fmt(app)}`;
+  }
+  return `official ${fmt(official)} vs app ${fmt(app)}`;
+}
+
 const HUB_REFRESH_MS = 45_000;
 
 function StatusDot({ status }: { status: "green" | "amber" | "red" }) {
@@ -3924,6 +3969,7 @@ function IntegrationHubPanel({
   onLogout: () => void;
 }) {
   const [data, setData] = useState<HubData | null>(null);
+  const [admobAlerts, setAdmobAlerts] = useState<AdmobAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -3932,16 +3978,30 @@ function IntegrationHubPanel({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/integration-hub", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401 || res.status === 403) {
+      const [hubRes, alertsRes] = await Promise.all([
+        fetch("/api/admin/integration-hub", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/webhook-alerts?limit=20&rejectionLimit=1", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      if (
+        hubRes.status === 401 ||
+        hubRes.status === 403 ||
+        alertsRes.status === 401 ||
+        alertsRes.status === 403
+      ) {
         onLogout();
         return;
       }
-      if (!res.ok) throw new Error("Failed to load status");
-      const json = (await res.json()) as HubData;
+      if (!hubRes.ok) throw new Error("Failed to load status");
+      const json = (await hubRes.json()) as HubData;
       setData(json);
+      if (alertsRes.ok) {
+        const alertsJson = (await alertsRes.json()) as { admobAlerts?: AdmobAlert[] };
+        setAdmobAlerts(alertsJson.admobAlerts ?? []);
+      }
       setLastRefreshed(new Date());
     } catch (err: any) {
       setError(err.message || "Failed to load status");
@@ -3965,6 +4025,18 @@ function IntegrationHubPanel({
 
   const usersOnline = data?.usersOnline ?? null;
   const allServicesUp = (data?.services ?? []).every((s) => s.up);
+
+  // The endpoint returns a reverse-chronological log of fire/resolve events.
+  // The latest event per condition is its CURRENT state, so a resolved
+  // condition quiets down instead of lingering as an active alert.
+  const admobCurrent: AdmobAlert[] = (() => {
+    const seen = new Map<AdmobAlert["condition"], AdmobAlert>();
+    for (const a of admobAlerts) {
+      if (!seen.has(a.condition)) seen.set(a.condition, a);
+    }
+    return Array.from(seen.values());
+  })();
+  const admobFiring = admobCurrent.filter((a) => a.status === "firing");
 
   return (
     <div className="space-y-6">
@@ -4162,6 +4234,75 @@ function IntegrationHubPanel({
           </div>
         )}
       </div>
+
+      {/* AdMob reporting alerts */}
+      {admobCurrent.length > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+                AdMob Reporting Alerts
+              </h3>
+              <span className="text-white/30 text-sm">
+                {admobFiring.length > 0
+                  ? `${admobFiring.length} active`
+                  : "All clear"}
+              </span>
+            </div>
+            <StatusDot status={admobFiring.length > 0 ? "red" : "green"} />
+          </div>
+
+          <div className="space-y-2.5">
+            {admobCurrent.map((alert) => {
+              const firing = alert.status === "firing";
+              return (
+                <div
+                  key={alert.condition}
+                  className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 ${
+                    firing
+                      ? "bg-red-500/[0.07] border-red-500/20"
+                      : "bg-[#00E676]/[0.05] border-[#00E676]/15"
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    {firing ? (
+                      <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <Check className="w-4 h-4 text-[#00E676] flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-medium">
+                          {ADMOB_ALERT_LABELS[alert.condition]}
+                        </p>
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            firing
+                              ? "bg-red-500/15 text-red-400"
+                              : "bg-[#00E676]/15 text-[#00E676]"
+                          }`}
+                        >
+                          {firing ? "Firing" : "Resolved"}
+                        </span>
+                      </div>
+                      <p className="text-white/50 text-xs mt-1">
+                        {admobAlertDetail(alert)}
+                      </p>
+                      <p className="text-white/30 text-[11px] mt-1">
+                        {alert.message}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-white/20 text-[10px] flex-shrink-0 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {hubTimeAgo(alert.firedAt)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <p className="text-white/20 text-xs text-center">
         Auto-refreshes every {HUB_REFRESH_MS / 1000}s ·{" "}
