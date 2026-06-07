@@ -76,3 +76,8 @@ is NOT used for ads — only Game ID + Placement ID are.
 **Reminder:** wiring these into AdMob mediation is correct prep and harmless to live build 29, but
 Unity won't actually serve/earn until **build 39** (with the native Unity adapter) is approved by
 Apple — AdMob mediation config is server-side, but the adapter must be in the binary to bid.
+
+## Swapped Game IDs corrected + Unity-verified (Jun 6 2026)
+Owner-attested & proven via Unity approval/completion email: the Android/Apple Unity Ad **Game IDs were swapped** in the credential slots and have been **corrected and verified**. Unity SETUP is confirmed correct — do NOT re-flag the wiring/IDs as the problem.
+**Why:** owner already proved this with the email; repeating "Unity isn't wired" frustrates him and is wrong now.
+**How to apply:** the ONLY remaining gate for Unity ads to serve on a phone is the native **adapter shipping in build 39** installed on the device — a build step, not a setup/credential error.
