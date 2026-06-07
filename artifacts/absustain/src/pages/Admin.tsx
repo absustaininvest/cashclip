@@ -15,6 +15,7 @@ import {
   Check,
   Clock,
   TrendingUp,
+  DollarSign,
   Users,
   MessageSquare,
   Bell,
@@ -53,6 +54,17 @@ import {
   Pause,
   Ban,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+} from "recharts";
 
 interface Lead {
   id: string;
@@ -4977,9 +4989,351 @@ export function PublisherProgramPanel({ token }: { token: string }) {
   );
 }
 
+interface AdMobDailyRow {
+  date: string;
+  earnings: number;
+  impressions: number;
+  clicks: number;
+  adRequests: number;
+  matchedRequests: number;
+  ctr: number;
+  ecpm: number;
+  matchRate: number;
+  showRate: number;
+}
+
+interface AdMobRevenueData {
+  ok: boolean;
+  configured: boolean;
+  error?: string;
+  missing?: string[];
+  publisherId?: string;
+  currency?: string;
+  range?: { startDate: string; endDate: string; days: number };
+  totals?: {
+    earnings: number;
+    impressions: number;
+    clicks: number;
+    adRequests: number;
+    matchedRequests: number;
+    ctr: number;
+    ecpm: number;
+    matchRate: number;
+    showRate: number;
+  };
+  daily?: AdMobDailyRow[];
+  fetchedAt?: string;
+}
+
+function RevenueStat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+        {label}
+      </p>
+      <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
+      {hint && <p className="text-white/30 text-xs mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+function RevenuePanel({
+  token,
+  onLogout,
+}: {
+  token: string;
+  onLogout: () => void;
+}) {
+  const [days, setDays] = useState(30);
+  const [data, setData] = useState<AdMobRevenueData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const fetchRevenue = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/admob/revenue?days=${days}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        onLogout();
+        return;
+      }
+      const raw = await res.text();
+      let json: AdMobRevenueData | null = null;
+      try {
+        json = raw ? (JSON.parse(raw) as AdMobRevenueData) : null;
+      } catch {
+        json = null;
+      }
+      if (!json) {
+        setData(null);
+        setError(
+          `AdMob revenue request failed (HTTP ${res.status}). The server returned an unexpected response.`,
+        );
+        return;
+      }
+      setData(json);
+      setLastRefreshed(new Date());
+      if (!res.ok && json.error) setError(json.error);
+    } catch (err: any) {
+      setData(null);
+      setError(err?.message || "Failed to load AdMob revenue");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, onLogout, days]);
+
+  useEffect(() => {
+    fetchRevenue();
+  }, [fetchRevenue]);
+
+  const currency = data?.currency || "USD";
+  const fmtMoney = (n: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(n || 0);
+  const fmtNum = (n: number) =>
+    new Intl.NumberFormat("en-US").format(Math.round(n || 0));
+  const fmtPct = (n: number) => `${((n || 0) * 100).toFixed(2)}%`;
+
+  const totals = data?.totals;
+  const chartData = (data?.daily ?? []).map((r) => ({
+    label: r.date ? r.date.slice(5) : "",
+    earnings: Number((r.earnings || 0).toFixed(2)),
+    impressions: Math.round(r.impressions || 0),
+  }));
+
+  const configured = data?.configured !== false;
+  const showData = !!data?.ok && !!totals;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
+            <DollarSign className="w-5 h-5 text-[#00E676]" />
+          </div>
+          <div>
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+              AdMob Revenue
+            </h2>
+            <p className="text-white/40 text-sm">
+              Live earnings pulled directly from the AdMob Reporting API
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-white/[0.05] border border-white/10 rounded-xl overflow-hidden">
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  days === d
+                    ? "bg-[#00E676]/20 text-[#00E676]"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={fetchRevenue}
+            disabled={loading}
+            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            title="Refresh now"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {loading && !data && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-10 text-center text-white/40 text-sm">
+          Loading live AdMob data…
+        </div>
+      )}
+
+      {!loading && !data && error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-red-400 text-sm">
+          <div className="flex items-center gap-2 font-semibold mb-1">
+            <AlertCircle className="w-4 h-4" /> Could not reach AdMob revenue
+          </div>
+          <p className="text-red-400/80 break-words">{error}</p>
+        </div>
+      )}
+
+      {!loading && data && !configured && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-5 text-amber-300 text-sm">
+          <div className="flex items-center gap-2 font-semibold mb-1">
+            <AlertCircle className="w-4 h-4" /> AdMob is not fully configured
+          </div>
+          <p className="text-amber-300/80">
+            Missing secret{(data.missing?.length ?? 0) > 1 ? "s" : ""}:{" "}
+            {(data.missing ?? []).join(", ") || "unknown"}
+          </p>
+        </div>
+      )}
+
+      {!loading && data && configured && !showData && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-red-400 text-sm">
+          <div className="flex items-center gap-2 font-semibold mb-1">
+            <AlertCircle className="w-4 h-4" /> Could not load AdMob revenue
+          </div>
+          <p className="text-red-400/80 break-words">
+            {error || data.error || "AdMob returned an error."}
+          </p>
+        </div>
+      )}
+
+      {showData && totals && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <RevenueStat
+              label={`Earnings (${days}d)`}
+              value={fmtMoney(totals.earnings)}
+            />
+            <RevenueStat label="Impressions" value={fmtNum(totals.impressions)} />
+            <RevenueStat label="Clicks" value={fmtNum(totals.clicks)} />
+            <RevenueStat
+              label="eCPM"
+              value={fmtMoney(totals.ecpm)}
+              hint="per 1,000 impressions"
+            />
+            <RevenueStat label="CTR" value={fmtPct(totals.ctr)} />
+            <RevenueStat label="Match rate" value={fmtPct(totals.matchRate)} />
+            <RevenueStat label="Show rate" value={fmtPct(totals.showRate)} />
+            <RevenueStat label="Ad requests" value={fmtNum(totals.adRequests)} />
+          </div>
+
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+            <p className="text-white/60 text-sm font-semibold mb-4">
+              Daily earnings
+            </p>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="earnFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00E676" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#00E676" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={20}
+                />
+                <YAxis
+                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
+                />
+                <RechartsTooltip
+                  contentStyle={{
+                    background: "#0B0B16",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                    color: "#fff",
+                    fontSize: 12,
+                  }}
+                  formatter={(v: any) => [fmtMoney(Number(v)), "Earnings"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="earnings"
+                  stroke="#00E676"
+                  strokeWidth={2}
+                  fill="url(#earnFill)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+            <p className="text-white/60 text-sm font-semibold mb-4">
+              Daily impressions
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={20}
+                />
+                <YAxis
+                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
+                />
+                <RechartsTooltip
+                  contentStyle={{
+                    background: "#0B0B16",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                    color: "#fff",
+                    fontSize: 12,
+                  }}
+                  formatter={(v: any) => [fmtNum(Number(v)), "Impressions"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="impressions"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-white/30 text-xs">
+            {data?.publisherId && <span>Account: {data.publisherId}</span>}
+            {data?.range && (
+              <span>
+                Range: {data.range.startDate} → {data.range.endDate}
+              </span>
+            )}
+            {lastRefreshed && (
+              <span>
+                Refreshed{" "}
+                {lastRefreshed.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 type Tab =
   | "submissions"
   | "hub"
+  | "revenue"
   | "ventures"
   | "inbox"
   | "account"
@@ -5064,6 +5418,7 @@ function Dashboard({
   const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "submissions", label: "Submissions", icon: MessageSquare },
     { id: "hub", label: "Integration Hub", icon: Activity },
+    { id: "revenue", label: "AdMob Revenue", icon: DollarSign },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
     { id: "publishers", label: "Publisher Program", icon: Megaphone },
     { id: "ventures", label: "Ventures", icon: Layers },
@@ -5287,6 +5642,7 @@ function Dashboard({
         )}
 
         {tab === "hub" && <IntegrationHubPanel token={token} onLogout={onLogout} />}
+        {tab === "revenue" && <RevenuePanel token={token} onLogout={onLogout} />}
         {tab === "cashclip" && <CashClipUsersPanel token={token} />}
         {tab === "publishers" && <PublisherProgramPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
