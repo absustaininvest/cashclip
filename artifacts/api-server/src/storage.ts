@@ -391,7 +391,9 @@ export class DatabaseStorage implements IStorage {
       db
         .select({
           cnt: count(),
-          amount: sql<string>`coalesce(sum(${withdrawals.amount}::numeric), 0)`,
+          // total_payout = base amount + any approved bonus, i.e. the real cash
+          // that will actually leave on payout (not just the requested base).
+          amount: sql<string>`coalesce(sum(${withdrawals.totalPayout}::numeric), 0)`,
         })
         .from(withdrawals)
         .where(eq(withdrawals.status, "pending")),

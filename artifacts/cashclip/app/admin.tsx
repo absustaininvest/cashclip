@@ -654,6 +654,29 @@ export default function AdminScreen() {
           <StatCard label={t.admin.pendingPayouts} value={stats ? fmtMoney(stats.pendingPayouts.amount) : "—"} icon="send" iconColor="#FF7043" />
         </View>
 
+        <Text style={styles.sectionTitle}>{t.admin.adRevenue}</Text>
+        <View style={styles.adRevCard}>
+          <View style={styles.adRevRow}>
+            <View style={styles.adRevItem}>
+              <Text style={styles.adRevLabel}>{t.admin.adRevToday}</Text>
+              <Text style={styles.adRevValue}>{stats?.admob ? fmtMoney(stats.admob.today) : "—"}</Text>
+            </View>
+            <View style={styles.adRevItemDivider} />
+            <View style={styles.adRevItem}>
+              <Text style={styles.adRevLabel}>{t.admin.adRev7d}</Text>
+              <Text style={styles.adRevValue}>{stats?.admob ? fmtMoney(stats.admob.last7d) : "—"}</Text>
+            </View>
+            <View style={styles.adRevItemDivider} />
+            <View style={styles.adRevItem}>
+              <Text style={styles.adRevLabel}>{t.admin.adRev30d}</Text>
+              <Text style={styles.adRevValue}>{stats?.admob ? fmtMoney(stats.admob.last30d) : "—"}</Text>
+            </View>
+          </View>
+          {!stats?.admob && (
+            <Text style={styles.adRevHint}>{t.admin.adRevNotConnected}</Text>
+          )}
+        </View>
+
         <Text style={styles.sectionTitle}>{t.admin.integrationStatus}</Text>
         <Pressable
           testID="open-setup-wizard"
@@ -1527,6 +1550,13 @@ const styles = StyleSheet.create({
   healthItemLabel: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, marginBottom: 4 },
   healthItemValue: { fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text },
 
+  adRevCard: { backgroundColor: Colors.surface, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 8 },
+  adRevRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  adRevItem: { flex: 1, alignItems: "center" },
+  adRevItemDivider: { width: 1, height: 34, backgroundColor: "rgba(255,255,255,0.06)" },
+  adRevLabel: { fontFamily: "Outfit_400Regular", fontSize: 11, color: Colors.textMuted, marginBottom: 4 },
+  adRevValue: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.text },
+  adRevHint: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 12, textAlign: "center" },
   revenueCard: { backgroundColor: Colors.surface, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", marginBottom: 8 },
   revenueRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14 },
   revenueRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },

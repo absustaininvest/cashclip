@@ -465,6 +465,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   app.get("/api/admin/stats", adminMiddleware, async (req: AuthRequest, res) => {
     try {
+      // Keep the persisted AdMob store fresh in the background (fire-and-forget,
+      // fail-soft) so the phone admin auto-updates without manual uploads. The
+      // response is served from the DB, so a slow/failed AdMob call never blocks
+      // the page — we just serve the last-known snapshot (or null → "—").
+      void syncAdMobSnapshots(30).catch((err) => {
+        req.log?.warn({ err }, "admob background sync failed (stats)");
+      });
+
       const [overview, today, last7d, last30d] = await Promise.all([
         storage.getAdminOverviewStats(),
         storage.getAdmobSnapshotSummary(1),
