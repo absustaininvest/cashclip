@@ -71,6 +71,31 @@ type Section = { title: string; emoji: string; color: string; items: Item[] };
 
 const sections: Section[] = [
   {
+    title: "ACTIVE NOW — June 7",
+    emoji: ">",
+    color: "#2563EB",
+    items: [
+      {
+        text: 'Ship the Home "fake $0.05" balance fix (OTA to live build 29)',
+        sub: "Home adds $0.05 locally per ad watched, so it shows more than the real Wallet. Fix is built & tested — just needs your GO.",
+        urgent: true,
+      },
+      {
+        text: 'Fix Unity\'s "wrong door" — rebuild the AdMob rewarded mediation group',
+        sub: "Delete the dead duplicate group first, then point AdMob at Game ID 6110340 + placement Rewarded_IOs so Unity ads actually fill.",
+        urgent: true,
+      },
+      {
+        text: "Regenerate the AdMob reporting token + publish the Google OAuth consent screen",
+        sub: "Google rejects the current token (it expires every 7 days while the consent screen is in 'Testing'). Blocks website numbers only — real ad money is unaffected.",
+      },
+      {
+        text: "Build the Revenue Hub on the website (/sc-portal)",
+        sub: "Live AdMob/Unity earnings panel. Do this AFTER the token is fixed, or it just shows the same auth error.",
+      },
+    ],
+  },
+  {
     title: "CRITICAL — Do First",
     emoji: "!",
     color: "#EF4444",
