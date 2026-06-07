@@ -23,6 +23,10 @@ celebration from the trusted server result, never the optimistic display value.
 **Why:** celebrations must ride an OTA update onto the live build (runtime 1.0.0,
 channel production). Adding a native confetti/particle lib would require a new App
 Store build. The overlay uses only Reanimated primitives already in the bundle.
+**How to apply:** a Chipley *voice* clip (expo-audio) was added once, then removed —
+expo-audio is a native module that can't ride OTA, AND the owner judged the voice
+version "cheapo" / off-brand and prefers the silent visual-only celebration. Keep
+the celebration silent; do not re-add audio/voice to it.
 
 **Modal/Alert timing:** RN Modal/Alert render above the app tree, so for spin and
 streak (Modals) and Alert-based wins (claim-all, convert, withdraw) fire

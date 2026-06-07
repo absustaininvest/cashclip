@@ -270,10 +270,7 @@ function WatchingModal({
                 <Animated.View style={coinStyle}>
                   <Chipley pose="celebrate" size={92} />
                 </Animated.View>
-                <Text style={styles.rewardEarned}>
-                  +${ad.reward.toFixed(2)}
-                </Text>
-                <Text style={styles.rewardLabel}>{t.earn.rewardEarned}</Text>
+                <Text style={styles.rewardEarned}>{t.earn.rewardEarned}</Text>
               </>
             )}
           </View>
@@ -1534,7 +1531,7 @@ export default function EarnScreen() {
           if (spinWasGenuine) {
             celebrate({
               tier: spinReward >= 200 ? "epic" : "nice",
-              label: `+${formatPoints(spinReward)} pts`,
+              label: `+${formatPoints(spinReward)}`,
               title: "You Won!",
             });
           }
@@ -1550,7 +1547,7 @@ export default function EarnScreen() {
           setShowMilestone(false);
           celebrate({
             tier: "epic",
-            label: `+${formatPoints(milestoneCelebration.bonus)} pts`,
+            label: `+${formatPoints(milestoneCelebration.bonus)}`,
             title: `${milestoneCelebration.streak}-Day Streak!`,
           });
         }}

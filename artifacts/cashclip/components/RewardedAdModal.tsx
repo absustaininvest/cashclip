@@ -69,8 +69,7 @@ export default function RewardedAdModal({
             ) : (
               <>
                 <Chipley pose="celebrate" size={92} />
-                <Text style={styles.rewardEarned}>+${reward.toFixed(2)}</Text>
-                <Text style={styles.rewardLabel}>Reward earned!</Text>
+                <Text style={styles.rewardEarned}>Reward earned!</Text>
               </>
             )}
           </View>

@@ -181,13 +181,14 @@ export async function recordAdWatch(): Promise<number> {
     await AsyncStorage.setItem(KEYS.LAST_WATCH_DATE, today);
   }
 
-  const reward = 0.05 + (streak > 3 ? 0.02 : 0);
-  await addEarnings(reward, "Ad watch reward");
-
+  // Ad rewards are credited server-side ONLY — real AdMob views pay via Google's
+  // verified SSV callback, and in-app fallback views pay via the secure
+  // begin→complete flow (sharing the rewarded_ad daily cap). The client must
+  // never mint balance locally, so we only track counts/streak/missions here.
   await updateMissionProgress("watch_ads", 1);
   await updateWeeklyMissionProgress("weekly_ads", 1);
 
-  return reward;
+  return 0;
 }
 
 export async function recordVideoWatch(): Promise<void> {
