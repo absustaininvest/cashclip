@@ -86,6 +86,7 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 - All domains must use registered legal domains (absustaininvest.com, cash-clip.app) — never Replit subdomains — in any production-facing configuration, links, or API references.
 - Every fix requires explicit user approval before execution. No unsolicited changes.
 - During integration/ad-network setup, give ONE step at a time and wait for confirmation — never a multi-step list at once. This is the highest-stakes part of the project (ad-revenue wiring); rushing it means money never flows.
+- When entering credentials/secrets/tokens, capture and SAVE each one individually as its step completes — never open several secret boxes at once. Batching all boxes together caused values to get pasted into the wrong fields. One value → save → confirm → next.
 - Deliver app changes as small, frequent, self-contained over-the-air (OTA) update groups that actually land on the live in-distribution build (29) — never big bundled update packs. Native-level changes can't ride OTA and need a new App Store build.
 
 ## Footnote (agent memory — context only)
