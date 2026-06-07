@@ -3961,7 +3961,7 @@ const HUB_CATEGORY_LABELS: Record<string, string> = {
   investments: "Investments",
 };
 
-function IntegrationHubPanel({
+export function IntegrationHubPanel({
   token,
   onLogout,
 }: {
