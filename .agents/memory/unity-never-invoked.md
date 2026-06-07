@@ -19,3 +19,8 @@ Rule: If an AdMob *mediation adapter* (Unity/IronSource/Pangle) is earning ~$0, 
 - Valid `fields` ONLY: `adrequest_count, available_sum, revenue_sum, start_count, view_count`. Max window is **P1Y (1 year)** or it 400s. `scale=all` returns one `timestamp:"all-time"` row.
 - **BASELINE Jun 6 2026** (last 12mo = entire build-29 live life): `adrequest_count=2, start_count=0, view_count=0, revenue_sum=0`. 2 requests across a year = test pings only → the Unity SDK has never run on real users' phones. Hard proof the adapter was never in a LIVE build — NOT a key/dashboard problem.
 - **Success test** after a Unity-carrying build goes LIVE + approved: `adrequest_count` should climb into the thousands with real DAU. This metric is the honest scoreboard for "did Unity actually turn on."
+
+## CORRECTION (Jun 7 2026): build 29 DOES contain the Unity adapter
+Evidence: `snapshots/original-29/app.json` (the saved build-29 config) includes `react-native-google-mobile-ads`, `GoogleMobileAdsMediationUnity`, and `./plugins/withAndroidUnityAdapter`. So the live build 29 was compiled WITH the Unity mediation adapter — earlier "adapter not in live build" claim was WRONG for Unity/29.
+**Implication:** Unity CAN serve on the live build 29 with NO new build. The remaining trigger is the AdMob **mediation group** (dashboard): the ad unit must list Unity Ads as a source with the correct Game ID/placement, else AdMob never calls Unity → 0 requests → no callback.
+**Proof to check:** Unity Reporting "Ad requests" >0 = AdMob is calling Unity; 0 = mediation-group mapping still missing. Do NOT push owner to build 39 for Unity — fix the AdMob dashboard mapping instead.
