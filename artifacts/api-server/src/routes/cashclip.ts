@@ -11,6 +11,7 @@ import {
   getIntegrationKeyHealth,
 } from "../lib/integrationKeyStore";
 import { verifyIntegrationKey } from "../lib/integrationVerify";
+import { fetchAdMobReport, getAdMobConfigState } from "../lib/admobReporting";
 import { secretsPassphraseMiddleware } from "../lib/secretsPassphrase";
 import { sponsoredBeginRateLimiter } from "../lib/sponsoredVisitRateLimit";
 import {
@@ -343,6 +344,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       unreachable: results.filter((r) => !r.reachable).length,
       results,
     });
+  });
+
+  /**
+   * GET /api/admin/admob/revenue?days=30
+   *
+   * REAL AdMob earnings/impression data pulled live from the AdMob Reporting
+   * API (OAuth2 refresh token). Returns daily rows + computed totals for the
+   * Revenue tab charts. Never fabricates numbers:
+   *   - keys not set        => 200 { ok:false, configured:false }
+   *   - AdMob/OAuth failure  => 502 { ok:false, configured:true, error }
+   */
+  app.get("/api/admin/admob/revenue", adminMiddleware, async (req: AuthRequest, res) => {
+    const days = Math.min(Math.max(parseInt(String(req.query.days ?? "30"), 10) || 30, 1), 365);
+    const cfg = getAdMobConfigState();
+    if (!cfg.configured) {
+      res.json({
+        ok: false,
+        configured: false,
+        error: `AdMob not configured. Missing: ${cfg.missing.join(", ")}`,
+        missing: cfg.missing,
+      });
+      return;
+    }
+    try {
+      const report = await fetchAdMobReport(days);
+      if (!report.ok) {
+        res.status(502).json(report);
+        return;
+      }
+      res.json(report);
+    } catch (err) {
+      req.log?.error({ err }, "admob revenue report failed");
+      res.status(502).json({
+        ok: false,
+        configured: true,
+        error: `AdMob report error: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
   });
 
   /**
