@@ -71,28 +71,88 @@ type Section = { title: string; emoji: string; color: string; items: Item[] };
 
 const sections: Section[] = [
   {
-    title: "ACTIVE NOW — June 7",
+    title: "BIG FISH — STARTING NOW",
     emoji: ">",
     color: "#2563EB",
     items: [
       {
-        text: 'Ship the Home "fake $0.05" balance fix (OTA to live build 29)',
-        sub: "Home adds $0.05 locally per ad watched, so it shows more than the real Wallet. Fix is built & tested — just needs your GO.",
+        text: "Build the Hub on the website (/sc-portal) — THE BIG FISH",
+        sub: "Real AdMob + Unity earnings and live integration status, all in one place. This is what we build first.",
         urgent: true,
       },
+      {
+        text: "OAuth 2.0 Playground — mint a fresh AdMob refresh token (right AFTER the Hub)",
+        sub: "Google's Playground generates a new long-lived token so the Hub's revenue numbers actually load. Do this immediately after the Hub is built.",
+      },
+      {
+        text: "Regenerate the AdMob reporting token + publish the Google OAuth consent screen",
+        sub: "The current token dies every 7 days while the consent screen is in 'Testing'. Publishing it stops the expiry. Real ad money is unaffected — this only unblocks the website numbers.",
+      },
+    ],
+  },
+  {
+    title: "MONEY DISPLAY FIXES",
+    emoji: "$",
+    color: "#EF4444",
+    items: [
+      {
+        text: 'Ship the Home "fake $0.05" balance fix (OTA to live build 29)',
+        sub: "Home credits $0.05 locally per ad watched, so it shows more than the real Wallet. Fix is built & tested.",
+        urgent: true,
+      },
+      {
+        text: 'Fix the cents for coins — Chipley\'s fake "+$0.05" popup',
+        sub: "Chipley celebrates a made-up dollar amount when an ad finishes. Make him show the REAL server reward (or no number). Bundle this with the Home fix.",
+        urgent: true,
+      },
+      {
+        text: "Reseed Project + Customer Care — reset the fake numbers",
+        sub: "Wipe the old local/fake balances so every user starts clean on real, server-tracked money.",
+      },
+    ],
+  },
+  {
+    title: "WORKFLOWS / DASHBOARD",
+    emoji: "+",
+    color: "#7C3AED",
+    items: [
+      {
+        text: "Production Hub",
+        sub: "Operations dashboard for the live app.",
+      },
+      {
+        text: "Integration status board: Expo·Unity / GitHub·Replit / Vexo·Sentry",
+        sub: "One panel showing each integration's live connection state at a glance.",
+      },
+      {
+        text: "Re-implement Chipley mascot — voice + more functionality",
+        sub: "Needs a NEW App Store build (39+). Chipley's voice is a native module — it CANNOT ride an OTA onto build 29.",
+      },
+      {
+        text: "Remove the 3-hour hold on earnings",
+        sub: "Drop the wait before earned points become claimable.",
+      },
+      {
+        text: "Ship small releases every ~2 hours (frequent OTA cadence)",
+        sub: "Small, self-contained OTA update groups onto live build 29 — never big bundled packs.",
+      },
+    ],
+  },
+  {
+    title: "AD PARTNERS — WIRE UP",
+    emoji: "$",
+    color: GREEN,
+    items: [
       {
         text: 'Fix Unity\'s "wrong door" — rebuild the AdMob rewarded mediation group',
         sub: "Delete the dead duplicate group first, then point AdMob at Game ID 6110340 + placement Rewarded_IOs so Unity ads actually fill.",
         urgent: true,
       },
-      {
-        text: "Regenerate the AdMob reporting token + publish the Google OAuth consent screen",
-        sub: "Google rejects the current token (it expires every 7 days while the consent screen is in 'Testing'). Blocks website numbers only — real ad money is unaffected.",
-      },
-      {
-        text: "Build the Revenue Hub on the website (/sc-portal)",
-        sub: "Live AdMob/Unity earnings panel. Do this AFTER the token is fixed, or it just shows the same auth error.",
-      },
+      { text: "TikTok ads", sub: "Add as an ad partner / mediation source." },
+      { text: "YouTube", sub: "Add as an ad partner / channel." },
+      { text: "Tapjoy", sub: "Offerwall — verify live wiring end-to-end." },
+      { text: "ironSource", sub: "Add the AdMob mediation adapter (native — ships in build 39+)." },
+      { text: "BitLabs", sub: "Survey partner — verify live wiring end-to-end." },
     ],
   },
   {
@@ -182,9 +242,21 @@ const sections: Section[] = [
 
 let y = divY + 16;
 
+function newPage() {
+  doc.addPage();
+  doc.save().rect(0, 0, PAGE_W, doc.page.height).fill("#FFFFFF").restore();
+  doc.save().rect(0, 0, PAGE_W, 6).fill(GREEN).restore();
+  y = 48;
+}
+
+function ensure(needed: number) {
+  if (y + needed > doc.page.height - 56) newPage();
+}
+
 for (const section of sections) {
   // Section header
   const headerH = 26;
+  ensure(headerH + 8 + 44);
   doc.save().roundedRect(ML, y, CW, headerH, 5).fill(section.color + "15").restore();
   doc.save().rect(ML, y, 3, headerH).fill(section.color).restore();
 
@@ -202,8 +274,11 @@ for (const section of sections) {
   y += headerH + 8;
 
   for (const item of section.items) {
-    const itemY = y;
     const BOX = 14;
+    const textH0 = doc.heightOfString(item.text, { width: CW - BOX - 12, fontSize: 11 });
+    const subH0 = item.sub ? doc.heightOfString(item.sub, { width: CW - BOX - 12, fontSize: 9 }) : 0;
+    ensure(textH0 + subH0 + 20);
+    const itemY = y;
 
     // Checkbox
     doc.save().roundedRect(ML, itemY, BOX, BOX, 2)
