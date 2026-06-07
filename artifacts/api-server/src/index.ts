@@ -9,6 +9,7 @@ import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
 import { startSecurityAuditCleanupJob } from "./jobs/securityAuditCleanup";
 import { startConversionRateJob } from "./jobs/conversionRateJob";
 import { startAdmobAlertsJob } from "./jobs/admobAlertsJob";
+import { startAdmobSyncJob } from "./jobs/admobSyncJob";
 import { startDedupeCleanupJob } from "./jobs/dedupeCleanup";
 import { startLoginAttemptsCleanupJob } from "./jobs/loginAttemptsCleanup";
 import bcrypt from "bcryptjs";
@@ -84,6 +85,7 @@ const server = app.listen(port, (err) => {
   startWebhookAuditCleanupJob();
   startSecurityAuditCleanupJob();
   startConversionRateJob();
+  startAdmobSyncJob();
   startAdmobAlertsJob();
   startDedupeCleanupJob();
   startLoginAttemptsCleanupJob();
