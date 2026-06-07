@@ -56,6 +56,16 @@ type, so Native stays AdMob-only (no Unity/ironSource/Pangle bid on it).
 - Android barely wired: only `Rewarded_Android` mapped, no Banner/Interstitial;
   Android Unity store ID "Not configured".
 
+## CORRECTION: AdMob Unity mapping REQUIRES a Placement ID (even for bidding)
+
+Confirmed in AdMob UI Jun 7, 2026: the Unity Ads (bidding) ad-unit mapping has a
+**Placement ID field marked "This field is required"** — Game ID alone is NOT
+enough, contrary to the "bidding needs only Game ID" assumption. Do NOT tell the
+owner placement is optional for Unity bidding. The Placement ID comes from the
+Unity dashboard (Monetize → the iOS project, Game ID 6110340 → Ad Units /
+Placements). Unity's default rewarded placement is commonly named `Rewarded_iOS`
+but read the owner's REAL one from his Unity dashboard — never fabricate it.
+
 ## New clean unit IDs as created (NOT in app code yet — held per guardrail)
 
 App ID (iOS): `ca-app-pub-8679658921848348~6212139107`
