@@ -157,14 +157,6 @@ function AdCard({
           <Text style={styles.adDescription} numberOfLines={1}>
             {ad.description}
           </Text>
-          <View style={styles.adReward}>
-            <MaterialCommunityIcons
-              name="cash"
-              size={14}
-              color={Colors.primary}
-            />
-            <Text style={styles.adRewardText}>+${ad.reward.toFixed(2)}</Text>
-          </View>
         </View>
         <View style={styles.watchBtnContainer}>
           {adPreloaded && (
