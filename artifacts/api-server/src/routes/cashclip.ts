@@ -454,6 +454,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
+   * GET /api/admin/stats
+   *
+   * Real numbers for the phone admin Overview cards: total users, users active
+   * today, pending payouts (count + summed amount), and AdMob earnings
+   * (today / last 7d / last 30d). AdMob is served from the persisted snapshot
+   * store; when nothing has synced yet (e.g. the reporting token isn't
+   * connected) `admob` is null so the client renders "—" instead of a
+   * fabricated $0. The DB-backed metrics are always real.
+   */
+  app.get("/api/admin/stats", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const [overview, today, last7d, last30d] = await Promise.all([
+        storage.getAdminOverviewStats(),
+        storage.getAdmobSnapshotSummary(1),
+        storage.getAdmobSnapshotSummary(7),
+        storage.getAdmobSnapshotSummary(30),
+      ]);
+      const admobHasData = last30d.rowCount > 0;
+      res.json({
+        totalUsers: overview.totalUsers,
+        activeToday: overview.activeToday,
+        pendingPayouts: overview.pendingPayouts,
+        admob: admobHasData
+          ? {
+              today: today.totals.earnings,
+              last7d: last7d.totals.earnings,
+              last30d: last30d.totals.earnings,
+              currency: last30d.currency,
+              lastSyncedAt: last30d.lastSyncedAt,
+            }
+          : null,
+      });
+    } catch (err) {
+      req.log?.error({ err }, "admin stats failed");
+      res.status(500).json({ error: "Failed to load admin stats" });
+    }
+  });
+
+  /**
    * GET /api/admin/integration-hub
    *
    * One consolidated payload for the admin Integration Hub:

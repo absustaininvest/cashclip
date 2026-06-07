@@ -104,6 +104,11 @@ export interface IStorage {
   incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
   touchUserLastSeen(id: string): Promise<void>;
   countOnlineUsers(withinMs: number): Promise<number>;
+  getAdminOverviewStats(): Promise<{
+    totalUsers: number;
+    activeToday: number;
+    pendingPayouts: { count: number; amount: number };
+  }>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
   recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }): Promise<void>;
   getSecurityAuditEntries(opts?: {
@@ -367,6 +372,38 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(gte(users.lastSeenAt, since));
     return Number(row?.total ?? 0);
+  }
+
+  // Real overview numbers for the admin dashboard: total registered users,
+  // users active since local-server midnight today, and the count + summed
+  // dollar amount of withdrawals still awaiting payout. All derived from the
+  // DB — never fabricated.
+  async getAdminOverviewStats(): Promise<{
+    totalUsers: number;
+    activeToday: number;
+    pendingPayouts: { count: number; amount: number };
+  }> {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const [[totalRow], [activeRow], [payoutRow]] = await Promise.all([
+      db.select({ total: count() }).from(users),
+      db.select({ total: count() }).from(users).where(gte(users.lastSeenAt, startOfToday)),
+      db
+        .select({
+          cnt: count(),
+          amount: sql<string>`coalesce(sum(${withdrawals.amount}::numeric), 0)`,
+        })
+        .from(withdrawals)
+        .where(eq(withdrawals.status, "pending")),
+    ]);
+    return {
+      totalUsers: Number(totalRow?.total ?? 0),
+      activeToday: Number(activeRow?.total ?? 0),
+      pendingPayouts: {
+        count: Number(payoutRow?.cnt ?? 0),
+        amount: Number(payoutRow?.amount ?? 0),
+      },
+    };
   }
 
   async setTotpBackupCodes(userId: string, hashes: string[], executor: Executor = db): Promise<void> {

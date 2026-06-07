@@ -15,7 +15,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
@@ -41,14 +40,6 @@ interface WithdrawalRecord {
   createdAt: string;
   processedAt: string | null;
 }
-
-const REVENUE_SOURCES = [
-  { key: "videoAds" as const, amount: 0, percent: 0, color: "#4ECDC4" },
-  { key: "surveyPartners" as const, amount: 0, percent: 0, color: "#FFD600" },
-  { key: "affiliates" as const, amount: 0, percent: 0, color: "#FF7043" },
-  { key: "dataInsights" as const, amount: 0, percent: 0, color: "#42A5F5" },
-];
-
 
 function StatCard({ label, value, icon, iconColor, trend }: { label: string; value: string; icon: string; iconColor: string; trend?: string }) {
   return (
@@ -205,6 +196,12 @@ export default function AdminScreen() {
   const [resetLoadingId, setResetLoadingId] = useState<string | null>(null);
   const [publisherLoadingId, setPublisherLoadingId] = useState<string | null>(null);
   const [verifyEmailLoadingId, setVerifyEmailLoadingId] = useState<string | null>(null);
+  const [stats, setStats] = useState<{
+    totalUsers: number;
+    activeToday: number;
+    pendingPayouts: { count: number; amount: number };
+    admob: { today: number; last7d: number; last30d: number; currency: string; lastSyncedAt: string | null } | null;
+  } | null>(null);
 
   const loadBrands = useCallback(async () => {
     const b = await getSponsorBrands();
@@ -455,9 +452,25 @@ export default function AdminScreen() {
     }
   }, []);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const savedToken = await secureGet("cashclip_auth_token");
+      if (!savedToken) return;
+      const res = await globalThis.fetch(new URL("/api/admin/stats", getApiUrl()).toString(), {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setStats(data);
+    } catch (err: any) {
+      console.error("Failed to load admin stats:", err?.message || err?.toString() || JSON.stringify(err));
+    }
+  }, []);
+
   useEffect(() => {
     loadBrands();
     if (token) {
+      loadStats();
       loadWithdrawals();
       loadPaypalStatus();
       loadWebhookAlerts();
@@ -551,10 +564,10 @@ export default function AdminScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadBrands(), loadWithdrawals(), loadPaypalStatus(), loadWebhookAlerts(), loadWebhookAudit(), loadUsers()]);
+    await Promise.all([loadStats(), loadBrands(), loadWithdrawals(), loadPaypalStatus(), loadWebhookAlerts(), loadWebhookAudit(), loadUsers()]);
     await new Promise((r) => setTimeout(r, 300));
     setRefreshing(false);
-  }, [loadWithdrawals, loadUsers]);
+  }, [loadStats, loadWithdrawals, loadUsers]);
 
   if (!fontsLoaded) return null;
 
@@ -574,10 +587,8 @@ export default function AdminScreen() {
   }
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
-  const grossRevenue = 28200;
-  const totalExpenses = 24253;
-  const netProfit = grossRevenue - totalExpenses;
-  const netMargin = Math.round((netProfit / grossRevenue) * 100);
+  const fmtMoney = (n: number) =>
+    `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <View style={{ flex: 1 }}>
@@ -637,60 +648,10 @@ export default function AdminScreen() {
 
         <Text style={styles.sectionTitle}>{t.admin.overview}</Text>
         <View style={styles.statsGrid}>
-          <StatCard label={t.admin.totalUsers} value="1,247" icon="users" iconColor="#42A5F5" trend="+12%" />
-          <StatCard label={t.admin.activeToday} value="342" icon="activity" iconColor={Colors.primary} trend="+8%" />
-          <StatCard label={t.admin.monthlyRevenue} value="$28,200" icon="dollar-sign" iconColor="#FFD600" trend="+15%" />
-          <StatCard label={t.admin.pendingPayouts} value="$1,830" icon="send" iconColor="#FF7043" />
-        </View>
-
-        <Text style={styles.sectionTitle}>{t.admin.financialHealth}</Text>
-        <LinearGradient colors={["#0D2818", "#0A1A12"]} style={styles.healthCard}>
-          <View style={styles.healthHeader}>
-            <View style={styles.healthBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={Colors.primary} />
-              <Text style={styles.healthBadgeText}>{t.admin.healthy}</Text>
-            </View>
-            <Text style={styles.marginValue}>{netMargin}%</Text>
-          </View>
-          <Text style={styles.marginLabel}>{t.admin.netMargin}</Text>
-
-          <View style={styles.healthDivider} />
-
-          <View style={styles.healthRow}>
-            <View style={styles.healthItem}>
-              <Text style={styles.healthItemLabel}>{t.admin.grossRevenue}</Text>
-              <Text style={styles.healthItemValue}>${grossRevenue.toLocaleString()}</Text>
-            </View>
-            <View style={styles.healthItemDivider} />
-            <View style={styles.healthItem}>
-              <Text style={styles.healthItemLabel}>{t.admin.totalExpenses}</Text>
-              <Text style={[styles.healthItemValue, { color: "#FF7043" }]}>${totalExpenses.toLocaleString()}</Text>
-            </View>
-            <View style={styles.healthItemDivider} />
-            <View style={styles.healthItem}>
-              <Text style={styles.healthItemLabel}>{t.admin.netProfit}</Text>
-              <Text style={[styles.healthItemValue, { color: Colors.primary }]}>${netProfit.toLocaleString()}</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        <Text style={styles.sectionTitle}>{t.admin.revenueBreakdown}</Text>
-        <View style={styles.revenueCard}>
-          {REVENUE_SOURCES.map((source, i) => (
-            <View key={source.key} style={[styles.revenueRow, i < REVENUE_SOURCES.length - 1 && styles.revenueRowBorder]}>
-              <View style={styles.revenueLeft}>
-                <View style={[styles.revenueDot, { backgroundColor: source.color }]} />
-                <Text style={styles.revenueName}>{t.admin[source.key]}</Text>
-              </View>
-              <View style={styles.revenueRight}>
-                <Text style={styles.revenueAmount}>${source.amount.toLocaleString()}</Text>
-                <View style={styles.revenueBarBg}>
-                  <View style={[styles.revenueBar, { width: `${source.percent * 3}%`, backgroundColor: source.color }]} />
-                </View>
-                <Text style={styles.revenuePercent}>{source.percent}%</Text>
-              </View>
-            </View>
-          ))}
+          <StatCard label={t.admin.totalUsers} value={stats ? stats.totalUsers.toLocaleString() : "—"} icon="users" iconColor="#42A5F5" />
+          <StatCard label={t.admin.activeToday} value={stats ? stats.activeToday.toLocaleString() : "—"} icon="activity" iconColor={Colors.primary} />
+          <StatCard label={t.admin.monthlyRevenue} value={stats?.admob ? fmtMoney(stats.admob.last30d) : "—"} icon="dollar-sign" iconColor="#FFD600" />
+          <StatCard label={t.admin.pendingPayouts} value={stats ? fmtMoney(stats.pendingPayouts.amount) : "—"} icon="send" iconColor="#FF7043" />
         </View>
 
         <Text style={styles.sectionTitle}>{t.admin.integrationStatus}</Text>
