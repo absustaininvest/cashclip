@@ -41,6 +41,7 @@ import {
   getRecentAlerts,
   getRejectionSummary,
 } from "../lib/webhookAlerts";
+import { evaluateAdmobAlerts, getRecentAdmobAlerts } from "../lib/admobAlerts";
 import { fetchInbox } from "../lib/inbox";
 import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe } from "drizzle-orm";
 
@@ -385,6 +386,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const lastSyncedAt = summary.lastSyncedAt;
+
+      // Fire/resolve operator alerts for a stale sync or a revenue divergence
+      // beyond threshold. In-memory de-duped + cooldown'd, so a sustained
+      // condition never floods. Read-only — never blocks/affects the response.
+      try {
+        evaluateAdmobAlerts({
+          configured: cfg.configured,
+          lastSyncedAt,
+          reconciliation: hasData ? reconciliation : null,
+        });
+      } catch (alertErr) {
+        req.log?.warn({ err: alertErr }, "admob alert evaluation failed");
+      }
 
       // Configured but nothing has ever synced (e.g. the AdMob OAuth token is
       // expired). Do NOT fabricate $0 — that would read as "earned nothing"
@@ -2337,6 +2351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         summary: getRejectionSummary(),
         alerts: getRecentAlerts(alertLimit),
         rejections: getRecentRejections(rejectionLimit),
+        admobAlerts: getRecentAdmobAlerts(alertLimit),
       });
     } catch (err) {
       req.log?.error({ err }, "Failed to get webhook alerts");

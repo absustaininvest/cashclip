@@ -18,7 +18,7 @@
  * Only the logger is mocked. Requires DATABASE_URL (always set here).
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { randomBytes } from "node:crypto";
 
 vi.mock("./lib/logger", () => ({
@@ -211,5 +211,75 @@ describe("getAdmobReconciliation", () => {
     expect(r.officialEarnings).toBe(0);
     expect(r.appReportedEarnings).toBeCloseTo(3, 2);
     expect(r.differencePct).toBeNull();
+  });
+});
+
+describe("syncAdMobSnapshots last-known fallback", () => {
+  const ADMOB_ENV = [
+    "ADMOB_OAUTH_CLIENT_ID",
+    "ADMOB_OAUTH_CLIENT_SECRET",
+    "ADMOB_OAUTH_REFRESH_TOKEN",
+    "ADMOB_PUBLISHER_ID",
+  ] as const;
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of ADMOB_ENV) savedEnv[k] = process.env[k];
+  });
+
+  afterEach(() => {
+    for (const k of ADMOB_ENV) {
+      if (savedEnv[k] === undefined) delete process.env[k];
+      else process.env[k] = savedEnv[k];
+    }
+    vi.unstubAllGlobals();
+  });
+
+  it("returns configured:false and never touches the store when unconfigured", async () => {
+    for (const k of ADMOB_ENV) delete process.env[k];
+    const date = ymdDaysAgo(1);
+    await storage.upsertAdmobSnapshots([
+      { date, adFormat: "REWARDED", earnings: 7, impressions: 700, clicks: 3, ecpm: 10 },
+    ]);
+
+    const { syncAdMobSnapshots } = await import("./lib/admobReporting");
+    const result = await syncAdMobSnapshots(30);
+    expect(result.ok).toBe(false);
+    expect(result.configured).toBe(false);
+
+    // Prior persisted data is untouched.
+    const summary = await storage.getAdmobSnapshotSummary(30);
+    expect(summary.totals.earnings).toBeCloseTo(7, 2);
+  });
+
+  it("leaves last-known snapshots intact when the AdMob API is unreachable", async () => {
+    for (const k of ADMOB_ENV) process.env[k] = "test-value";
+    process.env.ADMOB_PUBLISHER_ID = "pub-0000000000000000";
+
+    // Pre-seed a known-good snapshot (the "last known" data).
+    const date = ymdDaysAgo(1);
+    await storage.upsertAdmobSnapshots([
+      { date, adFormat: "REWARDED", earnings: 15, impressions: 1500, clicks: 7, ecpm: 10 },
+    ]);
+
+    // Simulate the AdMob API being unreachable: the OAuth token refresh throws.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+
+    const { syncAdMobSnapshots } = await import("./lib/admobReporting");
+    const result = await syncAdMobSnapshots(30);
+    expect(result.ok).toBe(false);
+    expect(result.configured).toBe(true);
+    expect(result.error).toBeTruthy();
+
+    // The pre-existing snapshot is still there and unchanged — we served the
+    // last-known value rather than wiping it or fabricating zeros.
+    const summary = await storage.getAdmobSnapshotSummary(30);
+    expect(summary.totals.earnings).toBeCloseTo(15, 2);
+    expect(summary.rowCount).toBe(1);
   });
 });
