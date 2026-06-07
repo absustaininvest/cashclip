@@ -41,7 +41,13 @@ import {
   getRecentAlerts,
   getRejectionSummary,
 } from "../lib/webhookAlerts";
-import { evaluateAdmobAlerts, getRecentAdmobAlerts } from "../lib/admobAlerts";
+import { evaluateAdmobAlerts, getRecentAdmobAlerts, getAdmobAlertConfig } from "../lib/admobAlerts";
+import {
+  getSetting,
+  setSetting,
+  ADMOB_ALERT_EMAIL_KEY,
+  ADMOB_ALERT_EMAIL_ENABLED_KEY,
+} from "../lib/runtimeSettings";
 import { fetchInbox } from "../lib/inbox";
 import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe } from "drizzle-orm";
 
@@ -63,6 +69,12 @@ interface RevenueAllocation {
   growth: number;
   reserve: number;
 }
+
+// Default operator mailbox AdMob reporting alerts fall back to when neither a
+// persisted recipient setting nor the ADMIN_ALERT_EMAIL env var is set. Mirrors
+// the default in lib/email.ts (sendAdmobReportAlert).
+const ADMIN_ALERT_DEFAULT_EMAIL = "support@absustaininvest.com";
+const ADMIN_ALERT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface FundingMetrics {
   totalRevenueSources: number;
@@ -464,6 +476,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         configured: cfg.configured,
         error: `AdMob report error: ${err instanceof Error ? err.message : String(err)}`,
       });
+    }
+  });
+
+  /**
+   * GET /api/admin/admob/alert-email
+   *
+   * Current operator-alert email routing for AdMob reporting alerts: the
+   * effective recipient + whether the email channel is on. `recipientSource`
+   * tells the UI where the effective value comes from (the persisted setting, an
+   * env override, or the built-in default) so it can show the right hint.
+   */
+  app.get("/api/admin/admob/alert-email", adminMiddleware, (_req, res) => {
+    const cfg = getAdmobAlertConfig();
+    const persistedRecipient = getSetting(ADMOB_ALERT_EMAIL_KEY)?.trim() || null;
+    const persistedEnabled = getSetting(ADMOB_ALERT_EMAIL_ENABLED_KEY);
+    const effectiveRecipient =
+      cfg.emailRecipient || process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_ALERT_DEFAULT_EMAIL;
+    const recipientSource = persistedRecipient
+      ? "setting"
+      : process.env["ADMIN_ALERT_EMAIL"]?.trim()
+        ? "env"
+        : "default";
+    res.json({
+      enabled: cfg.emailEnabled,
+      recipient: effectiveRecipient,
+      persistedRecipient,
+      recipientSource,
+      enabledSource: persistedEnabled != null ? "setting" : "env",
+      defaultRecipient: ADMIN_ALERT_DEFAULT_EMAIL,
+    });
+  });
+
+  /**
+   * PUT /api/admin/admob/alert-email
+   *
+   * Update where AdMob reporting alerts are emailed and whether the email
+   * channel is on. Persisted in the DB and read at evaluation time, so changes
+   * take effect without a redeploy. Body: { enabled?: boolean, recipient?: string }.
+   * An empty/null recipient clears the override (falls back to env/default).
+   */
+  app.put("/api/admin/admob/alert-email", adminMiddleware, async (req: AuthRequest, res) => {
+    const body = (req.body ?? {}) as { enabled?: unknown; recipient?: unknown };
+
+    if ("enabled" in body && typeof body.enabled !== "boolean") {
+      res.status(400).json({ error: "Field 'enabled' must be a boolean" });
+      return;
+    }
+    if (
+      "recipient" in body &&
+      body.recipient != null &&
+      typeof body.recipient !== "string"
+    ) {
+      res.status(400).json({ error: "Field 'recipient' must be a string" });
+      return;
+    }
+
+    try {
+      if ("recipient" in body) {
+        const raw = typeof body.recipient === "string" ? body.recipient.trim() : "";
+        if (raw.length === 0) {
+          // Clear the override — fall back to env/default.
+          await setSetting(ADMOB_ALERT_EMAIL_KEY, "");
+        } else {
+          if (raw.length > 254 || !ADMIN_ALERT_EMAIL_REGEX.test(raw)) {
+            res.status(400).json({ error: "Enter a valid email address" });
+            return;
+          }
+          await setSetting(ADMOB_ALERT_EMAIL_KEY, raw);
+        }
+      }
+      if ("enabled" in body) {
+        await setSetting(ADMOB_ALERT_EMAIL_ENABLED_KEY, body.enabled ? "true" : "false");
+      }
+
+      const cfg = getAdmobAlertConfig();
+      const effectiveRecipient =
+        cfg.emailRecipient || process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_ALERT_DEFAULT_EMAIL;
+      res.json({
+        ok: true,
+        enabled: cfg.emailEnabled,
+        recipient: effectiveRecipient,
+        persistedRecipient: getSetting(ADMOB_ALERT_EMAIL_KEY)?.trim() || null,
+      });
+    } catch (err) {
+      req.log?.error({ err }, "failed to update admob alert email settings");
+      res.status(500).json({ error: "Failed to save alert email settings" });
     }
   });
 

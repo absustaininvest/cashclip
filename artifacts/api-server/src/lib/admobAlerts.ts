@@ -1,5 +1,10 @@
 import { logger } from "./logger";
 import { sendAdmobReportAlert } from "./email";
+import {
+  getSetting,
+  ADMOB_ALERT_EMAIL_KEY,
+  ADMOB_ALERT_EMAIL_ENABLED_KEY,
+} from "./runtimeSettings";
 
 /**
  * Operator alerts for the AdMob reporting pipeline.
@@ -47,9 +52,15 @@ export interface AdmobAlertConfig {
   minEarningsUsd: number;
   cooldownMs: number;
   notifyUrl?: string;
-  /** Email the operator (Zoho SMTP) on fire/resolve. On by default; set
-   * ADMOB_ALERT_EMAIL_DISABLED to a truthy value to suppress just the email. */
+  /** Email the operator (Zoho SMTP) on fire/resolve. On by default. The admin
+   * Integration Hub toggle (persisted, read at evaluation time) wins; absent
+   * that, the ADMOB_ALERT_EMAIL_DISABLED env flag suppresses just the email. */
   emailEnabled: boolean;
+  /** Recipient for the operator alert email. The admin Integration Hub setting
+   * (persisted) wins; absent that, sendAdmobReportAlert falls back to the
+   * ADMIN_ALERT_EMAIL env var and then the default operator mailbox. undefined
+   * means "no override — use that fallback chain". */
+  emailRecipient?: string;
 }
 
 function envFlag(name: string): boolean {
@@ -71,8 +82,26 @@ export function getAdmobAlertConfig(): AdmobAlertConfig {
     })(),
     cooldownMs: Math.round(envNum("ADMOB_ALERT_COOLDOWN_MS", DEFAULT_COOLDOWN_MS)),
     notifyUrl: process.env.ADMIN_ALERT_WEBHOOK_URL || undefined,
-    emailEnabled: !envFlag("ADMOB_ALERT_EMAIL_DISABLED"),
+    emailEnabled: resolveEmailEnabled(),
+    emailRecipient: resolveEmailRecipient(),
   };
+}
+
+/** The persisted admin toggle wins; absent that, fall back to the env flag. */
+function resolveEmailEnabled(): boolean {
+  const override = getSetting(ADMOB_ALERT_EMAIL_ENABLED_KEY);
+  if (override != null) {
+    return /^(1|true|yes|on)$/i.test(override.trim());
+  }
+  return !envFlag("ADMOB_ALERT_EMAIL_DISABLED");
+}
+
+/** The persisted admin recipient wins; absent that, undefined lets the email
+ * layer fall back to ADMIN_ALERT_EMAIL and then the default operator mailbox. */
+function resolveEmailRecipient(): string | undefined {
+  const override = getSetting(ADMOB_ALERT_EMAIL_KEY);
+  const trimmed = override?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export type AdmobAlertCondition = "stale_sync" | "revenue_divergence";
@@ -169,6 +198,7 @@ function fireAlert(alert: AdmobAlert, cfg: AdmobAlertConfig): void {
         message: alert.message,
         firedAt: alert.firedAt,
         detail: alert.detail,
+        to: cfg.emailRecipient,
       });
     } catch (err) {
       logger.error(

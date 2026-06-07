@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { storage } from "./storage";
 import { RESERVED_ADMIN_USERNAMES } from "./auth";
 import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
+import { loadRuntimeSettings } from "./lib/runtimeSettings";
 import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
 import { startSecurityAuditCleanupJob } from "./jobs/securityAuditCleanup";
 import { startConversionRateJob } from "./jobs/conversionRateJob";
@@ -79,6 +80,7 @@ const server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   seedAdmins().catch((e) => logger.error({ err: e }, "Admin seed failed"));
+  loadRuntimeSettings().catch((e) => logger.error({ err: e }, "Runtime settings load failed"));
   startWebhookAuditCleanupJob();
   startSecurityAuditCleanupJob();
   startConversionRateJob();

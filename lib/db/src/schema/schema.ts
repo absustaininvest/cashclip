@@ -623,3 +623,17 @@ export const conversionRates = pgTable("conversion_rates", {
 
 export type ConversionRate = typeof conversionRates.$inferSelect;
 export type InsertConversionRate = typeof conversionRates.$inferInsert;
+
+// Generic operator-adjustable runtime settings (key/value). Lets the admin
+// change behaviour that used to require an env change + redeploy — e.g. where
+// AdMob reporting alerts are emailed and whether that email channel is on. Read
+// at evaluation time (cached in memory, refreshed on write) so changes take
+// effect without a restart. Values are stored as text; callers parse/validate.
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;

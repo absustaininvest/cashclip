@@ -3895,6 +3895,15 @@ const ADMOB_ALERT_LABELS: Record<AdmobAlert["condition"], string> = {
   revenue_divergence: "Revenue divergence",
 };
 
+interface AlertEmailSettings {
+  enabled: boolean;
+  recipient: string;
+  persistedRecipient: string | null;
+  recipientSource: "setting" | "env" | "default";
+  enabledSource: "setting" | "env";
+  defaultRecipient: string;
+}
+
 function admobAlertDetail(alert: AdmobAlert): string {
   if (alert.condition === "stale_sync") {
     const ageMs = alert.detail?.ageMs;
@@ -3961,6 +3970,159 @@ const HUB_CATEGORY_LABELS: Record<string, string> = {
   investments: "Investments",
 };
 
+function AdmobAlertEmailCard({
+  token,
+  settings,
+  onSaved,
+}: {
+  token: string;
+  settings: AlertEmailSettings | null;
+  onSaved: () => void;
+}) {
+  const [recipient, setRecipient] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+
+  // Sync the form with the server values whenever they load/refresh, but only
+  // the persisted recipient (so an env/default value shows as a placeholder the
+  // operator can override, not as pre-filled text that looks already-saved).
+  useEffect(() => {
+    if (!settings) return;
+    setRecipient(settings.persistedRecipient ?? "");
+    setEnabled(settings.enabled);
+  }, [settings]);
+
+  if (!settings) return null;
+
+  const dirty =
+    recipient.trim() !== (settings.persistedRecipient ?? "") ||
+    enabled !== settings.enabled;
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/admin/admob/alert-email", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ enabled, recipient: recipient.trim() }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || "Failed to save");
+      }
+      setSavedAt(Date.now());
+      onSaved();
+    } catch (e: any) {
+      setErr(e.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="p-2 rounded-xl bg-[#00E676]/10">
+          <Mail className="w-4 h-4 text-[#00E676]" />
+        </div>
+        <div>
+          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+            AdMob Alert Email
+          </h3>
+          <p className="text-white/40 text-sm">
+            Where AdMob staleness / revenue-divergence alerts are emailed. Saved
+            instantly — no redeploy needed.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* On/off toggle */}
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Bell className="w-4 h-4 text-white/50" />
+            <div>
+              <p className="text-white text-sm font-medium">Email alerts</p>
+              <p className="text-white/40 text-xs">
+                {enabled ? "Alerts will be emailed" : "Email alerts are muted"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => setEnabled((v) => !v)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+              enabled ? "bg-[#00E676]" : "bg-white/15"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                enabled ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Recipient */}
+        <div>
+          <label className="block text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+            Recipient email
+          </label>
+          <input
+            type="email"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            placeholder={settings.defaultRecipient}
+            className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40"
+          />
+          <p className="text-white/30 text-xs mt-2">
+            Currently sending to{" "}
+            <span className="text-white/60">{settings.recipient}</span>
+            {settings.recipientSource === "default" && " (default)"}
+            {settings.recipientSource === "env" && " (from environment)"}
+            . Leave blank to use the default ({settings.defaultRecipient}).
+          </p>
+        </div>
+
+        {err && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 text-red-400 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {err}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={saving || !dirty}
+            className="inline-flex items-center gap-2 bg-[#00E676] text-black font-semibold text-sm px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#00E676]/90 transition-colors"
+          >
+            {saving ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+          {savedAt && !dirty && (
+            <span className="text-[#00E676] text-xs flex items-center gap-1">
+              <Check className="w-3 h-3" /> Saved
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function IntegrationHubPanel({
   token,
   onLogout,
@@ -3973,16 +4135,20 @@ export function IntegrationHubPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [alertEmail, setAlertEmail] = useState<AlertEmailSettings | null>(null);
 
   const fetchHub = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [hubRes, alertsRes] = await Promise.all([
+      const [hubRes, alertsRes, alertEmailRes] = await Promise.all([
         fetch("/api/admin/integration-hub", {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/webhook-alerts?limit=20&rejectionLimit=1", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/admob/alert-email", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -4001,6 +4167,9 @@ export function IntegrationHubPanel({
       if (alertsRes.ok) {
         const alertsJson = (await alertsRes.json()) as { admobAlerts?: AdmobAlert[] };
         setAdmobAlerts(alertsJson.admobAlerts ?? []);
+      }
+      if (alertEmailRes.ok) {
+        setAlertEmail((await alertEmailRes.json()) as AlertEmailSettings);
       }
       setLastRefreshed(new Date());
     } catch (err: any) {
@@ -4040,6 +4209,7 @@ export function IntegrationHubPanel({
 
   return (
     <div className="space-y-6">
+      <AdmobAlertEmailCard token={token} settings={alertEmail} onSaved={fetchHub} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-[#00E676]/10">

@@ -666,8 +666,9 @@ export async function sendWithdrawalVelocityAdmin(alert: {
  * caller's responsibility — admobAlerts only calls this once per fired/resolved
  * transition (governed by its cooldown), so this never floods.
  *
- * Recipient defaults to the operator mailbox (support@absustaininvest.com); set
- * ADMIN_ALERT_EMAIL to route operator alerts to a different address.
+ * Recipient resolution: an explicit `to` (the admin Integration Hub setting,
+ * persisted in the DB) wins; absent that, the ADMIN_ALERT_EMAIL env var; absent
+ * that, the default operator mailbox (support@absustaininvest.com).
  */
 export function sendAdmobReportAlert(alert: {
   condition: "stale_sync" | "revenue_divergence";
@@ -675,8 +676,9 @@ export function sendAdmobReportAlert(alert: {
   message: string;
   firedAt: string;
   detail: Record<string, unknown>;
+  to?: string;
 }): void {
-  const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const to = alert.to?.trim() || process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
   const isResolved = alert.status === "resolved";
   const conditionLabel =
     alert.condition === "stale_sync" ? "AdMob reporting stale" : "AdMob revenue divergence";
