@@ -279,3 +279,135 @@ export async function fetchAdMobReport(days = 30): Promise<AdMobReport> {
     fetchedAt: new Date().toISOString(),
   };
 }
+
+export interface AdMobFormatRow {
+  date: string; // YYYY-MM-DD
+  adFormat: string; // REWARDED, BANNER, INTERSTITIAL, … (FORMAT dimension value)
+  earnings: number;
+  impressions: number;
+  clicks: number;
+  ecpm: number;
+}
+
+export interface AdMobFormatReport {
+  ok: boolean;
+  configured: boolean;
+  error?: string;
+  currency?: string;
+  rows?: AdMobFormatRow[];
+  fetchedAt?: string;
+}
+
+/**
+ * Pull a daily network report broken down by ad FORMAT (rewarded / banner /
+ * interstitial / …) for the last `days` days. Used by the persistence sync so
+ * snapshots are stored per (date, format). Same fail-soft contract as
+ * fetchAdMobReport — returns { ok:false } on any failure, never throws/fabricates.
+ */
+export async function fetchAdMobReportByFormat(days = 30): Promise<AdMobFormatReport> {
+  const cfg = getAdMobConfigState();
+  if (!cfg.configured) {
+    return { ok: false, configured: false, error: `AdMob not configured. Missing: ${cfg.missing.join(", ")}` };
+  }
+
+  const auth = await getAccessToken();
+  if (!auth.ok) return { ok: false, configured: true, error: auth.error };
+
+  const safeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+  const end = new Date();
+  const start = new Date(end.getTime() - (safeDays - 1) * 24 * 60 * 60 * 1000);
+
+  const reportSpec = {
+    dateRange: { startDate: ymd(start), endDate: ymd(end) },
+    dimensions: ["DATE", "FORMAT"],
+    metrics: ["ESTIMATED_EARNINGS", "IMPRESSIONS", "CLICKS", "IMPRESSION_RPM"],
+    sortConditions: [{ dimension: "DATE", order: "ASCENDING" }],
+  };
+
+  const account = publisherAccountId();
+  let payload: any;
+  try {
+    const res = await timed((signal) =>
+      fetch(`${ADMOB_BASE}/accounts/${encodeURIComponent(account)}/networkReport:generate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reportSpec }),
+        signal,
+      }),
+    );
+    const text = await res.text();
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        detail = JSON.parse(text)?.error?.message || detail;
+      } catch {
+        /* keep HTTP status */
+      }
+      return { ok: false, configured: true, error: `AdMob report failed: ${detail}` };
+    }
+    payload = JSON.parse(text);
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      error: `AdMob report error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const chunks: any[] = Array.isArray(payload) ? payload : [payload];
+  let currency = "USD";
+  const header = chunks.find((c) => c && c.header)?.header;
+  if (header?.localizationSettings?.currencyCode) currency = header.localizationSettings.currencyCode;
+
+  const rows: AdMobFormatRow[] = [];
+  for (const chunk of chunks) {
+    const row = chunk?.row;
+    if (!row) continue;
+    const dim = row.dimensionValues || {};
+    const m = row.metricValues || {};
+    const dateVal = dim.DATE?.value;
+    const date = dateVal ? `${dateVal.slice(0, 4)}-${dateVal.slice(4, 6)}-${dateVal.slice(6, 8)}` : "";
+    if (!date) continue;
+    const adFormat = (dim.FORMAT?.value || "UNKNOWN").toString().toUpperCase();
+    rows.push({
+      date,
+      adFormat,
+      earnings: metricNum(m.ESTIMATED_EARNINGS),
+      impressions: metricNum(m.IMPRESSIONS),
+      clicks: metricNum(m.CLICKS),
+      ecpm: metricNum(m.IMPRESSION_RPM),
+    });
+  }
+
+  return { ok: true, configured: true, currency, rows, fetchedAt: new Date().toISOString() };
+}
+
+/**
+ * Pull the per-format daily report from AdMob and idempotently upsert it into
+ * the persistent snapshot store (the single source of truth shared by the phone
+ * admin and the website hub). Safe to call repeatedly and on a schedule.
+ *
+ * Fail-soft: if AdMob is unconfigured or unreachable, prior persisted data is
+ * left intact and we return { ok:false } — never throws, never fabricates.
+ */
+export async function syncAdMobSnapshots(
+  lookbackDays = 30,
+): Promise<{ ok: boolean; configured: boolean; written?: number; error?: string }> {
+  const report = await fetchAdMobReportByFormat(lookbackDays);
+  if (!report.ok || !report.rows) {
+    return { ok: false, configured: report.configured, error: report.error };
+  }
+  try {
+    const { storage } = await import("../storage");
+    const written = await storage.upsertAdmobSnapshots(
+      report.rows.map((r) => ({ ...r, currency: report.currency })),
+    );
+    return { ok: true, configured: true, written };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      error: `AdMob snapshot persist failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}

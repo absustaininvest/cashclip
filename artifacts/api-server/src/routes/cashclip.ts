@@ -11,7 +11,7 @@ import {
   getIntegrationKeyHealth,
 } from "../lib/integrationKeyStore";
 import { verifyIntegrationKey } from "../lib/integrationVerify";
-import { fetchAdMobReport, getAdMobConfigState } from "../lib/admobReporting";
+import { getAdMobConfigState, syncAdMobSnapshots } from "../lib/admobReporting";
 import { secretsPassphraseMiddleware } from "../lib/secretsPassphrase";
 import { sponsoredBeginRateLimiter } from "../lib/sponsoredVisitRateLimit";
 import {
@@ -357,28 +357,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   app.get("/api/admin/admob/revenue", adminMiddleware, async (req: AuthRequest, res) => {
     const days = Math.min(Math.max(parseInt(String(req.query.days ?? "30"), 10) || 30, 1), 365);
+    // Hours after which the persisted snapshots are considered stale.
+    const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
     const cfg = getAdMobConfigState();
-    if (!cfg.configured) {
-      res.json({
-        ok: false,
-        configured: false,
-        error: `AdMob not configured. Missing: ${cfg.missing.join(", ")}`,
-        missing: cfg.missing,
-      });
-      return;
-    }
+
     try {
-      const report = await fetchAdMobReport(days);
-      if (!report.ok) {
-        res.status(502).json(report);
+      // Refresh the persisted store in the background (fire-and-forget). The
+      // response is served from the DB so a slow/failed AdMob call never blocks
+      // or breaks the page — it just means we serve the last-known snapshot.
+      void syncAdMobSnapshots(days).catch((err) => {
+        req.log?.warn({ err }, "admob background sync failed");
+      });
+
+      const summary = await storage.getAdmobSnapshotSummary(days);
+      const reconciliation = await storage.getAdmobReconciliation(days);
+      const hasData = summary.rowCount > 0;
+
+      // No persisted data AND keys not set => honest "not configured".
+      if (!hasData && !cfg.configured) {
+        res.json({
+          ok: false,
+          configured: false,
+          error: `AdMob not configured. Missing: ${cfg.missing.join(", ")}`,
+          missing: cfg.missing,
+        });
         return;
       }
-      res.json(report);
+
+      const lastSyncedAt = summary.lastSyncedAt;
+
+      // Configured but nothing has ever synced (e.g. the AdMob OAuth token is
+      // expired). Do NOT fabricate $0 — that would read as "earned nothing"
+      // rather than "we don't know yet". Return an explicit no-data state so the
+      // hub renders "—/no data yet".
+      if (!hasData) {
+        res.json({
+          ok: true,
+          configured: cfg.configured,
+          source: "persisted",
+          noData: true,
+          stale: true,
+          currency: summary.currency,
+          range: summary.range,
+          totals: null,
+          daily: [],
+          byFormat: [],
+          lastSyncedAt: null,
+          reconciliation: null,
+          fetchedAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      const ageMs = lastSyncedAt ? Date.now() - new Date(lastSyncedAt).getTime() : Infinity;
+      const stale = ageMs > STALE_AFTER_MS;
+
+      // Response keeps the legacy AdMobReport shape (ok/configured/currency/
+      // range/totals/daily) so existing consumers keep working, and adds the
+      // persistence fields the hub needs (byFormat/lastSyncedAt/stale/recon).
+      // Metrics we no longer persist (adRequests/matchedRequests/matchRate/
+      // showRate) are returned as null — not 0 — so consumers render "—" rather
+      // than a fabricated measured value.
+      res.json({
+        ok: true,
+        configured: cfg.configured,
+        source: "persisted",
+        noData: false,
+        currency: summary.currency,
+        range: summary.range,
+        totals: {
+          earnings: summary.totals.earnings,
+          impressions: summary.totals.impressions,
+          clicks: summary.totals.clicks,
+          adRequests: null,
+          matchedRequests: null,
+          ctr: summary.totals.impressions > 0 ? summary.totals.clicks / summary.totals.impressions : 0,
+          ecpm: summary.totals.ecpm,
+          matchRate: null,
+          showRate: null,
+        },
+        daily: summary.daily,
+        byFormat: summary.byFormat,
+        lastSyncedAt,
+        stale,
+        reconciliation,
+        fetchedAt: new Date().toISOString(),
+      });
     } catch (err) {
       req.log?.error({ err }, "admob revenue report failed");
       res.status(502).json({
         ok: false,
-        configured: true,
+        configured: cfg.configured,
         error: `AdMob report error: ${err instanceof Error ? err.message : String(err)}`,
       });
     }

@@ -16,6 +16,8 @@ import {
   rewardSessions,
   unsettledCompletions,
   adEvents,
+  admobReportSnapshots,
+  type AdmobReportSnapshot,
   webhookAudit,
   securityAuditLog,
   supportReplies,
@@ -1377,6 +1379,193 @@ export class DatabaseStorage implements IStorage {
   async insertAdEvent(event: InsertAdEvent): Promise<AdEvent> {
     const [row] = await db.insert(adEvents).values(event).returning();
     return row;
+  }
+
+  /**
+   * Idempotently upsert daily per-format AdMob snapshots. Re-running for the
+   * same (date, format) updates the existing row (refreshing syncedAt) instead
+   * of duplicating it. Returns the number of rows written.
+   */
+  async upsertAdmobSnapshots(
+    rows: Array<{
+      date: string;
+      adFormat: string;
+      earnings: number;
+      impressions: number;
+      clicks: number;
+      ecpm: number;
+      currency?: string;
+    }>,
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
+    const now = new Date();
+    const values = rows.map((r) => ({
+      date: r.date,
+      adFormat: (r.adFormat || "UNKNOWN").toUpperCase(),
+      earnings: String(r.earnings ?? 0),
+      impressions: String(Math.round(r.impressions ?? 0)),
+      clicks: String(Math.round(r.clicks ?? 0)),
+      ecpm: String(r.ecpm ?? 0),
+      currency: r.currency || "USD",
+      syncedAt: now,
+    }));
+    await db
+      .insert(admobReportSnapshots)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [admobReportSnapshots.date, admobReportSnapshots.adFormat],
+        set: {
+          earnings: sql`excluded.earnings`,
+          impressions: sql`excluded.impressions`,
+          clicks: sql`excluded.clicks`,
+          ecpm: sql`excluded.ecpm`,
+          currency: sql`excluded.currency`,
+          syncedAt: sql`excluded.synced_at`,
+        },
+      });
+    return values.length;
+  }
+
+  /** Most recent syncedAt across all snapshots, or null if none stored yet. */
+  async getAdmobLastSyncedAt(): Promise<Date | null> {
+    const [row] = await db
+      .select({ last: sql<string | null>`max(${admobReportSnapshots.syncedAt})` })
+      .from(admobReportSnapshots);
+    return row?.last ? new Date(row.last) : null;
+  }
+
+  /**
+   * Read AdMob earnings from the persisted store for the last `days` UTC days
+   * (inclusive of today). Returns roll-up totals, a per-format breakdown, the
+   * daily series, currency, and the last-synced timestamp. Never fabricates —
+   * absent data simply sums to zero. The "TOTAL" pseudo-format is excluded from
+   * the per-format breakdown to avoid double-counting.
+   */
+  async getAdmobSnapshotSummary(days: number): Promise<{
+    range: { startDate: string; endDate: string; days: number };
+    currency: string;
+    totals: { earnings: number; impressions: number; clicks: number; ecpm: number };
+    byFormat: Array<{ adFormat: string; earnings: number; impressions: number; clicks: number; ecpm: number }>;
+    daily: Array<{ date: string; earnings: number; impressions: number }>;
+    lastSyncedAt: string | null;
+    rowCount: number;
+  }> {
+    const safeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+    const end = new Date();
+    const start = new Date(end.getTime() - (safeDays - 1) * 24 * 60 * 60 * 1000);
+    const ymd = (d: Date) =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const startDate = ymd(start);
+    const endDate = ymd(end);
+
+    const rows = (await db
+      .select()
+      .from(admobReportSnapshots)
+      .where(
+        and(
+          gte(admobReportSnapshots.date, startDate),
+          sql`${admobReportSnapshots.date} <= ${endDate}`,
+          ne(admobReportSnapshots.adFormat, "TOTAL"),
+        ),
+      )) as AdmobReportSnapshot[];
+
+    const currency = rows[0]?.currency || "USD";
+    let lastSynced: Date | null = null;
+    const fmtMap = new Map<string, { earnings: number; impressions: number; clicks: number }>();
+    const dayMap = new Map<string, { earnings: number; impressions: number }>();
+    let totEarnings = 0;
+    let totImpr = 0;
+    let totClicks = 0;
+
+    for (const r of rows) {
+      const earnings = Number(r.earnings) || 0;
+      const impressions = Number(r.impressions) || 0;
+      const clicks = Number(r.clicks) || 0;
+      totEarnings += earnings;
+      totImpr += impressions;
+      totClicks += clicks;
+
+      const f = fmtMap.get(r.adFormat) || { earnings: 0, impressions: 0, clicks: 0 };
+      f.earnings += earnings;
+      f.impressions += impressions;
+      f.clicks += clicks;
+      fmtMap.set(r.adFormat, f);
+
+      const d = dayMap.get(r.date) || { earnings: 0, impressions: 0 };
+      d.earnings += earnings;
+      d.impressions += impressions;
+      dayMap.set(r.date, d);
+
+      const sAt = r.syncedAt ? new Date(r.syncedAt) : null;
+      if (sAt && (!lastSynced || sAt > lastSynced)) lastSynced = sAt;
+    }
+
+    const byFormat = Array.from(fmtMap.entries())
+      .map(([adFormat, v]) => ({
+        adFormat,
+        earnings: Number(v.earnings.toFixed(2)),
+        impressions: v.impressions,
+        clicks: v.clicks,
+        ecpm: v.impressions > 0 ? Number(((v.earnings / v.impressions) * 1000).toFixed(2)) : 0,
+      }))
+      .sort((a, b) => b.earnings - a.earnings);
+
+    const daily = Array.from(dayMap.entries())
+      .map(([date, v]) => ({ date, earnings: Number(v.earnings.toFixed(2)), impressions: v.impressions }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+    return {
+      range: { startDate, endDate, days: safeDays },
+      currency,
+      totals: {
+        earnings: Number(totEarnings.toFixed(2)),
+        impressions: totImpr,
+        clicks: totClicks,
+        ecpm: totImpr > 0 ? Number(((totEarnings / totImpr) * 1000).toFixed(2)) : 0,
+      },
+      byFormat,
+      daily,
+      lastSyncedAt: lastSynced ? lastSynced.toISOString() : null,
+      rowCount: rows.length,
+    };
+  }
+
+  /**
+   * Reconcile official AdMob earnings (persisted snapshots) against the app's
+   * own client-reported per-impression revenue (summed ad_events.revenue_micros)
+   * for the same window. Returns both totals plus the absolute and percentage
+   * difference. Divide-by-zero guarded: when official is 0 the percentage is null.
+   */
+  async getAdmobReconciliation(days: number): Promise<{
+    officialEarnings: number;
+    appReportedEarnings: number;
+    differenceAbs: number;
+    differencePct: number | null;
+    currency: string;
+  }> {
+    const summary = await this.getAdmobSnapshotSummary(days);
+    const officialEarnings = summary.totals.earnings;
+
+    const safeDays = summary.range.days;
+    const from = new Date(Date.now() - (safeDays - 1) * 24 * 60 * 60 * 1000);
+    from.setUTCHours(0, 0, 0, 0);
+    const [appRow] = await db
+      .select({ micros: sql<string | null>`coalesce(sum(${adEvents.revenueMicros}), 0)` })
+      .from(adEvents)
+      .where(gte(adEvents.createdAt, from));
+    const appReportedEarnings = Number(((Number(appRow?.micros ?? 0) || 0) / 1_000_000).toFixed(2));
+
+    const differenceAbs = Number((officialEarnings - appReportedEarnings).toFixed(2));
+    const differencePct =
+      officialEarnings > 0 ? Number(((differenceAbs / officialEarnings) * 100).toFixed(2)) : null;
+
+    return {
+      officialEarnings,
+      appReportedEarnings,
+      differenceAbs,
+      differencePct,
+      currency: summary.currency,
+    };
   }
 
   async getAdAnalyticsSummary(from?: Date, to?: Date): Promise<{

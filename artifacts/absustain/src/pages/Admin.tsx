@@ -5014,15 +5014,35 @@ interface AdMobRevenueData {
     earnings: number;
     impressions: number;
     clicks: number;
-    adRequests: number;
-    matchedRequests: number;
+    adRequests: number | null;
+    matchedRequests: number | null;
     ctr: number;
     ecpm: number;
-    matchRate: number;
-    showRate: number;
-  };
+    matchRate: number | null;
+    showRate: number | null;
+  } | null;
   daily?: AdMobDailyRow[];
+  byFormat?: AdMobFormatBreakdown[];
+  lastSyncedAt?: string | null;
+  stale?: boolean;
+  noData?: boolean;
+  source?: string;
+  reconciliation?: {
+    officialEarnings: number;
+    appReportedEarnings: number;
+    differenceAbs: number;
+    differencePct: number | null;
+    currency: string;
+  };
   fetchedAt?: string;
+}
+
+interface AdMobFormatBreakdown {
+  adFormat: string;
+  earnings: number;
+  impressions: number;
+  clicks: number;
+  ecpm: number;
 }
 
 function RevenueStat({
@@ -5117,6 +5137,26 @@ function RevenuePanel({
 
   const configured = data?.configured !== false;
   const showData = !!data?.ok && !!totals;
+  const byFormat = data?.byFormat ?? [];
+  const recon = data?.reconciliation;
+  const isStale = !!data?.ok && data?.stale === true && data?.noData !== true;
+  const lastSynced = data?.lastSyncedAt ? new Date(data.lastSyncedAt) : null;
+  const fmtSynced = (d: Date) =>
+    d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  const prettyFormat = (f: string) =>
+    f
+      .toLowerCase()
+      .split("_")
+      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+      .join(" ");
+  // "In sync" when official and app-reported agree within 5%.
+  const reconInSync =
+    !!recon && (recon.differencePct === null || Math.abs(recon.differencePct) <= 5);
 
   return (
     <div className="space-y-6">
@@ -5161,6 +5201,29 @@ function RevenuePanel({
         </div>
       </div>
 
+      {(lastSynced || isStale) && (
+        <div
+          className={`flex items-center gap-2 text-xs rounded-xl px-4 py-2.5 border ${
+            isStale
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
+              : "bg-white/[0.03] border-white/[0.06] text-white/50"
+          }`}
+        >
+          {isStale ? (
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          ) : (
+            <RefreshCw className="w-3.5 h-3.5 shrink-0" />
+          )}
+          <span>
+            {isStale
+              ? `Showing last-known data — AdMob hasn't synced recently${
+                  lastSynced ? ` (last synced ${fmtSynced(lastSynced)})` : ""
+                }.`
+              : `Last synced ${lastSynced ? fmtSynced(lastSynced) : "—"} · auto-updates from AdMob`}
+          </span>
+        </div>
+      )}
+
       {loading && !data && (
         <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-10 text-center text-white/40 text-sm">
           Loading live AdMob data…
@@ -5188,7 +5251,21 @@ function RevenuePanel({
         </div>
       )}
 
-      {!loading && data && configured && !showData && (
+      {!loading && data && configured && !showData && (data.noData || data.ok) && !data.error && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.04] mb-3">
+            <RefreshCw className="w-5 h-5 text-white/40" />
+          </div>
+          <p className="text-white/70 text-sm font-semibold mb-1">No AdMob data synced yet</p>
+          <p className="text-white/40 text-xs max-w-sm mx-auto">
+            We haven't pulled any figures from AdMob for this period yet. Once the
+            AdMob connection syncs, today / 7-day / 30-day earnings and the
+            per-format breakdown will appear here. Nothing is assumed to be $0.
+          </p>
+        </div>
+      )}
+
+      {!loading && data && configured && !showData && !data.noData && !data.ok && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-red-400 text-sm">
           <div className="flex items-center gap-2 font-semibold mb-1">
             <AlertCircle className="w-4 h-4" /> Could not load AdMob revenue
@@ -5213,11 +5290,90 @@ function RevenuePanel({
               value={fmtMoney(totals.ecpm)}
               hint="per 1,000 impressions"
             />
-            <RevenueStat label="CTR" value={fmtPct(totals.ctr)} />
-            <RevenueStat label="Match rate" value={fmtPct(totals.matchRate)} />
-            <RevenueStat label="Show rate" value={fmtPct(totals.showRate)} />
-            <RevenueStat label="Ad requests" value={fmtNum(totals.adRequests)} />
           </div>
+
+          {byFormat.length > 0 && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-white/60 text-sm font-semibold mb-4">
+                Earnings by ad format
+              </p>
+              <div className="space-y-3">
+                {byFormat.map((f) => {
+                  const pct =
+                    totals.earnings > 0
+                      ? Math.round((f.earnings / totals.earnings) * 100)
+                      : 0;
+                  return (
+                    <div key={f.adFormat}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-white/80 font-medium">
+                          {prettyFormat(f.adFormat)}
+                        </span>
+                        <span className="text-white tabular-nums">
+                          {fmtMoney(f.earnings)}{" "}
+                          <span className="text-white/30 text-xs">({pct}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden">
+                        <div
+                          className="h-full bg-[#00E676]/70 rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex gap-4 text-white/30 text-xs mt-1">
+                        <span>{fmtNum(f.impressions)} impressions</span>
+                        <span>eCPM {fmtMoney(f.ecpm)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {recon && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-white/60 text-sm font-semibold">
+                  Reconciliation · official vs app-reported
+                </p>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    reconInSync
+                      ? "bg-[#00E676]/15 text-[#00E676]"
+                      : "bg-amber-500/15 text-amber-300"
+                  }`}
+                >
+                  {reconInSync ? "In sync" : "Diverging"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <RevenueStat
+                  label="AdMob (official)"
+                  value={fmtMoney(recon.officialEarnings)}
+                  hint={`last ${days}d`}
+                />
+                <RevenueStat
+                  label="App-reported"
+                  value={fmtMoney(recon.appReportedEarnings)}
+                  hint="from ad events"
+                />
+                <RevenueStat
+                  label="Difference"
+                  value={`${fmtMoney(recon.differenceAbs)}${
+                    recon.differencePct !== null
+                      ? ` (${recon.differencePct > 0 ? "+" : ""}${recon.differencePct}%)`
+                      : ""
+                  }`}
+                />
+              </div>
+              <p className="text-white/30 text-xs mt-3">
+                Official AdMob estimated earnings compared with the revenue the app
+                reports per impression for the same period. Small gaps are normal
+                (AdMob figures are estimates and finalize later).
+              </p>
+            </div>
+          )}
 
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
             <p className="text-white/60 text-sm font-semibold mb-4">

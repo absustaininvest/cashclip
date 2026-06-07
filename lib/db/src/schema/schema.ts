@@ -364,6 +364,43 @@ export const adEvents = pgTable(
   })
 );
 
+// Persisted daily AdMob report snapshots — the single source of truth for AdMob
+// earnings shared by the phone admin and the website /sc-portal hub. Keyed by
+// (date, ad_format) so the sync can idempotently upsert; "TOTAL" holds the
+// all-formats roll-up for a given day. Read-optimized for date-range queries.
+export const admobReportSnapshots = pgTable(
+  "admob_report_snapshots",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    // UTC calendar day, "YYYY-MM-DD".
+    date: text("date").notNull(),
+    // AdMob FORMAT dimension value: REWARDED, BANNER, INTERSTITIAL, NATIVE,
+    // REWARDED_INTERSTITIAL, APP_OPEN, … or "TOTAL" for the day roll-up.
+    adFormat: text("ad_format").notNull(),
+    earnings: numeric("earnings", { precision: 18, scale: 6 }).notNull().default("0"),
+    impressions: numeric("impressions", { precision: 18, scale: 0 }).notNull().default("0"),
+    clicks: numeric("clicks", { precision: 18, scale: 0 }).notNull().default("0"),
+    // Impression RPM (per 1,000 impressions), in account currency.
+    ecpm: numeric("ecpm", { precision: 14, scale: 6 }).notNull().default("0"),
+    currency: text("currency").notNull().default("USD"),
+    // When this row was last pulled from the AdMob API + upserted.
+    syncedAt: timestamp("synced_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    dayFormatUnique: uniqueIndex("admob_snapshots_day_format_unique").on(t.date, t.adFormat),
+    dateIdx: index("admob_snapshots_date_idx").on(t.date),
+  })
+);
+
+export const insertAdmobReportSnapshotSchema = createInsertSchema(admobReportSnapshots).omit({
+  id: true,
+  syncedAt: true,
+});
+export type AdmobReportSnapshot = typeof admobReportSnapshots.$inferSelect;
+export type InsertAdmobReportSnapshot = z.infer<typeof insertAdmobReportSnapshotSchema>;
+
 export const webhookAudit = pgTable(
   "webhook_audit",
   {
