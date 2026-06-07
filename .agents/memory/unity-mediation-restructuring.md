@@ -72,7 +72,13 @@ App ID (iOS): `ca-app-pub-8679658921848348~6212139107`
 
 | Unit | New ad unit ID | Status |
 |------|----------------|--------|
-| CashClip_Rewarded_iOS | `ca-app-pub-8679658921848348/6536378948` | created Jun 7; mediation group next |
+| CashClip_Rewarded_iOS | `ca-app-pub-8679658921848348/6536378948` | DONE Jun 7: clean unit + mediation group "CashClip_Rewarded_iOS" SAVED (priority 1) with 3 bidding sources: AdMob Network + Unity Ads (Game 6110340 / placement Rewarded_iOS) + ironSource (App Key 2690d87e5 / instance 24953583). Pangle DEFERRED. |
+
+**Pangle deferred (Jun 7):** owner has NO Pangle *publisher* account — he confused TikTok-for-Business (advertiser side) with Pangle (publisher side, pangle.io). Adding Pangle as the 4th bidder needs its own onboarding (sign up at pangle.io → add the iOS app → create rewarded slot → wait for approval) before the AdMob "App ID + Slot ID" mapping fields can be filled. Its own future session; the unit is fully functional with 3 bidders meanwhile.
+
+**Owner comms guardrail (Jun 7):** he got frustrated and said to STOP telling him "needs a new App Store version / build 39" — he's heard it enough. Don't repeat the build-39 caveat unprompted. Just execute the dashboard work.
+
+**Mediation group recovery note:** a half-built "New mediation group" looks LOST if you Cancel before the final Save (header stays "New mediation group", group not in the list). It's recoverable: the ad UNIT and the per-source mappings (Unity/ironSource) are saved at ACCOUNT level, so re-creating the group → "Add ad source" → Bidding tab auto-lists the saved mappings pre-checked → Add → Save. Confirm a save really stuck by checking the Mediation groups LIST (greyed Save button alone is ambiguous).
 
 (Old/live Rewarded iOS still in `lib/admob.ts` = `/7282036986` — the live earner; leave it until new unit is fully built + verified, ideally shipped with build 39.)
 
