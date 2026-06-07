@@ -77,6 +77,7 @@ import {
   type PendingState,
   type ClaimMissionResult,
 } from "@/lib/earn-client";
+import { dollarsToPoints } from "@/lib/points";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DAILY_GOAL = 20;
@@ -157,6 +158,10 @@ function AdCard({
           <Text style={styles.adDescription} numberOfLines={1}>
             {ad.description}
           </Text>
+          <View style={styles.adReward}>
+            <Ionicons name="star" size={13} color={Colors.primary} />
+            <Text style={styles.adRewardText}>+{formatPoints(dollarsToPoints(ad.reward))}</Text>
+          </View>
         </View>
         <View style={styles.watchBtnContainer}>
           {adPreloaded && (
