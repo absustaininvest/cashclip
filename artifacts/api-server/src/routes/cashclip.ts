@@ -4042,14 +4042,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.redirect(302, advertiserRedirect);
     } catch (err: any) {
       req.log?.error?.({ err }, "Sponsored completion redirect failed");
-      // Only redirect to targetUrl if it has a safe scheme.
-      try {
-        const u = new URL(targetUrl);
-        if (["http:", "https:"].includes(u.protocol)) {
-          res.redirect(302, targetUrl);
-          return;
-        }
-      } catch { /* fall through */ }
+      // Only redirect to targetUrl if it exists and has a safe scheme.
+      if (targetUrl) {
+        try {
+          const u = new URL(targetUrl);
+          if (["http:", "https:"].includes(u.protocol)) {
+            res.redirect(302, targetUrl);
+            return;
+          }
+        } catch { /* fall through */ }
+      }
       res.status(500).send("Redirect failed");
     }
   });
