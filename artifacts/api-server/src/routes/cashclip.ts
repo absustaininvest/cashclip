@@ -2869,7 +2869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (
         typeof title !== "string" || title.length < 3 || title.length > 80 ||
         typeof description !== "string" || description.length < 10 || description.length > 300 ||
-        typeof targetUrl !== "string" || (() => { try { new URL(targetUrl); return false; } catch { return true; } })() ||
+        typeof targetUrl !== "string" || (() => { try { const u = new URL(targetUrl); return !["http:", "https:"].includes(u.protocol); } catch { return true; } })() ||
         typeof rewardPerVisit !== "number" || rewardPerVisit < 0.01 || rewardPerVisit > 0.50 ||
         typeof totalBudget !== "number" || totalBudget < 0.50 || totalBudget > 500
       ) { res.status(400).json({ error: "Invalid campaign data" }); return; }
@@ -4019,24 +4019,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //   sees. A script completing this chain still cannot call /postback because
       //   it doesn't have callbackKey — settlement therefore stays null until the
       //   advertiser's server makes the authenticated postback call.
-      let advertiserRedirect: string;
+      // Enforce http/https allowlist before redirecting — stored targetUrl must
+      // be a web URL; any other scheme (javascript:, data:, etc.) is rejected.
+      let parsedTarget: URL;
       try {
-        const u = new URL(targetUrl);
-        u.searchParams.set("cashclip_t", token);
-        advertiserRedirect = u.toString();
+        parsedTarget = new URL(targetUrl);
       } catch {
-        advertiserRedirect = targetUrl + (targetUrl.includes("?") ? "&" : "?") + "cashclip_t=" + encodeURIComponent(token);
+        req.log?.warn({ targetUrl }, "Sponsored completion: unparseable targetUrl — aborting redirect");
+        res.status(500).send("Redirect failed");
+        return;
       }
+      if (!["http:", "https:"].includes(parsedTarget.protocol)) {
+        req.log?.warn({ protocol: parsedTarget.protocol }, "Sponsored completion: non-http(s) scheme rejected");
+        res.status(500).send("Redirect failed");
+        return;
+      }
+
+      parsedTarget.searchParams.set("cashclip_t", token);
+      const advertiserRedirect = parsedTarget.toString();
 
       res.setHeader("Cache-Control", "no-store");
       res.redirect(302, advertiserRedirect);
     } catch (err: any) {
       req.log?.error?.({ err }, "Sponsored completion redirect failed");
-      if (targetUrl) {
-        res.redirect(302, targetUrl);
-      } else {
-        res.status(500).send("Redirect failed");
-      }
+      // Only redirect to targetUrl if it has a safe scheme.
+      try {
+        const u = new URL(targetUrl);
+        if (["http:", "https:"].includes(u.protocol)) {
+          res.redirect(302, targetUrl);
+          return;
+        }
+      } catch { /* fall through */ }
+      res.status(500).send("Redirect failed");
     }
   });
 
