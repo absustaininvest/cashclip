@@ -681,8 +681,8 @@ export async function getNextSpinTime(): Promise<number | null> {
 
 // ── FORMATTING HELPERS ────────────────────────────────────────────────────────
 // pointsToUsd and formatPoints are re-exported from "./points" (see top of file).
-export function formatCountdown(claimableAt: number): string {
-  const remaining = claimableAt - Date.now();
+export function formatCountdown(claimableAt: number, now: number = Date.now()): string {
+  const remaining = claimableAt - now;
   if (remaining <= 0) return "Ready!";
   const h = Math.floor(remaining / 3_600_000);
   const m = Math.floor((remaining % 3_600_000) / 60_000);

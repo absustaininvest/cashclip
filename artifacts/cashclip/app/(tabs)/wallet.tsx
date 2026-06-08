@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ import {
   claimAllReady,
   fetchServerBalance,
   formatPoints,
+  formatCountdown,
   pointsToUsd,
   type PendingState,
 } from "@/lib/earn-client";
@@ -180,6 +182,8 @@ export default function WalletScreen() {
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [isFocused, setIsFocused] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -236,9 +240,22 @@ export default function WalletScreen() {
     }
   }, [isConverting, pendingState, t, loadData, celebrate]);
 
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      loadData();
+      return () => setIsFocused(false);
+    }, [loadData]),
+  );
+
   useEffect(() => {
-    loadData();
-  }, []);
+    const pend = pendingState?.pending ?? [];
+    const nextAt = pend.length > 0 ? Math.min(...pend.map((tk) => tk.claimableAt)) : null;
+    if (!isFocused || nextAt == null || nextAt <= Date.now()) return;
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isFocused, pendingState]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -341,6 +358,13 @@ export default function WalletScreen() {
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const displayBalance = serverBalance;
+  const pendingTokens = pendingState?.pending ?? [];
+  const nextUnlockAt =
+    pendingTokens.length > 0
+      ? Math.min(...pendingTokens.map((tk) => tk.claimableAt))
+      : null;
+  const hasPendingHold = (pendingState?.pendingPoints ?? 0) > 0 && nextUnlockAt != null;
+  const countdownReady = nextUnlockAt != null && nowMs >= nextUnlockAt;
   const progressToNext = displayBalance < 3
     ? (displayBalance / 3) * 100
     : 100;
@@ -402,7 +426,13 @@ export default function WalletScreen() {
               <View style={styles.pointsStatsRow}>
                 <View style={styles.pointsStat}>
                   <Text style={styles.pointsValue}>{formatPoints(pendingState?.pendingPoints ?? 0)}</Text>
-                  <Text style={styles.pointsStatLabel}>{t.wallet.holdFor3h}</Text>
+                  <Text style={styles.pointsStatLabel}>
+                    {hasPendingHold
+                      ? countdownReady
+                        ? t.wallet.readyToConvert
+                        : tFn(t, "wallet.readyIn", { time: formatCountdown(nextUnlockAt!, nowMs) })
+                      : t.wallet.holdFor3h}
+                  </Text>
                 </View>
                 <View style={styles.pointsDivider} />
                 <View style={styles.pointsStat}>
