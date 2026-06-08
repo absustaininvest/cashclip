@@ -838,13 +838,18 @@ export default function EarnScreen() {
     if (isAdMobReady()) {
       setAdLoading(true);
       setAdPreloaded(false);
+      // Get the server challenge BEFORE showing the ad so a completed watch can pay
+      // via the secure begin→complete path (Google's SSV callback isn't landing in
+      // production). The server decides the amount and shares the rewarded_ad cap.
+      const begin = await beginAdView();
       try {
         const result = await showRewardedAd();
         setAdPreloaded(isRewardedAdPreloaded());
         if (result.rewarded) {
           await recordAdWatch();
-          // Real ad payout comes via Google's verified SSV callback server-side,
-          // so we don't credit on the client here — just refresh the balance.
+          if (begin.ok) {
+            await completeAdView(begin.challengeToken, "Watched video");
+          }
           await loadAll();
           balancePulse.value = withSequence(
             withSpring(1.1, { damping: 4 }),

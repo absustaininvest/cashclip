@@ -192,14 +192,22 @@ export default function HomeScreen() {
       return;
     }
 
-    // Real rewarded ad when AdMob is ready — payout comes via Google's verified
-    // SSV callback server-side, so we don't credit on the client here.
+    // Real rewarded ad when AdMob is ready. Google's verified SSV callback isn't
+    // landing in production, so credit the small, server-decided reward through the
+    // same secure begin→complete path the in-app fallback uses. The server shares
+    // the rewarded_ad daily cap across both paths, so it can't be farmed, and the
+    // generic /record path still blocks "rewarded_ad" outright.
     if (isAdMobReady()) {
       setAdLoading(true);
+      // Get the server challenge BEFORE showing the ad so a completed watch can pay.
+      const begin = await beginAdView();
       try {
         const result = await showRewardedAd();
         if (result.rewarded) {
           await recordAdWatch();
+          if (begin.ok) {
+            await completeAdView(begin.challengeToken, "Watched video");
+          }
           loadBalance();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else if (result.timedOut) {

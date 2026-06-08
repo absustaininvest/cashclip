@@ -34,3 +34,20 @@ pay even when AdMob doesn't fill, without trusting the phone for the amount.
   rides OTA onto build 29 (channel `production`, runtimeVersion 1.0.0).
 - The separate open question (why SSV callbacks don't land) is NOT fixed by the
   fallback — still investigate that for the real-revenue path.
+
+## The AdMob-ready branch must ALSO credit via begin/complete (the real live bug)
+**Jun 2026 — zero `rewarded_ad` credits in 14 days on live build 29.** Root cause:
+on build 29 AdMob fills, so the watch handlers always took the `showRewardedAd()`
+branch and `return`ed, crediting ONLY via Google SSV — and SSV callbacks aren't
+landing in prod. The begin/complete fallback was gated behind "AdMob NOT ready",
+so on the live build it never ran → nothing credited.
+**Fix:** in the AdMob-ready branch of BOTH `app/(tabs)/index.tsx` and
+`app/(tabs)/earn.tsx`, call `beginAdView()` BEFORE `showRewardedAd()`, and on a
+rewarded result call `completeAdView(begin.challengeToken, "Watched video")` to
+credit via the reliable server path. Server enforces AD_CHALLENGE_MIN_MS=4000
+(a real ad always exceeds it) and SPIN_CHALLENGE_TTL_MS=60000 (challenge expires
+in 60s — slow ad loads can drop a credit; acceptable). Double-credit risk is low
+while SSV credits zero, and both paths share the rewarded_ad daily cap anyway; if
+SSV ever resumes, watch for dual-path over-credit.
+**Lesson:** never let a rewarded-watch path depend SOLELY on SSV — always route
+the completion through the server begin/complete credit too.
