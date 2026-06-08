@@ -73,6 +73,7 @@ App ID (iOS): `ca-app-pub-8679658921848348~6212139107`
 | Unit | New ad unit ID | Status |
 |------|----------------|--------|
 | CashClip_Rewarded_iOS | `ca-app-pub-8679658921848348/6536378948` | DONE Jun 7: clean unit + mediation group "CashClip_Rewarded_iOS" SAVED (priority 1) with 3 bidding sources: AdMob Network + Unity Ads (Game 6110340 / placement Rewarded_iOS) + ironSource (App Key 2690d87e5 / instance 24953583). Pangle DEFERRED. |
+| CashClip_Interstitial_iOS | `ca-app-pub-8679658921848348/3874026351` | Unit CREATED Jun 7 (clean). Mediation group NOT built yet — next: add AdMob + Unity (Game 6110340 / interstitial placement) + ironSource interstitial instance. |
 
 **Pangle deferred (Jun 7):** owner has NO Pangle *publisher* account — he confused TikTok-for-Business (advertiser side) with Pangle (publisher side, pangle.io). Adding Pangle as the 4th bidder needs its own onboarding (sign up at pangle.io → add the iOS app → create rewarded slot → wait for approval) before the AdMob "App ID + Slot ID" mapping fields can be filled. Its own future session; the unit is fully functional with 3 bidders meanwhile.
 
