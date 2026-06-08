@@ -203,9 +203,3 @@ id = "0CRJqqDGE7lrREpaw5tzC"
 uri = "file://exports/CashClip_Session_Recap.md"
 type = "text"
 title = "CashClip — Session Recap & Status Script"
-
-[[outputs]]
-id = "jZjEIxga4pFDCTEAHTuTD"
-uri = "file://scripts/exports/CashClip-TodoChecklist.pdf"
-type = "pdf"
-title = "CashClip — Master Checklist (both lists merged)"
