@@ -37,6 +37,8 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `SENTRY_TOKEN` | Sentry **build-time auth token** (uploads source maps during the EAS build so crash stack traces are readable). NOT the DSN. Owner added Jun 5 2026. Sentry org: `ab-sustainability-investments`. |
 | `EXPO_PUBLIC_SENTRY_DSN` | Sentry **DSN** — the client key that actually lets the app *send* crash/error reports. Client-exposed by design (lives in the app), so EXPO_PUBLIC so Expo inlines it into build 39. Found in Sentry → Settings → Projects → CashClip → Client Keys (DSN). |
 | `EXPO_PUBLIC_VEXO_API_KEY` | Vexo Analytics client API key (Vexo app "Cash-Clip", repo `absustaininvest/cashclip`). Client-exposed by design; EXPO_PUBLIC so Expo inlines it into build 39. From the Vexo dashboard → App Settings → API KEY. |
+| `TIKTOK_APP_ID` | TikTok Marketing API app ID (advertiser-side, for advertising CashClip + measuring installs). Issued by TikTok only AFTER the app is approved (business verification gates approval). From business-api.tiktok.com → My Apps → CashClip. Used by the API server's TikTok OAuth (`/api/integrations/tiktok/*`). |
+| `TIKTOK_APP_SECRET` | TikTok Marketing API app secret — pairs with `TIKTOK_APP_ID` for the OAuth token exchange. Sensitive. Registered redirect URI: `https://api.cash-clip.app/api/integrations/tiktok/callback`. Must be added to the **production** deployment secrets and the API re-published to work live. |
 
 ## Apps / Artifacts
 
