@@ -66,3 +66,15 @@ IOS     v1.1.0(build 33)  2026-05-19  -> absustaininvest/absustaininvest_IOS_v1.
 ANDROID v1.1.0(build 1)  2026-05-19  -> absustaininvest/absustaininvest_ANDROID_v1.1.0_build1_9CmrM1ow.aab
       src: https://expo.dev/artifacts/eas/9CmrM1owtcFZiWVA8Rf14v.aab
 
+
+=== V39-PREP BUNDLE (added 2026-06-09) — see V39-prep/README.md ===
+SOURCE  full workspace @ HEAD f6e07a0  -> V39-prep/full-source-HEAD_f6e07a0.tar.gz  (LOCAL-ONLY ~447MB)
+          = V39 app (build 39 / v1.1.0, all latest fixes) + OWL "Mail Lady" backend + /sc-portal + docs
+          regenerate: git archive -o out.tar.gz HEAD
+SOURCE  cashclip @ 9c71ec4 (LIVE build-29 OTA)  -> V39-prep/cashclip-OTA-live-good_9c71ec4.tar.gz  (LOCAL-ONLY ~4.4MB)
+          = "what was successfully implemented on 29" (good group 26fa0d4c-...)
+          regenerate: git archive -o out.tar.gz 9c71ec4 artifacts/cashclip
+LAYOUT  build-29-safe OTA layout override  -> V39-prep/_layout.build29.tsx
+CREDS   Apple iOS Distribution Certificate  -> V39-prep/credentials/DistCert_CGHKZMC5AY.zip  (LOCAL-ONLY, SENSITIVE)
+CREDS   Apple/Expo signing reference notes  -> V39-prep/credentials/CREDENTIALS-NOTES.txt    (LOCAL-ONLY)
+APPLE   ASC API key in Replit secrets: APPLE_ASC_PRIVATE_KEY / APPLE_ASC_ISSUER_ID / APPLE_ASC_KEY_ID (+ in Expo)
