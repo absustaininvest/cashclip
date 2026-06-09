@@ -424,6 +424,7 @@
         {
           "ios": {
             "deploymentTarget": "15.1",
+            "useFrameworks": "static",
             "extraPods": [
               {
                 "name": "GoogleMobileAdsMediationUnity"
