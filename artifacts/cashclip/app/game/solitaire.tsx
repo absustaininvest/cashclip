@@ -218,6 +218,7 @@ export default function SolitaireGame() {
   const [serverPoints, setServerPoints] = useState<number | null>(null);
   const [bankFailed, setBankFailed] = useState(false);
   const rewardRecorded = useRef(false);
+  const challengeTokenRef = useRef<string | null>(null);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
@@ -237,6 +238,12 @@ export default function SolitaireGame() {
         setWaste(deal.waste);
         setFoundations(deal.foundations);
         setGameStarted(true);
+        // Game earn endpoints are currently disabled server-side (410).
+        // beginGame() will return { ok: false }; bankReward handles this
+        // gracefully — the player still gets the win UI but no server reward.
+        void beginGame().then((r) => {
+          if (r.ok) challengeTokenRef.current = r.challengeToken;
+        });
       }
     });
   }, []);
@@ -258,21 +265,23 @@ export default function SolitaireGame() {
     ]).start();
   }, []);
 
-  // Server-authoritative reward: request a challenge at the reward moment, then
-  // redeem it. The SERVER decides the prize (from its GAME_POOL) and drops it
-  // into the pending wallet — the on-screen outcome is cosmetic. We mark the
-  // play locally WITHOUT crediting a phantom balance (creditLocally:false).
+  // Server-authoritative reward: the challenge was issued at game start so the
+  // server can verify a real session elapsed (GAME_CHALLENGE_MIN_MS). The SERVER
+  // decides the prize (from its GAME_POOL) and drops it into the pending wallet —
+  // the on-screen outcome is cosmetic. We mark the play locally WITHOUT crediting
+  // a phantom balance (creditLocally:false).
   const bankedRef = useRef(false);
 
   const bankReward = useCallback(async (desc: string) => {
     if (bankedRef.current) return;
     bankedRef.current = true;
-    const begin = await beginGame();
-    if (!begin.ok) {
+    const token = challengeTokenRef.current;
+    if (!token) {
+      // begin never succeeded (network error at game start); skip server reward
       setBankFailed(true);
       return;
     }
-    const result = await completeGame(begin.challengeToken, desc);
+    const result = await completeGame(token, desc);
     if (result.ok) {
       setServerPoints(result.token.points);
       await recordGamePlay("solitaire", result.token.points, desc, { creditLocally: false });
