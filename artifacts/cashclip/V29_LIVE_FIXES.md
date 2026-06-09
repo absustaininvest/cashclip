@@ -52,4 +52,17 @@ These can't ride OTA; they need the new native build:
 
 ---
 
-*Compiled from git history of `artifacts/cashclip/` and the Expo `production` update groups, June 9 2026.*
+## C. Backend / Admin tools — live on the production API + `/sc-portal`
+
+These run on the **server**, so they're already live no matter which build (29 or 39) is on phones.
+
+### 📬 The "Mail Lady" — unified support Inbox
+- Pulls every email to **support@absustaininvest.com** into the admin portal (`/sc-portal`) via Zoho IMAP.
+- **Auto-sorts** each message into buckets: corporate / app / support / other.
+- **Reply right from the portal** — no more bouncing between Zoho tabs.
+- **Double-send protection** (won't fire the same reply twice) + a **durable, browsable history** of every reply sent.
+- **Honest status:** today she *centralizes and organizes* everything in one place — **you still type the reply.** The part that **fully releases you** (auto-drafted / auto-sent replies) is the **vision upgrade** we build on top of her. The plumbing — read, sort, reply, log — is already done and live.
+
+---
+
+*Compiled from git history of `artifacts/cashclip/`, the Expo `production` update groups, and the live api-server code, June 9 2026.*
