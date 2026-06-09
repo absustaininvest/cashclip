@@ -39,7 +39,10 @@ async function send(options: {
   subject: string;
   html: string;
   text: string;
-  replyTo?: string;
+  // string  → use it as Reply-To
+  // omitted → default to the support address
+  // null    → send NO Reply-To header at all
+  replyTo?: string | null;
 }): Promise<void> {
   const { replyTo, ...mailOptions } = options;
   const transport = createTransport();
@@ -51,9 +54,9 @@ async function send(options: {
     logger.warn({ to: mailOptions.to }, "Skipping email — invalid recipient address");
     return;
   }
-  const replyToAddr = replyTo ?? ADMIN_EMAIL;
+  const replyToAddr = replyTo === null ? undefined : (replyTo ?? ADMIN_EMAIL);
   try {
-    await transport.sendMail({ from: FROM_MAIN, replyTo: replyToAddr, ...mailOptions });
+    await transport.sendMail({ from: FROM_MAIN, ...(replyToAddr ? { replyTo: replyToAddr } : {}), ...mailOptions });
     logger.info({ to: mailOptions.to, subject: mailOptions.subject }, "Email sent");
   } catch (err) {
     logger.error({ err, to: mailOptions.to, subject: mailOptions.subject }, "Failed to send email");
@@ -483,21 +486,39 @@ export async function sendSupportTicket(ticket: {
   userId: string;
   subject: string;
   message: string;
+  userEmail?: string | null;
 }): Promise<void> {
   const safeUsername = escapeHtml(ticket.username);
   const safeUserId = escapeHtml(ticket.userId);
   const safeSubject = escapeHtml(ticket.subject);
   const safeMessage = escapeHtml(ticket.message);
+
+  // When the account on file has a valid email, set it as Reply-To so hitting
+  // "Reply" in the support mailbox goes straight to the user (not back to the
+  // support address itself). Also surface it in the body so the operator can
+  // see who the ticket is from at a glance.
+  const userEmail = ticket.userEmail?.trim();
+  const hasEmail = !!userEmail && isValidEmail(userEmail);
+  const safeUserEmail = hasEmail ? escapeHtml(userEmail!) : "";
+  const emailRowHtml = hasEmail
+    ? `<tr><td style="padding:8px 0;font-weight:600;color:#555">Email</td><td style="padding:8px 0"><a href="mailto:${safeUserEmail}" style="color:#00A843">${safeUserEmail}</a></td></tr>`
+    : `<tr><td style="padding:8px 0;font-weight:600;color:#555">Email</td><td style="padding:8px 0;color:#c0392b">none on file — ask the user to reply with their account email</td></tr>`;
+  const emailTextLine = hasEmail ? `\nEmail: ${userEmail}` : "\nEmail: none on file";
+
   await send({
     to: ADMIN_EMAIL,
+    // Valid user email → reply goes to them; otherwise send NO Reply-To so the
+    // ticket doesn't misleadingly route a reply back to the support address.
+    replyTo: hasEmail ? userEmail! : null,
     subject: `[CashClip Support] ${ticket.subject}`,
-    text: `New support ticket from ${ticket.username} (ID: ${ticket.userId})\n\nSubject: ${ticket.subject}\n\nMessage:\n${ticket.message}`,
+    text: `New support ticket from ${ticket.username} (ID: ${ticket.userId})${emailTextLine}\n\nSubject: ${ticket.subject}\n\nMessage:\n${ticket.message}`,
     // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
     html: `
       <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
         <h2 style="color:#1a1a1a;border-bottom:2px solid #00C853;padding-bottom:12px">New Support Ticket</h2>
         <table style="width:100%;border-collapse:collapse;margin-top:16px">
           <tr><td style="padding:8px 0;font-weight:600;color:#555;width:100px">User</td><td style="padding:8px 0">${safeUsername}</td></tr>
+          ${emailRowHtml}
           <tr><td style="padding:8px 0;font-weight:600;color:#555">User ID</td><td style="padding:8px 0;font-size:12px;color:#999">${safeUserId}</td></tr>
           <tr><td style="padding:8px 0;font-weight:600;color:#555">Subject</td><td style="padding:8px 0"><strong>${safeSubject}</strong></td></tr>
         </table>

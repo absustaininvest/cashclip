@@ -2670,6 +2670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: String(req.userId),
         subject: subject.trim(),
         message: message.trim(),
+        userEmail: user?.email ?? null,
       });
       req.log?.info({ userId: req.userId, subject: subject.trim() }, "Support ticket submitted");
       res.status(200).json({ ok: true });
