@@ -28,6 +28,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 
 - **Primary production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/auth.ts`, `artifacts/api-server/src/routes/cashclip.ts`, `artifacts/api-server/src/surveys.ts`, `artifacts/api-server/src/offerwalls.ts`, `artifacts/api-server/src/routes/earnings.ts`.
 - **Highest-risk areas:** auth/session handling, account-recovery/password-reset flows, admin middleware and secret-management routes, reward-crediting and withdrawal flows, sponsored earning routes, webhook verification, PayPal payout logic, public integration-status/operator metadata routes, the same-origin admin portal under `artifacts/absustain/src/pages/Admin.tsx`, and browser-served CashClip admin/setup routes under `artifacts/cashclip/app`.
+- **Client-timed reward flows:** treat `/api/earn/ad/begin` → `/api/earn/ad/complete` and `/api/earn/game/begin` → `/api/earn/game/complete` as high-risk anchors. A same-user challenge token plus elapsed time is not trusted proof that an ad impression or game win actually occurred.
 - **Publisher destination handling:** publisher-managed sponsored campaign destinations are attacker-controlled once a publisher account is malicious or compromised. Any persistence or redirect/render use of `campaign.targetUrl` must enforce an `http`/`https` allowlist both when written and at the redirect/render sink.
 - **Production abuse-control anchor:** prioritize DB-backed or otherwise shared enforcement on login/TOTP, password reset, sponsored visits, withdrawals, and webhook-related throttles; memory-only counters do not hold across replicas.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
@@ -41,7 +42,7 @@ CashClip relies on bearer JWTs plus optional cookies, and it accepts third-party
 
 ### Tampering
 
-The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, payout eligibility, and sponsored-visit completion must be derived from trusted server-side records and verified provider callbacks or reliable proof of delivery, not from optimistic client claims or replayable browser choreography alone.
+The highest tampering risk is reward and payout manipulation. Clients must not be able to mint balances, complete reward sessions, alter withdrawal states, rotate integration secrets, or modify campaigns through client-controlled values alone. Reward amounts, completion state, payout eligibility, and sponsored-visit completion must be derived from trusted server-side records and verified provider callbacks or reliable proof of delivery, not from optimistic client claims or replayable browser choreography alone. Client-timed begin/complete ceremonies are not sufficient proof for money-like rewards unless they are bound to a trusted provider callback or another server-verifiable signal.
 
 ### Repudiation
 
