@@ -52,6 +52,10 @@ args = "EAS Update A"
 task = "workflow.run"
 args = "Ship Points OTA"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build iOS V39"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -106,6 +110,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash /tmp/ship_points_ota.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Build iOS V39"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash /tmp/build_v39_real.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
