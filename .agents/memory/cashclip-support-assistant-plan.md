@@ -21,6 +21,9 @@ Approved as the **next major build right after** the Google Play public launch i
 - **Reply in the language the message was received in** (auto-detect; e.g. French in → French out).
 - Tone: warm, honest, retention-minded. No overpromising. Same honesty bar as the rest of the app.
 
+## Known bugs to fix (part of this build)
+- Operator Portal → **Inbox → "Sent Replies" tab errors with "No token provided"** (Jun 2026). The sent-replies fetch isn't sending the admin token, so the audit-trail/history list won't load. Fix when building the assistant (same inbox surface).
+
 ## Notes / gotchas learned
 - Inbound sender email may NOT match a registered account (people write from a different address than they signed up with). Match by username when the email isn't found; ask for username if needed.
 - "Video points not accumulating" is typically the **Pending Points → auto-convert every 2 hours** design, confirmed healthy on server + owner test phones (Jun 2026). Confirm per-user before claiming it's fine.
