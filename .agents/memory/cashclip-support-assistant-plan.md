@@ -8,6 +8,7 @@ description: Owner-approved plan for an Operator-Portal support assistant that d
 Owner (Jorge) spends significant daily time hand-answering CashClip support email and
 wants this automated to "get the load off his shoulders" so he can focus on building.
 Approved as the **next major build right after** the Google Play public launch is sent for review.
+**Priority: HIGH** (owner-set, Jun 2026).
 
 ## What it must do
 - Lives in the existing **Operator Portal inbox** (absustain `/sc-portal`-style admin surface; inbox already reads Zoho IMAP, sends via Zoho SMTP).
