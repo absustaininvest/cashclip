@@ -203,3 +203,9 @@ id = "0CRJqqDGE7lrREpaw5tzC"
 uri = "file://exports/CashClip_Session_Recap.md"
 type = "text"
 title = "CashClip — Session Recap & Status Script"
+
+[[outputs]]
+id = "Ayjx3gLHCSUIjKz0sa0Xg"
+uri = "file://artifacts/cashclip/store-assets/android/cashclip-icon-512.png"
+type = "image"
+title = "CashClip App Icon — 512×512 (Google Play)"
