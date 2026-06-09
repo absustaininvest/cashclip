@@ -209,3 +209,9 @@ id = "Ayjx3gLHCSUIjKz0sa0Xg"
 uri = "file://artifacts/cashclip/store-assets/android/cashclip-icon-512.png"
 type = "image"
 title = "CashClip App Icon — 512×512 (Google Play)"
+
+[[outputs]]
+id = "6UhGZTV2tvXENrk00iCYw"
+uri = "file://artifacts/cashclip/store-assets/android/cashclip-feature-1024x500.png"
+type = "image"
+title = "CashClip Feature Graphic — 1024×500 (Google Play)"
