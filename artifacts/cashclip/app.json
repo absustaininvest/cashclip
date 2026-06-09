@@ -380,6 +380,7 @@
     "android": {
       "package": "app.replit.cashclip",
       "versionCode": 39,
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
       },
