@@ -47,6 +47,7 @@
         "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
       },
       "ios": {
+        "image": "macos-sequoia-15.6-xcode-16.4",
         "resourceClass": "m-medium",
         "credentialsSource": "remote"
       },
