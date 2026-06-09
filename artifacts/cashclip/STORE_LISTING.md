@@ -116,7 +116,10 @@ App Preview video (optional): 15–30s, .mp4/.mov, same resolutions as screensho
 > Turn spare minutes into real money with CashClip — the all-in-one rewards app that pays cash, not points.
 >
 > 💸 EARN REAL CASH
-> Complete short surveys, try new apps, watch videos, play featured games, and refer friends. Every action adds straight to your withdrawable balance.
+> Complete short surveys, try new apps, watch videos, play featured games, and refer friends. Every action adds straight to your balance.
+>
+> ⏱️ 3-HOUR CASH TIMER
+> Earn points as you play, then watch them convert into real, withdrawable cash on a 3-hour timer. When the countdown hits zero, just tap to claim — no catch.
 >
 > 🏦 PAYPAL CASHOUTS
 > Withdraw to PayPal as soon as you hit the minimum threshold. Eligible withdrawals include a bonus percent on top.
