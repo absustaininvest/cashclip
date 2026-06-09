@@ -215,3 +215,45 @@ id = "6UhGZTV2tvXENrk00iCYw"
 uri = "file://artifacts/cashclip/store-assets/android/cashclip-feature-1024x500.png"
 type = "image"
 title = "CashClip Feature Graphic — 1024×500 (Google Play)"
+
+[[outputs]]
+id = "Y9XpIMswO4xlnFdeixU2K"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/01-home.png"
+type = "image"
+title = "1 — Home"
+
+[[outputs]]
+id = "85RzjnT6b9YYTAHMaFO9u"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/02-cashout.png"
+type = "image"
+title = "2 — $3.00 Cashout (hero) 🎉"
+
+[[outputs]]
+id = "Cy5y9spM33lQyYHMDRfe2"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/03-surveys.png"
+type = "image"
+title = "3 — Surveys"
+
+[[outputs]]
+id = "TDtZiWpvUZG2t0NALhTdI"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/04-games.png"
+type = "image"
+title = "4 — Games"
+
+[[outputs]]
+id = "xw4Jw7Fz2ihW4BjS8qHkV"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/05-videos.png"
+type = "image"
+title = "5 — Watch & Earn"
+
+[[outputs]]
+id = "_IVizi8CrSPHlmZ7uZ2c0"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/06-spin.png"
+type = "image"
+title = "6 — Spin & Missions"
+
+[[outputs]]
+id = "U6a7cLnZwgrzgIE7bmq8S"
+uri = "file://artifacts/cashclip/store-assets/android/screenshots/07-profile.png"
+type = "image"
+title = "7 — Profile (name covered)"
