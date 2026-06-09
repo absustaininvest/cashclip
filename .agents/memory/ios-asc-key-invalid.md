@@ -1,30 +1,39 @@
 ---
-name: iOS ASC API key invalid + EAS non-interactive build setup
-description: Why V39 iOS builds fail at signing — the saved APPLE_ASC_* trio doesn't authenticate to Apple — plus the exact env vars and PEM-rewrap gotcha for non-interactive EAS iOS builds.
+name: iOS ASC API key — Admin Team Key required for EAS builds
+description: The iOS signing 401 was a revoked key; fix is a fresh Admin Team Key. Includes how to validate any ASC key, the PEM-rewrap gotcha, and the exact env vars for non-interactive EAS iOS builds.
 ---
 
-# iOS App Store Connect API key is invalid (V39 build blocker)
+# iOS App Store Connect API key — what makes signing work (V39 build)
 
-The saved `APPLE_ASC_KEY_ID` / `APPLE_ASC_ISSUER_ID` / `APPLE_ASC_PRIVATE_KEY` trio
-does **not** authenticate to Apple. Proven by signing a correct ES256 JWT
-(aud `appstoreconnect-v1`) and calling the App Store Connect API directly:
-every endpoint returns **401 "Authentication credentials are missing or invalid"**
-(`/v1/apps`, `/v1/profiles`, `/v1/certificates`, `/v1/bundleIds`). A 401 (not 403)
-means the token itself is rejected → the Key ID and private key don't belong
-together, or the key was revoked. Re-testing with `kid=87Z27CQ96U` (the real
-"[Expo] EAS Submit" key, App Manager) + the same `.p8` also 401s, so the saved
-`.p8` is neither known key.
+**Root cause of the long 401 streak:** the ASC key saved in secrets was a
+**revoked** key. The App Store Connect → Integrations → App Store Connect API →
+Team Keys page showed the only Admin key (`F74QC35BH2`) was Revoked (May 2026);
+the one Active key (`87Z27CQ96U`, "[Expo] EAS Submit") is **App Manager** (can
+submit, can't manage certs/profiles). Signing a correct ES256 JWT
+(aud `appstoreconnect-v1`) against `/v1/apps`,`/v1/profiles`,`/v1/certificates`
+returned **401** for the saved trio and for `kid=87Z27CQ96U` → the saved `.p8`
+matched neither and was a dead key. A 401 (not 403) = token rejected
+(wrong/revoked key), not a permissions problem.
 
-**Why:** the trio was assumed self-consistent only because the issuer UUID matched
-the account; that assumption was wrong. Issuer IDs are account-wide, so a matching
-issuer proves nothing about the key/.p8 pairing.
+**Fix that worked:** owner created a **fresh App Store Connect *Team* Key with the
+Admin role** (App Manager/Developer can't manage certs/profiles → EAS credential
+generation needs Admin; an Individual Key is a different, per-user thing — use a
+Team Key). Apple names the download `AuthKey_<KEYID>.p8`, so the filename reveals
+the Key ID. The new Admin key validated **200** on `/v1/apps`,`/v1/certificates`,
+`/v1/profiles`,`/v1/bundleIds`. Saved into `APPLE_ASC_KEY_ID` +
+`APPLE_ASC_PRIVATE_KEY`.
 
-**How to apply:** don't keep retrying iOS builds with the current secrets — they
-will always 401. Owner must create a **fresh App Store Connect API key with the
-Admin role** (App Manager/Developer can't manage certs/profiles, so EAS credential
-generation needs Admin), download the one-time `.p8`, and save: new Key ID + the
-`.p8` into `APPLE_ASC_KEY_ID` / `APPLE_ASC_PRIVATE_KEY`. The Issuer ID is
-account-wide and stays the same. Re-verify with the JWT probe below before building.
+**Why issuer never needed changing:** the Issuer ID
+(`45944549-8278-4477-a1c6-3348ec45c3f0`, shown on the Team Keys page header) is
+**account-wide and constant** — it stays the same across key create/revoke, so a
+matching issuer proves nothing about whether a specific Key ID/.p8 pair is valid.
+
+**How to apply / re-validate:** never trust an ASC key by issuer match alone —
+prove it by signing an ES256 JWT and hitting the App Store Connect API; want
+**200** on `/v1/profiles` and `/v1/certificates` (Admin) before building. If 401,
+the key is revoked/mismatched → make a new Admin Team Key. Credential-setup
+failures in `eas build` are FREE (machine starts only after creds succeed), so
+iterate freely.
 
 ## PEM-flattening gotcha (must fix before use)
 `APPLE_ASC_PRIVATE_KEY` is stored **flattened to a single line** — no real newlines
