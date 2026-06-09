@@ -16,7 +16,37 @@ CashClip home. Two others are strays/decoys that can waste a whole build cycle i
   - This is where build 38 (v1.1.0) lives and where build 39 must go.
 - **Stray to AVOID:** a **lowercase `cashclip`** project under account **`Expodeveloper20`**
   (only old v1.0.0 builds ~3 weeks old). NOT the live app. Never build/OTA there.
-  A third lowercase `absustainabilityinvest...` account also exists — also not the target.
+  A third lowercase `absustainabilityinvest...` account also exists — this is the USER
+  account (NOT an empty decoy): see "Three-account graph + build-39 home" below.
+
+## Three-account graph + build-39 home (owner-verified Jun 9 2026)
+
+Token EXPO_TOKLAST sees **3 accounts, all Role Owner** (one person, Jorge Ballen,
+login `support@absustaininvest.com`):
+1. **USER `absustainabilityinvestments-owner`** (display "AB Sustainability Investments") —
+   his PERSONAL account. Holds the **$199 Production plan + ~$225 build credits**. Owned no
+   project yet → **this is the NEW HOME for build 39.** Linked sign-ins: Google
+   `andbalvan53@gmail.com` (Play), Apple `andyballen0814@icloud.com` (App Store Connect),
+   GitHub `absustaininvest` — but those are LOGIN methods, not store-submit keys.
+2. **ORG `absustainabilityinvestments`** — currently OWNS CashClip Project A (`aac2a3d9…`),
+   the 1.1.0 / build 38-39 lineage.
+3. **ORG `absustainabilityinvestmentsllc`** (display **"Expodeveloper20"**, plan **Starter/free**) —
+   the ORIGINAL; owns Project B (`10994af8…`) = **live build-29 OTA + old v1.0.0 builds.**
+   ✋ SACRED, has NO build credits, do not touch.
+
+**Plan (owner-agreed):** TRANSFER Project A from org `absustainabilityinvestments` → user
+`absustainabilityinvestments-owner` (browser: project settings → Transfer; no stable CLI).
+projectId `aac2a3d9…` stays; update app.json `owner`. Keystore/iOS certs ride along — and
+it's the **same signing key Google already accepted for build 38**, so Android 39 won't be
+rejected. Build 29 (Project B / Expodeveloper20) stays untouched.
+
+**Identity consistency (all trace to one person):** Expo home ↔ Apple
+`andyballen0814@icloud.com` (team FAX932PG78, ascAppId 6759931285) ↔ Google Play owner
+`andbalvan53@gmail.com` / **AB Sustainability Investments LLC** ↔ absustaininvest.com ↔
+support@absustaininvest.com. Android *submit* key = a service-account JSON generated from
+inside that Play Console (`credentials/` per eas.json), separate from the Google login.
+The Sentry "Connected as ab-sustainability-investments" on Expodeveloper20 is just a
+third-party service link, NOT what ties the Expo accounts together (the owner does).
 
 **Why:** the build/OTA destination is determined by `owner` + `extra.eas.projectId` in
 `artifacts/cashclip/app.json` plus the EXPO_TOKLAST token's org membership — **NOT** by
