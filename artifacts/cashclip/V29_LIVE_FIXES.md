@@ -56,8 +56,9 @@ These can't ride OTA; they need the new native build:
 
 These run on the **server**, so they're already live no matter which build (29 or 39) is on phones.
 
-### 📬 The "Mail Lady" — unified support Inbox
-- Pulls every email to **support@absustaininvest.com** into the admin portal (`/sc-portal`) via Zoho IMAP.
+### 📬 The "Mail Lady" — unified support Inbox *(the Harry-Potter OWL 🦉)*
+- Flies between **both houses** — carries mail for **CashClip (`@cash-clip.app`)** *and* the **AB Sustaininvest website (`@absustaininvest.com`)** into one place.
+- Pulls every email (incl. **support@absustaininvest.com**) into the admin portal (`/sc-portal`) via Zoho IMAP.
 - **Auto-sorts** each message into buckets: corporate / app / support / other.
 - **Reply right from the portal** — no more bouncing between Zoho tabs.
 - **Double-send protection** (won't fire the same reply twice) + a **durable, browsable history** of every reply sent.
