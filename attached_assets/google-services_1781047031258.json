@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "130785964499",
+    "project_id": "cashclip-earn-real-money",
+    "storage_bucket": "cashclip-earn-real-money.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:130785964499:android:f1374667d48dc96be4ff26",
+        "android_client_info": {
+          "package_name": "app.replit.cashclip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCc-oSikV0UKd2dtUUfkPQOgbdm5w0WGds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
