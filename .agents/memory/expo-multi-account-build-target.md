@@ -30,7 +30,28 @@ has owner `absustainabilityinvestments` + projectId `aac2a3d9…`. To verify in 
 open a project's **Details** and check the Project ID equals `aac2a3d9…`. Ignore the
 Expodeveloper20 / lowercase-cashclip project entirely.
 
-**Open question (not yet resolved):** the live build-29 OTA path's projectId was not
-confirmed here; OTA to build 29 is empirically working, so don't disturb it. The two
-projects showed *different* recent OTA update messages, so updates may have history on more
-than one project — verify projectId before publishing OTA, don't assume.
+**RESOLVED — the live build-29 OTA actually comes from a DIFFERENT project (Project B):**
+Per `snapshots/original-29/RESTORE.md` (owner-verified Jun 3 2026) and git history of
+`artifacts/cashclip/app.json`, two projects are braided together:
+- **Project A** (everyday pointer in app.json now): projectId `aac2a3d9-56b6-49ab-b254-9b80e98bab2f`,
+  owner `absustainabilityinvestments`. Where build 38 (and future 39) live.
+- **Project B** (what LIVE App Store build 29 / v1.0.0 actually pulls OTA from):
+  `@absustainabilityinvestmentsllc/cashclip`, projectId `10994af8-62e3-4a9d-9e35-7f4381965a31`,
+  owner `absustainabilityinvestmentsllc`.
+
+**Consequence:** publishing OTA with the current (Project A) app.json does NOT reach live
+build-29 devices. To OTA build 29 you must do the documented dance: temporarily set
+owner→`absustainabilityinvestmentsllc` + projectId→`10994af8…` + matching updates.url,
+publish/republish (runtime 1.0.0), then REVERT app.json to Project A. Git shows this A↔B
+flip happened repeatedly on Jun 3. This two-project split is exactly why OTA updates appear
+"in both accounts" and why owner couldn't tell which was real.
+
+**Why building 39 is the clean fix:** build 39 (native, from current app.json) bakes
+Project A `aac2a3d9` + runtime 1.1.0, so post-39 the normal update workflow reaches users
+directly with no A/B dance. Caveat: this does NOT retro-fix 29 users — they stay on the
+Project-B path until they update to 39.
+
+Note: there are 3 accounts in the Expo switcher (Expodeveloper20 has a stray lowercase
+`cashclip` with old v1.0.0 builds; a capital "ABSustainabilityInvestments" holds CashClip;
+a lowercase empty one). Display names != slugs, so confirm a project by its **Project ID**
+(Details panel) or via read-only `eas project:info`/`eas update:list`, not by the switcher label.
