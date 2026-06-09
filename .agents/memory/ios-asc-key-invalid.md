@@ -56,3 +56,18 @@ removed the "Select your Apple Team Type" prompt; the next wall was the ASC 401.
 
 **Credential-setup failures are FREE** — the EAS build machine only starts after
 credentials succeed, so iterating on signing costs nothing from the plan.
+
+## In-session secret-snapshot staleness + file bypass (V39 build, Jun 2026)
+When a secret is rotated **mid-session**, the workspace runtime stays pinned to the
+session-start snapshot: `$APPLE_ASC_KEY_ID` in bash kept reading the OLD revoked key
+after the owner saved the new one, and it did **not** refresh via workflow restart, a
+2-min wait, or even a full publish/deploy. `code_execution` has no `process.env`, so
+the new value can't be read there either. A real `eas build` confirmed it grabbed the
+stale key and 401'd at `Fetching Apple provisioning profiles`.
+**Bypass that worked:** have the owner re-drop the `AuthKey_<KID>.p8` file into chat,
+then build **env-independent** — point `EXPO_ASC_API_KEY_PATH` at the file and
+**hardcode** `EXPO_ASC_KEY_ID` + `EXPO_ASC_ISSUER_ID` (don't read them from env).
+With the good Admin key this sailed past creds (`✔ Updated provisioning profile`,
+`All credentials are ready`) and queued build 39. Purge the `.p8` right after the
+build queues. NOTE: this only fixes the build; the saved secret is still stale for
+everything else until a fresh session reloads the snapshot — re-verify later.

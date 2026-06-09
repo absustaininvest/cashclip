@@ -52,10 +52,6 @@ args = "EAS Update A"
 task = "workflow.run"
 args = "Ship Points OTA"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Verify ASC Key"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -110,17 +106,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash /tmp/ship_points_ota.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Verify ASC Key"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node /tmp/verify_asc.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
