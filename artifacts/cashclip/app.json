@@ -449,6 +449,7 @@
           }
         }
       ],
+      "./plugins/withIosRnfbNonModularPatch",
       "./plugins/withAndroidManifestFix",
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
