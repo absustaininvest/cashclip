@@ -116,7 +116,7 @@ export interface IStorage {
   getAdjustmentLedger(limit?: number): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>>;
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
-  incrementTokenVersion(id: string): Promise<{ tokenVersion: number }>;
+  incrementTokenVersion(id: string, expectedVersion?: number): Promise<{ tokenVersion: number } | null>;
   touchUserLastSeen(id: string): Promise<void>;
   countOnlineUsers(withinMs: number): Promise<number>;
   getAdminOverviewStats(): Promise<{
@@ -357,16 +357,22 @@ export class DatabaseStorage implements IStorage {
     return { tokenVersion: updated.tokenVersion };
   }
 
-  async incrementTokenVersion(id: string): Promise<{ tokenVersion: number }> {
+  async incrementTokenVersion(
+    id: string,
+    expectedVersion?: number,
+  ): Promise<{ tokenVersion: number } | null> {
+    const whereClause =
+      expectedVersion !== undefined
+        ? and(eq(users.id, id), eq(users.tokenVersion, expectedVersion))
+        : eq(users.id, id);
     const [updated] = await db
       .update(users)
       .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
-      .where(eq(users.id, id))
+      .where(whereClause)
       .returning({ tokenVersion: users.tokenVersion });
-    if (!updated) {
-      throw new Error(`incrementTokenVersion: no row updated for user ${id}`);
-    }
-    return { tokenVersion: updated.tokenVersion };
+    // Returns null when a CAS expectedVersion was supplied and another
+    // concurrent refresh already rotated the version past it.
+    return updated ?? null;
   }
 
   // Mark a user as recently active. Guarded by a SQL WHERE so it only writes

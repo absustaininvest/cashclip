@@ -1288,10 +1288,18 @@ export function registerAuthRoutes(app: Express) {
         clearRefreshCookie(res);
         res.status(401).json({ error: "Session invalidated — please log in again" }); return;
       }
-      // Rotate tokenVersion on every refresh so the just-consumed refresh token
-      // is immediately invalidated server-side. Any replay of the old token will
-      // fail the tokenVersion check above.
-      const { tokenVersion: newVersion } = await storage.incrementTokenVersion(user.id);
+      // Atomically rotate tokenVersion only when the stored version still matches
+      // the one embedded in this refresh token. If another concurrent request
+      // already incremented the version, the WHERE clause matches 0 rows and we
+      // get null back — reject immediately so the race loser cannot obtain a
+      // fresh session. This turns the read-then-write into a compare-and-swap,
+      // closing the concurrent-replay window.
+      const rotated = await storage.incrementTokenVersion(user.id, payload.tokenVersion);
+      if (!rotated) {
+        clearRefreshCookie(res);
+        res.status(401).json({ error: "Session invalidated — please log in again" }); return;
+      }
+      const { tokenVersion: newVersion } = rotated;
       const newToken = generateToken(user.id, user.role, newVersion);
       const newRefreshToken = generateRefreshToken(user.id, newVersion);
       setSessionCookie(res, newToken);
