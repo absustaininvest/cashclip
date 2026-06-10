@@ -16,7 +16,7 @@ const withAndroidPangleAdapter = (config) => {
     }
     config.modResults.contents = config.modResults.contents.replace(
       /dependencies\s*\{/,
-      'dependencies {\n    implementation "com.google.ads.mediation:pangle:8.0.0.5"'
+      'dependencies {\n    implementation "com.google.ads.mediation:pangle:8.0.0.5.0"'
     );
     return config;
   });

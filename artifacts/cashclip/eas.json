@@ -44,7 +44,8 @@
       "autoIncrement": false,
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_DOMAIN": "cash-clip.app"
+        "EXPO_PUBLIC_DOMAIN": "cash-clip.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
