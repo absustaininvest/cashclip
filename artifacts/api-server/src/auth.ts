@@ -14,11 +14,13 @@ import { eq as drizzleEq, and as drizzleAnd, isNull as drizzleIsNull, gte as dri
 import { generateTotpSecret, verifyTotp, generateBackupCodes, hashBackupCode } from "./lib/totp";
 
 // ── TOTP verify rate-limit constants ─────────────────────────────────────────
-// Both counters are DB-backed so they are shared across all autoscaled replicas.
-const MAX_TOTP_ATTEMPTS = 5;          // per pending-token (5-minute window)
-const MAX_TOTP_ATTEMPTS_PER_IP = 20;  // per IP (15-minute window)
-const TOTP_TOKEN_WINDOW_MS = 5 * 60 * 1000;   // matches pending-token lifetime
-const TOTP_IP_WINDOW_MS   = 15 * 60 * 1000;
+// All counters are DB-backed so they are shared across all autoscaled replicas.
+const MAX_TOTP_ATTEMPTS = 5;             // per pending-token (5-minute window)
+const MAX_TOTP_ATTEMPTS_PER_IP = 20;    // per IP (15-minute window)
+const MAX_TOTP_ATTEMPTS_PER_ACCOUNT = 10; // per account across ALL sessions/IPs (30-minute window)
+const TOTP_TOKEN_WINDOW_MS   = 5 * 60 * 1000;    // matches pending-token lifetime
+const TOTP_IP_WINDOW_MS      = 15 * 60 * 1000;
+const TOTP_ACCOUNT_WINDOW_MS = 30 * 60 * 1000;
 
 function getTotpTokenKey(totpSessionToken: string): string {
   return "totp:token:" + crypto.createHash("sha256").update(totpSessionToken).digest("hex");
@@ -707,6 +709,20 @@ export function registerAuthRoutes(app: Express) {
         res.status(401).json({ error: "Invalid or expired session. Please log in again." });
         return;
       }
+
+      // DB-backed per-account TOTP failure counter — shared across ALL sessions
+      // and source IPs for this user.  An attacker who holds the admin password
+      // and distributes requests across many IPs can mint fresh totpSessionTokens
+      // from each IP (bypassing the per-token and per-IP limits) but this counter
+      // accumulates every wrong guess regardless of origin, anchoring the defence
+      // to the target account rather than to any single session or IP.
+      const acctTotpKey = `totp:acct:${user.id}`;
+      const { allowed: acctTotpAllowed } = await checkLoginAttempts(acctTotpKey, MAX_TOTP_ATTEMPTS_PER_ACCOUNT);
+      if (!acctTotpAllowed) {
+        res.status(429).json({ error: "Too many incorrect attempts. Please try again later." });
+        return;
+      }
+
       // Accept either a live TOTP code or a single-use backup recovery code so a
       // lost authenticator never locks the admin out. Backup codes are consumed
       // atomically on use.
@@ -718,7 +734,9 @@ export function registerAuthRoutes(app: Express) {
         usedBackupCode = authed;
       }
       if (!authed) {
+        // Increment both the per-token counter and the shared per-account counter.
         const { count: failures } = await recordLoginAttempt(tokenKey, MAX_TOTP_ATTEMPTS, TOTP_TOKEN_WINDOW_MS);
+        await recordLoginAttempt(acctTotpKey, MAX_TOTP_ATTEMPTS_PER_ACCOUNT, TOTP_ACCOUNT_WINDOW_MS);
         const remaining = MAX_TOTP_ATTEMPTS - failures;
         if (remaining <= 0) {
           res.status(429).json({ error: "Too many incorrect attempts. Please log in again." });
@@ -728,6 +746,7 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
       await clearLoginAttempts(tokenKey);
+      await clearLoginAttempts(acctTotpKey);
       if (usedBackupCode) {
         // Notify the admin a single-use backup code was consumed so an
         // unnoticed exhaustion can't quietly lock them out again.
