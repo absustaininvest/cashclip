@@ -6,6 +6,7 @@ const TOKEN = "test-admin-token";
 
 const HUB_URL = "/api/admin/integration-hub";
 const ALERTS_URL = "/api/admin/webhook-alerts";
+const ALERT_EMAIL_URL = "/api/admin/admob/alert-email";
 
 const HUB_DATA = {
   checkedAt: new Date("2026-06-07T00:00:00Z").toISOString(),
@@ -91,6 +92,21 @@ function installFetchMock(admobAlerts: any[]) {
         ok: true,
         status: 200,
         json: async () => ({ admobAlerts }),
+      } as Response;
+    }
+
+    if (u.startsWith(ALERT_EMAIL_URL)) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          enabled: false,
+          recipient: "",
+          persistedRecipient: null,
+          recipientSource: "default",
+          enabledSource: "setting",
+          defaultRecipient: "",
+        }),
       } as Response;
     }
 
@@ -203,5 +219,50 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
         screen.queryByText("AdMob Reporting Alerts"),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("stale_sync with only lastSyncedAt (no ageMs) falls back to hubTimeAgo string", async () => {
+    const fixedNow = new Date("2026-06-10T12:00:00Z").getTime();
+    vi.spyOn(Date, "now").mockReturnValue(fixedNow);
+
+    const lastSyncedAt = new Date(fixedNow - 3 * 3_600_000).toISOString();
+
+    installFetchMock([
+      staleSyncEvent("firing", {
+        detail: { lastSyncedAt },
+      }),
+    ]);
+    renderPanel();
+
+    const row = await findAlertRow("Reporting sync stale");
+    expect(within(row).getByText("Last sync 3h ago")).toBeInTheDocument();
+  });
+
+  it("stale_sync with no timing fields at all shows 'Reporting has never synced'", async () => {
+    installFetchMock([
+      staleSyncEvent("firing", {
+        detail: {},
+      }),
+    ]);
+    renderPanel();
+
+    const row = await findAlertRow("Reporting sync stale");
+    expect(
+      within(row).getByText("Reporting has never synced"),
+    ).toBeInTheDocument();
+  });
+
+  it("revenue_divergence with missing differencePct and earnings shows em-dash placeholders", async () => {
+    installFetchMock([
+      revenueDivergenceEvent("firing", {
+        detail: {},
+      }),
+    ]);
+    renderPanel();
+
+    const row = await findAlertRow("Revenue divergence");
+    expect(
+      within(row).getByText("official — vs app —"),
+    ).toBeInTheDocument();
   });
 });
