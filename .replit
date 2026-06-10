@@ -44,6 +44,10 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Project Video"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build Android 40"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -76,6 +80,17 @@ author = "agent"
 task = "shell.exec"
 args = "PORT=5173 pnpm --filter @workspace/intro-video run dev"
 waitForPort = 5173
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Build Android 40"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/cashclip && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" pnpm exec eas build --platform android --profile production --non-interactive"
 
 [workflows.workflow.metadata]
 outputType = "console"
