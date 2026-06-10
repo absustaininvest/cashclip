@@ -257,3 +257,9 @@ id = "U6a7cLnZwgrzgIE7bmq8S"
 uri = "file://artifacts/cashclip/store-assets/android/screenshots/07-profile.png"
 type = "image"
 title = "7 — Profile (name covered)"
+
+[[outputs]]
+id = "NGsMgujzyJYTLaSNEIo68"
+uri = "file://exports/CashClip_Holy_Grail_Notes.pdf"
+type = "pdf"
+title = "CashClip — The Holy Grail Notes"
