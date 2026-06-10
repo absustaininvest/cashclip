@@ -27,6 +27,7 @@
     "eas:submit:ios": "eas submit -p ios --profile production",
     "eas:submit:android": "eas submit -p android --profile production",
     "release:submit": "eas submit --platform ios --profile production --latest && eas submit --platform android --profile production --latest",
+    "eas-build-pre-install": "node -e \"const p=process.env.EAS_BUILD_PROFILE; if(p==='production'){ if(!process.env.SENTRY_AUTH_TOKEN){ console.error('ERROR: SENTRY_AUTH_TOKEN is not set in the EAS production environment. Source map uploads will fail. Register it via: eas env:create --environment production --name SENTRY_AUTH_TOKEN --type secret'); process.exit(1); } console.log('SENTRY_AUTH_TOKEN is present (production build) — source map upload enabled.'); } else { console.log('Non-production profile ('+p+') — skipping SENTRY_AUTH_TOKEN check.'); }\"",
     "postinstall": "patch-package",
     "android": "expo run:android",
     "ios": "expo run:ios"
