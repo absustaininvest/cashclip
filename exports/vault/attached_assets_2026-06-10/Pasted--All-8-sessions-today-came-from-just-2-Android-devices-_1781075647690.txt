@@ -1,0 +1,22 @@
+
+All 8 sessions today came from just 2 Android devices — a Motorola Moto G Play (2024) and a OnePlus 8 Pro — belonging to anonymous users. This looks like internal testing rather than organic traffic.
+No Tracked Issues Found
+I queried for all untriaged issues in the last 7 days — including errors, network errors, dead clicks, rage clicks, and error states — and found zero issues flagged by LogRocket. That said, session replay tells a more nuanced story.
+Key Findings from Session Replay
+1. 🔴 Login/Signup Friction — Users Getting Stuck
+Two sessions showed users unable to get past the login screen:
+In Session #7 00:06:10, the user spent several minutes interacting with input fields on the login screen but never successfully proceeded. The session ended with them still stuck:
+Keyframe 5
+In Session #2 00:00:34, the user reached the login screen where multiple 401 errors fired for profile/balance data, then sat idle for over 5 minutes without attempting login — a likely abandonment:
+Keyframe 2
+2. 🔴 Authentication Loops & Broken Game Flow
+The most problematic session was Session #8 00:07:29. This user experienced:
+Auth loops: Despite successful registration Session #8 00:01:44 and login Session #8 00:02:21, they were repeatedly redirected back to the login screen with 401 errors
+Broken Spin game: After briefly accessing the spin feature, subsequent attempts returned 410 Gone network errors, leaving the user on a black screen:
+Keyframe 4
+Survey access blocked: An attempt to start a survey was met with a qualification pop-up, adding to frustration Session #8 00:08:48
+3. 🟡 Minor 401 Errors During Active Sessions
+In Session #5 00:05:22, the offerwall providers endpoint returned 401 errors, though the app's token refresh mechanism recovered gracefully and the user wasn't visibly impacted.
+4. ✅ Successful Flows Exist
+Not everything is broken. Session #3 and Session #4 showed clean experiences — successful login, dashboard loading correctly, and smooth navigation through surveys, balance, and earnings sections:
+Keyframe 1
