@@ -45,7 +45,6 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_DOMAIN": "cash-clip.app",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "false",
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_ORG": "ab-sustainability-investments",
         "SENTRY_PROJECT": "cash-clip"
