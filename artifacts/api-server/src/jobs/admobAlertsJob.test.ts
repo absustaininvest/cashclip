@@ -204,6 +204,51 @@ describe("startAdmobAlertsJob", () => {
     ).toBe(false);
   });
 
+  it("fires a revenue_divergence alert through the real state machine when official vs app revenue diverges beyond the threshold", async () => {
+    // No admin watching — the job alone must surface this.
+    getAdmobReconciliation.mockResolvedValue({
+      officialEarnings: 100,
+      appReportedEarnings: 50,
+      differenceAbs: 50,
+      differencePct: 50,
+      currency: "USD",
+    });
+    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 5 });
+
+    startAdmobAlertsJob();
+    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
+
+    const diverged = getRecentAdmobAlerts().find(
+      (a) => a.condition === "revenue_divergence",
+    );
+    expect(diverged).toBeTruthy();
+    expect(diverged!.status).toBe("firing");
+    expect(diverged!.threshold).toBe(25);
+    expect(diverged!.detail).toMatchObject({
+      officialEarnings: 100,
+      appReportedEarnings: 50,
+      differencePct: 50,
+    });
+  });
+
+  it("does not fire a revenue_divergence alert when reconciliation is within threshold", async () => {
+    getAdmobReconciliation.mockResolvedValue({
+      officialEarnings: 100,
+      appReportedEarnings: 95,
+      differenceAbs: 5,
+      differencePct: 5,
+      currency: "USD",
+    });
+    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 5 });
+
+    startAdmobAlertsJob();
+    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
+
+    expect(
+      getRecentAdmobAlerts().some((a) => a.condition === "revenue_divergence"),
+    ).toBe(false);
+  });
+
   it("catches a storage/DB error, logs it, and never throws out of the timer", async () => {
     getAdmobSnapshotSummary.mockRejectedValue(new Error("db blip"));
 
