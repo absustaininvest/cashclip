@@ -23,6 +23,8 @@ import {
   supportReplies,
   type SupportReply,
   type InsertSupportReply,
+  publisherAuditLog,
+  campaigns,
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { eq, ne, desc, and, or, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
@@ -84,6 +86,19 @@ export interface SupportReplyView {
   createdAt: Date;
 }
 
+export interface PublisherAuditEntryView {
+  id: string;
+  actorUserId: string;
+  actorUsername: string | null;
+  targetUserId: string | null;
+  targetUsername: string | null;
+  campaignId: string | null;
+  campaignTitle: string | null;
+  action: string;
+  detail: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
 export type LedgerType =
   | "survey"
   | "offerwall"
@@ -125,6 +140,17 @@ export interface IStorage {
     limit?: number;
     offset?: number;
   }): Promise<{ replies: SupportReplyView[]; total: number }>;
+  logPublisherAudit(entry: {
+    actorUserId: string;
+    targetUserId?: string | null;
+    campaignId?: string | null;
+    action: string;
+    detail?: Record<string, unknown> | null;
+  }): Promise<void>;
+  getPublisherAuditLog(opts?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entries: PublisherAuditEntryView[]; total: number }>;
   getTotpBackupCodesRemaining(userId: string): Promise<number>;
   consumeTotpBackupCode(userId: string, hash: string): Promise<boolean>;
   factoryResetUser(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
@@ -2102,6 +2128,61 @@ export class DatabaseStorage implements IStorage {
       .where(lt(securityAuditLog.createdAt, before))
       .returning({ id: securityAuditLog.id });
     return rows.length;
+  }
+
+  async logPublisherAudit(entry: {
+    actorUserId: string;
+    targetUserId?: string | null;
+    campaignId?: string | null;
+    action: string;
+    detail?: Record<string, unknown> | null;
+  }): Promise<void> {
+    await db.insert(publisherAuditLog).values({
+      actorUserId: entry.actorUserId,
+      targetUserId: entry.targetUserId ?? null,
+      campaignId: entry.campaignId ?? null,
+      action: entry.action,
+      detail: entry.detail ?? null,
+    });
+  }
+
+  async getPublisherAuditLog(opts: {
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ entries: PublisherAuditEntryView[]; total: number }> {
+    const limit = Math.min(opts.limit ?? 100, 500);
+    const offset = opts.offset ?? 0;
+    const actorAlias = alias(users, "actor");
+    const targetAlias = alias(users, "target_user");
+    const [entries, totalRows] = await Promise.all([
+      db
+        .select({
+          id: publisherAuditLog.id,
+          actorUserId: publisherAuditLog.actorUserId,
+          actorUsername: actorAlias.username,
+          targetUserId: publisherAuditLog.targetUserId,
+          targetUsername: targetAlias.username,
+          campaignId: publisherAuditLog.campaignId,
+          campaignTitle: campaigns.title,
+          action: publisherAuditLog.action,
+          detail: publisherAuditLog.detail,
+          createdAt: publisherAuditLog.createdAt,
+        })
+        .from(publisherAuditLog)
+        .innerJoin(actorAlias, eq(publisherAuditLog.actorUserId, actorAlias.id))
+        .leftJoin(targetAlias, eq(publisherAuditLog.targetUserId, targetAlias.id))
+        .leftJoin(campaigns, eq(publisherAuditLog.campaignId, campaigns.id))
+        .orderBy(desc(publisherAuditLog.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(publisherAuditLog),
+    ]);
+    return {
+      entries: entries as PublisherAuditEntryView[],
+      total: Number(totalRows[0]?.total ?? 0),
+    };
   }
 }
 

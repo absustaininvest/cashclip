@@ -2118,6 +2118,19 @@ export type CreditAuditRow = {
   createdAt: string;
 };
 
+export type PublisherAuditRow = {
+  id: string;
+  actorUserId: string;
+  actorUsername: string | null;
+  targetUserId: string | null;
+  targetUsername: string | null;
+  campaignId: string | null;
+  campaignTitle: string | null;
+  action: string;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
   return (
     <table className="w-full text-sm">
@@ -4540,6 +4553,10 @@ export function PublisherProgramPanel({ token }: { token: string }) {
   const [grantSearchLoading, setGrantSearchLoading] = useState(false);
   const [grantSearched, setGrantSearched] = useState(false);
   const [grantGiftCredits, setGrantGiftCredits] = useState("");
+  const [auditRows, setAuditRows] = useState<PublisherAuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [showAudit, setShowAudit] = useState(true);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -4572,9 +4589,27 @@ export function PublisherProgramPanel({ token }: { token: string }) {
     }
   }, [token]);
 
+  const fetchAuditLog = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const res = await fetch("/api/admin/publisher-audit?limit=200", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setAuditRows(data.entries ?? []);
+      setAuditTotal(data.total ?? 0);
+    } catch {
+      setAuditRows([]);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchAuditLog();
+  }, [fetchData, fetchAuditLog]);
 
   async function handleAddCredits() {
     if (!creditTarget) return;
@@ -4607,6 +4642,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       setCreditTarget(null);
       setCreditAmount("");
       fetchData();
+      fetchAuditLog();
     } catch (err: any) {
       setCreditError(err.message);
     } finally {
@@ -4634,6 +4670,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       showToast(`Publisher access revoked for ${revokeTarget.username}`);
       setRevokeTarget(null);
       fetchData();
+      fetchAuditLog();
     } catch (err: any) {
       showToast(err.message, false);
       setRevokeTarget(null);
@@ -4692,6 +4729,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       );
       closeGrant();
       fetchData();
+      fetchAuditLog();
     } catch (err: any) {
       showToast(err.message, false);
     } finally {
@@ -4737,6 +4775,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
               : "updated";
       showToast(`Campaign "${c.title}" ${verb}`);
       fetchData();
+      fetchAuditLog();
     } catch (err: any) {
       showToast(err.message, false);
     } finally {
@@ -5294,6 +5333,93 @@ export function PublisherProgramPanel({ token }: { token: string }) {
               })}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Publisher program audit log */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="border-b border-white/[0.06]">
+          <button
+            onClick={() => setShowAudit((s) => !s)}
+            className="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
+          >
+            <div>
+              <h3 className="text-white text-sm font-semibold">Publisher Audit Log</h3>
+              <p className="text-white/30 text-xs mt-0.5">
+                Every grant, revoke, ad-credit addition, and campaign status change — who did it and when.
+              </p>
+            </div>
+            <span className="text-white/30 text-xs whitespace-nowrap">
+              {showAudit ? "Hide" : "Show"} ({auditTotal > 0 ? auditTotal : auditRows.length})
+            </span>
+          </button>
+        </div>
+        {showAudit && (
+          <div className="max-h-80 overflow-y-auto">
+            {auditLoading ? (
+              <div className="px-5 py-6 text-white/30 text-sm">Loading audit log…</div>
+            ) : auditRows.length === 0 ? (
+              <div className="px-5 py-6 text-white/30 text-sm">No publisher actions recorded yet.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-white/30 text-[10px] uppercase tracking-wider border-b border-white/[0.06]">
+                    <th className="text-left font-medium px-5 py-2">Action</th>
+                    <th className="text-left font-medium px-3 py-2">Target</th>
+                    <th className="text-left font-medium px-3 py-2">Detail</th>
+                    <th className="text-left font-medium px-3 py-2">By</th>
+                    <th className="text-right font-medium px-5 py-2">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditRows.map((r) => {
+                    const actionLabel =
+                      r.action === "grant_publisher" ? "Grant publisher"
+                      : r.action === "revoke_publisher" ? "Revoke publisher"
+                      : r.action === "add_credits" ? "Add credits"
+                      : r.action === "campaign_status" ? "Campaign status"
+                      : r.action;
+                    const actionColor =
+                      r.action === "grant_publisher" ? "text-[#00E676]"
+                      : r.action === "revoke_publisher" ? "text-red-400"
+                      : r.action === "add_credits" ? "text-amber-400"
+                      : "text-blue-400";
+                    const detailText =
+                      r.action === "add_credits" && r.detail?.creditsAdded != null
+                        ? `+$${Number(r.detail.creditsAdded).toFixed(2)}`
+                      : r.action === "grant_publisher" && r.detail?.creditsAdded != null
+                        ? `gifted $${Number(r.detail.creditsAdded).toFixed(2)}`
+                      : r.action === "campaign_status" && r.detail?.status
+                        ? `→ ${r.detail.status}${r.detail.adminNote ? ` (${r.detail.adminNote})` : ""}`
+                      : "—";
+                    const target =
+                      r.action === "campaign_status"
+                        ? r.campaignTitle ?? r.campaignId ?? "—"
+                        : r.targetUsername ?? r.targetUserId ?? "—";
+                    return (
+                      <tr key={r.id} className="border-t border-white/[0.04] align-top">
+                        <td className="px-5 py-2.5">
+                          <span className={`text-xs font-semibold ${actionColor}`}>{actionLabel}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-white/60 text-xs break-all max-w-[140px]">
+                          {target}
+                        </td>
+                        <td className="px-3 py-2.5 text-white/50 text-xs max-w-[180px] break-words">
+                          {detailText}
+                        </td>
+                        <td className="px-3 py-2.5 text-white/50 text-xs break-all">
+                          {r.actorUsername ?? r.actorUserId ?? "—"}
+                        </td>
+                        <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
       </div>
     </div>

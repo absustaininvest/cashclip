@@ -2705,6 +2705,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(drizzleSql`id = ${targetId}`);
 
+      await storage.logPublisherAudit({
+        actorUserId: req.userId!,
+        targetUserId: targetId,
+        action: grant ? "grant_publisher" : "revoke_publisher",
+        detail: grant && creditsToAdd > 0 ? { creditsAdded: creditsToAdd } : null,
+      });
+
       req.log?.info({ adminId: req.userId, targetId, grant, creditsToAdd }, "Publisher status updated");
       res.json({ ok: true, grant, creditsAdded: creditsToAdd });
     } catch (err) {
@@ -2726,6 +2733,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dbClient.update(usersTable)
         .set({ adCredits: drizzleSql`${usersTable.adCredits} + ${String(amount)}` })
         .where(drizzleSql`id = ${targetId}`);
+
+      await storage.logPublisherAudit({
+        actorUserId: req.userId!,
+        targetUserId: targetId,
+        action: "add_credits",
+        detail: { creditsAdded: amount },
+      });
+
       req.log?.info({ adminId: req.userId, targetId, amount }, "Ad credits added");
       res.json({ ok: true, added: amount });
     } catch (err) {
@@ -2807,11 +2822,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dbClient.update(campaignsTable)
         .set({ status, adminNote: adminNote ?? null, updatedAt: new Date() })
         .where(drizzleSql`id = ${req.params.id}`);
+
+      await storage.logPublisherAudit({
+        actorUserId: req.userId!,
+        campaignId: String(req.params.id),
+        action: "campaign_status",
+        detail: { status, ...(adminNote ? { adminNote } : {}) },
+      });
+
       req.log?.info({ adminId: req.userId, campaignId: req.params.id, status }, "Campaign status updated");
       res.json({ ok: true });
     } catch (err) {
       req.log?.error({ err }, "Admin update campaign failed");
       res.status(500).json({ error: "Failed to update campaign" });
+    }
+  });
+
+  /** Admin: read the publisher program audit log */
+  app.get("/api/admin/publisher-audit", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const parsedLimit = Number(req.query["limit"] ?? 100);
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 500) : 100;
+      const parsedOffset = Number(req.query["offset"] ?? 0);
+      const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+      const { entries, total } = await storage.getPublisherAuditLog({ limit, offset });
+      res.json({ entries, total });
+    } catch (err: any) {
+      req.log?.error({ err }, "Publisher audit log read failed");
+      res.status(500).json({ error: "Failed to load publisher audit log" });
     }
   });
 

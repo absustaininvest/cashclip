@@ -493,6 +493,41 @@ export const supportReplies = pgTable(
 export type SupportReply = typeof supportReplies.$inferSelect;
 export type InsertSupportReply = typeof supportReplies.$inferInsert;
 
+// Durable, attributable trail of publisher-program admin actions:
+// grant/revoke publisher status, manual ad-credit additions, and campaign
+// status changes. Unlike best-effort logger.info lines (ephemeral), these rows
+// survive restarts and give any operator an auditable "who did what, when"
+// record for money- and access-affecting publisher actions.
+export const publisherAuditLog = pgTable(
+  "publisher_audit_log",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    // Admin who performed the action.
+    actorUserId: varchar("actor_user_id").notNull().references(() => users.id),
+    // Affected publisher user (for grant/revoke/add_credits). Null for
+    // campaign-only actions where the publisher is identified via campaignId.
+    targetUserId: varchar("target_user_id").references(() => users.id),
+    // Affected campaign row (for campaign_status actions).
+    campaignId: varchar("campaign_id").references(() => campaigns.id),
+    // Short machine-readable action identifier.
+    action: text("action").notNull(),
+    // Structured context: { creditsAdded, status, adminNote, … }.
+    detail: jsonb("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    actorIdx: index("publisher_audit_actor_idx").on(t.actorUserId, t.createdAt),
+    targetIdx: index("publisher_audit_target_idx").on(t.targetUserId, t.createdAt),
+    campaignIdx: index("publisher_audit_campaign_idx").on(t.campaignId, t.createdAt),
+    createdAtIdx: index("publisher_audit_created_at_idx").on(t.createdAt),
+  })
+);
+
+export type PublisherAuditEntry = typeof publisherAuditLog.$inferSelect;
+export type InsertPublisherAuditEntry = typeof publisherAuditLog.$inferInsert;
+
 export const insertAdEventSchema = createInsertSchema(adEvents).omit({ id: true, createdAt: true });
 export type InsertAdEvent = z.infer<typeof insertAdEventSchema>;
 export type AdEvent = typeof adEvents.$inferSelect;
