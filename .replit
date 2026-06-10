@@ -118,12 +118,12 @@ outputType = "console"
 name = "Build Android V39"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash /tmp/build_v39_android.sh"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/cashclip && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" pnpm exec eas build --platform android --profile production --non-interactive"
 
 [[ports]]
 localPort = 3001
