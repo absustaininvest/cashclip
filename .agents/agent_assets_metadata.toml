@@ -269,3 +269,9 @@ id = "1IN8p-yJ3FpIYnpR2xBwk"
 uri = "file://exports/CashClip_Project_Build29-39_2026-06-10.zip"
 type = "unspecified"
 title = "CashClip Project Zip — Build 29 + 39 (Jun 10, 2026)"
+
+[[outputs]]
+id = "BjRR3S1uBLIOnTsJACzp3"
+uri = "file://exports/expo-artifacts/v29-files-all.tar.gz"
+type = "unspecified"
+title = "V29 files bundle (layout, RESTORE, app.json, MANIFEST, credentials notes, sentry.properties)"

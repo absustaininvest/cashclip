@@ -397,7 +397,13 @@
     "plugins": [
       "@react-native-firebase/app",
       "@logrocket/react-native",
-      "@sentry/react-native/expo",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "ab-sustainability-investments",
+          "project": "cash-clip"
+        }
+      ],
       [
         "expo-router",
         {

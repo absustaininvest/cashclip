@@ -45,9 +45,11 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_DOMAIN": "cash-clip.app",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false",
+        "SENTRY_ALLOW_FAILURE": "true"
       },
       "ios": {
+        "image": "latest",
         "resourceClass": "m-medium",
         "credentialsSource": "remote"
       },

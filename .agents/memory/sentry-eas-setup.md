@@ -10,6 +10,7 @@ description: How Sentry crash reporting + source maps are wired into CashClip EA
 - The production **build profile in eas.json MUST set `"environment": "production"`** or those EAS env vars are never injected. It's additive to the profile's inline `env`; inline keys win on a name collision.
 - The upload token (`SENTRY_TOKEN` in Replit → copied into EAS `SENTRY_AUTH_TOKEN`) is **upload-scoped only**: it returns 403 on every Sentry read/list endpoint, so you cannot auto-resolve the project slug with it — read the slug from the dashboard URL instead.
 - `SENTRY_ALLOW_FAILURE=true` is set so a failed source-map upload **cannot fail the EAS build** (honors the "never break the build" rule). The `@sentry/react-native` build scripts check this var and exit 0 on upload error.
+- **DSN root cause (Jun 2026):** `EXPO_PUBLIC_SENTRY_DSN` had a Sentry auth token (`sntryu_*`, 71 chars) stored in it instead of the actual DSN URL — causing `Sentry.init` to silently reject it and zero events to flow. The real DSN is always `https://KEY@HOST/PROJECT_ID` (starts `https://`, contains `@`). Found at: sentry.io → Settings → Projects → cash-clip → Client Keys (DSN). Always verify format first: `dsn.startsWith('https://') && dsn.includes('@')`.
 
 **Why:** owner's #1 rule is never break the live build / ship path. Crash capture must work even if the token/slug are wrong; source-map upload is best-effort.
 
