@@ -263,3 +263,9 @@ id = "NGsMgujzyJYTLaSNEIo68"
 uri = "file://exports/CashClip_Holy_Grail_Notes.pdf"
 type = "pdf"
 title = "CashClip — The Holy Grail Notes"
+
+[[outputs]]
+id = "1IN8p-yJ3FpIYnpR2xBwk"
+uri = "file://exports/CashClip_Project_Build29-39_2026-06-10.zip"
+type = "unspecified"
+title = "CashClip Project Zip — Build 29 + 39 (Jun 10, 2026)"
