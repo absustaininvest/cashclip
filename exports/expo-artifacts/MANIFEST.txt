@@ -1,4 +1,7 @@
 CashClip Expo build-artifact backup — generated 2026-06-05T11:06:12Z
+  *** REFRESHED 2026-06-10: added iOS build 40 (.ipa) + Android build 39 (.aab). ***
+  Latest full workspace source = git HEAD d7f2aee (Firebase removed); regenerate: git archive -o out.tar.gz d7f2aee
+  Live build-29 OTA source still at commit 9c71ec4 (good group 26fa0d4c-...). Signing creds in V39-prep/credentials/ (local-only).
 
 === @absustainabilityinvestmentsllc/cashclip (expo20) ===
 IOS     v1.1.0(build 30)  2026-05-15  -> expo20-llc/expo20_IOS_v1.1.0_build30_c3dvLtcE.ipa
@@ -33,6 +36,12 @@ IOS     v1.0.0(build 26)  2026-05-11  -> expo20-llc/expo20_IOS_v1.0.0_build26_f7
       src: https://expo.dev/artifacts/eas/f7HfD2uLBpNfR7BxANvkJE.ipa
 
 === @absustainabilityinvestments/cashclip (absustaininvest) ===
+IOS     v1.1.0(build 40)  2026-06-10  -> absustaininvest/absustaininvest_IOS_v1.1.0_build40_bhweYXGV.ipa
+      src: https://expo.dev/artifacts/eas/bhweYXGVYGJHYRtgUugYDj.ipa
+      note: FIREBASE-REMOVED build (RNFB static-framework blocker fixed). EAS build id 5349ec73-c71a-49e9-9fb5-aa4b6b60b12c. Signed with FRESH Admin ASC key 7A95W39FFG. NOT yet submitted to Apple.
+ANDROID v1.1.0(build 39)  2026-06-10  -> absustaininvest/absustaininvest_ANDROID_v1.1.0_build39_253EjxJo.aab
+      src: https://expo.dev/artifacts/eas/253EjxJo79nrSNddoz75Ty.aab
+      note: latest clean Android build (several build-39 attempts errored; this one FINISHED). EAS id 08a9c0e1-d44d-482b-ba33-d32e0f229efe. versionCode 39 > live Play 38, valid for Play. NOT yet promoted to Production.
 IOS     v1.1.0(build 38)  2026-05-28  -> absustaininvest/absustaininvest_IOS_v1.1.0_build38_dF31hRgG.ipa
       src: https://expo.dev/artifacts/eas/dF31hRgGdW7XRwypRn2cy3.ipa
 ANDROID v1.1.0(build 38)  2026-05-27  -> absustaininvest/absustaininvest_ANDROID_v1.1.0_build38_x1EXtsuJ.aab
