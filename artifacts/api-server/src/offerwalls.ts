@@ -9,6 +9,7 @@ import {
 } from "./lib/offerwallProviders";
 import { verifyWebhook, logWebhookVerificationFailure } from "./lib/webhookAuth";
 import { webhookRateLimiter } from "./lib/webhookRateLimit";
+import { providerListRateLimiter, providerCompleteRateLimiter } from "./lib/providerRateLimit";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
@@ -38,7 +39,7 @@ export function registerOfferwallRoutes(app: Express): void {
     });
   });
 
-  app.get("/api/offerwalls/available", authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get("/api/offerwalls/available", authMiddleware, providerListRateLimiter, async (req: AuthRequest, res: Response) => {
     try {
       const providerStatuses = getOfferwallProviderStatus();
       const configuredProviders = providerStatuses.filter((p) => p.configured);
@@ -125,7 +126,7 @@ export function registerOfferwallRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/offerwalls/complete", authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post("/api/offerwalls/complete", authMiddleware, providerCompleteRateLimiter, async (req: AuthRequest, res: Response) => {
     try {
       const { sessionToken, transactionId: rawTransactionId } = req.body;
       const transactionId = typeof rawTransactionId === "string" ? rawTransactionId.trim() : rawTransactionId;

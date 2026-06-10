@@ -10,6 +10,7 @@ import {
 } from "./lib/surveyProviders";
 import { verifyWebhook, logWebhookVerificationFailure } from "./lib/webhookAuth";
 import { webhookRateLimiter } from "./lib/webhookRateLimit";
+import { providerListRateLimiter, providerCompleteRateLimiter } from "./lib/providerRateLimit";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "./auth";
 import { storage } from "./storage";
 import { recordIssuedOffers, getIssuedOffer, generateSessionToken } from "./issuedOffers";
@@ -36,7 +37,7 @@ export function registerSurveyRoutes(app: Express): void {
     });
   });
 
-  app.get("/api/surveys/available", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  app.get("/api/surveys/available", authMiddleware, providerListRateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const providerStatuses = getProviderStatus();
       const configuredProviders = providerStatuses.filter((p) => p.configured);
@@ -188,7 +189,7 @@ export function registerSurveyRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/surveys/complete", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  app.post("/api/surveys/complete", authMiddleware, providerCompleteRateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { sessionToken, transactionId: rawTransactionId } = req.body;
       const transactionId = typeof rawTransactionId === "string" ? rawTransactionId.trim() : rawTransactionId;
