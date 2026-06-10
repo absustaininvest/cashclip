@@ -1,153 +1,91 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { StatusBar } from "expo-status-bar";
-import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { queryClient } from "@/lib/query-client";
-import { LanguageProvider, useLanguage } from "@/lib/LanguageContext";
-import { AuthProvider, useAuth } from "@/lib/AuthContext";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { Tabs } from "expo-router";
+import { BlurView } from "expo-blur";
+import { Platform, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+
 import Colors from "@/constants/colors";
-import { initializeAdMob, preloadRewardedAd } from "@/lib/admob";
-import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics";
-import { TrackingConsentGate } from "@/components/TrackingConsentGate";
-import { ForceUpdateGate } from "@/components/ForceUpdateGate";
+import { useLanguage } from "@/lib/LanguageContext";
+import { vexo } from 'vexo-analytics';
 
-SplashScreen.preventAutoHideAsync();
-
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
-      router.replace("/(tabs)");
-    }
-  }, [user, isLoading, segments]);
-
-  if (isLoading) {
-    return (
-      <View style={loadingStyles.container}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  return <>{children}</>;
+// Initialize Vexo at the root level, outside of any component
+// Recommended to wrap in production-only check
+if (__DEV__ === false) {
+  vexo('e0117fee-ebc2-4e6b-b2e7-6361b93a3b22');
 }
 
-const loadingStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
-});
-
-function RootLayoutNav() {
+export default function TabLayout() {
+  const isWeb = Platform.OS === "web";
+  const isIOS = Platform.OS === "ios";
   const { t } = useLanguage();
-  return (
-    <AuthGate>
-      <Stack screenOptions={{ headerBackTitle: t.common.back }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="referral"
-          options={{
-            title: t.referral.referralProgram,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: "#0A0A0F" },
-            headerTintColor: "#00E676",
-            headerTitleStyle: {
-              fontFamily: "Outfit_700Bold",
-              fontSize: 18,
-              color: "#FFFFFF",
-            },
-          }}
-        />
-        <Stack.Screen
-          name="notifications"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="surveys"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="admin"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen name="setup-wizard" options={{ headerShown: false }} />
-        <Stack.Screen name="games" options={{ headerShown: false }} />
-        <Stack.Screen name="game" options={{ headerShown: false }} />
-        <Stack.Screen name="security" options={{ headerShown: false }} />
-        <Stack.Screen name="about" options={{ headerShown: false }} />
-      </Stack>
-    </AuthGate>
-  );
-}
-
-export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Outfit_400Regular,
-    Outfit_600SemiBold,
-    Outfit_700Bold,
-  });
-  const [consentReady, setConsentReady] = React.useState(false);
-
-  useEffect(() => {
-    if (fontsLoaded && consentReady) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, consentReady]);
-
-  useEffect(() => {
-    startAdAnalyticsFlush();
-    return () => stopAdAnalyticsFlush();
-  }, []);
-
-  if (!fontsLoaded) return null;
 
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <LanguageProvider>
-          <AuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <StatusBar style="light" />
-              <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                <ForceUpdateGate>
-                  {/* TrackingConsentGate shows Apple-style pre-permission screens
-                      first, fires the ATT prompt, then AdsConsent — fully
-                      serialized. Only after the user taps Continue does AdMob
-                      initialize. Splash screen is held until consent resolves
-                      to prevent a blank-screen flash on launch. */}
-                  <TrackingConsentGate onConsentDone={() => {
-                    setConsentReady(true);
-                    initializeAdMob().then((initialized) => {
-                      if (initialized) preloadRewardedAd();
-                    });
-                  }}>
-                    <RootLayoutNav />
-                  </TrackingConsentGate>
-                </ForceUpdateGate>
-              </View>
-            </GestureHandlerRootView>
-          </AuthProvider>
-        </LanguageProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: isIOS ? "transparent" : Colors.background,
+          borderTopWidth: isWeb ? 1 : 0,
+          borderTopColor: Colors.border,
+          elevation: 0,
+          ...(isWeb ? { height: 64, paddingBottom: 8, paddingTop: 8 } : {}),
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          marginTop: 2,
+        },
+        tabBarBackground: () =>
+          isIOS ? (
+            <BlurView
+              intensity={100}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          ) : isWeb ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.background }]} />
+          ) : null,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: t.tabs.feed,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="earn"
+        options={{
+          title: t.tabs.earn,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cash-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: t.tabs.wallet,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="wallet-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: t.tabs.profile,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
