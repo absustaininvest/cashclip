@@ -36,6 +36,7 @@ import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
+import { supportTicketRateLimiter } from "../lib/supportTicketRateLimit";
 import {
   getRecentRejections,
   getRecentAlerts,
@@ -2644,7 +2645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/support/tickets", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
+  app.post("/api/support/tickets", authMiddleware, supportTicketRateLimiter, async (req: AuthRequest, res): Promise<void> => {
     try {
       const { subject, message } = req.body ?? {};
       if (!subject || typeof subject !== "string" || subject.trim().length === 0) {
