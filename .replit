@@ -44,22 +44,6 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Project Video"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS Update A"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Ship Points OTA"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Build Android V39"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Build iOS V40"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -92,50 +76,6 @@ author = "agent"
 task = "shell.exec"
 args = "PORT=5173 pnpm --filter @workspace/intro-video run dev"
 waitForPort = 5173
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "EAS Update A"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/balance-ota-build && rm -f /tmp/eas_update_A.log && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_PUBLIC_ENV=production EXPO_PUBLIC_DOMAIN=cash-clip.app pnpm exec eas update --branch production --message \"V29 OTA test: Home shows real server balance; celebration+spin-fix+home-taps reproduced\" --non-interactive 2>&1 | tee -a /tmp/eas_update_A.log; echo \"EAS_EXIT=${PIPESTATUS[0]}\" | tee -a /tmp/eas_update_A.log"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Ship Points OTA"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash /tmp/ship_points_ota.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Build Android V39"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/workspace/artifacts/cashclip && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" pnpm exec eas build --platform android --profile production --non-interactive"
-
-[[workflows.workflow]]
-name = "Build iOS V40"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/workspace/artifacts/cashclip && rm -f /tmp/eas_ios_v40.log && EAS_NO_VCS=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_ASC_API_KEY_PATH=\"/home/runner/workspace/attached_assets/AuthKey_7A95W39FFG_1781038963705.p8\" EXPO_ASC_KEY_ID=\"7A95W39FFG\" EXPO_ASC_ISSUER_ID=\"$APPLE_ASC_ISSUER_ID\" EXPO_APPLE_TEAM_ID=\"FAX932PG78\" EXPO_APPLE_TEAM_TYPE=\"COMPANY_OR_ORGANIZATION\" pnpm exec eas build --platform ios --profile production --non-interactive 2>&1 | tee -a /tmp/eas_ios_v40.log; echo \"EAS_IOS_EXIT=${PIPESTATUS[0]}\" | tee -a /tmp/eas_ios_v40.log"
 
 [workflows.workflow.metadata]
 outputType = "console"
