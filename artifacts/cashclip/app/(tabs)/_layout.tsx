@@ -6,6 +6,13 @@ import React from "react";
 
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
+import { vexo } from 'vexo-analytics';
+
+// Initialize Vexo at the root level, outside of any component
+// Recommended to wrap in production-only check
+if (__DEV__ === false) {
+  vexo('f3302c03-8df5-4b5d-b22e-1ad16c92457d');
+}
 
 export default function TabLayout() {
   const isWeb = Platform.OS === "web";
