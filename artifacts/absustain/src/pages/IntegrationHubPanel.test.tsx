@@ -146,6 +146,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
 
     // Section summary reflects one active alert.
     expect(await screen.findByText("1 active")).toBeInTheDocument();
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("quiets a condition to green/Resolved when a later resolve event supersedes the fire", async () => {
@@ -170,6 +175,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
 
     // Section summary reflects no active alerts.
     expect(await screen.findByText("All clear")).toBeInTheDocument();
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("renders a stale_sync + revenue_divergence mix with correct per-condition state and detail strings", async () => {
@@ -207,6 +217,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     // Both conditions render exactly once.
     expect(screen.getAllByText("Reporting sync stale")).toHaveLength(1);
     expect(screen.getAllByText("Revenue divergence")).toHaveLength(1);
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the AdMob alerts section entirely when there are no events", async () => {
@@ -219,6 +234,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
         screen.queryByText("AdMob Reporting Alerts"),
       ).not.toBeInTheDocument();
     });
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("stale_sync with only lastSyncedAt (no ageMs) falls back to hubTimeAgo string", async () => {
@@ -236,6 +256,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
 
     const row = await findAlertRow("Reporting sync stale");
     expect(within(row).getByText("Last sync 3h ago")).toBeInTheDocument();
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("stale_sync with no timing fields at all shows 'Reporting has never synced'", async () => {
@@ -250,6 +275,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     expect(
       within(row).getByText("Reporting has never synced"),
     ).toBeInTheDocument();
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 
   it("revenue_divergence with missing differencePct and earnings shows em-dash placeholders", async () => {
@@ -264,5 +294,10 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     expect(
       within(row).getByText("official — vs app —"),
     ).toBeInTheDocument();
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
   });
 });
