@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -309,7 +310,7 @@ export default function ScratchCardGame() {
   }, []);
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -318,7 +319,11 @@ export default function ScratchCardGame() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.infoSection}>
           <Text style={styles.subtitle}>{t.games.scratchCardDesc}</Text>
           <Text style={styles.hint}>
@@ -360,7 +365,7 @@ export default function ScratchCardGame() {
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
 
       {(gameState === "won" || gameState === "lost") && (
         <Animated.View
@@ -458,8 +463,11 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.text,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,

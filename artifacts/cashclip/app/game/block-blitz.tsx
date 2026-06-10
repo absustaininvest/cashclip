@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -370,7 +371,7 @@ export default function BlockBlitzGame() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -381,85 +382,91 @@ export default function BlockBlitzGame() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>{t.games.score}</Text>
-          <Text style={styles.statValue}>{score}</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>{t.games.lines}</Text>
-          <Text style={styles.statValue}>{linesCleared}</Text>
-        </View>
-        {combo > 0 && (
-          <View style={[styles.statBox, styles.comboBox]}>
-            <Text style={styles.statLabel}>{t.games.combo}</Text>
-            <Text style={[styles.statValue, styles.comboValue]}>x{combo}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>{t.games.score}</Text>
+            <Text style={styles.statValue}>{score}</Text>
           </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>{t.games.lines}</Text>
+            <Text style={styles.statValue}>{linesCleared}</Text>
+          </View>
+          {combo > 0 && (
+            <View style={[styles.statBox, styles.comboBox]}>
+              <Text style={styles.statLabel}>{t.games.combo}</Text>
+              <Text style={[styles.statValue, styles.comboValue]}>x{combo}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.gridContainer}>
+          {grid.map((row, r) => (
+            <View key={r} style={styles.gridRow}>
+              {row.map((cell, c) => {
+                const isHighlighted = highlightCells.has(`${r}-${c}`);
+                const cellColor = cell !== 0 ? CELL_COLORS[cell] || "#666" : undefined;
+                return (
+                  <TouchableOpacity
+                    key={c}
+                    testID={`cell-${r}-${c}`}
+                    activeOpacity={0.7}
+                    onPress={() => handleCellPress(r, c)}
+                    onPressIn={() => handleCellHover(r, c)}
+                    style={[
+                      styles.cell,
+                      cell !== 0 && { backgroundColor: cellColor },
+                      cell !== 0 && styles.filledCell,
+                      isHighlighted && styles.highlightCell,
+                    ]}
+                  >
+                    {cell !== 0 && <View style={[styles.cellShine, { backgroundColor: cellColor }]} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.pieceTray}>
+          {pieces.map((piece, index) => {
+            if (!piece) return <View key={index} style={styles.pieceSlotEmpty} />;
+            const isSelected = selectedPiece === index;
+            return (
+              <TouchableOpacity
+                key={piece.id}
+                testID={`piece-${index}`}
+                activeOpacity={0.7}
+                onPress={() => handlePieceSelect(index)}
+                style={[styles.pieceSlot, isSelected && styles.pieceSlotSelected]}
+              >
+                {piece.shape.map((row, r) => (
+                  <View key={r} style={styles.miniRow}>
+                    {row.map((cell, c) => (
+                      <View
+                        key={c}
+                        style={[
+                          styles.miniCell,
+                          cell === 1 && { backgroundColor: piece.color },
+                          cell === 1 && styles.miniCellFilled,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {selectedPiece !== null && (
+          <Text style={styles.hintText}>Tap a cell on the grid to place the block</Text>
         )}
-      </View>
-
-      <View style={styles.gridContainer}>
-        {grid.map((row, r) => (
-          <View key={r} style={styles.gridRow}>
-            {row.map((cell, c) => {
-              const isHighlighted = highlightCells.has(`${r}-${c}`);
-              const cellColor = cell !== 0 ? CELL_COLORS[cell] || "#666" : undefined;
-              return (
-                <TouchableOpacity
-                  key={c}
-                  testID={`cell-${r}-${c}`}
-                  activeOpacity={0.7}
-                  onPress={() => handleCellPress(r, c)}
-                  onPressIn={() => handleCellHover(r, c)}
-                  style={[
-                    styles.cell,
-                    cell !== 0 && { backgroundColor: cellColor },
-                    cell !== 0 && styles.filledCell,
-                    isHighlighted && styles.highlightCell,
-                  ]}
-                >
-                  {cell !== 0 && <View style={[styles.cellShine, { backgroundColor: cellColor }]} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.pieceTray}>
-        {pieces.map((piece, index) => {
-          if (!piece) return <View key={index} style={styles.pieceSlotEmpty} />;
-          const isSelected = selectedPiece === index;
-          return (
-            <TouchableOpacity
-              key={piece.id}
-              testID={`piece-${index}`}
-              activeOpacity={0.7}
-              onPress={() => handlePieceSelect(index)}
-              style={[styles.pieceSlot, isSelected && styles.pieceSlotSelected]}
-            >
-              {piece.shape.map((row, r) => (
-                <View key={r} style={styles.miniRow}>
-                  {row.map((cell, c) => (
-                    <View
-                      key={c}
-                      style={[
-                        styles.miniCell,
-                        cell === 1 && { backgroundColor: piece.color },
-                        cell === 1 && styles.miniCellFilled,
-                      ]}
-                    />
-                  ))}
-                </View>
-              ))}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {selectedPiece !== null && (
-        <Text style={styles.hintText}>Tap a cell on the grid to place the block</Text>
-      )}
+      </ScrollView>
 
       {gameState === "over" && (
         <Animated.View
@@ -515,6 +522,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",

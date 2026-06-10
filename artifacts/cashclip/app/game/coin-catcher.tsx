@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -274,7 +275,11 @@ export default function CoinCatcherScreen() {
       </View>
 
       {gameState === "ready" && (
-        <View style={styles.centeredContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.centeredContent, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.iconCircle}>
             <Ionicons name="game-controller" size={64} color={Colors.accent} />
           </View>
@@ -307,7 +312,7 @@ export default function CoinCatcherScreen() {
               <Text style={styles.cooldownText}>{t.games.comeBackTomorrow}</Text>
             </View>
           )}
-        </View>
+        </ScrollView>
       )}
 
       {gameState === "playing" && (
@@ -341,7 +346,11 @@ export default function CoinCatcherScreen() {
       )}
 
       {gameState === "ended" && (
-        <View style={styles.centeredContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.centeredContent, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={[styles.iconCircle, { borderColor: finalReward > 0 ? Colors.primary : Colors.error }]}>
             <Ionicons
               name={finalReward > 0 ? "trophy" : "sad"}
@@ -379,7 +388,7 @@ export default function CoinCatcherScreen() {
             <Ionicons name="arrow-back" size={20} color={Colors.background} />
             <Text style={styles.playButtonText}>{t.games.playAgain}</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -427,8 +436,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Outfit_600SemiBold",
   },
-  centeredContent: {
+  scrollView: {
     flex: 1,
+  },
+  centeredContent: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,

@@ -8,6 +8,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -257,7 +258,7 @@ export default function TapFrenzyScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset, paddingBottom: gameState === "playing" ? bottomInset : 0 }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} testID="back-button" style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -267,7 +268,11 @@ export default function TapFrenzyScreen() {
       </View>
 
       {gameState === "idle" && (
-        <View style={styles.centerContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.centerContent, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.iconContainer}>
             <Ionicons name="finger-print" size={80} color={Colors.accent} />
           </View>
@@ -300,7 +305,7 @@ export default function TapFrenzyScreen() {
               <Text style={styles.cooldownText}>{t.games.comeBackTomorrow}</Text>
             </View>
           )}
-        </View>
+        </ScrollView>
       )}
 
       {gameState === "playing" && (
@@ -357,7 +362,11 @@ export default function TapFrenzyScreen() {
       )}
 
       {gameState === "finished" && (
-        <View style={styles.centerContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.centerContent, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.resultIconContainer}>
             <Ionicons name="trophy" size={64} color={Colors.accent} />
           </View>
@@ -414,7 +423,7 @@ export default function TapFrenzyScreen() {
           <TouchableOpacity style={styles.doneButton} onPress={() => router.back()} testID="done-button">
             <Ionicons name="checkmark" size={24} color={Colors.background} />
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -443,8 +452,11 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.text,
   },
-  centerContent: {
+  scrollView: {
     flex: 1,
+  },
+  centerContent: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,

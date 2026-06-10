@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -273,7 +274,11 @@ export default function TriviaGame() {
   };
 
   const renderCooldown = () => (
-    <View style={styles.centerContainer}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[styles.centerContainer, { paddingBottom: bottomInset + 24 }]}
+      showsVerticalScrollIndicator={false}
+    >
       <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
       <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
       <Text style={styles.cooldownSubtitle}>{t.games.triviaQuizDesc}</Text>
@@ -284,11 +289,15 @@ export default function TriviaGame() {
       >
         <Ionicons name="arrow-back" size={24} color={Colors.text} />
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 
   const renderReady = () => (
-    <View style={styles.centerContainer}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[styles.centerContainer, { paddingBottom: bottomInset + 24 }]}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.readyIconContainer}>
         <Ionicons name="help-circle" size={80} color={Colors.primary} />
       </View>
@@ -316,7 +325,7 @@ export default function TriviaGame() {
         <Ionicons name="play" size={24} color={Colors.background} />
         <Text style={styles.playButtonText}>{t.games.play}</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 
   const renderPlaying = () => {
@@ -330,52 +339,62 @@ export default function TriviaGame() {
 
     return (
       <Animated.View style={[styles.playingContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        <View style={styles.progressBarContainer}>
-          <Animated.View
-            style={[
-              styles.progressBarFill,
-              {
-                width: progressWidth,
-                backgroundColor: timeLeft <= 5 ? Colors.error : Colors.primary,
-              },
-            ]}
-          />
-        </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.progressBarContainer}>
+            <Animated.View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: progressWidth,
+                  backgroundColor: timeLeft <= 5 ? Colors.error : Colors.primary,
+                },
+              ]}
+            />
+          </View>
 
-        <View style={styles.questionCard}>
-          <Text style={styles.questionText}>{question.question}</Text>
-        </View>
+          <View style={styles.questionCard}>
+            <Text style={styles.questionText}>{question.question}</Text>
+          </View>
 
-        <View style={styles.optionsContainer}>
-          {question.options.map((option, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.optionButton, getOptionStyle(index)]}
-              onPress={() => handleAnswer(index)}
-              disabled={selectedAnswer !== null}
-              testID={`trivia-option-${index}`}
-            >
-              <View style={styles.optionLabelContainer}>
-                <Text style={[styles.optionLabel, getOptionTextStyle(index)]}>
-                  {String.fromCharCode(65 + index)}
-                </Text>
-              </View>
-              <Text style={[styles.optionText, getOptionTextStyle(index)]}>{option}</Text>
-              {selectedAnswer !== null && index === question.correctIndex && (
-                <Ionicons name="checkmark-circle" size={22} color={Colors.success} style={styles.optionIcon} />
-              )}
-              {selectedAnswer === index && !isCorrect && (
-                <Ionicons name="close-circle" size={22} color={Colors.error} style={styles.optionIcon} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+          <View style={styles.optionsContainer}>
+            {question.options.map((option, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.optionButton, getOptionStyle(index)]}
+                onPress={() => handleAnswer(index)}
+                disabled={selectedAnswer !== null}
+                testID={`trivia-option-${index}`}
+              >
+                <View style={styles.optionLabelContainer}>
+                  <Text style={[styles.optionLabel, getOptionTextStyle(index)]}>
+                    {String.fromCharCode(65 + index)}
+                  </Text>
+                </View>
+                <Text style={[styles.optionText, getOptionTextStyle(index)]}>{option}</Text>
+                {selectedAnswer !== null && index === question.correctIndex && (
+                  <Ionicons name="checkmark-circle" size={22} color={Colors.success} style={styles.optionIcon} />
+                )}
+                {selectedAnswer === index && !isCorrect && (
+                  <Ionicons name="close-circle" size={22} color={Colors.error} style={styles.optionIcon} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
       </Animated.View>
     );
   };
 
   const renderFinished = () => (
-    <View style={styles.centerContainer}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[styles.centerContainer, { paddingBottom: bottomInset + 24 }]}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.resultIconContainer}>
         <Ionicons
           name={correctCount >= 8 ? "trophy" : correctCount >= 5 ? "ribbon" : "sad-outline"}
@@ -414,11 +433,11 @@ export default function TriviaGame() {
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} testID="trivia-back">
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -463,6 +482,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -491,7 +517,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   centerContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 32,

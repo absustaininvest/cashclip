@@ -7,6 +7,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -385,7 +386,7 @@ export default function TetrisGame() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -394,93 +395,99 @@ export default function TetrisGame() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>{t.games.score}</Text>
-          <Text style={styles.statValue}>{score}</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>{t.games.level}</Text>
-          <Text style={styles.statValue}>{level}</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>{t.games.lines}</Text>
-          <Text style={styles.statValue}>{lines}</Text>
-        </View>
-        <NextPiecePreview piece={nextPiece} />
-      </View>
-
-      {gameState === "cooldown" && !canPlay ? (
-        <View style={styles.cooldownContainer}>
-          <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
-          <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
-          <Text style={styles.cooldownSubtitle}>{t.games.dailyPlaysLeft}: 0</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.gameArea}>
-            {renderGrid()}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>{t.games.score}</Text>
+            <Text style={styles.statValue}>{score}</Text>
           </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>{t.games.level}</Text>
+            <Text style={styles.statValue}>{level}</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>{t.games.lines}</Text>
+            <Text style={styles.statValue}>{lines}</Text>
+          </View>
+          <NextPiecePreview piece={nextPiece} />
+        </View>
 
-          {gameState === "playing" && (
-            <View style={styles.controlsWrapper}>
-              <View style={styles.controlsTopRow}>
-                <TouchableOpacity testID="hard-drop" onPress={hardDrop} style={styles.controlBtnAccent}>
-                  <Ionicons name="arrow-down" size={28} color={Colors.background} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.controlsBottomRow}>
-                <TouchableOpacity testID="move-left" onPress={moveLeft} style={styles.controlBtn}>
-                  <Ionicons name="chevron-back" size={28} color={Colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity testID="soft-drop" onPress={softDrop} style={styles.controlBtn}>
-                  <Ionicons name="chevron-down" size={28} color={Colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity testID="rotate" onPress={rotate} style={styles.controlBtn}>
-                  <Ionicons name="refresh" size={24} color={Colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity testID="move-right" onPress={moveRight} style={styles.controlBtn}>
-                  <Ionicons name="chevron-forward" size={28} color={Colors.text} />
-                </TouchableOpacity>
-              </View>
+        {gameState === "cooldown" && !canPlay ? (
+          <View style={styles.cooldownContainer}>
+            <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
+            <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
+            <Text style={styles.cooldownSubtitle}>{t.games.dailyPlaysLeft}: 0</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.gameArea}>
+              {renderGrid()}
             </View>
-          )}
 
-          {gameState === "over" && (
-            <View style={styles.gameOverOverlay}>
-              <View style={styles.gameOverCard}>
-                <Ionicons name="game-controller" size={48} color={Colors.primary} />
-                <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
-                <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
-                <Text style={styles.gameOverLines}>{t.games.lines}: {lines} | {t.games.level}: {level}</Text>
-                {bankFailed ? (
-                  <Text style={styles.gameOverRewardLabel}>
-                    We couldn&apos;t add your reward right now. Please try again later.
-                  </Text>
-                ) : serverPoints === null ? (
-                  <>
-                    <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
-                    <Text style={styles.gameOverRewardLabel}>Adding your reward…</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.gameOverReward}>{formatPoints(serverPoints)}</Text>
-                    <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
-                  </>
-                )}
-
-                <TouchableOpacity testID="play-again-button" style={styles.playAgainBtn} onPress={handleNewGame}>
-                  <Text style={styles.playAgainText}>{t.games.playAgain}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity testID="back-to-games-button" style={styles.backToGamesBtn} onPress={() => router.back()}>
-                  <Ionicons name="arrow-back" size={18} color={Colors.textSecondary} />
-                  <Text style={styles.backToGamesText}>{t.games.title}</Text>
-                </TouchableOpacity>
+            {gameState === "playing" && (
+              <View style={styles.controlsWrapper}>
+                <View style={styles.controlsTopRow}>
+                  <TouchableOpacity testID="hard-drop" onPress={hardDrop} style={styles.controlBtnAccent}>
+                    <Ionicons name="arrow-down" size={28} color={Colors.background} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.controlsBottomRow}>
+                  <TouchableOpacity testID="move-left" onPress={moveLeft} style={styles.controlBtn}>
+                    <Ionicons name="chevron-back" size={28} color={Colors.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="soft-drop" onPress={softDrop} style={styles.controlBtn}>
+                    <Ionicons name="chevron-down" size={28} color={Colors.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="rotate" onPress={rotate} style={styles.controlBtn}>
+                    <Ionicons name="refresh" size={24} color={Colors.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="move-right" onPress={moveRight} style={styles.controlBtn}>
+                    <Ionicons name="chevron-forward" size={28} color={Colors.text} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
-        </>
+            )}
+          </>
+        )}
+      </ScrollView>
+
+      {gameState === "over" && (
+        <View style={styles.gameOverOverlay}>
+          <View style={styles.gameOverCard}>
+            <Ionicons name="game-controller" size={48} color={Colors.primary} />
+            <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
+            <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
+            <Text style={styles.gameOverLines}>{t.games.lines}: {lines} | {t.games.level}: {level}</Text>
+            {bankFailed ? (
+              <Text style={styles.gameOverRewardLabel}>
+                We couldn&apos;t add your reward right now. Please try again later.
+              </Text>
+            ) : serverPoints === null ? (
+              <>
+                <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
+                <Text style={styles.gameOverRewardLabel}>Adding your reward…</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.gameOverReward}>{formatPoints(serverPoints)}</Text>
+                <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
+              </>
+            )}
+
+            <TouchableOpacity testID="play-again-button" style={styles.playAgainBtn} onPress={handleNewGame}>
+              <Text style={styles.playAgainText}>{t.games.playAgain}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity testID="back-to-games-button" style={styles.backToGamesBtn} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={18} color={Colors.textSecondary} />
+              <Text style={styles.backToGamesText}>{t.games.title}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -490,6 +497,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",
@@ -560,9 +574,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   gameArea: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 8,
   },
   gridContainer: {
     borderWidth: 2,

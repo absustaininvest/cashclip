@@ -618,7 +618,7 @@ export default function DominoesGame() {
   const dominoSize = Math.min(30, (SCREEN_WIDTH - 100) / 10);
 
   return (
-    <View style={[styles.container, { paddingTop: topInset, paddingBottom: bottomInset }]}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -633,13 +633,21 @@ export default function DominoesGame() {
       </View>
 
       {gameState === "cooldown" && !canPlay ? (
-        <View style={styles.cooldownContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.cooldownContainer, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
           <Text style={styles.cooldownTitle}>{t.games.comeBackTomorrow}</Text>
           <Text style={styles.cooldownSubtitle}>{t.games.dailyPlaysLeft}: 0</Text>
-        </View>
+        </ScrollView>
       ) : (
-        <View style={styles.gameArea}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.gameArea, { paddingBottom: bottomInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.aiSection}>
             <Text style={styles.sectionLabel}>
               {isPlayerTurn ? "" : t.games.aiTurn + "..."}
@@ -732,7 +740,7 @@ export default function DominoesGame() {
               ))}
             </ScrollView>
           </View>
-        </View>
+        </ScrollView>
       )}
 
       {(gameState === "won" || gameState === "lost" || gameState === "draw") && (
@@ -819,8 +827,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
   },
-  cooldownContainer: {
+  scrollView: {
     flex: 1,
+  },
+  cooldownContainer: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
@@ -837,7 +848,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   gameArea: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "space-between",
   },
   aiSection: {
@@ -880,10 +891,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   chainContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    minHeight: 100,
+    minHeight: 120,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: Colors.border,
