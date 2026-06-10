@@ -167,15 +167,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     reserve: 10,
   };
 
-  app.get("/api/revenue/sources", (_req, res) => {
+  app.get("/api/revenue/sources", adminMiddleware, (_req, res) => {
     res.json({ sources: revenueSources });
   });
 
-  app.get("/api/revenue/allocation", (_req, res) => {
+  app.get("/api/revenue/allocation", adminMiddleware, (_req, res) => {
     res.json({ allocation });
   });
 
-  app.get("/api/revenue/metrics", (_req, res) => {
+  app.get("/api/revenue/metrics", adminMiddleware, (_req, res) => {
     const totalMonthly = revenueSources.reduce((sum, s) => sum + s.monthlyEstimate, 0);
     const metrics: FundingMetrics = {
       totalRevenueSources: revenueSources.length,
@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ metrics });
   });
 
-  app.get("/api/revenue/transparency", (_req, res) => {
+  app.get("/api/revenue/transparency", adminMiddleware, (_req, res) => {
     const totalMonthly = revenueSources.reduce((sum, s) => sum + s.monthlyEstimate, 0);
     res.json({
       model: "Multi-stream passive revenue",
@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/revenue/margin", (_req, res) => {
+  app.get("/api/revenue/margin", adminMiddleware, (_req, res) => {
     const grossRevenue = revenueSources.reduce((sum, s) => sum + s.monthlyEstimate, 0);
 
     const revenueBreakdown = revenueSources.map((s) => ({
