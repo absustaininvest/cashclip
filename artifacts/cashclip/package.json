@@ -90,8 +90,6 @@
   },
   "dependencies": {
     "@logrocket/react-native": "^3.1.1",
-    "@react-native-firebase/analytics": "^24.0.0",
-    "@react-native-firebase/app": "^24.0.0",
     "@react-navigation/native": "^7.2.2",
     "@sentry/cli": "2.37.0",
     "@sentry/react-native": "~7.2.0",

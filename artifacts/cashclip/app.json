@@ -18,7 +18,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
       "buildNumber": "40",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission \u2014 tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking.",
@@ -380,7 +379,6 @@
     "android": {
       "package": "app.replit.cashclip",
       "versionCode": 40,
-      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
       },
@@ -395,7 +393,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "@react-native-firebase/app",
       "@logrocket/react-native",
       [
         "@sentry/react-native/expo",
@@ -450,7 +447,6 @@
           }
         }
       ],
-      "./plugins/withIosRnfbNonModularPatch",
       "./plugins/withAndroidManifestFix",
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
