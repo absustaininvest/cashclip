@@ -55,3 +55,4 @@
 - [Deploy image 8 GiB limit](deploy-image-size-limit.md) — publish can build OK then fail "image size over 8 GiB"; not a typecheck error; fix = .replitignore excluding exports/.local/.git/.cache/attached_assets (local-only, not runtime).
 - [Sandbox reaps background jobs](sandbox-background-jobs.md) — nohup `&` dies when the bash tool call returns (eas build died mid-upload); run long CLI as a managed workflow + poll getWorkflowStatus; captured spinner lines look "stuck" but aren't.
 - [New-build readiness ritual](v39-build-readiness-ritual.md) — owner wants a full grail backup (binaries+OTA source+OWL+signing creds) in exports/expo-artifacts before any new native build; heavy/sensitive stay local-only, catalogue in git.
+- [Surveys never credit — webhook 401](cashclip-survey-webhook-401.md) — CPX+BitLabs postbacks rejected 401 in prod (162 CPX sessions pending/0 paid); it's the integration secret handshake, server-only fix + republish, NEVER a rebuild.
