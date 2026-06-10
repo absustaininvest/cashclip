@@ -4022,43 +4022,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!attempt.settledAt && !attempt.witnessedAt) {
         // Burn the witness nonce so the ackToken cannot be replayed.
-        // witnessedAt is NOT set here — it is set ONLY by the advertiser-origin
-        // pixel callback at /api/earn/sponsored/pixel/:pixelToken, which fires
-        // when the user's real browser renders the <img> pixel on the advertiser's
-        // landing page. Settlement at /visit requires witnessedAt; without the
-        // pixel firing from the advertiser's domain, that column stays null and
-        // /visit rejects with 400. This means the claimant cannot settle just by
-        // completing the /c redirect — they must also produce an advertiser-origin
-        // callback that the server validates independently.
+        // witnessedAt is NOT set here. It is set exclusively by the platform
+        // delivery pixel endpoint (/api/earn/sponsored/pixel/:deliveryNonce)
+        // after this redirect completes and the user's browser loads the
+        // delivery pixel on the publisher's landing page.
         await dbClient.update(attemptsTable)
           .set({ witnessNonce: null })
           .where(drizzleAndLocal(
             drizzleEqLocal(attemptsTable.token, token),
             drizzleSql`${attemptsTable.witnessNonce} IS NOT NULL`,
           ));
-        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: nonce burned; awaiting advertiser pixel");
+        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: nonce burned; minting delivery nonce for pixel");
       }
 
       if (!targetUrl) {
         res.status(410).send("Campaign no longer available"); return;
       }
 
-      // Redirect to the advertiser page. We append `cashclip_t=<attemptToken>`
-      // as a parameter so the advertiser's SERVER can read it and call our
-      // server-to-server postback at POST /api/earn/sponsored/postback.
-      //
-      // Security design — why not a browser pixel any more:
-      //   The old browser-pixel approach embedded the pixelToken in the Location
-      //   header of this response. A script could read that header, extract the
-      //   token, and call the pixel endpoint directly with a spoofed Referer.
-      //   That made witnessedAt reachable through purely claimant-controlled data.
-      //
-      //   The postback model breaks this: the callbackKey (HMAC of campaignId
-      //   with JWT_ACCESS_SECRET) is shown only to the campaign owner in the
-      //   publisher dashboard. It is NEVER included in any response the claimant
-      //   sees. A script completing this chain still cannot call /postback because
-      //   it doesn't have callbackKey — settlement therefore stays null until the
-      //   advertiser's server makes the authenticated postback call.
       // Enforce http/https allowlist before redirecting — stored targetUrl must
       // be a web URL; any other scheme (javascript:, data:, etc.) is rejected.
       let parsedTarget: URL;
@@ -4073,6 +4053,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.log?.warn({ protocol: parsedTarget.protocol }, "Sponsored completion: non-http(s) scheme rejected");
         res.status(500).send("Redirect failed");
         return;
+      }
+
+      // ── Platform witness cookie (HttpOnly — not accessible to publisher) ──
+      // Issued AFTER all validation and targetUrl scheme checks succeed.
+      //
+      // Security design — why a first-party HttpOnly cookie, not a URL param:
+      //   All prior witness models (postback, nonce in URL) disclosed the
+      //   witness credential to the publisher's server or page via URL
+      //   parameters, allowing a malicious publisher to replay those credentials
+      //   from their own backend and self-attest any visit.
+      //
+      //   The HttpOnly cookie model breaks self-attestation:
+      //     1. The witness proof (witnessToken) is a random 32-byte value
+      //        placed in an HttpOnly Set-Cookie on the platform's own domain
+      //        (api.cash-clip.app). HttpOnly means JavaScript on the publisher's
+      //        page CANNOT read it. Being first-party to api.cash-clip.app, it
+      //        is completely invisible to code on the publisher's domain.
+      //     2. The witnessToken is NOT in the redirect URL. The publisher sees
+      //        only cashclip_t=<attemptToken> — the delivery pixel URL (/delivery/
+      //        <token>) does not contain the secret, so calling the pixel endpoint
+      //        directly from their server provides no cookie and fails.
+      //     3. When the user's browser loads the publisher's page and the page
+      //        includes <img src="https://api.cash-clip.app/api/earn/sponsored/
+      //        delivery/<token>">, the browser automatically attaches the cookie
+      //        to that cross-origin image request (SameSite=None; Secure).
+      //     4. A publisher server calling the delivery URL has no access to the
+      //        user's browser cookie store — the witnessToken is a credential
+      //        that only the browser that executed the /c navigation possesses.
+      //     5. Short-lived (SPONSORED_DELIVERY_NONCE_TTL_MS, default 5 min).
+      //     6. Single-use: deliveryNonce cleared in DB when witnessedAt is set.
+      //     7. Cookie path scoped to the specific delivery URL so concurrent
+      //        visits from the same browser don't overwrite each other's cookie.
+      //
+      // Placement: MUST run after all validation and targetUrl scheme checks.
+      // ─────────────────────────────────────────────────────────────────────
+      if (!attempt.settledAt && !attempt.witnessedAt) {
+        const { randomBytes: _rb, createHash: _ch2 } = await import("node:crypto");
+        const witnessToken = _rb(32).toString("hex");
+        const witnessTokenHash = _ch2("sha256").update(witnessToken).digest("hex");
+        const DELIVERY_NONCE_TTL = Math.max(
+          60_000,
+          parseInt(process.env.SPONSORED_DELIVERY_NONCE_TTL_MS ?? String(5 * 60_000), 10),
+        );
+        await dbClient.update(attemptsTable)
+          .set({
+            deliveryNonce: witnessTokenHash,
+            deliveryNonceExpiresAt: new Date(Date.now() + DELIVERY_NONCE_TTL),
+          })
+          .where(drizzleEqLocal(attemptsTable.token, token));
+
+        // The cookie path is scoped to exactly this attempt's delivery URL so
+        // that parallel visits in the same browser cannot clobber each other.
+        // SameSite=None allows the cookie to be sent on the cross-origin image
+        // request from the publisher's page (a different origin) to api.cash-clip.app.
+        const cookiePath = `/api/earn/sponsored/delivery/${token}`;
+        const cookieMaxAgeSec = Math.floor(DELIVERY_NONCE_TTL / 1000);
+        res.setHeader("Set-Cookie", [
+          `cashclip_witness=${witnessToken}`,
+          `HttpOnly`,
+          `Secure`,
+          `SameSite=None`,
+          `Path=${cookiePath}`,
+          `Max-Age=${cookieMaxAgeSec}`,
+        ].join("; "));
+        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: witness cookie set (HttpOnly)");
       }
 
       parsedTarget.searchParams.set("cashclip_t", token);
@@ -4096,35 +4141,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  /** DEPRECATED — replaced by POST /api/earn/sponsored/postback.
+  /** DEPRECATED — routes with this path prefix were the original pixel approach.
    *
-   *  The browser-pixel approach embedded the pixelToken in the /c redirect URL.
-   *  A script reading the Location header could extract the token and call this
-   *  endpoint directly with a spoofed Referer, bypassing the witness requirement.
-   *  Returns 410 Gone so any cached links fail explicitly.
+   *  The original pixel embedded the token in the /c redirect URL; a script
+   *  reading the Location header could extract the token and call the endpoint
+   *  directly with a spoofed Referer. Returns 410 Gone so any cached links
+   *  fail explicitly. The new pixel path is /api/earn/sponsored/delivery/:nonce.
    */
   app.get("/api/earn/sponsored/pixel/:pixelToken", (_req, res) => {
     res.status(410).json({
-      error: "This endpoint has been replaced by the server-to-server postback. See POST /api/earn/sponsored/postback.",
+      error: "This endpoint is no longer active. See GET /api/earn/sponsored/delivery/:nonce.",
     });
   });
 
   /**
-   * Server-to-server advertiser postback — the ONLY path that sets witnessedAt.
+   * Platform delivery pixel — the ONLY path that sets witnessedAt.
    *
-   * The advertiser's backend reads `?cashclip_t=<attemptToken>` from the /c
-   * redirect URL, then calls this endpoint with their campaign's callbackKey.
-   * The callbackKey is shown only to the campaign owner in the publisher
-   * dashboard and is never included in any response the visiting user sees.
+   * The /c redirect sends the browser to the publisher's page with only
+   * cashclip_t=<attemptToken> in the URL. Simultaneously, /c sets an HttpOnly,
+   * SameSite=None; Secure cookie `cashclip_witness=<witnessToken>` on the
+   * platform domain (api.cash-clip.app), scoped to this endpoint's path.
    *
-   * Security design:
-   *   callbackKey = HMAC-SHA256(campaignId + ":cbk-v1", JWT_ACCESS_SECRET)
-   *   The key is server-derivable but unknown to the claimant because it is
-   *   never returned in any API response the visitor is entitled to call.
-   *   A script that completes the full /begin → /r → /ack → /c chain gets
-   *   only `cashclip_t=<attemptToken>` in the redirect URL — not callbackKey.
-   *   Without callbackKey it cannot call this endpoint, so witnessedAt stays
-   *   null and /visit refuses settlement.
+   * The publisher's page must embed:
+   *   <img src="https://api.cash-clip.app/api/earn/sponsored/delivery/<token>"
+   *        style="display:none" width="1" height="1" crossorigin />
+   *
+   * The browser automatically attaches the cashclip_witness cookie to this
+   * cross-origin image request (SameSite=None allows it). The endpoint hashes
+   * the cookie value and compares to the stored SHA-256(witnessToken) in the
+   * DB. On match, witnessedAt is set.
+   *
+   * Security: the witnessToken is NEVER in the URL. Publisher JS cannot read
+   * it (HttpOnly). A publisher server calling this endpoint directly has no
+   * access to the user's browser cookie — only the browser that navigated
+   * through /c carries the credential. Static campaign callbackKey is not
+   * accepted here at all; there is no static credential path to witnessedAt.
+   *
+   * Returns a 1×1 transparent GIF so the <img> tag renders silently.
+   * Rate-limited at the IP level (fail-closed).
+   */
+  app.get("/api/earn/sponsored/delivery/:token", async (req, res) => {
+    // 1×1 transparent GIF — returned for ALL outcomes so that broken pixels
+    // don't leave visible broken-image icons on the publisher's page.
+    const TRANSPARENT_GIF = Buffer.from(
+      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+      "base64",
+    );
+    const sendPixel = () => {
+      res.setHeader("Content-Type", "image/gif");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.end(TRANSPARENT_GIF);
+    };
+
+    try {
+      const attemptToken = String(req.params.token ?? "");
+      if (!attemptToken || !/^[a-f0-9]{64}$/.test(attemptToken)) {
+        sendPixel(); return;
+      }
+
+      // ── Per-IP rate limit ──────────────────────────────────────────────────
+      {
+        const { getClientIp: _dip } = await import("../lib/clientIp");
+        const { recordLoginAttempt: _drl } = await import("../lib/dbRateLimit");
+        const _dipVal = _dip(req);
+        const _dLimit = Math.max(1, parseInt(process.env.SPONSORED_PIXEL_IP_LIMIT ?? "60", 10));
+        try {
+          const { allowed } = await _drl(`sponsored:pixel:ip:${_dipVal}`, _dLimit, 60 * 60 * 1000);
+          if (!allowed) {
+            req.log?.warn?.({ ip: _dipVal }, "Sponsored pixel rate limit exceeded (IP)");
+            sendPixel(); return;
+          }
+        } catch (rlErr) {
+          req.log?.error?.({ err: rlErr }, "Sponsored pixel IP rate-limit check failed — failing closed");
+          sendPixel(); return;
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
+      // ── HttpOnly cookie validation (the core witness gate) ─────────────────
+      // The cashclip_witness cookie was set by /c on the platform's own domain
+      // during the user's browser navigation. It is HttpOnly and first-party to
+      // api.cash-clip.app, so:
+      //   • Publisher JS running on a different origin cannot read it.
+      //   • A publisher server calling this endpoint directly sends no cookie —
+      //     the user's browser cookie store is not accessible to a server.
+      //   • Only the browser that navigated through /c carries this credential.
+      //
+      // Parse the raw Cookie header instead of relying on a cookie-parser
+      // middleware so the security logic is explicit and self-contained.
+      const rawCookieHeader = String(req.headers["cookie"] ?? "");
+      let witnessTokenFromCookie: string | null = null;
+      for (const part of rawCookieHeader.split(";")) {
+        const [k, ...vs] = part.trim().split("=");
+        if (k?.trim() === "cashclip_witness") {
+          witnessTokenFromCookie = vs.join("=").trim() || null;
+          break;
+        }
+      }
+      if (!witnessTokenFromCookie || !/^[a-f0-9]{64}$/.test(witnessTokenFromCookie)) {
+        req.log?.warn?.({
+          token: attemptToken.slice(0, 8) + "…",
+          hasCookie: !!witnessTokenFromCookie,
+        }, "Sponsored pixel: witness cookie absent or malformed — witnessedAt not set");
+        sendPixel(); return;
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
+      const { createHash: _pixelHash, timingSafeEqual: _pixelTse } = await import("node:crypto");
+      const cookieHash = _pixelHash("sha256").update(witnessTokenFromCookie).digest("hex");
+
+      const {
+        db: dbClient,
+        campaignVisitAttempts: attemptsTable,
+      } = await import("@workspace/db");
+      const { sql: drizzleSqlP, eq: drizzleEqP, and: drizzleAndP } = await import("drizzle-orm");
+
+      const [attempt] = await dbClient.select().from(attemptsTable)
+        .where(drizzleEqP(attemptsTable.token, attemptToken));
+
+      if (!attempt) {
+        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: attempt not found");
+        sendPixel(); return;
+      }
+      if (!attempt.deliveryNonce || !attempt.deliveryNonceExpiresAt) {
+        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: no delivery nonce stored");
+        sendPixel(); return;
+      }
+      if (attempt.deliveryNonceExpiresAt.getTime() < Date.now()) {
+        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: delivery nonce expired");
+        sendPixel(); return;
+      }
+      if (attempt.settledAt || attempt.witnessedAt) {
+        sendPixel(); return;
+      }
+
+      // Constant-time comparison of cookie-derived hash vs stored hash.
+      let cookieHashBuf: Buffer, storedHashBuf: Buffer;
+      try {
+        cookieHashBuf = Buffer.from(cookieHash, "hex");
+        storedHashBuf = Buffer.from(attempt.deliveryNonce, "hex");
+      } catch {
+        cookieHashBuf = Buffer.alloc(0);
+        storedHashBuf = Buffer.alloc(1);
+      }
+      if (
+        cookieHashBuf.length !== storedHashBuf.length ||
+        !_pixelTse(cookieHashBuf, storedHashBuf)
+      ) {
+        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" },
+          "Sponsored pixel: witness cookie hash mismatch — witnessedAt not set");
+        sendPixel(); return;
+      }
+
+      // All checks passed — set witnessedAt atomically and clear nonce (single-use).
+      await dbClient.update(attemptsTable)
+        .set({
+          witnessedAt: drizzleSqlP`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
+          deliveryNonce: null,
+          deliveryNonceExpiresAt: null,
+        })
+        .where(drizzleAndP(
+          drizzleEqP(attemptsTable.id, attempt.id),
+          drizzleSqlP`${attemptsTable.witnessedAt} IS NULL`,
+        ));
+      req.log?.info?.({
+        token: attemptToken.slice(0, 8) + "…",
+        attemptId: attempt.id,
+        campaignId: attempt.campaignId,
+      }, "Sponsored pixel: witnessedAt set via HttpOnly witness cookie");
+
+      sendPixel();
+    } catch (err: any) {
+      req.log?.error?.({ err }, "Sponsored pixel handler error");
+      // Always return the pixel — broken image on publisher page = poor UX.
+      try { sendPixel(); } catch { /* already sent */ }
+    }
+  });
+
+  /**
+   * Server-to-server advertiser postback — informational only.
+   *
+   * Previously this endpoint set witnessedAt. It no longer does so because
+   * the publisher possesses their campaign's callbackKey (static, returned
+   * in the dashboard) and receives the attemptToken in the ?cashclip_t= URL
+   * parameter the moment a user lands on their page. Combining these values,
+   * a malicious publisher could call /postback immediately from their own
+   * server to self-attest any visit, bypassing the intended witness gate.
+   *
+   * witnessedAt is now set exclusively by GET /api/earn/sponsored/delivery/:nonce
+   * (the platform delivery pixel), which requires a random per-attempt nonce
+   * that is only mintable after completing the /c chain, redeemed via a
+   * browser-origin image request (Sec-Fetch-Dest: image, Sec-Fetch-Site:
+   * cross-site), and expires after a short TTL.
+   *
+   * This endpoint is retained for publisher integrations that call it and
+   * validates the callbackKey to confirm the caller is the campaign owner,
+   * but it does NOT mutate any settlement-critical field.
    *
    * Rate-limited at the IP level (fail-closed).
    */
@@ -4167,7 +4380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         campaigns: campaignsTable,
         campaignVisitAttempts: attemptsTable,
       } = await import("@workspace/db");
-      const { sql: drizzleSql, eq: drizzleEqLocal, and: drizzleAndLocal } = await import("drizzle-orm");
+      const { eq: drizzleEqLocal } = await import("drizzle-orm");
       const { createHmac: _hmacPb, timingSafeEqual: _tsePb } = await import("node:crypto");
 
       const [attempt] = await dbClient.select().from(attemptsTable)
@@ -4180,6 +4393,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (attempt.settledAt) {
         res.status(409).json({ error: "Already settled." }); return;
+      }
+
+      // Guard: the redirect chain must have been completed before a postback
+      // is accepted. redirectedAt is set server-side only when the user's
+      // browser fetches /r/:token. A publisher cannot call this endpoint on
+      // an attempt that has not yet gone through the platform redirect — this
+      // prevents a postback race that front-runs the redirect hop.
+      if (!attempt.redirectedAt) {
+        req.log?.warn?.({ attemptToken: attemptToken.slice(0, 8) + "…" }, "Sponsored postback: redirectedAt not set — rejected");
+        res.status(400).json({ error: "Visit redirect not yet completed." }); return;
       }
 
       const [campaign] = await dbClient.select().from(campaignsTable)
@@ -4206,17 +4429,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(403).json({ error: "Invalid callback key." }); return;
       }
 
-      // All checks passed — set witnessedAt atomically.
-      if (!attempt.witnessedAt) {
-        await dbClient.update(attemptsTable)
-          .set({ witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())` })
-          .where(drizzleAndLocal(
-            drizzleEqLocal(attemptsTable.token, attemptToken),
-            drizzleSql`${attemptsTable.witnessedAt} IS NULL`,
-          ));
-        req.log?.info?.({ attemptToken: attemptToken.slice(0, 8) + "…", campaignId: campaign.id },
-          "Sponsored postback: witnessedAt set by advertiser server callback");
-      }
+      // Postback is INFORMATIONAL ONLY — it does not write witnessedAt.
+      //
+      // witnessedAt is set exclusively by the platform's /c redirect hop,
+      // which verifies a server-derived HMAC ack token (JWT_ACCESS_SECRET +
+      // witnessNonce, not derivable by the publisher), Fetch-Metadata
+      // browser-navigation headers, IP/UA binding, and the interstitial dwell
+      // gate. Those checks cannot be replicated by a publisher server call.
+      //
+      // Allowing postback to write witnessedAt — even conditionally — creates
+      // a self-attestation path: the publisher possesses callbackKey (static,
+      // returned from their dashboard) and receives attemptToken in the
+      // ?cashclip_t= URL the moment a user lands on their page. They could call
+      // this endpoint with those two values alone to satisfy the only witness
+      // gate, bypassing the requirement for independent proof of delivery.
+      //
+      // This endpoint is retained for publisher integrations that call it
+      // (e.g. logging on their end) but cannot influence settlement state.
+      // Settlement at /visit requires witnessedAt to have been set by /c.
+      req.log?.info?.({ attemptToken: attemptToken.slice(0, 8) + "…", campaignId: campaign.id, witnessedAt: attempt.witnessedAt },
+        "Sponsored postback: acknowledged (informational only — witnessedAt written only by /c)");
 
       res.json({ ok: true });
     } catch (err: any) {
@@ -4353,14 +4585,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await releaseIpSlot("not-redirected");
         res.status(400).json({ error: "Open the visit link before claiming the reward." }); return;
       }
-      // witnessedAt must be set — proves the advertiser-origin pixel fired.
-      // witnessedAt is set ONLY by /api/earn/sponsored/pixel/:pixelToken when the
-      // user's browser renders the tracking pixel on the advertiser's landing page.
-      // /c does NOT set witnessedAt; it only burns the witness nonce. A script can
-      // complete the full /begin → /r → /ack → /c chain and still cannot settle
-      // here because the pixel requires a browser request from the advertiser's
-      // domain with a matching Referer origin, which a non-browser script cannot
-      // produce without also knowing JWT_ACCESS_SECRET (needed to derive pixelToken).
+      // witnessedAt must be set — proves the platform's /c redirect hop fired.
+      // witnessedAt is set by /api/earn/sponsored/c/:token when the platform's
+      // completion redirect verifies the HMAC ack token (bound to JWT_ACCESS_SECRET
+      // + witnessNonce), Fetch-Metadata browser-navigation headers, IP/UA binding,
+      // and the interstitial dwell gate. A script that completes the redirect chain
+      // must genuinely navigate through /c (a real browser navigation) before this
+      // flag is set; the server will not set it from any publisher-controlled path.
       if (!attempt.witnessedAt) {
         await releaseIpSlot("not-witnessed");
         res.status(400).json({

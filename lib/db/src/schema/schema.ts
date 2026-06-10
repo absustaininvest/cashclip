@@ -301,6 +301,14 @@ export const campaignVisitAttempts = pgTable(
     // Single-use nonce set by /r, verified and cleared by /c. Also issued as
     // an HttpOnly cookie so clients without cookie support fail at /c.
     witnessNonce: varchar("witness_nonce", { length: 64 }),
+    // Short-lived delivery nonce minted by /c and redeemed by the platform
+    // pixel endpoint. Stored as SHA-256(plain nonce) so the plain value is
+    // only ever transmitted once (embedded in the redirect URL). The pixel
+    // endpoint hashes its input and compares to this column. Expires after a
+    // short TTL (default 5 min) so the window for reuse is bounded. Cleared
+    // when witnessedAt is set.
+    deliveryNonce: varchar("delivery_nonce", { length: 64 }),
+    deliveryNonceExpiresAt: timestamp("delivery_nonce_expires_at"),
     settledAt: timestamp("settled_at"),
     expiresAt: timestamp("expires_at").notNull(),
     // SHA-256 of the X-Device-Id captured at /begin time. Stored here so
