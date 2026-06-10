@@ -231,6 +231,43 @@ describe("startAdmobAlertsJob", () => {
     });
   });
 
+  it("resolves a revenue_divergence alert automatically when earnings come back within threshold", async () => {
+    // Run 1: diverged — a firing alert must be recorded.
+    getAdmobReconciliation.mockResolvedValue({
+      officialEarnings: 100,
+      appReportedEarnings: 50,
+      differenceAbs: 50,
+      differencePct: 50,
+      currency: "USD",
+    });
+    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 5 });
+
+    startAdmobAlertsJob();
+    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
+
+    const firing = getRecentAdmobAlerts().find(
+      (a) => a.condition === "revenue_divergence" && a.status === "firing",
+    );
+    expect(firing).toBeTruthy();
+
+    // Run 2: back within threshold — the state machine must emit a resolved alert.
+    getAdmobReconciliation.mockResolvedValue({
+      officialEarnings: 100,
+      appReportedEarnings: 97,
+      differenceAbs: 3,
+      differencePct: 3,
+      currency: "USD",
+    });
+
+    await vi.advanceTimersByTimeAsync(EVALUATE_INTERVAL_MS);
+
+    const resolved = getRecentAdmobAlerts().find(
+      (a) => a.condition === "revenue_divergence" && a.status === "resolved",
+    );
+    expect(resolved).toBeTruthy();
+    expect(resolved!.threshold).toBe(25);
+  });
+
   it("does not fire a revenue_divergence alert when reconciliation is within threshold", async () => {
     getAdmobReconciliation.mockResolvedValue({
       officialEarnings: 100,
