@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, Dimensions, useWindowDimensions } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getAdUnitId } from "@/lib/admob";
 import { dollarsToPoints, formatPoints } from "@/lib/points";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-export const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
+// Static export kept for FlatList layout estimation in parent screens
+export const CARD_WIDTH = (Dimensions.get("window").width - 48) / 2;
 
 const CATEGORY_COLORS: Record<string, string> = {
   finance:     "#43A047",
@@ -72,6 +72,8 @@ interface NativeAdCardProps {
 }
 
 export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = (screenWidth - 48) / 2;
   const [adData, setAdData] = useState<AdData | null>(null);
   const [loading, setLoading] = useState(true);
   const nativeAdRef = useRef<any>(null);
@@ -119,7 +121,7 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
     };
   }, []);
 
-  if (loading) return <SkeletonCard />;
+  if (loading) return <SkeletonCard width={cardWidth} />;
   if (!adData) return null;
 
   const CardContent = (
@@ -152,7 +154,7 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
   if (nativeAdRef.current) {
     const { NativeAdView } = require("react-native-google-mobile-ads");
     return (
-      <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
+      <Pressable onPress={onPress} style={{ width: cardWidth }}>
         <NativeAdView nativeAd={nativeAdRef.current} style={{ flex: 1 }}>
           {CardContent}
         </NativeAdView>
@@ -161,15 +163,15 @@ export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
   }
 
   return (
-    <Pressable onPress={onPress} style={{ width: CARD_WIDTH }}>
+    <Pressable onPress={onPress} style={{ width: cardWidth }}>
       {CardContent}
     </Pressable>
   );
 }
 
-function SkeletonCard() {
+function SkeletonCard({ width }: { width: number }) {
   return (
-    <View style={[styles.card, { width: CARD_WIDTH, opacity: 0.4 }]}>
+    <View style={[styles.card, { width, opacity: 0.4 }]}>
       <View style={[styles.thumbnail, { backgroundColor: Colors.surfaceHighlight }]} />
       <View style={styles.cardBody}>
         <View style={styles.skeletonLine} />

@@ -275,3 +275,9 @@ id = "BjRR3S1uBLIOnTsJACzp3"
 uri = "file://exports/expo-artifacts/v29-files-all.tar.gz"
 type = "unspecified"
 title = "V29 files bundle (layout, RESTORE, app.json, MANIFEST, credentials notes, sentry.properties)"
+
+[[outputs]]
+id = "_9TP9uZNuVqP5kNtpqKTd"
+uri = "file://exports/CashClip_Covered_Fixes_Manuscript.pdf"
+type = "pdf"
+title = "CashClip — Covered Fixes Manuscript"
