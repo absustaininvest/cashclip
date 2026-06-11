@@ -82,3 +82,19 @@ at all, only begin/complete). Meanwhile `spin`, `checkin`, `mission_daily`,
 `survey_profile` keep crediting daily — confirming the break is isolated to the two
 disabled routes, not a DB/auth/OTA problem. This is the definitive answer to papi's
 "internally my app is not crediting the points."
+
+## RE-ENABLED in workspace Jun 11 2026 — but a 401 curl does NOT prove prod is live
+The four routes were restored to the hardened begin/complete spin-style impl in the
+workspace (typecheck clean) with owner approval. **Trap I fell into:** an
+UNAUTHENTICATED `curl POST /api/earn/ad/begin` returns **401**, not 410 — because
+`authMiddleware` runs BEFORE the handler, so the request never reaches the 410 line.
+So "prod returns 401 now, fix is live" is FALSE reasoning: the disabled (410) build
+ALSO returns 401 to an unauthenticated caller. The app is authenticated, so it sails
+past auth and hits whatever the handler does (410 if not yet republished).
+**How to actually verify prod state:** read `fetch_deployment_logs` for the live
+status codes the *app* gets (authenticated) — `earn/(ad|game)/(begin) → 410` means
+still disabled/not republished; `→ 201/200` means the fix is live. Or check
+`earn_tokens` for fresh `rewarded_ad`/`game` rows. NEVER claim "live" off an
+unauthenticated curl. (Jun 11: workspace fixed + committed, but prod logs still
+showed 410 on papi's real taps → the API had NOT been republished; only Publish
+advances prod.)
