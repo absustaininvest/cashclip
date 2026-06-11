@@ -51,3 +51,21 @@ while SSV credits zero, and both paths share the rewarded_ad daily cap anyway; i
 SSV ever resumes, watch for dual-path over-credit.
 **Lesson:** never let a rewarded-watch path depend SOLELY on SSV — always route
 the completion through the server begin/complete credit too.
+
+## SUPERSEDED Jun 11 2026 — the begin/complete fallback is now DISABLED server-side (410)
+The fallback described above is no longer live. `POST /api/earn/ad/begin`,
+`/api/earn/ad/complete`, AND `/api/earn/game/begin|complete` all return **410
+permanently** in `artifacts/api-server/src/routes/earnings.ts` (~lines 700-732).
+**Why:** anti-fraud / threat-model call — a client-timed begin→complete ceremony
+is NOT trusted proof an ad impression actually happened, so it was removed; ad
+rewards are meant to credit ONLY via the ECDSA-signed AdMob SSV callback
+(`GET /api/admob/ssv`). **Consequence (the live bug papi reports on V29):** the
+home screen's 25 video cards (`LIVE_AD_SLOTS = AD_CARD_COUNT = 25` in
+`app/(tabs)/index.tsx`) credit NOTHING on any watch — the client still calls
+`beginAdView()` but gets 410 (`begin.ok=false`), so `completeAdView()` is skipped,
+and SSV callbacks aren't landing in prod → zero `rewarded_ad` credits.
+**How to apply:** to make watches pay again, owner must choose ONE path (needs API
+republish either way): (a) **fix real SSV** — the correct money path (relates to
+the "Real AdMob revenue in admin" follow-up), or (b) **re-enable the small
+fallback** — reverts the anti-fraud decision, owner-approved only. Do NOT silently
+re-enable the 410 routes; it was an intentional security removal.
