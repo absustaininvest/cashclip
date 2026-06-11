@@ -12,21 +12,11 @@ const team = [
     bio: "Entrepreneur, technology builder, and visionary behind AB Sustainability Investments LLC and its flagship product CashClip. Jorge leads the company's product development, technology infrastructure, and strategic direction — turning an idea into a real, growing business.",
     highlights: ["Product & Technology", "Venture Strategy", "Capital Operations"],
   },
-  {
-    initials: "AT",
-    name: "Ashley Turner",
-    title: "Head of Partnerships & Growth",
-    color: "#F5A623",
-    email: "supportpr@absustaininvest.com",
-    linkedin: null,
-    bio: "Enterprise retail executive with 20+ years of progressive leadership across multi-unit, big-box, specialty, and luxury retail environments. Former Regional Vice President overseeing $150M+ P&L and 1,200+ employees. US Army Veteran. Ashley leads all partnerships, sponsorships, influencer relations, and growth strategy for CashClip and AB Sustainability Investments.",
-    highlights: ["Partnerships & Sponsors", "Growth Strategy", "Team Development"],
-  },
 ];
 
 export default function Team() {
   const { t } = useLang();
-  const bios = [t.team.jbBio, t.team.atBio];
+  const bios = [t.team.jbBio];
   return (
     <div className="pt-32 pb-24 px-6 max-w-5xl mx-auto min-h-[80vh]">
 

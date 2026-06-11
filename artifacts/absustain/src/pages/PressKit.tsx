@@ -1,4 +1,4 @@
-import { Download, Mail, Globe, Briefcase, Smartphone, Users, BarChart3, Building2 } from "lucide-react";
+import { Mail, Globe, Briefcase, Smartphone, Users, BarChart3, Building2 } from "lucide-react";
 import { useLang } from "../lib/i18n";
 import { Seo } from "../components/Seo";
 
@@ -141,64 +141,10 @@ export default function PressKit() {
               <Mail className="w-4 h-4" /> support@absustaininvest.com
             </a>
           </div>
-          <div className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500/20 to-[#06060E] border border-yellow-500/30 flex items-center justify-center mb-4">
-              <span className="font-serif italic font-bold text-xl text-yellow-500">AT</span>
-            </div>
-            <h3 className="font-['Space_Grotesk'] text-xl font-bold text-white mb-1">Ashley Turner</h3>
-            <div className="text-yellow-500 text-xs font-medium tracking-widest uppercase mb-4">Head of Partnerships & Growth</div>
-            <p className="text-white/50 text-sm leading-relaxed">
-              Enterprise retail executive with 20+ years of leadership experience. Former Regional Vice President overseeing $150M+ P&L and 1,200+ employees. US Army Veteran. Ashley leads all partnerships, sponsorships, and growth strategy.
-            </p>
-            <a href="mailto:ashley.turner@cash-clip.app" className="mt-4 inline-flex items-center gap-2 text-yellow-500 text-sm hover:underline">
-              <Mail className="w-4 h-4" /> ashley.turner@cash-clip.app
-            </a>
-          </div>
         </div>
       </section>
 
-      {/* Media Contact */}
-      <section className="mb-16">
-        <div className="section-label">{t.press.contactLabel}</div>
-        <div className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-10 mt-6">
-          <div className="flex flex-col md:flex-row md:items-center gap-8">
-            <div className="flex-1">
-              <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-white mb-2">{t.press.mediaInquiries}</h2>
-              <p className="text-white/50 mb-4">{t.press.mediaDesc}</p>
-              <div className="space-y-3">
-                <a href="mailto:ashley.turner@cash-clip.app" className="flex items-center gap-3 text-white/70 hover:text-[#00E676] transition-colors">
-                  <Mail className="w-5 h-5 text-[#00E676]" />
-                  <span>ashley.turner@cash-clip.app</span>
-                </a>
-                <a href="https://absustaininvest.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-white/70 hover:text-[#00E676] transition-colors">
-                  <Globe className="w-5 h-5 text-[#00E676]" />
-                  <span>absustaininvest.com</span>
-                </a>
-                <a href="https://cash-clip.app" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-white/70 hover:text-[#00E676] transition-colors">
-                  <Smartphone className="w-5 h-5 text-[#00E676]" />
-                  <span>cash-clip.app</span>
-                </a>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <a
-                href="mailto:ashley.turner@cash-clip.app?subject=Media%20Inquiry%20—%20AB%20Sustainability%20Investments"
-                className="hero-cta"
-              >
-                <Mail className="w-4 h-4 mr-2" /> {t.press.contactMediaTeam}
-              </a>
-              <a
-                href="/absustain/ashley-resume.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/30 transition-colors text-sm font-medium"
-              >
-                <Download className="w-4 h-4" /> {t.press.leadershipBio}
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Media Contact — removed per owner (Jun 2026); area intentionally left blank to refill later */}
 
       {/* Key Facts */}
       <section>
