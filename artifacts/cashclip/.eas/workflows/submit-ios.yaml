@@ -1,0 +1,11 @@
+name: EAS Submit — iOS
+
+jobs:
+  submit:
+    name: Submit iOS
+    steps:
+      - eas/submit:
+          name: EAS Submit (iOS)
+          inputs:
+            platform: ios
+            profile: production

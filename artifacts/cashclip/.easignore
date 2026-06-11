@@ -1,28 +1,4 @@
-# Exclude other workspace artifacts — keeps EAS archive small
-../../artifacts/absustain
-../../artifacts/api-server
-../../artifacts/cashclip-overview
-../../artifacts/cashclip-video
-../../artifacts/mockup-sandbox
-../../scripts/exports
-
-# Exclude root and workspace node_modules (EAS installs its own)
-../../node_modules
-../../artifacts/api-server/node_modules
-../../artifacts/absustain/node_modules
-
-# Build artifacts
-../../artifacts/api-server/dist
-../../artifacts/absustain/dist
-
-# Heavy local-only dirs — when .easignore exists EAS ignores .gitignore, so these
-# must be listed explicitly or the upload tarball balloons (gigabytes) and fails.
-# Same set excluded from deployment via root .replitignore. None are needed to build.
-../../exports
-../../attached_assets
-../../snapshots
-../../.local
-../../.cache
-../../.git
-../../.config
-../../.pythonlibs
+node_modules/
+.git/
+*.log
+attached_assets/
