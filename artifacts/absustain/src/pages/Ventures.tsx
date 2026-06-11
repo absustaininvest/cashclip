@@ -1,4 +1,4 @@
-import { ArrowUpRight, Smartphone, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor } from "lucide-react";
+import { ArrowUpRight, ShoppingBag, UtensilsCrossed, Link2, ExternalLink, Monitor } from "lucide-react";
 import { Link } from "wouter";
 import { useLang } from "../lib/i18n";
 import { Seo } from "../components/Seo";
@@ -26,7 +26,13 @@ export default function Ventures() {
           <div className="flex-1 w-full relative">
             <div className="aspect-[4/3] rounded-3xl bg-gradient-to-br from-[#00E676]/20 to-[#06060E] border border-white/5 flex items-center justify-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-[#00E676]/5 group-hover:bg-[#00E676]/10 transition-colors" />
-              <Smartphone className="w-24 h-24 text-[#00E676] opacity-80 group-hover:scale-110 transition-transform duration-500" />
+              <div className="absolute inset-0 flex items-center justify-center p-10">
+                <img
+                  src={`${import.meta.env.BASE_URL}cashclip-logo.png`}
+                  alt="CashClip"
+                  className="w-full max-w-[220px] object-contain rounded-[28px] shadow-2xl opacity-95 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                />
+              </div>
             </div>
           </div>
           <div className="flex-1 space-y-6">
@@ -42,11 +48,11 @@ export default function Ventures() {
               </li>
               <li className="flex justify-between items-center text-white/70">
                 <span>{t.ventures.status}</span>
-                <span className="font-semibold text-[#00E676]">In Apple App Store Review</span>
+                <span className="font-semibold text-[#00E676]">Live on the App Store</span>
               </li>
             </ul>
-            <a href="https://cash-clip.app" target="_blank" rel="noopener noreferrer" className="hero-cta !text-sm !py-3 !px-6" data-testid="link-cashclip">
-              {t.ventures.visitSite} <ArrowUpRight className="w-4 h-4 ml-1" />
+            <a href="https://apps.apple.com/app/id6759931285" target="_blank" rel="noopener noreferrer" className="hero-cta !text-sm !py-3 !px-6" data-testid="link-cashclip">
+              Get it on the App Store <ArrowUpRight className="w-4 h-4 ml-1" />
             </a>
             <div className="flex flex-wrap gap-3 mt-2">
               <a
