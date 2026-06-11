@@ -275,13 +275,13 @@ export async function completeSpin(challengeToken: string): Promise<SpinComplete
   return { ok: false, retryable: true };
 }
 
-// ── SERVER-AUTHORITATIVE MINI-GAME REWARD (begin → complete) ──────────────────
-// Mirrors the spin wheel. The client calls beginGame() when the game starts to
-// get a server challenge token, then completeGame(token) when the player wins.
-// The SERVER decides the reward amount (from its GAME_POOL) and drops it into
-// the pending wallet — the game's on-screen symbols/outcome are cosmetic and are
-// never trusted for the amount. This is the only path that credits game rewards;
-// the old local-only credit never reached the withdrawable server balance.
+// ── MINI-GAME REWARD (begin → complete) — SERVER-SIDE DISABLED ────────────────
+// The /api/earn/game/begin and /api/earn/game/complete endpoints return 410 Gone.
+// A client-timed begin→complete ceremony proves only elapsed time (not a real
+// win) and was trivially bypassable; it has been disabled server-side until a
+// server-verifiable completion signal exists. beginGame() and completeGame() are
+// retained so game screens compile; they return { ok: false } on 410 and the
+// game UI shows the win animation without a server reward.
 export type GameBeginResult =
   | { ok: true;  challengeToken: string }
   | { ok: false; retryable: boolean };
@@ -361,13 +361,14 @@ export async function completeGame(
   return { ok: false, retryable: true };
 }
 
-// ── IN-APP REWARDED-AD FALLBACK (server-set small reward) ─────────────────────
-// Mirrors the spin/game flow. When AdMob isn't filling, the home/Earn video
-// slots still pay a SMALL server-decided amount: beginAdView() when the ad
-// starts (gets a server challenge token), completeAdView(token) when it finishes.
-// The SERVER decides the amount and shares the rewarded_ad daily cap with the
-// SSV path — the client never chooses the amount, and the generic /record path
-// still blocks "rewarded_ad" outright. Real ad revenue still pays via SSV.
+// ── IN-APP REWARDED-AD FALLBACK (begin → complete) — SERVER-SIDE DISABLED ─────
+// The /api/earn/ad/begin and /api/earn/ad/complete endpoints return 410 Gone.
+// A client-timed begin→complete ceremony proves only elapsed time (not a real
+// impression) and was trivially bypassable; it has been disabled server-side.
+// Real ad rewards are delivered exclusively via Google AdMob SSV (ECDSA-SHA256
+// verified at GET /api/admob/ssv). beginAdView() and completeAdView() are
+// retained so the Earn screen compiles; they return { ok: false } on 410 and
+// the caller skips the earn-token step gracefully.
 export type AdBeginResult =
   | { ok: true;  challengeToken: string }
   | { ok: false; retryable: boolean };

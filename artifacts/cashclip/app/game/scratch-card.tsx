@@ -190,11 +190,10 @@ export default function ScratchCardGame() {
     return () => { cancelled = true; };
   }, []);
 
-  // Request the server reward challenge once, lazily, on first interaction.
-  // beginGame() quietly retries transient failures; we cache the in-flight
-  // promise so the win handler can await the very-fast-win case. If a begin
-  // attempt FAILS we clear the ref so a later reveal (or the win handler) can
-  // re-attempt — otherwise a single early network blip would lose the reward.
+  // Game earn endpoints are currently disabled server-side (410).
+  // beginGame() returns { ok: false }; ensureChallenge clears the ref so
+  // the win handler finds no token and bankReward skips the server call —
+  // the player still gets the win UI but no server reward.
   const ensureChallenge = useCallback(() => {
     if (!beginPromiseRef.current) {
       const p = beginGame();

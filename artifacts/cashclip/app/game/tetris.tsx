@@ -192,6 +192,9 @@ export default function TetrisGame() {
     });
   }, []);
 
+  // Game earn endpoints are currently disabled server-side (410).
+  // beginGame() will return { ok: false }; bankReward handles this
+  // gracefully — the player still gets the win UI but no server reward.
   const bankReward = useCallback(async (desc: string) => {
     const begin = await beginGame();
     if (!begin.ok) {

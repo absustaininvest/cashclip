@@ -694,298 +694,61 @@ export function registerEarningsRoutes(app: Express): void {
   );
 
   // ── POST /api/earn/game/begin ────────────────────────────────────────────────
-  // Issues a server-side game challenge token. The client must present this
-  // token to /api/earn/game/complete before a game earn token is issued. This
-  // mirrors the spin wheel: /complete is rejected without a valid, unexpired,
-  // same-user challenge, so a tampered client can't mint game rewards directly
-  // (the generic /api/earnings/record path still blocks "game" outright).
+  // DISABLED: client-timed begin→complete is insufficient proof of a real game
+  // win (see threat model — "client-timed ceremonies are not trusted proof for
+  // money-like rewards without a server-verifiable signal"). No trusted third-
+  // party callback exists for in-app games; the time-delay guard (1.5 s) is
+  // trivially bypassable by an automated client. Returns 410 Gone until a
+  // server-verifiable completion signal is available.
   app.post(
     "/api/earn/game/begin",
     authMiddleware,
     earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { randomBytes } = await import("node:crypto");
-        const challengeToken = randomBytes(32).toString("hex");
-        await issueSpinChallenge(challengeToken, req.userId!, SPIN_CHALLENGE_TTL_MS);
-        logger.info({ userId: req.userId }, "game challenge issued");
-        res.status(201).json({ challengeToken });
-      } catch (err) {
-        if (err instanceof SpinChallengeStoreError) {
-          logger.error({ err, userId: req.userId }, "earn/game/begin store unavailable — failing retryable");
-          res.status(503).json({
-            error: "Games are temporarily unavailable. Please try again in a moment.",
-            retryable: true,
-          });
-          return;
-        }
-        logger.error({ err }, "earn/game/begin error");
-        res.status(500).json({ error: "Failed to begin game" });
-      }
+    (_req: AuthRequest, res: Response): void => {
+      res.status(410).json({ error: "Game rewards are not currently available" });
     },
   );
 
   // ── POST /api/earn/game/complete ─────────────────────────────────────────────
-  // Validates the server-issued game challenge and issues a pending earn token.
-  // The reward amount is ALWAYS server-decided (pickRandom(GAME_POOL)) — the
-  // client's game outcome/symbols are cosmetic and never trusted. Enforced:
-  // challenge must exist, belong to this user, not be expired, and have been
-  // issued at least GAME_CHALLENGE_MIN_MS ago. Then applies the daily game cap.
+  // DISABLED: see /api/earn/game/begin. No valid challenge can be obtained while
+  // begin returns 410, so this endpoint is also unreachable in practice. Kept as
+  // an explicit 410 to reject any stale or replayed challenge tokens cleanly.
   app.post(
     "/api/earn/game/complete",
     authMiddleware,
     earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { challengeToken, description } = req.body as { challengeToken?: unknown; description?: unknown };
-        if (!challengeToken || typeof challengeToken !== "string") {
-          res.status(400).json({ error: "challengeToken is required" }); return;
-        }
-
-        // Validate + atomically consume the challenge from the shared DB store.
-        const consumed = await consumeSpinChallenge(
-          challengeToken,
-          req.userId!,
-          GAME_CHALLENGE_MIN_MS,
-        );
-        if (consumed.status === "not_found") {
-          res.status(403).json({ error: "Invalid or expired game challenge" }); return;
-        }
-        if (consumed.status === "wrong_user") {
-          res.status(403).json({ error: "Game challenge does not belong to this user" }); return;
-        }
-        if (consumed.status === "expired") {
-          res.status(403).json({ error: "Game challenge expired — please play again" }); return;
-        }
-        if (consumed.status === "too_early") {
-          res.status(425).json({
-            error: "Game completed too quickly",
-            retryAfterMs: consumed.retryAfterMs,
-          }); return;
-        }
-
-        const config = ACTION_CONFIG.game;
-        const desc = typeof description === "string" && description.trim()
-          ? description.slice(0, 120)
-          : "Game reward";
-
-        // ── Serialize per-user game operations via row-level lock ────────────
-        // Daily cap check + insert run inside a single transaction that locks
-        // the user row first, so concurrent /complete requests (each with their
-        // own valid challenge) can't race past the daily cap.
-        type GameResult =
-          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
-          | { ok: false; status: number; error: string; cap?: number };
-
-        const result: GameResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
-          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
-
-          const now      = new Date();
-          const dayStart = new Date(now);
-          dayStart.setUTCHours(0, 0, 0, 0);
-
-          const [{ todayCount }] = await tx
-            .select({ todayCount: count() })
-            .from(earnTokens)
-            .where(and(
-              eq(earnTokens.userId, req.userId!),
-              eq(earnTokens.actionType, "game"),
-              gte(earnTokens.earnedAt, dayStart),
-            ));
-          if (Number(todayCount) >= config.dailyCap) {
-            return { ok: false, status: 429, error: "Daily game limit reached", cap: config.dailyCap };
-          }
-
-          const pts = pickRandom(GAME_POOL);
-          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
-          const snapshot = await snapshotRateString();
-          const [token] = await tx.insert(earnTokens).values({
-            userId:      req.userId!,
-            points:      pts,
-            actionType:  "game",
-            description: desc,
-            earnedAt:    now,
-            claimableAt,
-            status:      "pending",
-            usdPerPointSnapshot: snapshot,
-          }).returning();
-
-          return { ok: true, tokenId: token.id, points: pts, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: config.dailyCap };
-        });
-
-        if (!result.ok) {
-          const { status, error, ...rest } = result;
-          res.status(status).json({ error, ...rest }); return;
-        }
-
-        logger.info({ userId: req.userId, pts: result.points }, "game earn token issued via challenge");
-        res.status(201).json({
-          tokenId:     result.tokenId,
-          points:      result.points,
-          claimableAt: result.claimableAt,
-          dailyUsed:   result.dailyUsed,
-          dailyCap:    result.dailyCap,
-        });
-      } catch (err) {
-        if (err instanceof SpinChallengeStoreError) {
-          logger.error({ err, userId: req.userId }, "earn/game/complete store unavailable — failing retryable");
-          res.status(503).json({
-            error: "Games are temporarily unavailable. Please try again in a moment.",
-            retryable: true,
-          });
-          return;
-        }
-        logger.error({ err }, "earn/game/complete error");
-        res.status(500).json({ error: "Failed to complete game" });
-      }
+    (_req: AuthRequest, res: Response): void => {
+      res.status(410).json({ error: "Game rewards are not currently available" });
     },
   );
 
   // ── POST /api/earn/ad/begin ──────────────────────────────────────────────────
-  // Issues a server-side challenge token for the in-app rewarded-ad fallback.
-  // The client must present this token to /api/earn/ad/complete before a (small)
-  // earn token is issued. Mirrors the spin/game flow: /complete is rejected
-  // without a valid, unexpired, same-user challenge, so a tampered client can't
-  // mint ad rewards directly (the generic /api/earnings/record path still blocks
-  // "rewarded_ad" outright). Real ad revenue still pays via Google's SSV callback.
+  // DISABLED: client-timed begin→complete for in-app ads is insufficient proof
+  // of a real impression (see threat model). The time-delay guard (4 s) is
+  // trivially bypassable by an automated client. Real ad rewards are delivered
+  // exclusively via Google AdMob SSV (ECDSA-SHA256 verified at GET /api/admob/ssv).
+  // Returns 410 Gone. The fallback in-app ad modal will not reward users until
+  // SSV delivery is confirmed in production, at which point this path can be
+  // removed entirely.
   app.post(
     "/api/earn/ad/begin",
     authMiddleware,
     earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { randomBytes } = await import("node:crypto");
-        const challengeToken = randomBytes(32).toString("hex");
-        await issueSpinChallenge(challengeToken, req.userId!, SPIN_CHALLENGE_TTL_MS);
-        logger.info({ userId: req.userId }, "ad challenge issued");
-        res.status(201).json({ challengeToken });
-      } catch (err) {
-        if (err instanceof SpinChallengeStoreError) {
-          logger.error({ err, userId: req.userId }, "earn/ad/begin store unavailable — failing retryable");
-          res.status(503).json({
-            error: "Ads are temporarily unavailable. Please try again in a moment.",
-            retryable: true,
-          });
-          return;
-        }
-        logger.error({ err }, "earn/ad/begin error");
-        res.status(500).json({ error: "Failed to begin ad" });
-      }
+    (_req: AuthRequest, res: Response): void => {
+      res.status(410).json({ error: "Ad rewards via this path are not currently available" });
     },
   );
 
   // ── POST /api/earn/ad/complete ───────────────────────────────────────────────
-  // Validates the server-issued ad challenge and issues a small pending earn
-  // token. The reward amount is ALWAYS server-decided (AD_FALLBACK_POINTS) — the
-  // client never chooses it. Shares the rewarded_ad daily cap with SSV so the two
-  // ad paths together can't exceed ACTION_CONFIG.rewarded_ad.dailyCap per day.
+  // DISABLED: see /api/earn/ad/begin. No valid challenge can be obtained while
+  // begin returns 410, so this endpoint is also unreachable in practice. Kept as
+  // an explicit 410 to reject any stale or replayed challenge tokens cleanly.
   app.post(
     "/api/earn/ad/complete",
     authMiddleware,
     earnLimit,
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      try {
-        const { challengeToken, description } = req.body as { challengeToken?: unknown; description?: unknown };
-        if (!challengeToken || typeof challengeToken !== "string") {
-          res.status(400).json({ error: "challengeToken is required" }); return;
-        }
-
-        // Validate + atomically consume the challenge from the shared DB store.
-        const consumed = await consumeSpinChallenge(
-          challengeToken,
-          req.userId!,
-          AD_CHALLENGE_MIN_MS,
-        );
-        if (consumed.status === "not_found") {
-          res.status(403).json({ error: "Invalid or expired ad challenge" }); return;
-        }
-        if (consumed.status === "wrong_user") {
-          res.status(403).json({ error: "Ad challenge does not belong to this user" }); return;
-        }
-        if (consumed.status === "expired") {
-          res.status(403).json({ error: "Ad challenge expired — please watch again" }); return;
-        }
-        if (consumed.status === "too_early") {
-          res.status(425).json({
-            error: "Ad completed too quickly",
-            retryAfterMs: consumed.retryAfterMs,
-          }); return;
-        }
-
-        const cap = ACTION_CONFIG.rewarded_ad.dailyCap;
-        const desc = typeof description === "string" && description.trim()
-          ? description.slice(0, 120)
-          : "Rewarded ad · in-app";
-
-        // ── Serialize per-user ad operations via row-level lock ──────────────
-        // Daily cap check + insert run inside a single transaction that locks the
-        // user row first, so concurrent /complete requests (each with their own
-        // valid challenge) can't race past the shared rewarded_ad daily cap.
-        type AdResult =
-          | { ok: true; tokenId: string; points: number; claimableAt: string; dailyUsed: number; dailyCap: number }
-          | { ok: false; status: number; error: string; cap?: number };
-
-        const result: AdResult = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
-          await tx.execute(sql`SELECT id FROM users WHERE id = ${req.userId!} FOR UPDATE`);
-
-          const now      = new Date();
-          const dayStart = new Date(now);
-          dayStart.setUTCHours(0, 0, 0, 0);
-
-          // Shared rewarded_ad daily cap (counts both SSV-verified and in-app)
-          const [{ todayCount }] = await tx
-            .select({ todayCount: count() })
-            .from(earnTokens)
-            .where(and(
-              eq(earnTokens.userId, req.userId!),
-              eq(earnTokens.actionType, "rewarded_ad"),
-              gte(earnTokens.earnedAt, dayStart),
-            ));
-          if (Number(todayCount) >= cap) {
-            return { ok: false, status: 429, error: "Daily ad limit reached", cap };
-          }
-
-          const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
-          const snapshot = await snapshotRateString();
-          const [token] = await tx.insert(earnTokens).values({
-            userId:      req.userId!,
-            points:      AD_FALLBACK_POINTS,
-            actionType:  "rewarded_ad",
-            description: desc,
-            earnedAt:    now,
-            claimableAt,
-            status:      "pending",
-            usdPerPointSnapshot: snapshot,
-          }).returning();
-
-          return { ok: true, tokenId: token.id, points: AD_FALLBACK_POINTS, claimableAt: claimableAt.toISOString(), dailyUsed: Number(todayCount) + 1, dailyCap: cap };
-        });
-
-        if (!result.ok) {
-          const { status, error, ...rest } = result;
-          res.status(status).json({ error, ...rest }); return;
-        }
-
-        logger.info({ userId: req.userId, pts: result.points }, "ad fallback earn token issued via challenge");
-        res.status(201).json({
-          tokenId:     result.tokenId,
-          points:      result.points,
-          claimableAt: result.claimableAt,
-          dailyUsed:   result.dailyUsed,
-          dailyCap:    result.dailyCap,
-        });
-      } catch (err) {
-        if (err instanceof SpinChallengeStoreError) {
-          logger.error({ err, userId: req.userId }, "earn/ad/complete store unavailable — failing retryable");
-          res.status(503).json({
-            error: "Ads are temporarily unavailable. Please try again in a moment.",
-            retryable: true,
-          });
-          return;
-        }
-        logger.error({ err }, "earn/ad/complete error");
-        res.status(500).json({ error: "Failed to complete ad" });
-      }
+    (_req: AuthRequest, res: Response): void => {
+      res.status(410).json({ error: "Ad rewards via this path are not currently available" });
     },
   );
 

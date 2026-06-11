@@ -221,6 +221,9 @@ export default function BlockBlitzGame() {
 
   const bankedRef = useRef(false);
 
+  // Game earn endpoints are currently disabled server-side (410).
+  // beginGame() will return { ok: false }; bankReward handles this
+  // gracefully — the player still gets the win UI but no server reward.
   const bankReward = useCallback(async (desc: string) => {
     if (bankedRef.current) return;
     bankedRef.current = true;
