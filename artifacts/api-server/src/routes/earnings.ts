@@ -1254,11 +1254,12 @@ export function registerEarningsRoutes(app: Express): void {
     }
   });
 
-  // ── 2-HOUR AUTO-CONVERSION JOB ────────────────────────────────────────────────
+  // ── AUTO-CONVERSION JOB ───────────────────────────────────────────────────────
   // Sweeps ALL users' eligible earn tokens (past 3-hour hold) and credits
-  // balances automatically every 2 hours. Respects the daily $5 cap per user.
+  // balances automatically every 30 minutes, so points convert shortly after
+  // their 3-hour hold clears. Respects the daily $5 cap per user.
   // The manual /api/earnings/claim endpoint still exists for instant conversion.
-  const AUTO_CONVERT_INTERVAL_MS = 2 * 60 * 60 * 1000;
+  const AUTO_CONVERT_INTERVAL_MS = 30 * 60 * 1000;
   const AUTO_CONVERT_LOCK_KEY = 260001; // singleton-job advisory-lock key
 
   async function runAutoConvert(): Promise<void> {
@@ -1373,7 +1374,7 @@ export function registerEarningsRoutes(app: Express): void {
   // Expose the sweep for deterministic testing of the earn→convert flow.
   runAutoConvertForTests = runAutoConvert;
 
-  // Initial run 5 minutes after startup, then every 2 hours
+  // Initial run 5 minutes after startup, then every 30 minutes
   setTimeout(() => {
     runAutoConvert().catch((err) => logger.error({ err }, "auto-convert: initial run failed"));
     setInterval(() => {
