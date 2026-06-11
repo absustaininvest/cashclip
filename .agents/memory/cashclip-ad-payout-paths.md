@@ -69,3 +69,16 @@ republish either way): (a) **fix real SSV** — the correct money path (relates 
 the "Real AdMob revenue in admin" follow-up), or (b) **re-enable the small
 fallback** — reverts the anti-fraud decision, owner-approved only. Do NOT silently
 re-enable the 410 routes; it was an intentional security removal.
+
+## PROVEN Jun 11 2026 via prod DB — SSV has NEVER credited; all ad points came from the fallback
+Read-only prod query of `earn_tokens`: 107 `rewarded_ad` tokens EVER, **all with
+empty `transaction_id`** and the LAST one dated **Jun 9 2026** — same day commit
+`9e28a7b` ("disable exploitable game and ad reward earn paths (begin/complete)")
+landed. SSV-sourced tokens would carry Google's transaction_id; zero do. So the
+real Google SSV path has credited **nobody, ever** — every ad point users ever got
+came from the begin/complete fallback, which the Jun 9 security commit then turned
+off. `game` credits stopped the same day for the same reason (game has NO SSV path
+at all, only begin/complete). Meanwhile `spin`, `checkin`, `mission_daily`,
+`survey_profile` keep crediting daily — confirming the break is isolated to the two
+disabled routes, not a DB/auth/OTA problem. This is the definitive answer to papi's
+"internally my app is not crediting the points."
