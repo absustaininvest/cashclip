@@ -232,32 +232,19 @@ export default function SurveysScreen() {
       });
       setIsLaunchingExternal(false);
 
-      // CPX and BitLabs credit via S2S webhook — no manual claim needed.
-      // Attempting a fake transaction ID against these providers always fails
-      // and shows a confusing error. Just close the modal and let the webhook land.
-      const isWebhookProvider = pendingExternalSurvey.provider === "cpx" || pendingExternalSurvey.provider === "bitlabs";
-      if (isWebhookProvider) {
-        const estReward = pendingExternalSurvey.reward;
-        setPendingExternalSurvey(null);
-        setExternalSessionToken(null);
-        queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
-        refetchExternal();
-        setSuccessModal({
-          amount: Number.isFinite(estReward) ? estReward : 0,
-          title: "Survey Submitted!",
-          subtitle: "Your reward will appear in your balance within a few minutes — it's credited automatically.",
-        });
-        return;
-      }
-
-      // For all other providers: auto-claim the reward on browser close
-      setIsClaimingReward(true);
-      const autoTxnId = `${sessionTok.substring(0, 12)}-auto-${Date.now()}`;
-      await completeExternalMutation.mutateAsync({
-        surveyId: pendingExternalSurvey.id,
-        provider: pendingExternalSurvey.provider,
-        sessionToken: sessionTok,
-        transactionId: autoTxnId,
+      // All providers credit via S2S webhook — no client-side claim needed.
+      // Submitting a client-fabricated transaction ID cannot be verified against
+      // provider records and is rejected by the server. Wait for the provider
+      // callback to land instead.
+      const estReward = pendingExternalSurvey.reward;
+      setPendingExternalSurvey(null);
+      setExternalSessionToken(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
+      refetchExternal();
+      setSuccessModal({
+        amount: Number.isFinite(estReward) ? estReward : 0,
+        title: "Survey Submitted!",
+        subtitle: "Your reward will appear in your balance within a few minutes — it's credited automatically.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
     } catch (err: any) {
@@ -267,7 +254,7 @@ export default function SurveysScreen() {
         Alert.alert("Error", "Could not launch survey. Please try again.");
       }
     }
-  }, [pendingExternalSurvey, queryClient, completeExternalMutation]);
+  }, [pendingExternalSurvey, queryClient]);
 
   if (!fontsLoaded) return null;
 

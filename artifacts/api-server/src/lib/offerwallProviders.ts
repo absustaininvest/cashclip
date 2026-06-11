@@ -612,12 +612,12 @@ async function offerCompletionBodyOk(res: Response, transactionId: string, userI
   if (!payload || typeof payload !== "object") return false;
   const status = (payload.status || payload.state || "").toString().toLowerCase();
   const flag = payload.completed === true || payload.verified === true;
-  const txn = (payload.transaction_id || payload.transactionId || "").toString();
   const statusOk = ["completed", "complete", "success", "verified", "approved"].includes(status);
   if (!statusOk && !flag) return false;
-  if (txn && txn !== transactionId) return false;
+  const txn = (payload.transaction_id || payload.transactionId || "").toString();
+  if (!txn || txn !== transactionId) return false;
   const payloadUser = (payload.user_id || payload.userId || "").toString();
-  if (payloadUser && payloadUser !== userId) return false;
+  if (!payloadUser || payloadUser !== userId) return false;
   return true;
 }
 

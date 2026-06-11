@@ -414,7 +414,7 @@ async function verifyPollfishCompletion(surveyId: string, apiKey: string, transa
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) return false;
-    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
     return false;
   }
@@ -427,7 +427,7 @@ async function verifyCintCompletion(surveyId: string, apiKey: string, transactio
       headers: { "X-Api-Key": apiKey },
     });
     if (!res.ok) return false;
-    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
     return false;
   }
@@ -440,7 +440,7 @@ async function verifyLucidCompletion(surveyId: string, apiKey: string, transacti
       headers: { Authorization: apiKey },
     });
     if (!res.ok) return false;
-    return isCompletionPayloadValid(await safeJson(res), transactionId, userId);
+    return isStrictCompletionPayloadValid(await safeJson(res), transactionId, userId);
   } catch {
     return false;
   }
