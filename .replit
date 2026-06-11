@@ -44,6 +44,10 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Project Video"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "OTA V40 V41"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -76,6 +80,17 @@ author = "agent"
 task = "shell.exec"
 args = "PORT=5173 pnpm --filter @workspace/intro-video run dev"
 waitForPort = 5173
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "OTA V40 V41"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/cashclip && rm -f /tmp/ota_v40v41.log && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_PUBLIC_ENV=production EXPO_PUBLIC_DOMAIN=cash-clip.app pnpm exec eas update --branch production --message \"V40/V41 OTA: pending-points label 'Auto-converts ~3 hours after earning' (runtime 1.1.0)\" --non-interactive > /tmp/ota_v40v41.log 2>&1; echo \"EAS_DONE_EXIT=$?\" >> /tmp/ota_v40v41.log"
 
 [workflows.workflow.metadata]
 outputType = "console"
