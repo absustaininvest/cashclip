@@ -14,3 +14,15 @@
 # Build artifacts
 ../../artifacts/api-server/dist
 ../../artifacts/absustain/dist
+
+# Heavy local-only dirs — when .easignore exists EAS ignores .gitignore, so these
+# must be listed explicitly or the upload tarball balloons (gigabytes) and fails.
+# Same set excluded from deployment via root .replitignore. None are needed to build.
+../../exports
+../../attached_assets
+../../snapshots
+../../.local
+../../.cache
+../../.git
+../../.config
+../../.pythonlibs
