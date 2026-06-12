@@ -703,6 +703,7 @@ export default function EarnScreen() {
   const [lastWatchedAdId, setLastWatchedAdId] = useState<string | null>(null);
   const [lastWatchedAdPts, setLastWatchedAdPts] = useState<number>(0);
   const [lastGameEarnedPts, setLastGameEarnedPts] = useState<number | null>(null);
+  const [lastCheckinEarnedPts, setLastCheckinEarnedPts] = useState<number | null>(null);
   const pendingPtsBeforeGamesRef = useRef<number | null>(null);
   const checkGameEarnedRef = useRef(false);
 
@@ -805,6 +806,7 @@ export default function EarnScreen() {
     const server = await recordCheckin();
     if (server) {
       setCheckinStreak(server.checkinStreak);
+      setLastCheckinEarnedPts(server.points);
       if (server.milestoneBonus > 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setMilestoneCelebration({ streak: server.checkinStreak, bonus: server.milestoneBonus });
@@ -1172,48 +1174,55 @@ export default function EarnScreen() {
               const isToday = dayNum === checkinStreak && checkedInToday;
               const isMilestone = milestoneEvery > 0 && dayNum % milestoneEvery === 0;
               return (
-                <View
-                  key={i}
-                  style={[
-                    styles.dayCircle,
-                    isActive && styles.dayCircleActive,
-                    isToday && styles.dayCircleToday,
-                    isCurrent && styles.dayCircleCurrent,
-                    isMilestone && styles.dayCircleMilestone,
-                  ]}
-                >
-                  {isMilestone && (
-                    <View style={styles.dayMilestoneBadge}>
-                      <Ionicons name="star" size={9} color={Colors.background} />
-                    </View>
-                  )}
-                  {isActive ? (
-                    <Ionicons
-                      name="checkmark"
-                      size={14}
-                      color={Colors.background}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.dayNum,
-                        isCurrent && { color: Colors.primary },
-                        isMilestone && { color: Colors.accent },
-                      ]}
-                    >
-                      {dayNum}
-                    </Text>
-                  )}
-                  <Text
+                <View key={i} style={{ alignItems: "center" }}>
+                  <View
                     style={[
-                      styles.dayReward,
-                      isActive && { color: Colors.primary },
-                      isCurrent && { color: Colors.primary },
-                      isMilestone && !isActive && { color: Colors.accent },
+                      styles.dayCircle,
+                      isActive && styles.dayCircleActive,
+                      isToday && styles.dayCircleToday,
+                      isCurrent && styles.dayCircleCurrent,
+                      isMilestone && styles.dayCircleMilestone,
                     ]}
                   >
-                    {reward} pts
-                  </Text>
+                    {isMilestone && (
+                      <View style={styles.dayMilestoneBadge}>
+                        <Ionicons name="star" size={9} color={Colors.background} />
+                      </View>
+                    )}
+                    {isActive ? (
+                      <Ionicons
+                        name="checkmark"
+                        size={14}
+                        color={Colors.background}
+                      />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.dayNum,
+                          isCurrent && { color: Colors.primary },
+                          isMilestone && { color: Colors.accent },
+                        ]}
+                      >
+                        {dayNum}
+                      </Text>
+                    )}
+                    <Text
+                      style={[
+                        styles.dayReward,
+                        isActive && { color: Colors.primary },
+                        isCurrent && { color: Colors.primary },
+                        isMilestone && !isActive && { color: Colors.accent },
+                      ]}
+                    >
+                      {reward} pts
+                    </Text>
+                  </View>
+                  {isToday && lastCheckinEarnedPts != null && (
+                    <View style={styles.checkinEarnedBadge}>
+                      <Feather name="check" size={8} color={Colors.primary} />
+                      <Text style={styles.checkinEarnedText}>+{lastCheckinEarnedPts}</Text>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -2473,6 +2482,21 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
     fontSize: 11,
     color: "#E040FB",
+  },
+  checkinEarnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(0,230,118,0.12)",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  checkinEarnedText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 8,
+    color: Colors.primary,
   },
 
   modalOverlay: {
