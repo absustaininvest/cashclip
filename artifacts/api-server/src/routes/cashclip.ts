@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const now = Date.now();
     adFillState.rewardedFillAvailable = rewardedFillAvailable;
     adFillState.reportedAt = now;
-    adFillState.reportedByUserId = req.user?.id ?? null;
+    adFillState.reportedByUserId = req.userId ?? null;
     // Fire-and-forget: persist so the value survives API restarts.
     setSetting(AD_FILL_AVAILABLE_KEY, String(rewardedFillAvailable)).catch(() => {});
     setSetting(AD_FILL_REPORTED_AT_KEY, String(now)).catch(() => {});

@@ -168,7 +168,7 @@ describe.each(LENIENT_PROVIDERS)(
       );
       await verifyProviderCompletion({ surveyId, provider, userId, transactionId });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const calledUrl: string = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl: string = (fetchSpy.mock.calls as unknown as string[][])[0][0];
       const url = new URL(calledUrl);
       const expectedPath = `${expectedPathPrefix}abc/completions/${transactionId}`;
       expect(url.pathname).toBe(expectedPath);

@@ -306,7 +306,7 @@ function allText(node: TestRenderer.ReactTestInstance): string[] {
 // without any setTimeout that would allow React 19's scheduler to unmount/remount
 // the tree and falsely trigger a second modal fire.
 async function triggerRefresh(tr: TestRenderer.ReactTestRenderer) {
-  const rc = tr.root.find((n) => n.type === "RefreshControl");
+  const rc = tr.root.find((n) => (n.type as unknown) === "RefreshControl");
   if (!rc) throw new Error("RefreshControl not found");
   await act(async () => {
     await rc.props.onRefresh();

@@ -785,7 +785,7 @@ export class DatabaseStorage implements IStorage {
   async qualifyReferral(args: {
     referredUserId: string;
     bonusUsd: number;
-  }): Promise<{ credited: boolean; referrerId?: string }> {
+  }): Promise<{ credited: boolean; referrerId?: string; referrerUsername?: string; referrerEmail?: string | null }> {
     const { referredUserId, bonusUsd } = args;
     const bonusStr = bonusUsd.toFixed(2);
 
