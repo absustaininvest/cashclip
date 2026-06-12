@@ -228,24 +228,9 @@ export default function HomeScreen() {
       return;
     }
 
-    // AdMob isn't filling — fall back to the in-app ad. It still pays a small
-    // server-decided reward via the secure begin→complete flow (can't be faked
-    // by the phone). Get the challenge first so we only show the ad if it can pay.
-    setAdLoading(true);
-    const begin = await beginAdView();
-    setAdLoading(false);
-    if (!begin.ok) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(
-        "Try again",
-        begin.retryable
-          ? "Ads are busy right now. Please try again in a moment."
-          : "Couldn't start the ad. Please try again.",
-      );
-      return;
-    }
-    adChallengeRef.current = begin.challengeToken;
-
+    // LevelPlay native build pending — show the in-app ad card directly.
+    // Reward is issued via recordEarnAction("ad_view") on completion; no
+    // challenge token needed since begin/complete endpoints are disabled (410).
     const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];
     setWatching({
       brand: card.advertiser,
@@ -258,14 +243,10 @@ export default function HomeScreen() {
 
   const handleAdComplete = useCallback(async () => {
     setWatching(null);
-    const token = adChallengeRef.current;
     adChallengeRef.current = null;
     await recordAdWatch();
-    await recordEarnAction("ad_view", "Video ad");
-    if (token) {
-      const res = await completeAdView(token, "Watched video");
-      if (res.ok) loadBalance();
-    }
+    const earned = await recordEarnAction("ad_view", "Video ad");
+    if (earned) loadBalance();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [loadBalance]);
 

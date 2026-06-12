@@ -882,23 +882,10 @@ export default function EarnScreen() {
       return;
     }
 
-    // AdMob isn't filling — fall back to the in-app ad. It still pays a small
-    // server-decided reward via the secure begin→complete flow. Get the challenge
-    // first so we only show the ad if it can actually pay.
-    setAdLoading(true);
-    const begin = await beginAdView();
+    // LevelPlay native build pending — show the in-app ad modal directly.
+    // Reward is issued via recordEarnAction("ad_view") on completion; no
+    // challenge token needed since begin/complete endpoints are disabled (410).
     setAdLoading(false);
-    if (!begin.ok) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert(
-        "Try again",
-        begin.retryable
-          ? "Ads are busy right now. Please try again in a moment."
-          : "Couldn't start the ad. Please try again.",
-      );
-      return;
-    }
-    adChallengeRef.current = begin.challengeToken;
     setWatchingAd(ad);
     setShowModal(true);
   }, [adLoading, loadAll, t]);
@@ -908,17 +895,11 @@ export default function EarnScreen() {
     trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
-    await recordEarnAction("ad_view", "Video ad");
+    const earned = await recordEarnAction("ad_view", "Video ad");
     setShowModal(false);
     setWatchingAd(null);
-    // Issue the small server-set earn token for the in-app ad completion. The
-    // server decides the amount and shares the rewarded_ad daily cap (anti-fraud).
-    const token = adChallengeRef.current;
     adChallengeRef.current = null;
-    if (token) {
-      const res = await completeAdView(token, "Watched video");
-      if (res.ok) await loadAll();
-    }
+    if (earned) await loadAll();
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),
       withSpring(1, { damping: 8 })

@@ -1,36 +1,12 @@
-import React, { useEffect, useState, useRef } from "react";
+import React from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions, useWindowDimensions } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { getAdUnitId } from "@/lib/admob";
 import { dollarsToPoints, formatPoints } from "@/lib/points";
 
-// Static export kept for FlatList layout estimation in parent screens
 export const CARD_WIDTH = (Dimensions.get("window").width - 48) / 2;
 
-const CATEGORY_COLORS: Record<string, string> = {
-  finance:     "#43A047",
-  gaming:      "#1E88E5",
-  shopping:    "#FB8C00",
-  travel:      "#00ACC1",
-  food:        "#E53935",
-  health:      "#8E24AA",
-  tech:        "#D81B60",
-  education:   "#FDD835",
-  sports:      "#00897B",
-  entertainment: "#F4511E",
-  auto:        "#6D4C41",
-};
-
-function colorForHeadline(h: string): string {
-  const lower = h.toLowerCase();
-  for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
-    if (lower.includes(key)) return color;
-  }
-  return Colors.surfaceHighlight;
-}
-
-const FALLBACK_CARDS = [
+export const PLACEHOLDER_CARDS = [
   { headline: "Grow Your Money with Smart Investing", body: "Start building wealth today", advertiser: "Finance Weekly", color: "#43A047" },
   { headline: "Top Gaming Deals This Week", body: "Save big on the latest games", advertiser: "GameHub Pro", color: "#1E88E5" },
   { headline: "Shop the Best Deals Near You", body: "Exclusive offers from top brands", advertiser: "ShopLocal", color: "#FB8C00" },
@@ -58,127 +34,48 @@ const FALLBACK_CARDS = [
   { headline: "Work From Home — Real Jobs", body: "Remote roles at top companies", advertiser: "RemoteWork", color: "#6D4C41" },
 ];
 
-interface AdData {
-  headline: string;
-  body: string;
-  callToAction: string;
-  advertiser: string | null;
-  color: string;
+export function adSlotReward(index: number): number {
+  return parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
 }
 
 interface NativeAdCardProps {
   index: number;
+  live?: boolean;
   onPress?: () => void;
 }
 
-export default function NativeAdCard({ index, onPress }: NativeAdCardProps) {
+export default function NativeAdCard({ index, live, onPress }: NativeAdCardProps) {
   const { width: screenWidth } = useWindowDimensions();
   const cardWidth = (screenWidth - 48) / 2;
-  const [adData, setAdData] = useState<AdData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const nativeAdRef = useRef<any>(null);
-  const reward = parseFloat(((index % 5) * 0.01 + 0.01).toFixed(2));
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const { NativeAd } = require("react-native-google-mobile-ads");
-        const unitId = getAdUnitId("native");
-        if (!unitId) throw new Error("No unit ID");
-
-        const ad = await NativeAd.createForAdRequest(unitId, {
-          requestNonPersonalizedAdsOnly: true,
-        });
-
-        if (cancelled) { ad.destroy(); return; }
-
-        nativeAdRef.current = ad;
-        setAdData({
-          headline: ad.headline,
-          body: ad.body,
-          callToAction: ad.callToAction,
-          advertiser: ad.advertiser,
-          color: colorForHeadline(ad.headline),
-        });
-      } catch {
-        if (!cancelled) {
-          const fb = FALLBACK_CARDS[index % FALLBACK_CARDS.length];
-          setAdData({ ...fb, callToAction: "Learn More" });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      nativeAdRef.current?.destroy();
-      nativeAdRef.current = null;
-    };
-  }, []);
-
-  if (loading) return <SkeletonCard width={cardWidth} />;
-  if (!adData) return null;
-
-  const CardContent = (
-    <View style={styles.card}>
-      <View style={[styles.thumbnail, { backgroundColor: adData.color }]}>
-        <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
-        <View style={styles.sponsoredBadge}>
-          <Text style={styles.sponsoredText}>Ad</Text>
-        </View>
-        <View style={styles.rewardBadge}>
-          <MaterialCommunityIcons name="star" size={10} color={Colors.primary} />
-          <Text style={styles.rewardText}>+{formatPoints(dollarsToPoints(reward))}</Text>
-        </View>
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.headline} numberOfLines={2}>{adData.headline}</Text>
-        <Text style={styles.body} numberOfLines={1}>{adData.body}</Text>
-        {adData.advertiser ? (
-          <Text style={styles.advertiser} numberOfLines={1}>{adData.advertiser}</Text>
-        ) : null}
-      </View>
-      <View style={styles.cardFooter}>
-        <View style={styles.ctaBtn}>
-          <Text style={styles.ctaText} numberOfLines={1}>{adData.callToAction}</Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  if (nativeAdRef.current) {
-    const { NativeAdView } = require("react-native-google-mobile-ads");
-    return (
-      <Pressable onPress={onPress} style={{ width: cardWidth }}>
-        <NativeAdView nativeAd={nativeAdRef.current} style={{ flex: 1 }}>
-          {CardContent}
-        </NativeAdView>
-      </Pressable>
-    );
-  }
+  const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];
+  const reward = adSlotReward(index);
+  const isLive = live !== false;
 
   return (
-    <Pressable onPress={onPress} style={{ width: cardWidth }}>
-      {CardContent}
+    <Pressable onPress={onPress} style={[{ width: cardWidth }, !isLive && { opacity: 0.5 }]}>
+      <View style={styles.card}>
+        <View style={[styles.thumbnail, { backgroundColor: card.color }]}>
+          <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
+          <View style={styles.sponsoredBadge}>
+            <Text style={styles.sponsoredText}>Ad</Text>
+          </View>
+          <View style={styles.rewardBadge}>
+            <MaterialCommunityIcons name="star" size={10} color={Colors.primary} />
+            <Text style={styles.rewardText}>+{formatPoints(dollarsToPoints(reward))}</Text>
+          </View>
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.headline} numberOfLines={2}>{card.headline}</Text>
+          <Text style={styles.body} numberOfLines={1}>{card.body}</Text>
+          <Text style={styles.advertiser} numberOfLines={1}>{card.advertiser}</Text>
+        </View>
+        <View style={styles.cardFooter}>
+          <View style={styles.ctaBtn}>
+            <Text style={styles.ctaText}>{isLive ? "Watch & Earn" : "Coming soon"}</Text>
+          </View>
+        </View>
+      </View>
     </Pressable>
-  );
-}
-
-function SkeletonCard({ width }: { width: number }) {
-  return (
-    <View style={[styles.card, { width, opacity: 0.4 }]}>
-      <View style={[styles.thumbnail, { backgroundColor: Colors.surfaceHighlight }]} />
-      <View style={styles.cardBody}>
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: "70%" }]} />
-        <View style={[styles.skeletonLine, { width: "50%", marginTop: 4 }]} />
-      </View>
-    </View>
   );
 }
 
@@ -266,11 +163,5 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_700Bold",
     fontSize: 11,
     color: Colors.primary,
-  },
-  skeletonLine: {
-    height: 10,
-    backgroundColor: Colors.surfaceHighlight,
-    borderRadius: 5,
-    marginBottom: 4,
   },
 });
