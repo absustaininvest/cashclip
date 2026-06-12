@@ -1559,7 +1559,19 @@ export function registerEarningsRoutes(app: Express): void {
       for (const { userId } of usersWithTokens) {
         try {
           await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
-            await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+            const userRows = await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+            if ((userRows.rows?.length ?? 0) === 0) {
+              // User was deleted — expire their orphaned tokens so this sweep
+              // never tries to credit them again, then bail out cleanly.
+              await tx.update(earnTokens)
+                .set({ status: "expired" })
+                .where(and(
+                  eq(earnTokens.userId, userId),
+                  eq(earnTokens.status, "pending"),
+                ));
+              logger.warn({ userId }, "auto-convert: user not found — expired orphaned tokens");
+              return;
+            }
 
             await tx.update(earnTokens)
               .set({ status: "expired" })
