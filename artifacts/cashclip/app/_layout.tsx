@@ -3,8 +3,6 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import * as Sentry from '@sentry/react-native';
-Sentry.init({ dsn: 'https://26b82439bc26c80e6eb27a59f2962a65@o4511515134656512.ingest.us.sentry.io/4511515238727680', tracesSampleRate: 1.0 });
 import { StatusBar } from "expo-status-bar";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
