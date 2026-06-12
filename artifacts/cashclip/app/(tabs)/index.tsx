@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Share,
   Alert,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -143,6 +144,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [adLoading, setAdLoading] = useState(false);
+  const [adError, setAdError] = useState<string | null>(null);
   const [watching, setWatching] = useState<
     null | { brand: string; description: string; color: string; reward: number; duration: number }
   >(null);
@@ -214,14 +216,14 @@ export default function HomeScreen() {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else if (result.timedOut) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Ad Timed Out", "The ad took too long to load. Please check your connection and try again.");
+          setAdError("The ad took too long to load. Please check your connection and try again.");
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          Alert.alert("Ad Not Available", "No ads available right now. Please try again later.");
+          setAdError("No ads available right now. Please try again in a moment.");
         }
       } catch {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Something Went Wrong", "Could not load the ad. Please try again.");
+        setAdError("Could not load the ad. Please try again.");
       } finally {
         setAdLoading(false);
       }
@@ -389,6 +391,21 @@ export default function HomeScreen() {
           onClose={() => setWatching(null)}
         />
       )}
+
+      <Modal visible={!!adError} transparent animationType="fade">
+        <View style={styles.adErrorOverlay}>
+          <View style={styles.adErrorCard}>
+            <Chipley pose="sad" size={88} />
+            <Text style={styles.adErrorText}>{adError}</Text>
+            <Pressable
+              onPress={() => setAdError(null)}
+              style={({ pressed }) => [styles.adErrorBtn, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Text style={styles.adErrorBtnText}>Got it</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -597,5 +614,41 @@ const styles = StyleSheet.create({
   row: {
     gap: 12,
     marginBottom: 12,
+  },
+  adErrorOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  adErrorCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  adErrorText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  adErrorBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  adErrorBtnText: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 15,
+    color: Colors.background,
   },
 });

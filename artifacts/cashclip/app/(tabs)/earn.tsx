@@ -690,6 +690,7 @@ export default function EarnScreen() {
   // can fall back to a local display value, which is NOT a genuine win.
   const [spinWasGenuine, setSpinWasGenuine] = useState(false);
   const [spinRetryNotice, setSpinRetryNotice] = useState(false); // gentle "try again in a moment" after a transient 503
+  const [checkinSyncError, setCheckinSyncError] = useState(false); // server sync failed after optimistic check-in
   const [dailyMissions, setDailyMissions] = useState<DailyMission[]>([]);
   const [weeklyMissions, setWeeklyMissions] = useState<WeeklyMission[]>([]);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
@@ -778,14 +779,8 @@ export default function EarnScreen() {
     pendingPtsBeforeGamesRef.current = null;
   }, [pendingState]);
 
-  const handleCheckin = useCallback(async () => {
-    if (checkedInToday) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Optimistic local UI (also keeps the offline streak cache warm).
-    await performDailyCheckin();
-    setCheckedInToday(true);
-    // Server is authoritative: it advances the streak and returns the scaled
-    // reward. Reflect the real streak it reports before the full refresh.
+  const syncCheckin = useCallback(async () => {
+    setCheckinSyncError(false);
     const server = await recordCheckin();
     if (server) {
       setCheckinStreak(server.checkinStreak);
@@ -794,13 +789,27 @@ export default function EarnScreen() {
         setMilestoneCelebration({ streak: server.checkinStreak, bonus: server.milestoneBonus });
         setShowMilestone(true);
       }
+    } else {
+      setCheckinSyncError(true);
     }
+  }, []);
+
+  const handleCheckin = useCallback(async () => {
+    if (checkedInToday) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCheckinSyncError(false);
+    // Optimistic local UI (also keeps the offline streak cache warm).
+    await performDailyCheckin();
+    setCheckedInToday(true);
+    // Server is authoritative: it advances the streak and returns the scaled
+    // reward. Reflect the real streak it reports before the full refresh.
+    await syncCheckin();
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),
       withSpring(1, { damping: 8 })
     );
     await loadAll();
-  }, [checkedInToday]);
+  }, [checkedInToday, syncCheckin]);
 
   const handleSpin = useCallback(async () => {
     if (!spinAvailable || isSpinning) return;
@@ -1241,6 +1250,22 @@ export default function EarnScreen() {
               )}
             </LinearGradient>
           </Pressable>
+
+          {checkinSyncError && (
+            <View style={styles.checkinErrorCard}>
+              <Chipley pose="sad" size={60} />
+              <Text style={styles.checkinErrorText}>
+                Couldn't sync your check-in. Your streak is saved locally — tap to retry.
+              </Text>
+              <Pressable
+                onPress={syncCheckin}
+                style={({ pressed }) => [styles.spinErrorRetryBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Feather name="refresh-cw" size={14} color={Colors.background} />
+                <Text style={styles.spinErrorRetryBtnText}>Retry Sync</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         {/* Spin the Wheel */}
@@ -1350,15 +1375,16 @@ export default function EarnScreen() {
           </Pressable>
 
           {spinRetryNotice && (
-            <View style={styles.spinRetryNotice}>
-              <MaterialCommunityIcons
-                name="reload"
-                size={16}
-                color={Colors.textMuted}
-              />
-              <Text style={styles.spinRetryNoticeText}>
-                {t.earn.spinRetry}
-              </Text>
+            <View style={styles.spinErrorCard}>
+              <Chipley pose="sad" size={72} />
+              <Text style={styles.spinErrorText}>{t.earn.spinRetry}</Text>
+              <Pressable
+                onPress={() => { setSpinRetryNotice(false); handleSpin(); }}
+                style={({ pressed }) => [styles.spinErrorRetryBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Feather name="refresh-cw" size={14} color={Colors.background} />
+                <Text style={styles.spinErrorRetryBtnText}>Try Again</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -1907,18 +1933,47 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 16,
   },
-  spinRetryNotice: {
+  spinErrorCard: {
+    alignItems: "center",
+    paddingVertical: 16,
+    gap: 8,
+    marginTop: 8,
+  },
+  spinErrorText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+  spinErrorRetryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginTop: 10,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 4,
   },
-  spinRetryNoticeText: {
-    fontFamily: "Outfit_500Medium",
+  spinErrorRetryBtnText: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 13,
+    color: Colors.background,
+  },
+  checkinErrorCard: {
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 6,
+    marginTop: 8,
+  },
+  checkinErrorText: {
+    fontFamily: "Outfit_400Regular",
     fontSize: 13,
     color: Colors.textMuted,
     textAlign: "center",
+    paddingHorizontal: 8,
   },
   usedBadge: {
     backgroundColor: "rgba(255,82,82,0.12)",

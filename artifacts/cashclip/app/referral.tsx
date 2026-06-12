@@ -46,8 +46,10 @@ export default function ReferralScreen() {
   const [referralBonusAmount, setReferralBonusAmount] = useState(0);
   const [referralBonusCount, setReferralBonusCount] = useState(0);
   const hasShownBonus = useRef(false);
+  const [fetchError, setFetchError] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
+    setFetchError(false);
     const live = await fetchReferralStats();
     if (live) {
       setStats(live);
@@ -80,6 +82,7 @@ export default function ReferralScreen() {
     } else {
       // Offline / unauthenticated: fall back to last cached totals so the
       // screen isn't blank, but show no friend list we can't verify.
+      setFetchError(true);
       const totalRefs = await getTotalReferrals();
       const earnings = await getReferralEarnings();
       setStats((prev) =>
@@ -239,11 +242,33 @@ export default function ReferralScreen() {
             </View>
           </View>
 
+          {fetchError && !stats?.code && (
+            <View style={styles.fetchErrorCard}>
+              <Chipley pose="sad" size={96} />
+              <Text style={styles.fetchErrorTitle}>Couldn't Load Referrals</Text>
+              <Text style={styles.fetchErrorText}>
+                Something went wrong while fetching your referral data. Check your connection and try again.
+              </Text>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadData(); }}
+                style={({ pressed }) => [styles.fetchErrorRetryBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Feather name="refresh-cw" size={16} color={Colors.background} />
+                <Text style={styles.fetchErrorRetryBtnText}>Try Again</Text>
+              </Pressable>
+            </View>
+          )}
+
           <View style={styles.referralListSection}>
             <Text style={styles.sectionTitle}>{t.referral.yourReferrals}</Text>
             {loading ? (
               <View style={styles.emptyState}>
                 <ActivityIndicator color={Colors.primary} />
+              </View>
+            ) : fetchError && (stats?.referrals.length ?? 0) === 0 ? (
+              <View style={styles.emptyState}>
+                <Chipley pose="sad" size={80} />
+                <Text style={styles.emptyStateText}>Couldn't load your friends list. Pull down to retry.</Text>
               </View>
             ) : (stats?.referrals.length ?? 0) === 0 ? (
               <View style={styles.emptyState}>
@@ -494,5 +519,41 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 8,
+  },
+  fetchErrorCard: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 8,
+  },
+  fetchErrorTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+    textAlign: "center",
+  },
+  fetchErrorText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  fetchErrorRetryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginTop: 6,
+  },
+  fetchErrorRetryBtnText: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 14,
+    color: Colors.background,
   },
 });
