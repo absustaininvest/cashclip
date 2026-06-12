@@ -4897,6 +4897,16 @@ export function IntegrationHubPanel({
                         ? "Fill"
                         : "No fill"}
                 </p>
+                {adStatus !== null && adStatus.fillReportedAt !== null && (() => {
+                  const diffMs = Date.now() - adStatus.fillReportedAt;
+                  const stale = diffMs > 2 * 60 * 60 * 1000;
+                  const label = hubTimeAgo(new Date(adStatus.fillReportedAt).toISOString());
+                  return (
+                    <p className={`text-[10px] mt-0.5 ${stale ? "text-amber-400" : "text-white/20"}`}>
+                      reported {label}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
             {dotStatus !== "green" && adStatus !== null && (
