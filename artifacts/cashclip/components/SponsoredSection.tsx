@@ -118,7 +118,7 @@ export default function SponsoredSection() {
 
       if (visitRes.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert("Earned!", visitData.message || `+$${c.rewardPerVisit.toFixed(2)} added to your balance.`);
+        Alert.alert("Earned!", visitData.message || `+${Math.round(c.rewardPerVisit * 1000)} pts added to your balance.`);
         setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, alreadyVisited: true } : x));
       } else if (visitData.alreadyVisited) {
         setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, alreadyVisited: true } : x));
@@ -170,7 +170,7 @@ export default function SponsoredSection() {
               </View>
             ) : (
               <View style={styles.reward}>
-                <Text style={styles.rewardAmt}>+${c.rewardPerVisit.toFixed(2)}</Text>
+                <Text style={styles.rewardAmt}>+{Math.round(c.rewardPerVisit * 1000)} pts</Text>
                 <Text style={styles.visitBtn}>Visit →</Text>
               </View>
             )}
