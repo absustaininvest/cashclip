@@ -98,17 +98,18 @@ env vars that work for `eas build`. It reads credentials from the EAS-stored key
   Owner can confirm it's still Active in App Store Connect → Integrations → App Store
   Connect API → Team Keys (look for `87Z27CQ96U` status).
 
-**The workspace secret key `36377NCG8Z` is revoked (401 confirmed Jun 12 2026).** This
-breaks the next `eas build` for cert/profile management. A new **Admin** Team Key is needed
-before queuing build ≥41.
+**Current workspace key: `3685WS5P35` (Admin, created Jun 12 2026).** Saved in
+`APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY`. `.p8` purged after saving. Old revoked
+key `36377NCG8Z` should be revoked in ASC when convenient.
 
-**Replacement process (Jun 2026):**
+**Replacement process (for future rotations):**
 1. Owner creates a new Admin Team Key in ASC → Integrations → App Store Connect API → Team Keys → (+).
 2. Download the `.p8`; the filename reveals the Key ID: `AuthKey_<KEY_ID>.p8`.
 3. Validate with `node scripts/validate-asc-key.js <file.p8> <KEY_ID> 45944549-8278-4477-a1c6-3348ec45c3f0` — want 200 on all three endpoints (apps, certificates, profiles).
 4. Save `APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` workspace secrets (one at a time).
 5. Run `bash scripts/store-asc-key-in-eas.sh <file.p8>` to push the key into EAS credential storage.
-6. Revoke old key `36377NCG8Z` in ASC.
+6. Revoke old key in ASC.
+7. Due to in-session snapshot staleness: drop the `.p8` file into chat again at build time so the build script can reference it by path rather than reading the stale env var.
 
 **Query to read EAS-stored submit key (via Expo GraphQL API):**
 ```js
