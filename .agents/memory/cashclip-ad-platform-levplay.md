@@ -18,6 +18,14 @@ description: AdMob fully removed Jun 2026; LevelPlay (ironsource-mediation v3.2.
 - **Demand sources (server-side in LevelPlay dashboard):** Unity Ads ($0.20 earned, 15 impressions confirmed live Jun 2026), Pangle (company verification pending by owner).
 - **S2S reward callbacks:** LevelPlay sends server-to-server callbacks; the API's `/api/earn/ad/complete` path is unchanged (existing `begin/complete` challenge flow is the bridge until S2S is wired).
 
+## CRITICAL: NativeEventEmitter guard pattern
+
+`ironsource-mediation` (and many other RN packages) runs `new NativeEventEmitter(NativeModules.X)` at module-evaluation time. If the native module isn't in the binary, this throws immediately — BEFORE any try/catch in calling code can run, and before even `initializeAdMob()` is reached. This caused fatal crashes on V40/V41 after the first LevelPlay OTA was pushed.
+
+**Fix applied (Jun 12 2026):** `LP_NATIVE_AVAILABLE = Boolean(NativeModules.IronSourceMediation)` computed at import time (NO require() call), and included in `isAdMobAvailable`. Every function that would call `require("ironsource-mediation")` already guards on `isAdMobAvailable`, so the require is never reached on builds without the native module.
+
+**Rule:** For ANY new RN native-module package added to admob.ts (or similar), always add a `NativeModules.X` check BEFORE the `require()` — never rely on try/catch around require() alone.
+
 ## What still needs a new NATIVE BUILD (build ≥41)
 
 LevelPlay is JS-only on the surface (ironsource-mediation autolinks) but the native SDK (IronSourceSDK 8.10.0.0 on iOS via the podspec; ironSource Maven on Android) must be compiled into the binary. Live build 29 and V40 do NOT have the ironsource-mediation native module — `initializeAdMob()` will fail gracefully (returns false) and ads won't load on those builds. The maintenance-notice OTA was pushed to bridge the gap while the new build is prepared.

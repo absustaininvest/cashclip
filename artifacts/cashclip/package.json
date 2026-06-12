@@ -74,7 +74,6 @@
     "react-dom": "catalog:",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
-    "react-native-google-mobile-ads": "^16.0.3",
     "react-native-keyboard-controller": "1.18.5",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -100,7 +99,6 @@
     "expo-tracking-transparency": "^6.0.8",
     "expo-updates": "~29.0.17",
     "ironsource-mediation": "^3.2.0",
-    "react-native-unity-ads": "^1.0.3",
     "vexo-analytics": "^1.5.7"
   }
 }
