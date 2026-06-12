@@ -2268,6 +2268,30 @@ export function CashClipUsersPanel({ token }: { token: string }) {
     skippedReferrals: { referrer: string; referredFriend: string }[];
     failedReferrals: { referrer: string; referredFriend: string; error?: string }[];
   } | null>(null);
+  function downloadBackfillCsv() {
+    if (!backfillResult) return;
+    const rows: string[][] = [["status", "referrer", "referred_friend", "amount", "error"]];
+    for (const r of backfillResult.creditedReferrers) {
+      rows.push(["credited", r.referrer, r.referredFriend, String(r.amount), ""]);
+    }
+    for (const r of backfillResult.skippedReferrals) {
+      rows.push(["skipped", r.referrer, r.referredFriend, "", ""]);
+    }
+    for (const r of backfillResult.failedReferrals) {
+      rows.push(["failed", r.referrer, r.referredFriend, "", r.error ?? ""]);
+    }
+    const csv = rows
+      .map((cols) => cols.map((c) => `"${c.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `referral-backfill-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const [payoutRange, setPayoutRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
   const [payoutRows, setPayoutRows] = useState<{ userId: string; username: string; totalPayout: number; txCount: number }[]>([]);
   const [payoutLoading, setPayoutLoading] = useState(true);
@@ -2963,12 +2987,21 @@ export function CashClipUsersPanel({ token }: { token: string }) {
                 ))}
               </div>
             )}
-            <button
-              onClick={closeBackfill}
-              className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
-            >
-              Done
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={downloadBackfillCsv}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/15 text-white/70 font-semibold text-sm hover:border-white/30 hover:text-white transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download CSV
+              </button>
+              <button
+                onClick={closeBackfill}
+                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
