@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform, NativeModules } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import {
@@ -12,6 +12,12 @@ import {
 // Unity Ads, Pangle, and Chartboost are demand sources managed by LevelPlay.
 // AdMob has been fully removed.
 
+// CRITICAL: check native module presence BEFORE ever calling
+// require("ironsource-mediation"). The package's top-level JS creates a
+// NativeEventEmitter that crashes immediately if IronSourceMediation isn't
+// compiled into the binary (V40/V41 and earlier builds don't have it).
+const LP_NATIVE_AVAILABLE = Boolean(NativeModules.IronSourceMediation);
+
 export const ADMOB_APP_ID = "";
 export const AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
 export const TEST_AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
@@ -22,7 +28,8 @@ export function getAdUnitId(_type: "rewarded" | "interstitial" | "banner" | "nat
 
 export const isAdMobAvailable =
   Platform.OS !== "web" &&
-  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
+  LP_NATIVE_AVAILABLE;
 
 let lpInitialized = false;
 let lpRewardedAvailable = false;
