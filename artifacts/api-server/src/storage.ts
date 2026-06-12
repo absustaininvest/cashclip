@@ -1881,6 +1881,7 @@ export class DatabaseStorage implements IStorage {
       completions: number;
       rewards: number;
       failures: number;
+      noFills: number;
       revenue: number;
     }>
   > {
@@ -1897,6 +1898,7 @@ export class DatabaseStorage implements IStorage {
         completions: sql<number>`count(*) filter (where ${adEvents.event} = 'completion')`,
         rewards: sql<number>`count(*) filter (where ${adEvents.event} = 'reward_earned')`,
         failures: sql<number>`count(*) filter (where ${adEvents.event} = 'load_failed')`,
+        noFills: sql<number>`count(*) filter (where ${adEvents.event} = 'load_failed' and ${adEvents.errorCode} = 'NO_FILL')`,
       })
       .from(adEvents)
       .where(whereClause ?? undefined)
@@ -1910,6 +1912,7 @@ export class DatabaseStorage implements IStorage {
       completions: Number(r.completions),
       rewards: Number(r.rewards),
       failures: Number(r.failures),
+      noFills: Number(r.noFills),
       revenue: parseFloat((Number(r.rewards) * REWARDED_AD_PAYOUT_USD).toFixed(2)),
     }));
   }

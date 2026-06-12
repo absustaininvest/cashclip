@@ -44,6 +44,7 @@ interface TimelineDay {
   completions: number;
   rewards: number;
   failures: number;
+  noFills: number;
   revenue: number;
 }
 
@@ -483,6 +484,18 @@ export default function AdAnalyticsScreen() {
                     color="#FF5252"
                     label={adLabels.failureRate}
                     yAxisSuffix="%"
+                  />
+                </View>
+
+                <Text style={styles.sectionTitle}>
+                  {adLabels.dailyNoFill}
+                </Text>
+                <View style={styles.chartCard}>
+                  <MiniBarChart
+                    data={timeline}
+                    dataKey="noFills"
+                    color="#FF9800"
+                    label={adLabels.dailyNoFill}
                   />
                 </View>
               </View>
