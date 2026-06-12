@@ -232,5 +232,12 @@ describe("InboxPanel — Sent Replies audit log", () => {
     expect(
       await screen.findByText("Failed to load sent replies"),
     ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText("No replies have been sent yet"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No replies match the selected filters"),
+    ).not.toBeInTheDocument();
   });
 });

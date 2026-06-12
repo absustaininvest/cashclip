@@ -2048,7 +2048,7 @@ export function InboxPanel({ token }: { token: string }) {
               <RefreshCw className="w-8 h-8 text-white/20 animate-spin mx-auto mb-3" />
               <p className="text-white/40 text-sm">Loading sent replies…</p>
             </div>
-          ) : sentReplies.length === 0 ? (
+          ) : !sentError && sentReplies.length === 0 ? (
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl py-16 text-center">
               <Mail className="w-10 h-10 text-white/10 mx-auto mb-3" />
               <p className="text-white/30 text-sm">
@@ -2057,7 +2057,7 @@ export function InboxPanel({ token }: { token: string }) {
                   : "No replies have been sent yet"}
               </p>
             </div>
-          ) : (
+          ) : sentReplies.length > 0 ? (
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.04]">
               {sentReplies.map((r) => (
                 <div key={r.id} className="px-5 py-4">
@@ -2090,7 +2090,7 @@ export function InboxPanel({ token }: { token: string }) {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
 
           {/* Pagination */}
           {sentTotal > SENT_PAGE_SIZE && (
