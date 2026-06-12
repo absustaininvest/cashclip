@@ -457,6 +457,58 @@ describe("IntegrationHubPanel — resilience and auth", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("still renders core hub status when alert-email returns a non-OK response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        const u = typeof url === "string" ? url : url.toString();
+        if (u.startsWith(HUB_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => HUB_DATA,
+          } as Response;
+        }
+        if (u.startsWith(ALERTS_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ admobAlerts: [] }),
+          } as Response;
+        }
+        if (u.startsWith(ALERT_EMAIL_URL)) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ error: "internal server error" }),
+          } as Response;
+        }
+        if (u.startsWith(AD_STATUS_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => AD_STATUS_DEFAULT,
+          } as Response;
+        }
+        throw new Error(`Unexpected fetch call: ${u}`);
+      }),
+    );
+
+    renderPanel();
+
+    // Core hub status renders — the API service card is present.
+    await screen.findByText("API");
+    expect(screen.getByText("Operational")).toBeInTheDocument();
+
+    // Users Online card is present.
+    expect(screen.getByText("Users Online")).toBeInTheDocument();
+
+    // Alert-email failure is soft — it does NOT surface as a top-level error overlay.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
+  });
+
   it("calls onLogout when integration-hub returns 401", async () => {
     const onLogout = vi.fn();
     vi.stubGlobal(
