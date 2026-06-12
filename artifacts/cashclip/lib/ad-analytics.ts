@@ -20,6 +20,7 @@ interface AdEventPayload {
   errorCode?: string;
   errorMessage?: string;
   durationMs?: number;
+  revenueMicros?: number;
 }
 
 const EVENT_QUEUE_KEY = "cashclip_ad_event_queue";
@@ -133,8 +134,9 @@ export async function trackAdRewardEarned(
   adUnitType: AdUnitType,
   rewardAmount: number,
   rewardType?: string,
+  revenueMicros?: number,
 ): Promise<void> {
-  await enqueue({ event: "reward_earned", adUnitType, rewardAmount, rewardType });
+  await enqueue({ event: "reward_earned", adUnitType, rewardAmount, rewardType, revenueMicros });
 }
 
 export async function trackAdLoadFailed(

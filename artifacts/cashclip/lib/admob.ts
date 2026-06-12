@@ -110,6 +110,10 @@ let lpEarnedRewardThisSession = false;
 let pendingRewardResolve: ((rewarded: boolean) => void) | null = null;
 let pendingInterstitialResolve: ((ok: boolean) => void) | null = null;
 let adShowStartTime = 0;
+// Cached from the most recent ImpressionData event (revenue in micros).
+// onImpressionSuccess fires at ad show time; onAdRewarded fires shortly after.
+// Cleared after it is consumed so stale revenue doesn't leak across sessions.
+let lpLastImpressionRevenueMicros: number | null = null;
 
 function getAppKey(): string {
   try {
@@ -185,6 +189,43 @@ export async function initializeAdMob(): Promise<boolean> {
     // Set user ID before init so S2S reward callbacks carry the correct user
     if (lpUserId) await IronSource.setDynamicUserId(lpUserId);
 
+    // Impression-level revenue listener (ARM — Ad Revenue Measurement).
+    // onImpressionSuccess fires at the moment an impression is recorded; the
+    // revenue field (dollars) is converted to micros and cached so onAdRewarded
+    // can attach the real per-impression value to the reward_earned analytics
+    // event. ARM SDK Postbacks must be enabled in the IronSource dashboard
+    // (ironSource → Reporting → ARM) for revenue to be non-null.
+    //
+    // Correctness rules:
+    //  1. We ALWAYS write lpLastImpressionRevenueMicros (including null for
+    //     missing/invalid revenue) so a previous ad's value can never bleed
+    //     into a later reward event that has no revenue of its own.
+    //  2. We only cache revenue for REWARDED impressions — other formats
+    //     (interstitial, banner) must not pollute the rewarded revenue slot.
+    try {
+      IronSource.setImpressionDataListener({
+        onImpressionSuccess: (data?: { revenue?: number | null; adFormat?: string | null; adUnit?: string | null }) => {
+          // Scope to rewarded format. adFormat is the canonical field;
+          // fall back to the deprecated adUnit string for older SDK behaviour.
+          const fmt = (data?.adFormat ?? data?.adUnit ?? "").toUpperCase();
+          if (fmt && fmt !== "REWARDED") {
+            // Not a rewarded impression — leave cache untouched so the rewarded
+            // slot isn't clobbered by an unrelated format's revenue.
+            return;
+          }
+          // Always update the cache (including null) for rewarded impressions so
+          // stale values from a previous session cannot carry forward.
+          if (data?.revenue != null && Number.isFinite(data.revenue) && data.revenue > 0) {
+            lpLastImpressionRevenueMicros = Math.round(data.revenue * 1_000_000);
+          } else {
+            lpLastImpressionRevenueMicros = null;
+          }
+        },
+      });
+    } catch (e) {
+      console.warn("LevelPlay: setImpressionDataListener failed:", e);
+    }
+
     // Rewarded video listener — LevelPlay uses auto-load mode so the SDK
     // manages inventory. onAdAvailable/onAdUnavailable reflect fill state.
     // Each registration is wrapped independently so a failure in one listener's
@@ -200,13 +241,20 @@ export async function initializeAdMob(): Promise<boolean> {
           fillChangeCallback?.(false);
         },
         onAdOpened: () => {
+          // Reset impression revenue cache at the start of each new ad session
+          // so that a stale value from a previous watch cannot attach to this one.
+          lpLastImpressionRevenueMicros = null;
           adShowStartTime = Date.now();
           trackAdImpression("rewarded");
         },
         onAdRewarded: () => {
-          // Fired before onAdClosed — set flag so onAdClosed can resolve correctly
+          // Fired before onAdClosed — set flag so onAdClosed can resolve correctly.
+          // Consume the cached impression revenue (if any) so it doesn't bleed
+          // into the next ad session.
           lpEarnedRewardThisSession = true;
-          trackAdRewardEarned("rewarded", 1, "rewarded");
+          const revenueMicros = lpLastImpressionRevenueMicros ?? undefined;
+          lpLastImpressionRevenueMicros = null;
+          trackAdRewardEarned("rewarded", 1, "rewarded", revenueMicros);
         },
         onAdClosed: () => {
           const earned = lpEarnedRewardThisSession;
