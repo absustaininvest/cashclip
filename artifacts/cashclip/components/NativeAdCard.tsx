@@ -58,10 +58,6 @@ export default function NativeAdCard({ index, live, onPress }: NativeAdCardProps
           <View style={styles.sponsoredBadge}>
             <Text style={styles.sponsoredText}>Ad</Text>
           </View>
-          <View style={styles.rewardBadge}>
-            <MaterialCommunityIcons name="star" size={10} color={Colors.primary} />
-            <Text style={styles.rewardText}>+{formatPoints(dollarsToPoints(reward))}</Text>
-          </View>
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.headline} numberOfLines={2}>{card.headline}</Text>

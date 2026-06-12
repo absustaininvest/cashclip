@@ -132,7 +132,7 @@ cmd=${1:-}
 case $cmd in
   add|commit|merge|push|pull|fetch|checkout|reset|rebase|tag|stash|rm|mv) exit 0 ;;
   *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'Remove hardcoded pts from video ad cards and daily goal label' --non-interactive"""
+esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'Build 29: remove pts badges from all cards' --non-interactive"""
 
 [[ports]]
 localPort = 3001
