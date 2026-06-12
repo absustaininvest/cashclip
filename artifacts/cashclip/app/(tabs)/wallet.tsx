@@ -27,6 +27,8 @@ import {
   getUserStats,
   getTransactions,
   getWithdrawalTiers,
+  getSeenQualifiedReferrals,
+  setSeenQualifiedReferrals,
   type UserStats,
   type Transaction,
   type WithdrawalTier,
@@ -35,6 +37,7 @@ import {
   refreshPendingFromServer,
   claimAllReady,
   fetchServerBalance,
+  fetchReferralStats,
   formatPoints,
   formatCountdown,
   pointsToUsd,
@@ -188,6 +191,9 @@ export default function WalletScreen() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [isFocused, setIsFocused] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [referralBonusVisible, setReferralBonusVisible] = useState(false);
+  const [referralBonusAmount, setReferralBonusAmount] = useState(0);
+  const [referralBonusCount, setReferralBonusCount] = useState(0);
   const [serverError, setServerError] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
@@ -231,6 +237,28 @@ export default function WalletScreen() {
       // Either call returning null means at least one server piece failed.
       if (!srv || !pending) {
         setServerError(true);
+      }
+
+      // Check for newly qualified referrals and celebrate on the Wallet screen
+      // so users who never navigate to the Referral tab still see the bonus.
+      // The cursor is advanced on every check so the same bonus is never shown
+      // twice — but new qualifications on later focus events still fire.
+      if (!referralBonusVisible) {
+        const [prevSeen, live] = await Promise.all([
+          getSeenQualifiedReferrals(),
+          fetchReferralStats(),
+        ]);
+        if (live) {
+          const newlyQualified = live.qualifiedReferrals - prevSeen;
+          if (newlyQualified > 0) {
+            const bonus = newlyQualified * live.bonusPerReferral;
+            setReferralBonusCount(newlyQualified);
+            setReferralBonusAmount(bonus);
+            setReferralBonusVisible(true);
+          }
+          // Always advance the seen cursor so the Referral screen doesn't re-fire.
+          await setSeenQualifiedReferrals(live.qualifiedReferrals);
+        }
       }
     } catch {
       // Unexpected throw — keep whatever local data we have and show banner.
@@ -753,6 +781,22 @@ export default function WalletScreen() {
             tier: "epic",
             label: `$${withdrawSuccessAmount.toFixed(2)}`,
             title: "Cashing Out!",
+          });
+        }}
+      />
+
+      <RewardSuccessModal
+        visible={referralBonusVisible}
+        amount={referralBonusAmount}
+        title="Referral Bonus!"
+        subtitle={`${referralBonusCount} friend${referralBonusCount > 1 ? "s" : ""} cashed out — your bonus is in your wallet!`}
+        buttonLabel="Awesome!"
+        onClose={() => {
+          setReferralBonusVisible(false);
+          celebrate({
+            tier: referralBonusAmount >= 1 ? "epic" : "nice",
+            label: `+$${referralBonusAmount.toFixed(2)}`,
+            title: "Referral Bonus!",
           });
         }}
       />
