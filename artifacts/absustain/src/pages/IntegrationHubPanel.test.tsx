@@ -301,3 +301,74 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("IntegrationHubPanel — error banner on fetch failure", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("shows the error banner when the hub endpoint rejects (network error)", async () => {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.startsWith(HUB_URL)) {
+        throw new Error("Network error");
+      }
+      if (u.startsWith(ALERTS_URL)) {
+        return { ok: true, status: 200, json: async () => ({ admobAlerts: [] }) } as Response;
+      }
+      if (u.startsWith(ALERT_EMAIL_URL)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enabled: false,
+            recipient: "",
+            persistedRecipient: null,
+            recipientSource: "default",
+            enabledSource: "setting",
+            defaultRecipient: "",
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch call: ${u}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPanel();
+
+    await screen.findByText(/showing the last known values where available/i);
+  });
+
+  it("shows the error banner when the hub endpoint returns a non-ok response", async () => {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.startsWith(HUB_URL)) {
+        return { ok: false, status: 503, json: async () => ({}) } as Response;
+      }
+      if (u.startsWith(ALERTS_URL)) {
+        return { ok: true, status: 200, json: async () => ({ admobAlerts: [] }) } as Response;
+      }
+      if (u.startsWith(ALERT_EMAIL_URL)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enabled: false,
+            recipient: "",
+            persistedRecipient: null,
+            recipientSource: "default",
+            enabledSource: "setting",
+            defaultRecipient: "",
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch call: ${u}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPanel();
+
+    await screen.findByText(/showing the last known values where available/i);
+  });
+});
