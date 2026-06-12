@@ -188,35 +188,53 @@ export default function WalletScreen() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [isFocused, setIsFocused] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [serverError, setServerError] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
   const loadData = useCallback(async () => {
     setLoadError(false);
+    setServerError(false);
+
+    // Step 1: local reads — always populate the UI, even if server calls fail.
     try {
-      const [s, txns, srv, pending] = await Promise.all([
-        getUserStats(),
-        getTransactions(),
+      const [s, txns] = await Promise.all([getUserStats(), getTransactions()]);
+      setStats(s);
+      setTransactions(txns);
+    } catch {
+      // Local storage failed entirely — nothing to show.
+      setLoadError(true);
+      setTransactions([]);
+      return;
+    }
+
+    // Step 2: server calls — failure shows a warning banner, not the sad mascot.
+    // Both fetchServerBalance and refreshPendingFromServer catch internally and
+    // return null on failure rather than throwing, so each null return counts as
+    // a partial server failure and must set serverError.
+    try {
+      const [srv, pending] = await Promise.all([
         fetchServerBalance(),
         refreshPendingFromServer(),
       ]);
-      if (!srv) {
-        // fetchServerBalance caught internally and returned null — the server
-        // balance failed to load. Showing $0.00 would look like an empty wallet,
-        // which is misleading; treat this as a load error instead.
-        setLoadError(true);
-        setTransactions([]);
-        return;
+
+      if (srv) {
+        setServerBalance(srv.balance);
+        setServerTotalEarned(srv.totalEarned);
+        setTiers(getWithdrawalTiers(srv.balance));
       }
-      setStats(s);
-      setTransactions(txns);
-      setServerBalance(srv.balance);
-      setServerTotalEarned(srv.totalEarned);
-      setTiers(getWithdrawalTiers(srv.balance));
-      if (pending) setPendingState(pending);
+
+      if (pending) {
+        setPendingState(pending);
+      }
+
+      // Either call returning null means at least one server piece failed.
+      if (!srv || !pending) {
+        setServerError(true);
+      }
     } catch {
-      setLoadError(true);
-      setTransactions([]);
+      // Unexpected throw — keep whatever local data we have and show banner.
+      setServerError(true);
     }
   }, []);
 
@@ -552,6 +570,15 @@ export default function WalletScreen() {
                 ))}
               </View>
             </View>
+
+            {serverError && (
+              <View style={styles.serverWarningBanner}>
+                <Feather name="wifi-off" size={14} color="#F5A623" />
+                <Text style={styles.serverWarningText}>
+                  Balance couldn't refresh — showing last known data. Pull down to retry.
+                </Text>
+              </View>
+            )}
 
             <Text style={styles.sectionTitle}>{t.wallet.transactionHistory}</Text>
           </View>
@@ -915,4 +942,15 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 16, borderRadius: 14,
   },
   confirmText: { fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.background },
+  serverWarningBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(245, 166, 35, 0.12)",
+    borderWidth: 1, borderColor: "rgba(245, 166, 35, 0.3)",
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 16,
+  },
+  serverWarningText: {
+    fontFamily: "Outfit_400Regular", fontSize: 12,
+    color: "#F5A623", flex: 1,
+  },
 });
