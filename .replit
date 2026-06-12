@@ -46,6 +46,10 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Project Video"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "absustain-seo-noindex"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -81,6 +85,17 @@ waitForPort = 5173
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "absustain-seo-noindex"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter absustain exec vitest run src/components/Seo.test.tsx"
 
 [[ports]]
 localPort = 3001
