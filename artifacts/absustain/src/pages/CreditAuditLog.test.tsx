@@ -71,6 +71,178 @@ function installFetchMock(opts: {
   return mock;
 }
 
+const testUser = {
+  id: "user-1",
+  username: "jane",
+  email: "jane@example.com",
+  role: "user",
+  balance: "5.50",
+  totalEarned: "10.00",
+  pending: 0,
+  createdAt: new Date("2026-01-01T00:00:00Z").toISOString(),
+  profileComplete: true,
+  country: "US",
+  zipCode: null,
+  dateOfBirth: null,
+  gender: null,
+  employmentStatus: null,
+  householdIncome: null,
+  educationLevel: null,
+  ethnicity: null,
+  referredBy: null,
+};
+
+function installCreditFetchMock(opts: {
+  creditResponse?: { ok: boolean; body: object };
+}) {
+  const mock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), "http://localhost");
+    const path = url.pathname;
+    const method = (init?.method ?? "GET").toUpperCase();
+
+    if (path === "/api/admin/users") return jsonRes({ users: [testUser], total: 1 });
+    if (path === "/api/admin/payout-per-user") return jsonRes({ perUser: [] });
+    if (path === "/api/admin/adjustments") return jsonRes({ adjustments: [] });
+    if (path === "/api/admin/credit" && method === "POST") {
+      const res = opts.creditResponse ?? { ok: true, body: { balance: "10.50" } };
+      return Promise.resolve({
+        ok: res.ok,
+        json: () => Promise.resolve(res.body),
+      } as Response);
+    }
+    return jsonRes({});
+  });
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
+describe("CashClipUsersPanel — Manual Credit write path", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** Expand the jane user row so the credit form inputs become visible. */
+  async function expandJaneRow(user: ReturnType<typeof userEvent.setup>) {
+    const janeText = await screen.findByText("jane");
+    // Walk up to the clickable row container (the grid div with cursor-pointer).
+    const row = janeText.closest<HTMLElement>('[class*="cursor-pointer"]');
+    expect(row).toBeTruthy();
+    await user.click(row!);
+    // Credit form is now mounted; wait for one of its inputs to appear.
+    await screen.findByPlaceholderText("$ (e.g. 5 or -2.50)");
+  }
+
+  it("POSTs the expected payload to /api/admin/credit when the operator submits the credit form", async () => {
+    const fetchMock = installCreditFetchMock({});
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    await user.type(
+      screen.getByPlaceholderText("$ (e.g. 5 or -2.50)"),
+      "5",
+    );
+    await user.type(
+      screen.getByPlaceholderText("Reason (required for audit log)"),
+      "Goodwill credit",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await waitFor(() => {
+      const creditCall = fetchMock.mock.calls.find(([input, init]) => {
+        const url = new URL(String(input), "http://localhost");
+        return (
+          url.pathname === "/api/admin/credit" &&
+          ((init as RequestInit | undefined)?.method ?? "GET").toUpperCase() ===
+            "POST"
+        );
+      });
+      expect(creditCall).toBeDefined();
+      const body = JSON.parse(
+        (creditCall![1] as RequestInit).body as string,
+      );
+      expect(body).toEqual({
+        username: "jane",
+        amount: 5,
+        note: "Goodwill credit",
+      });
+    });
+  });
+
+  it("shows a success toast and re-fetches the audit log after a successful credit", async () => {
+    const fetchMock = installCreditFetchMock({
+      creditResponse: { ok: true, body: { balance: "10.50" } },
+    });
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    const adjustmentsBefore = fetchMock.mock.calls.filter(([input]) => {
+      const url = new URL(String(input), "http://localhost");
+      return url.pathname === "/api/admin/adjustments";
+    }).length;
+
+    await user.type(
+      screen.getByPlaceholderText("$ (e.g. 5 or -2.50)"),
+      "5",
+    );
+    await user.type(
+      screen.getByPlaceholderText("Reason (required for audit log)"),
+      "Goodwill credit",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await screen.findByText("Credited jane — new balance $10.50");
+
+    await waitFor(() => {
+      const adjustmentsAfter = fetchMock.mock.calls.filter(([input]) => {
+        const url = new URL(String(input), "http://localhost");
+        return url.pathname === "/api/admin/adjustments";
+      }).length;
+      expect(adjustmentsAfter).toBeGreaterThan(adjustmentsBefore);
+    });
+  });
+
+  it("shows an error toast and does not falsely report success when the credit request fails", async () => {
+    installCreditFetchMock({
+      creditResponse: {
+        ok: false,
+        body: { error: "Insufficient permissions" },
+      },
+    });
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    await user.type(
+      screen.getByPlaceholderText("$ (e.g. 5 or -2.50)"),
+      "5",
+    );
+    await user.type(
+      screen.getByPlaceholderText("Reason (required for audit log)"),
+      "Goodwill credit",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await screen.findByText("Insufficient permissions");
+    expect(screen.queryByText(/Credited jane/)).not.toBeInTheDocument();
+  });
+});
+
 describe("CashClipUsersPanel — Manual Credit Audit Log", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
