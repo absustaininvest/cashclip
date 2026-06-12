@@ -126,8 +126,9 @@ describe("verifyProviderCompletion — guard branches (no network)", () => {
   });
 });
 
-// Providers whose verifier accepts a confirmation that carries a matching status
-// even when the provider omits the transaction/user echo back (lenient match).
+// These providers use strict completion verification: they require the provider
+// to echo back BOTH the exact transaction id AND the exact user id before
+// rewarding. A bare status/completed field with no identity echo is NOT enough.
 const LENIENT_PROVIDERS: { provider: "pollfish" | "cint" | "lucid"; envKey: string; expectedPathPrefix: string }[] = [
   { provider: "pollfish", envKey: "POLLFISH_API_KEY", expectedPathPrefix: "/v2/surveys/" },
   { provider: "cint",     envKey: "CINT_API_KEY",     expectedPathPrefix: "/v1/surveys/" },
@@ -173,18 +174,18 @@ describe.each(LENIENT_PROVIDERS)(
       expect(url.pathname).toBe(expectedPath);
     });
 
-    it("verifies on a bare matching status even without txn/user echo", async () => {
+    it("denies on a bare status string when txn/user are not echoed back (strict)", async () => {
       configure();
       stubFetchResolving(fakeResponse({ body: { status: "success" } }));
       const res = await verifyProviderCompletion({ surveyId, provider, userId, transactionId });
-      expect(res.verified).toBe(true);
+      expect(res.verified).toBe(false);
     });
 
-    it("verifies when completed:true is returned without a status string", async () => {
+    it("denies on completed:true when txn/user are not echoed back (strict)", async () => {
       configure();
       stubFetchResolving(fakeResponse({ body: { completed: true } }));
       const res = await verifyProviderCompletion({ surveyId, provider, userId, transactionId });
-      expect(res.verified).toBe(true);
+      expect(res.verified).toBe(false);
     });
 
     it("denies when the provider reports a non-complete status", async () => {
@@ -620,22 +621,22 @@ describe("fetchExternalSurveys — CPX mapping and fallback", () => {
     expect(surveys[0].surveyUrl).toContain("offers.cpx-research.com");
   });
 
-  it("falls back to the offerwall card on a non-OK CPX response", async () => {
+  it("surfaces CPX as degraded (error set, empty surveys) on a non-OK response", async () => {
     configureCpx();
     stubFetchResolving(fakeResponse({ ok: false, status: 500 }));
     const results = await fetchExternalSurveys("user-1");
-    const surveys = surveysFor(results, "cpx");
-    expect(surveys).toHaveLength(1);
-    expect(surveys[0].id).toBe("cpx_wall");
+    const cpxEntry = results.find((r) => r.provider === "cpx")!;
+    expect(cpxEntry.error).toBeDefined();
+    expect(cpxEntry.surveys).toEqual([]);
   });
 
-  it("falls back to the offerwall card when fetch rejects", async () => {
+  it("surfaces CPX as degraded (error set, empty surveys) when fetch rejects", async () => {
     configureCpx();
     stubFetchRejecting();
     const results = await fetchExternalSurveys("user-1");
-    const surveys = surveysFor(results, "cpx");
-    expect(surveys).toHaveLength(1);
-    expect(surveys[0].id).toBe("cpx_wall");
+    const cpxEntry = results.find((r) => r.provider === "cpx")!;
+    expect(cpxEntry.error).toBeDefined();
+    expect(cpxEntry.surveys).toEqual([]);
   });
 });
 
@@ -721,12 +722,11 @@ describe("fetchExternalSurveys — multi-provider aggregation", () => {
     expect(surveysFor(results, "cint")).toEqual([]);
   });
 
-  it("keeps other surveys and still gives CPX its offerwall fallback when a provider returns non-OK", async () => {
+  it("marks non-OK providers as degraded without dropping surveys from healthy providers", async () => {
     configureMany();
     stubFetchRouting((url) => {
       if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
       if (url.includes("api.cint.com")) return fakeResponse({ ok: false, status: 500 });
-      // CPX itself returns non-OK -> verifier path falls back to the wall card
       if (url.includes("cpx-research.com")) return fakeResponse({ ok: false, status: 503 });
       throw new Error(`unexpected fetch to ${url}`);
     });
@@ -735,12 +735,114 @@ describe("fetchExternalSurveys — multi-provider aggregation", () => {
     expect(results.map((r) => r.provider).sort()).toEqual(["cint", "cpx", "pollfish"]);
     // healthy provider unaffected
     expect(surveysFor(results, "pollfish")[0]).toMatchObject({ id: "pollfish_111" });
-    // non-OK provider contributes nothing but doesn't drop others
-    expect(surveysFor(results, "cint")).toEqual([]);
-    // CPX never leaves the tab empty: falls back to the single offerwall card
-    const cpx = surveysFor(results, "cpx");
-    expect(cpx).toHaveLength(1);
-    expect(cpx[0]).toMatchObject({ id: "cpx_wall", provider: "cpx" });
+    // non-OK providers are degraded: empty surveys + error flag set
+    const cintEntry = results.find((r) => r.provider === "cint")!;
+    expect(cintEntry.surveys).toEqual([]);
+    expect(cintEntry.error).toBeDefined();
+    const cpxEntry = results.find((r) => r.provider === "cpx")!;
+    expect(cpxEntry.surveys).toEqual([]);
+    expect(cpxEntry.error).toBeDefined();
+  });
+});
+
+// --- Degraded provider flag -----------------------------------------------
+// These tests assert the specific `error` field contract: when a provider
+// outage occurs (network throw or non-OK HTTP) the failed provider's entry
+// has `error` set (degraded flag), while the overall call still returns a
+// result array (200-equivalent) and healthy providers' surveys are intact.
+
+describe("fetchExternalSurveys — degraded provider flag", () => {
+  const pollfishBody = {
+    surveys: [{ survey_id: "p1", survey_name: "Poll", reward_value: 0.50, loi: 3, category: "General" }],
+  };
+  const bitlabsBody = {
+    data: { surveys: [{ id: "b1", title: "BL Survey", value: 0.75, loi: 5 }] },
+  };
+
+  it("one provider throws → that provider's entry has error set, other surveys still returned", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    process.env.BITLABS_API_KEY = "bl-key";
+
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.bitlabs.ai")) throw new Error("bitlabs network down");
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+
+    expect(results.map((r) => r.provider).sort()).toEqual(["bitlabs", "pollfish"]);
+
+    const pollfishEntry = results.find((r) => r.provider === "pollfish")!;
+    expect(pollfishEntry.error).toBeUndefined();
+    expect(pollfishEntry.surveys).toHaveLength(1);
+    expect(pollfishEntry.surveys[0]).toMatchObject({ id: "pollfish_p1" });
+
+    const bitlabsEntry = results.find((r) => r.provider === "bitlabs")!;
+    expect(bitlabsEntry.error).toBeDefined();
+    expect(bitlabsEntry.surveys).toEqual([]);
+  });
+
+  it("all providers succeed → no entry has error set (degradedProviders empty)", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    process.env.BITLABS_API_KEY = "bl-key";
+
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.bitlabs.ai")) return fakeResponse({ body: bitlabsBody });
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+
+    expect(results.map((r) => r.provider).sort()).toEqual(["bitlabs", "pollfish"]);
+    const degraded = results.filter((r) => r.error !== undefined);
+    expect(degraded).toHaveLength(0);
+    expect(surveysFor(results, "pollfish")).toHaveLength(1);
+    expect(surveysFor(results, "bitlabs")).toHaveLength(1);
+  });
+
+  it("HTTP non-OK response → treated as degraded, not silent empty (error field set)", async () => {
+    process.env.POLLFISH_API_KEY = "pf-key";
+    process.env.BITLABS_API_KEY = "bl-key";
+
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("api.bitlabs.ai")) return fakeResponse({ ok: false, status: 503 });
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+
+    const bitlabsEntry = results.find((r) => r.provider === "bitlabs")!;
+    expect(bitlabsEntry.error).toBeDefined();
+    expect(bitlabsEntry.surveys).toEqual([]);
+
+    const pollfishEntry = results.find((r) => r.provider === "pollfish")!;
+    expect(pollfishEntry.error).toBeUndefined();
+    expect(pollfishEntry.surveys).toHaveLength(1);
+  });
+
+  it("CPX outage surfaces as degraded (cannot be silently reported as healthy)", async () => {
+    process.env.CPX_API_KEY = "cpx-key";
+    process.env.CPX_APP_ID = "app-123";
+    process.env.POLLFISH_API_KEY = "pf-key";
+
+    stubFetchRouting((url) => {
+      if (url.includes("api.pollfish.com")) return fakeResponse({ body: pollfishBody });
+      if (url.includes("cpx-research.com")) throw new Error("cpx network down");
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const results = await fetchExternalSurveys("user-1");
+
+    const cpxEntry = results.find((r) => r.provider === "cpx")!;
+    expect(cpxEntry.error).toBeDefined();
+    expect(cpxEntry.surveys).toEqual([]);
+
+    const pollfishEntry = results.find((r) => r.provider === "pollfish")!;
+    expect(pollfishEntry.error).toBeUndefined();
+    expect(pollfishEntry.surveys).toHaveLength(1);
   });
 });
 
