@@ -166,7 +166,7 @@ export default function SponsoredSection() {
             ) : c.alreadyVisited ? (
               <View style={styles.visitedBadge}>
                 <Feather name="check" size={12} color={Colors.primary} />
-                <Text style={styles.visitedText}>Visited</Text>
+                <Text style={styles.visitedText}>+{Math.round(c.rewardPerVisit * 1000)} pts earned</Text>
               </View>
             ) : (
               <View style={styles.reward}>
