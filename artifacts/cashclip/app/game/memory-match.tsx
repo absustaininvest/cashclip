@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 import {
   MEMORY_COLUMNS as COLUMNS,
   MEMORY_ROWS as ROWS,
@@ -174,6 +175,7 @@ function MemoryCard({
 }
 
 export default function MemoryMatchGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -231,7 +233,7 @@ export default function MemoryMatchGame() {
     if (bankedRef.current) return;
     bankedRef.current = true;
     const pts = dollarsToPoints(calculateReward(totalMoves));
-    await recordGamePlay("memory-match", pts, desc);
+    await claimGameReward("memory-match", pts, desc);
   }, [calculateReward]);
 
   const handleCardPress = useCallback(

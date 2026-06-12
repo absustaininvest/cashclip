@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 import { dominoPieceSize } from "./layout-sizing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -177,6 +178,7 @@ function ChainDominoPiece({ placed, size }: { placed: PlacedDomino; size: number
 }
 
 export default function DominoesGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -271,7 +273,7 @@ export default function DominoesGame() {
           ? "Dominoes: Draw"
           : "Dominoes: Lost";
       const pts = result === "won" ? dollarsToPoints(0.10) : result === "draw" ? dollarsToPoints(0.03) : 0;
-      void recordGamePlay("dominoes", pts, desc);
+      void claimGameReward("dominoes", pts, desc);
       setTimeout(showResult, 500);
     },
     [showResult]

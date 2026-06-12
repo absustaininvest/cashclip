@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
   BLOCK_GRID_SIZE,
@@ -182,6 +183,7 @@ function getColorIndex(color: string): number {
 }
 
 export default function BlockBlitzGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -239,7 +241,7 @@ export default function BlockBlitzGame() {
     showResult();
     if (!bankedRef.current) {
       bankedRef.current = true;
-      await recordGamePlay("block-blitz", dollarsToPoints(0.05), `Block Blitz: ${score} pts, ${linesCleared} lines`);
+      await claimGameReward("block-blitz", dollarsToPoints(0.05), `Block Blitz: ${score} pts, ${linesCleared} lines`);
     }
   }, [score, linesCleared, showResult]);
 

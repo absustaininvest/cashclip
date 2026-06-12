@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -74,6 +75,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 type GameState = "loading" | "cooldown" | "ready" | "playing" | "feedback" | "finished";
 
 export default function TriviaGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -216,7 +218,7 @@ export default function TriviaGame() {
 
     if (!bankedRef.current) {
       bankedRef.current = true;
-      await recordGamePlay("trivia", dollarsToPoints(reward), `Trivia Quiz: ${finalCorrect}/10 correct`);
+      await claimGameReward("trivia", dollarsToPoints(reward), `Trivia Quiz: ${finalCorrect}/10 correct`);
     }
   }, [correctCount]);
 

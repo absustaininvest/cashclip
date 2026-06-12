@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
   TETRIS_COLS,
@@ -149,6 +150,7 @@ function NextPiecePreview({ piece }: { piece: Piece }) {
 }
 
 export default function TetrisGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -213,7 +215,7 @@ export default function TetrisGame() {
       intervalRef.current = null;
     }
     const totalLines = linesRef.current;
-    void recordGamePlay("tetris", dollarsToPoints(0.05), `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
+    void claimGameReward("tetris", dollarsToPoints(0.05), `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
   }, []);
 
   const spawnNewPiece = useCallback(() => {

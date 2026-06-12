@@ -960,9 +960,11 @@ export default function EarnScreen() {
     }
 
     // LevelPlay native build pending — show the in-app ad modal directly.
-    // Reward is issued via recordEarnAction("ad_view") on completion; no
-    // challenge token needed since begin/complete endpoints are disabled (410).
+    // Kick off a server challenge before the modal opens so completeAdView()
+    // can issue a proper earn token when the user finishes watching.
     setAdLoading(false);
+    const adBegin = await beginAdView();
+    if (adBegin.ok) adChallengeRef.current = adBegin.challengeToken;
     setWatchingAd(ad);
     setShowModal(true);
   }, [adLoading, loadAll, t]);
@@ -972,14 +974,16 @@ export default function EarnScreen() {
     trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
+    const tok = adChallengeRef.current;
+    adChallengeRef.current = null;
     const earned = await recordEarnAction("ad_view", "Video ad");
+    if (tok) await completeAdView(tok, "Watched video");
     if (watchingAd) {
       setLastWatchedAdId(watchingAd.id);
       setLastWatchedAdPts(Math.round(watchingAd.reward * 1000));
     }
     setShowModal(false);
     setWatchingAd(null);
-    adChallengeRef.current = null;
     if (earned) await loadAll();
     balancePulse.value = withSequence(
       withSpring(1.1, { damping: 4 }),

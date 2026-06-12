@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 import {
   TAP_FRENZY_AREA_TOP as PLAY_AREA_TOP,
   TAP_FRENZY_AREA_BOTTOM as PLAY_AREA_BOTTOM,
@@ -54,6 +55,7 @@ function getPerformanceLabel(taps: number, t: any): string {
 }
 
 export default function TapFrenzyScreen() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -185,7 +187,7 @@ export default function TapFrenzyScreen() {
 
     if (!bankedRef.current) {
       bankedRef.current = true;
-      void recordGamePlay("tap-frenzy", dollarsToPoints(earnedReward), `Tap Frenzy: ${finalScore} taps`);
+      void claimGameReward("tap-frenzy", dollarsToPoints(earnedReward), `Tap Frenzy: ${finalScore} taps`);
     }
     setCanPlay(false);
   }, []);

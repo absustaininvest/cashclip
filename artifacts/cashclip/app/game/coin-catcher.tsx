@@ -22,6 +22,7 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 import {
   COIN_CATCHER_CATCHER_HEIGHT as CATCHER_HEIGHT,
   COIN_CATCHER_ITEM_SIZE as ITEM_SIZE,
@@ -74,6 +75,7 @@ function getRandomItemType(): FallingItem["type"] {
 }
 
 export default function CoinCatcherScreen() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -141,7 +143,7 @@ export default function CoinCatcherScreen() {
     const reward = parseFloat(finalScore.toFixed(2));
     if (!bankedRef.current) {
       bankedRef.current = true;
-      void recordGamePlay("coin-catcher", dollarsToPoints(reward), "Coin Catcher");
+      void claimGameReward("coin-catcher", dollarsToPoints(reward), "Coin Catcher");
     }
   }, [cleanup]);
 

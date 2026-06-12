@@ -16,6 +16,7 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useCelebration } from "@/lib/CelebrationContext";
 import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
   computeScratchCellSize,
@@ -152,6 +153,7 @@ function ScratchCell({
 }
 
 export default function ScratchCardGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -200,7 +202,7 @@ export default function ScratchCardGame() {
     async (symbol: SymbolType) => {
       const desc = `Scratch Card: matched 3 ${symbol}s`;
       const pts = dollarsToPoints(SYMBOL_CONFIG[symbol].reward);
-      await recordGamePlay("scratch-card", pts, desc);
+      await claimGameReward("scratch-card", pts, desc);
       celebrate({
         tier: "epic",
         label: `+${formatPoints(pts)} pts`,

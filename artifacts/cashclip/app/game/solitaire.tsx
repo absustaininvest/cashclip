@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { useGameEarn } from "@/lib/use-game-earn";
 import { solitaireCardWidth } from "./layout-sizing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -200,6 +201,7 @@ function EmptySlot({ onPress, testID, label }: { onPress?: () => void; testID?: 
 }
 
 export default function SolitaireGame() {
+  const { claimGameReward } = useGameEarn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -260,7 +262,7 @@ export default function SolitaireGame() {
     if (bankedRef.current) return;
     bankedRef.current = true;
     const pts = won ? dollarsToPoints(0.25) : 0;
-    await recordGamePlay("solitaire", pts, desc);
+    await claimGameReward("solitaire", pts, desc);
   }, []);
 
   const flipTopCard = (cols: Card[][]) => {
