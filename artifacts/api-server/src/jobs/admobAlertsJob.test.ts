@@ -109,6 +109,7 @@ beforeEach(async () => {
   process.env.ADMOB_ALERT_MIN_EARNINGS_USD = "1";
   process.env.ADMOB_ALERT_COOLDOWN_MS = String(6 * HOUR);
   delete process.env.ADMIN_ALERT_WEBHOOK_URL;
+  delete process.env.ADMOB_ALERTS_DISABLED;
 
   ({ startAdmobAlertsJob } = await import("./admobAlertsJob"));
 });
@@ -266,6 +267,31 @@ describe("startAdmobAlertsJob", () => {
     );
     expect(resolved).toBeTruthy();
     expect(resolved!.threshold).toBe(25);
+  });
+
+  it("resolves a stale_sync alert automatically when the sync comes back fresh", async () => {
+    // Run 1: last sync is too old — a firing stale_sync alert must be recorded.
+    getAdmobLastSyncedAt.mockResolvedValue(new Date(Date.now() - 8 * HOUR));
+    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 0 });
+
+    startAdmobAlertsJob();
+    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
+
+    const firing = getRecentAdmobAlerts().find(
+      (a) => a.condition === "stale_sync" && a.status === "firing",
+    );
+    expect(firing).toBeTruthy();
+
+    // Run 2: sync is now fresh — the state machine must emit a resolved alert.
+    getAdmobLastSyncedAt.mockResolvedValue(new Date(Date.now() - 1 * HOUR));
+
+    await vi.advanceTimersByTimeAsync(EVALUATE_INTERVAL_MS);
+
+    const resolved = getRecentAdmobAlerts().find(
+      (a) => a.condition === "stale_sync" && a.status === "resolved",
+    );
+    expect(resolved).toBeTruthy();
+    expect(resolved!.threshold).toBe(6 * HOUR);
   });
 
   it("does not fire a revenue_divergence alert when reconciliation is within threshold", async () => {
