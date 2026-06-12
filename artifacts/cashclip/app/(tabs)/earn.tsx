@@ -31,7 +31,7 @@ import {
   Outfit_600SemiBold,
   Outfit_700Bold,
 } from "@expo-google-fonts/outfit";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
 import SponsoredSection from "@/components/SponsoredSection";
@@ -122,12 +122,14 @@ function AdCard({
   disabled,
   adPreloaded,
   readyLabel,
+  earnedPts,
 }: {
   ad: (typeof adVideos)[0];
   onWatch: (ad: (typeof adVideos)[0]) => void;
   disabled?: boolean;
   adPreloaded?: boolean;
   readyLabel?: string;
+  earnedPts?: number;
 }) {
   const scale = useSharedValue(1);
 
@@ -165,15 +167,24 @@ function AdCard({
           </View>
         </View>
         <View style={styles.watchBtnContainer}>
-          {adPreloaded && (
-            <View style={styles.instantPlayBadge}>
-              <View style={styles.instantPlayDot} />
-              <Text style={styles.instantPlayText}>{readyLabel || "Ready"}</Text>
+          {earnedPts != null ? (
+            <View style={styles.adEarnedBadge}>
+              <Feather name="check" size={12} color={Colors.primary} />
+              <Text style={styles.adEarnedText}>+{earnedPts} pts earned</Text>
             </View>
+          ) : (
+            <>
+              {adPreloaded && (
+                <View style={styles.instantPlayBadge}>
+                  <View style={styles.instantPlayDot} />
+                  <Text style={styles.instantPlayText}>{readyLabel || "Ready"}</Text>
+                </View>
+              )}
+              <View style={[styles.watchBtn, adPreloaded && styles.watchBtnReady]}>
+                <Ionicons name="play" size={16} color={Colors.background} />
+              </View>
+            </>
           )}
-          <View style={[styles.watchBtn, adPreloaded && styles.watchBtnReady]}>
-            <Ionicons name="play" size={16} color={Colors.background} />
-          </View>
         </View>
       </Pressable>
     </Animated.View>
@@ -684,6 +695,11 @@ export default function EarnScreen() {
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [nextSpinTime, setNextSpinTime] = useState<number | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [lastWatchedAdId, setLastWatchedAdId] = useState<string | null>(null);
+  const [lastWatchedAdPts, setLastWatchedAdPts] = useState<number>(0);
+  const [lastGameEarnedPts, setLastGameEarnedPts] = useState<number | null>(null);
+  const pendingPtsBeforeGamesRef = useRef<number | null>(null);
+  const checkGameEarnedRef = useRef(false);
 
   const balancePulse = useSharedValue(1);
   const wheelRotation = useSharedValue(0);
@@ -737,6 +753,30 @@ export default function EarnScreen() {
       preloadRewardedAd();
     }
   }, [user?.id]);
+
+  // Reload when the screen regains focus. If the user navigated away to play a
+  // game, compare pending pts before/after to compute what was earned this session.
+  useFocusEffect(
+    useCallback(() => {
+      if (checkGameEarnedRef.current) {
+        loadAll();
+      }
+    }, [loadAll])
+  );
+
+  // After a game session, detect newly-added pending points and surface them on
+  // the game card badge. Runs whenever pendingState updates post-navigation.
+  useEffect(() => {
+    if (!checkGameEarnedRef.current) return;
+    if (pendingPtsBeforeGamesRef.current == null) return;
+    const total = (pendingState?.pendingPoints ?? 0) + (pendingState?.claimablePoints ?? 0);
+    const diff = total - pendingPtsBeforeGamesRef.current;
+    if (diff > 0) {
+      setLastGameEarnedPts(diff);
+    }
+    checkGameEarnedRef.current = false;
+    pendingPtsBeforeGamesRef.current = null;
+  }, [pendingState]);
 
   const handleCheckin = useCallback(async () => {
     if (checkedInToday) return;
@@ -860,6 +900,8 @@ export default function EarnScreen() {
           if (begin.ok) {
             await completeAdView(begin.challengeToken, "Watched video");
           }
+          setLastWatchedAdId(ad.id);
+          setLastWatchedAdPts(Math.round(ad.reward * 1000));
           await loadAll();
           balancePulse.value = withSequence(
             withSpring(1.1, { damping: 4 }),
@@ -896,6 +938,10 @@ export default function EarnScreen() {
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
     const earned = await recordEarnAction("ad_view", "Video ad");
+    if (watchingAd) {
+      setLastWatchedAdId(watchingAd.id);
+      setLastWatchedAdPts(Math.round(watchingAd.reward * 1000));
+    }
     setShowModal(false);
     setWatchingAd(null);
     adChallengeRef.current = null;
@@ -1320,7 +1366,13 @@ export default function EarnScreen() {
         {/* Play Games */}
         <Pressable
           testID="play-games-card"
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/games"); }}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            pendingPtsBeforeGamesRef.current = (pendingState?.pendingPoints ?? 0) + (pendingState?.claimablePoints ?? 0);
+            checkGameEarnedRef.current = true;
+            setLastGameEarnedPts(null);
+            router.push("/games");
+          }}
           style={({ pressed }) => [styles.sectionCard, { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1331,7 +1383,14 @@ export default function EarnScreen() {
               <Text style={{ fontFamily: "Outfit_700Bold", fontSize: 16, color: Colors.text }}>{t.games.playGames}</Text>
               <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 }}>{t.games.earnUpTo}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+            {lastGameEarnedPts != null ? (
+              <View style={styles.gameEarnedBadge}>
+                <Feather name="check" size={12} color="#E040FB" />
+                <Text style={styles.gameEarnedText}>+{lastGameEarnedPts} pts earned</Text>
+              </View>
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+            )}
           </View>
         </Pressable>
 
@@ -1499,7 +1558,14 @@ export default function EarnScreen() {
           return filtered.length > 0 ? (
             filtered.map((ad, i) => (
               <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
-                <AdCard ad={ad} onWatch={handleWatchAd} disabled={adLoading} adPreloaded={adPreloaded} readyLabel={t.earn.adReady} />
+                <AdCard
+                  ad={ad}
+                  onWatch={handleWatchAd}
+                  disabled={adLoading}
+                  adPreloaded={adPreloaded}
+                  readyLabel={t.earn.adReady}
+                  earnedPts={lastWatchedAdId === ad.id ? lastWatchedAdPts : undefined}
+                />
               </View>
             ))
           ) : (
@@ -2285,6 +2351,34 @@ const styles = StyleSheet.create({
   watchBtnReady: {
     borderWidth: 2,
     borderColor: "rgba(0,230,118,0.4)",
+  },
+  adEarnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,230,118,0.10)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  adEarnedText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 11,
+    color: Colors.primary,
+  },
+  gameEarnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(224,64,251,0.10)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  gameEarnedText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 11,
+    color: "#E040FB",
   },
 
   modalOverlay: {
