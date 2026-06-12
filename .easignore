@@ -1,0 +1,11 @@
+**/node_modules/
+.git/
+*.log
+attached_assets/
+exports/
+.local/
+.cache/
+snapshots/
+dist/
+static-build/
+.eas-tmp/

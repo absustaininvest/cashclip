@@ -18,6 +18,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
       "buildNumber": "41",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserTrackingUsageDescription": "By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. Your earnings depend on this permission \u2014 tracking helps us show the most relevant ads and maximize your payouts. You can change this at any time in Settings > Privacy & Security > Tracking.",
