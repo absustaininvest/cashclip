@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { readdirSync } from "fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { PUBLIC_ROUTES } from "./src/public-routes";
+import { PUBLIC_ROUTES, ROUTES } from "./src/public-routes";
 
 const SITE_BASE = "https://absustaininvest.com";
 
@@ -79,6 +79,40 @@ function antiClickjackPlugin(): Plugin {
   };
 }
 
+function routeSyncCheckPlugin(): Plugin {
+  return {
+    name: "route-sync-check",
+    buildStart() {
+      const EXCLUDED = new Set<string>([ROUTES.SC_PORTAL]);
+      const isDynamic = /:/;
+
+      const sitemapPaths = new Set(PUBLIC_ROUTES.map((r) => r.path));
+      const appPaths = (Object.values(ROUTES) as string[]).filter(
+        (p) => !EXCLUDED.has(p) && !isDynamic.test(p),
+      );
+
+      const missing = appPaths.filter((p) => !sitemapPaths.has(p));
+      if (missing.length > 0) {
+        this.error(
+          `Sitemap/route mismatch — routes in ROUTES but missing from PUBLIC_ROUTES:\n` +
+          missing.map((p) => `  ${p}`).join("\n") +
+          `\nAdd them to artifacts/absustain/src/public-routes.ts`,
+        );
+      }
+
+      const appPathSet = new Set(appPaths);
+      const orphaned = [...sitemapPaths].filter((p) => !appPathSet.has(p));
+      if (orphaned.length > 0) {
+        this.warn(
+          `Sitemap/route mismatch — paths in PUBLIC_ROUTES but not in ROUTES:\n` +
+          orphaned.map((p) => `  ${p}`).join("\n") +
+          `\nRemove them from artifacts/absustain/src/public-routes.ts or add matching ROUTES entries.`,
+        );
+      }
+    },
+  };
+}
+
 function archiveGuardPlugin(): Plugin {
   return {
     name: "archive-guard",
@@ -139,6 +173,7 @@ export default defineConfig({
   plugins: [
     antiClickjackPlugin(),
     archiveGuardPlugin(),
+    routeSyncCheckPlugin(),
     sitemapPlugin(),
     ...(MAINTENANCE_MODE ? [maintenancePlugin()] : []),
     react(),
