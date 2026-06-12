@@ -2,11 +2,196 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import { readdirSync } from "fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { PUBLIC_ROUTES, ROUTES } from "./src/public-routes";
 
 const SITE_BASE = "https://absustaininvest.com";
+
+interface RouteMeta {
+  title: string;
+  description: string;
+  image: string;
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
+const ROUTE_META: Record<string, RouteMeta> = {
+  "/": {
+    title: "AB Sustainability Investments LLC — Building Enduring Enterprises",
+    description:
+      "AB Sustainability Investments LLC is a diversified holding company building sustainable technology, retail, and food service ventures, including the CashClip rewards app and Solera Restaurant.",
+    image: "https://absustaininvest.com/absustain/opengraph.jpg",
+    imageWidth: 1280,
+    imageHeight: 720,
+  },
+  "/ventures": {
+    title: "Ventures & Portfolio | AB Sustainability Investments",
+    description:
+      "Explore the AB Sustainability Investments portfolio across technology, retail, and food service — including the CashClip mobile rewards app and Solera Restaurant.",
+    image: "https://absustaininvest.com/absustain/ab-logo.jpeg",
+    imageWidth: 1320,
+    imageHeight: 757,
+  },
+  "/ventures/solera": {
+    title: "Solera Restaurant | AB Sustainability Investments",
+    description:
+      "Solera Restaurant — aged in tradition, served with soul. A modern hospitality and food service venture in Lake Worth Beach, FL, part of AB Sustainability Investments.",
+    image: "https://absustaininvest.com/absustain/solera-logo.jpeg",
+    imageWidth: 1116,
+    imageHeight: 1140,
+  },
+  "/about": {
+    title: "About | AB Sustainability Investments",
+    description:
+      "Learn about AB Sustainability Investments LLC — a diversified holding company founded by Jorge Ballen that builds, operates, and invests in sustainable business models for long-term value.",
+    image: "https://absustaininvest.com/absustain/logo-full.png",
+    imageWidth: 981,
+    imageHeight: 487,
+  },
+  "/investors": {
+    title: "Investor Relations | AB Sustainability Investments",
+    description:
+      "Investor relations for AB Sustainability Investments LLC — explore investment opportunities, equity details, and the growth strategy behind our sustainable venture portfolio.",
+    image: "https://absustaininvest.com/absustain/opengraph.jpg",
+    imageWidth: 1280,
+    imageHeight: 720,
+  },
+  "/contact": {
+    title: "Contact | AB Sustainability Investments",
+    description:
+      "Get in touch with AB Sustainability Investments LLC for corporate inquiries, partnerships, and investor relations, or reach support for the CashClip rewards app.",
+    image: "https://absustaininvest.com/absustain/logo-full.png",
+    imageWidth: 981,
+    imageHeight: 487,
+  },
+  "/press": {
+    title: "Press Kit | AB Sustainability Investments",
+    description:
+      "Press and media resources for AB Sustainability Investments LLC — company background, brand assets, leadership, and information about CashClip and our venture portfolio.",
+    image: "https://absustaininvest.com/absustain/logo-full.png",
+    imageWidth: 981,
+    imageHeight: 487,
+  },
+  "/cashclip/privacy": {
+    title: "CashClip Privacy Policy | AB Sustainability Investments",
+    description:
+      "The CashClip privacy policy explains how AB Sustainability Investments LLC collects, uses, and protects your information when you use the CashClip mobile rewards app.",
+    image: "https://absustaininvest.com/absustain/logo-full.png",
+    imageWidth: 981,
+    imageHeight: 487,
+  },
+  "/cashclip/terms": {
+    title: "CashClip Terms of Service | AB Sustainability Investments",
+    description:
+      "The CashClip terms of service govern your use of the CashClip mobile rewards app operated by AB Sustainability Investments LLC, including rewards, withdrawals, and account rules.",
+    image: "https://absustaininvest.com/absustain/logo-full.png",
+    imageWidth: 981,
+    imageHeight: 487,
+  },
+};
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function replaceAttrValue(
+  html: string,
+  selector: string,
+  attrName: string,
+  value: string,
+): string {
+  const re = new RegExp(
+    `(<meta\\s[^>]*${selector}[^>]*\\s${attrName}=")[^"]*("(?:[^>]*>))`,
+    "i",
+  );
+  if (re.test(html)) return html.replace(re, `$1${value}$2`);
+  const re2 = new RegExp(
+    `(<meta\\s[^>]*${attrName}=")[^"]*("[^>]*${selector}[^>]*>)`,
+    "i",
+  );
+  return html.replace(re2, `$1${value}$2`);
+}
+
+function injectRouteMeta(template: string, route: string, meta: RouteMeta): string {
+  const canonicalUrl = SITE_BASE + (route === "/" ? "/" : route);
+  let html = template;
+
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttr(meta.title)}</title>`);
+
+  html = replaceAttrValue(html, 'name="description"', "content", escapeAttr(meta.description));
+
+  html = replaceAttrValue(html, 'property="og:title"', "content", escapeAttr(meta.title));
+  html = replaceAttrValue(html, 'property="og:description"', "content", escapeAttr(meta.description));
+  html = replaceAttrValue(html, 'property="og:url"', "content", canonicalUrl);
+  html = replaceAttrValue(html, 'property="og:image"', "content", meta.image);
+
+  html = replaceAttrValue(html, 'name="twitter:title"', "content", escapeAttr(meta.title));
+  html = replaceAttrValue(html, 'name="twitter:description"', "content", escapeAttr(meta.description));
+  html = replaceAttrValue(html, 'name="twitter:image"', "content", meta.image);
+
+  if (meta.imageWidth != null || meta.imageHeight != null) {
+    const dimensionTags: string[] = [];
+    if (meta.imageWidth != null) {
+      dimensionTags.push(`    <meta property="og:image:width" content="${meta.imageWidth}" />`);
+    }
+    if (meta.imageHeight != null) {
+      dimensionTags.push(`    <meta property="og:image:height" content="${meta.imageHeight}" />`);
+    }
+    if (html.includes('property="og:image:width"')) {
+      html = replaceAttrValue(html, 'property="og:image:width"', "content", String(meta.imageWidth ?? ""));
+    } else {
+      html = html.replace(
+        /(<meta\s[^>]*property="og:image"[^>]*>)/i,
+        `$1\n${dimensionTags[0]}`,
+      );
+      if (dimensionTags[1]) {
+        html = html.replace(
+          /(<meta\s[^>]*property="og:image:width"[^>]*>)/i,
+          `$1\n${dimensionTags[1]}`,
+        );
+      }
+    }
+    if (html.includes('property="og:image:height"') && !dimensionTags[1]) {
+      html = replaceAttrValue(html, 'property="og:image:height"', "content", String(meta.imageHeight ?? ""));
+    }
+  }
+
+  return html;
+}
+
+function prerenderPlugin(): Plugin {
+  return {
+    name: "prerender-meta",
+    apply: "build",
+    closeBundle() {
+      const outDir = path.resolve(import.meta.dirname, "dist/public");
+      const templatePath = path.join(outDir, "index.html");
+      let template: string;
+      try {
+        template = readFileSync(templatePath, "utf-8");
+      } catch {
+        this.warn("prerender-meta: dist/public/index.html not found, skipping.");
+        return;
+      }
+
+      for (const [route, meta] of Object.entries(ROUTE_META)) {
+        const html = injectRouteMeta(template, route, meta);
+
+        if (route === "/") {
+          writeFileSync(templatePath, html, "utf-8");
+        } else {
+          const routeDir = path.join(outDir, route.slice(1));
+          mkdirSync(routeDir, { recursive: true });
+          writeFileSync(path.join(routeDir, "index.html"), html, "utf-8");
+        }
+      }
+
+      const count = Object.keys(ROUTE_META).length;
+      console.log(`\n✓ prerender-meta: wrote ${count} per-route index.html files with injected og/twitter meta\n`);
+    },
+  };
+}
 
 function sitemapPlugin(): Plugin {
   return {
@@ -175,6 +360,7 @@ export default defineConfig({
     archiveGuardPlugin(),
     routeSyncCheckPlugin(),
     sitemapPlugin(),
+    prerenderPlugin(),
     ...(MAINTENANCE_MODE ? [maintenancePlugin()] : []),
     react(),
     tailwindcss(),
