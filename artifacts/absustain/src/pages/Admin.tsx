@@ -4152,6 +4152,125 @@ const HUB_CATEGORY_LABELS: Record<string, string> = {
   investments: "Investments",
 };
 
+function DisplayRateCard({
+  token,
+  current,
+  onSaved,
+}: {
+  token: string;
+  current: number | null;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (current != null) setValue(String(current));
+  }, [current]);
+
+  if (current == null) return null;
+
+  const parsed = parseInt(value, 10);
+  const valid = Number.isInteger(parsed) && parsed >= 100 && parsed <= 1_000_000;
+  const dirty = valid && parsed !== current;
+
+  const save = async () => {
+    if (!valid) return;
+    setSaving(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/admin/economy/display-rate", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ displayPointsPerDollar: parsed }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || "Failed to save");
+      }
+      setSavedAt(Date.now());
+      onSaved();
+    } catch (e: any) {
+      setErr(e.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="p-2 rounded-xl bg-[#00E676]/10">
+          <TrendingUp className="w-4 h-4 text-[#00E676]" />
+        </div>
+        <div>
+          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+            Display Points Multiplier
+          </h3>
+          <p className="text-white/40 text-sm">
+            How many on-screen points equal $1 in the app UI. Cosmetic only — never
+            affects real cash owed. Takes effect on next app hydrate, no redeploy needed.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+            Points per $1
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={100}
+              max={1000000}
+              step={100}
+              value={value}
+              onChange={(e) => { setValue(e.target.value); setErr(""); setSavedAt(null); }}
+              className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#00E676]/40 transition-colors"
+              placeholder="e.g. 10000"
+            />
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !dirty}
+              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                dirty && !saving
+                  ? "bg-[#00E676] text-black hover:bg-[#00E676]/90"
+                  : "bg-white/10 text-white/30 cursor-not-allowed"
+              }`}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {!valid && value !== "" && (
+            <p className="text-red-400 text-xs mt-1.5">
+              Enter a whole number between 100 and 1,000,000
+            </p>
+          )}
+        </div>
+
+        {err && (
+          <p className="text-red-400 text-sm">{err}</p>
+        )}
+        {savedAt && !err && (
+          <p className="text-[#00E676] text-sm">
+            ✓ Saved — new value is live on the next app refresh
+          </p>
+        )}
+        <p className="text-white/25 text-xs">
+          Current active value: <span className="text-white/50 font-mono">{current.toLocaleString()} pts = $1</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AdmobAlertEmailCard({
   token,
   settings,
@@ -4466,12 +4585,13 @@ export function IntegrationHubPanel({
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [alertEmail, setAlertEmail] = useState<AlertEmailSettings | null>(null);
+  const [displayRate, setDisplayRate] = useState<number | null>(null);
 
   const fetchHub = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [hubRes, alertsRes, alertEmailRes, adStatusRes] = await Promise.all([
+      const [hubRes, alertsRes, alertEmailRes, adStatusRes, economyRes] = await Promise.all([
         fetch("/api/admin/integration-hub", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -4482,6 +4602,9 @@ export function IntegrationHubPanel({
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/ad-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/economy/rate", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -4506,6 +4629,12 @@ export function IntegrationHubPanel({
       }
       if (adStatusRes.ok) {
         setAdStatus((await adStatusRes.json()) as AdStatus);
+      }
+      if (economyRes.ok) {
+        const eco = (await economyRes.json()) as { displayPointsPerDollar?: number };
+        if (typeof eco.displayPointsPerDollar === "number") {
+          setDisplayRate(eco.displayPointsPerDollar);
+        }
       }
       setLastRefreshed(new Date());
     } catch (err: any) {
@@ -4545,6 +4674,7 @@ export function IntegrationHubPanel({
 
   return (
     <div className="space-y-6">
+      <DisplayRateCard token={token} current={displayRate} onSaved={fetchHub} />
       <AdmobAlertEmailCard token={token} settings={alertEmail} onSaved={fetchHub} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

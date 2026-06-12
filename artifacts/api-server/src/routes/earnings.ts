@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
-import { authMiddleware, type AuthRequest } from "../auth";
+import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { db, earnTokens, users, earningsLedger } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -16,6 +16,11 @@ import {
   LEGACY_USD_PER_POINT,
   DISPLAY_POINTS_PER_DOLLAR,
 } from "../lib/pointsEconomy";
+import {
+  getSetting,
+  setSetting,
+  DISPLAY_POINTS_PER_DOLLAR_KEY,
+} from "../lib/runtimeSettings";
 import { withAdvisoryLock } from "../lib/advisoryLock";
 
 // ── CONVERSION & LIMITS ───────────────────────────────────────────────────────
@@ -1144,30 +1149,76 @@ export function registerEarningsRoutes(app: Express): void {
 
   // ── GET /api/economy/rate ───────────────────────────────────────────────────
   // The current server-authoritative points→cash conversion rate (read-only).
-  // There is intentionally NO write counterpart: the rate is set only by the
-  // recompute job from code constants, never by any client or admin request.
+  // `displayPointsPerDollar` is the cosmetic UI multiplier (e.g. 10 000 pts = $1)
+  // served from the `app_settings` DB row (written by PUT /api/admin/economy/display-rate)
+  // with the code constant as a safe fallback. Real cash (usdPerPoint) is unaffected.
   app.get(
     "/api/economy/rate",
     authMiddleware,
     async (_req: AuthRequest, res: Response): Promise<void> => {
       try {
         const rate = await getCurrentRate(DEFAULT_REGION);
+        const rawSetting = getSetting(DISPLAY_POINTS_PER_DOLLAR_KEY);
+        const parsedSetting = rawSetting != null ? parseInt(rawSetting, 10) : NaN;
+        const displayPointsPerDollar =
+          Number.isInteger(parsedSetting) && parsedSetting > 0
+            ? parsedSetting
+            : DISPLAY_POINTS_PER_DOLLAR;
         res.json({
-          usdPerPoint:       rate.usdPerPoint,
-          floorUsdPerPoint:  rate.floorUsdPerPoint,
-          legacyUsdPerPoint: LEGACY_USD_PER_POINT,
-          pointsPerDollar:   rate.usdPerPoint > 0 ? Math.round(1 / rate.usdPerPoint) : null,
-          // Cosmetic display rate (10,000 pts = $1). Served so every client
-          // surface shows one consistent number and the owner can retune it
-          // without an app build. Does NOT affect real cash (usdPerPoint above).
-          displayPointsPerDollar: DISPLAY_POINTS_PER_DOLLAR,
-          method:            rate.method,
-          region:            rate.region,
-          updatedAt:         rate.computedAt,
+          usdPerPoint:            rate.usdPerPoint,
+          floorUsdPerPoint:       rate.floorUsdPerPoint,
+          legacyUsdPerPoint:      LEGACY_USD_PER_POINT,
+          pointsPerDollar:        rate.usdPerPoint > 0 ? Math.round(1 / rate.usdPerPoint) : null,
+          displayPointsPerDollar,
+          method:                 rate.method,
+          region:                 rate.region,
+          updatedAt:              rate.computedAt,
         });
       } catch (err) {
         logger.error({ err }, "economy/rate error");
         res.status(500).json({ error: "Failed to load conversion rate" });
+      }
+    },
+  );
+
+  // ── PUT /api/admin/economy/display-rate ────────────────────────────────────
+  // Admin-only: update the cosmetic on-screen display multiplier (how many
+  // points equal $1 in the UI). Persisted in app_settings and served by
+  // GET /api/economy/rate — clients pick it up on the next hydrate without an
+  // app build or API redeploy. Real cash (usdPerPoint) is completely unaffected.
+  //
+  // Validation: must be a positive integer between 100 and 1,000,000.
+  // Rationale: 100 = floor that keeps display numbers legible; 1,000,000 = hard
+  // cap preventing absurdly inflated numbers that could mislead users.
+  app.put(
+    "/api/admin/economy/display-rate",
+    adminMiddleware,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      const body = (req.body ?? {}) as { displayPointsPerDollar?: unknown };
+      const raw = body.displayPointsPerDollar;
+
+      if (raw === undefined || raw === null) {
+        res.status(400).json({ error: "displayPointsPerDollar is required" });
+        return;
+      }
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 100 || value > 1_000_000) {
+        res.status(400).json({
+          error: "displayPointsPerDollar must be a whole number between 100 and 1,000,000",
+        });
+        return;
+      }
+
+      try {
+        await setSetting(DISPLAY_POINTS_PER_DOLLAR_KEY, String(value));
+        logger.info(
+          { value, actorUserId: req.userId },
+          "display_points_per_dollar updated",
+        );
+        res.json({ ok: true, displayPointsPerDollar: value });
+      } catch (err) {
+        logger.error({ err }, "failed to update display_points_per_dollar");
+        res.status(500).json({ error: "Failed to save setting" });
       }
     },
   );

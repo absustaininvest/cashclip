@@ -20,6 +20,9 @@ import { logger } from "./logger";
 // Setting keys. Keep these stable — they are the persisted column values.
 export const ADMOB_ALERT_EMAIL_KEY = "admob_alert_email";
 export const ADMOB_ALERT_EMAIL_ENABLED_KEY = "admob_alert_email_enabled";
+// Cosmetic on-screen display multiplier: how many points equal $1 in the UI.
+// Does NOT affect real cash owed. Owner can update via PUT /api/admin/economy/display-rate.
+export const DISPLAY_POINTS_PER_DOLLAR_KEY = "display_points_per_dollar";
 
 const cache = new Map<string, string>();
 let loaded = false;
