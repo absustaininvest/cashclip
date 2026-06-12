@@ -268,6 +268,13 @@ export default function SurveysScreen() {
   const degradedProviders: string[] = (externalData as any)?.degradedProviders || [];
   const externalTotalReward = externalSurveys.reduce((sum: number, s: ExternalSurvey) => sum + s.reward, 0);
 
+  function formatProviderList(names: string[]): string {
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  }
+
   return (
     <View style={[styles.container, { paddingTop: webTopPad + insets.top }]}>
       <View style={styles.header}>
@@ -331,7 +338,9 @@ export default function SurveysScreen() {
               {degradedProviders.length > 0 && degradedProviders.length === providersList.filter((p) => p.configured).length ? (
                 <>
                   <Text style={styles.allDoneTitle}>Surveys Temporarily Unavailable</Text>
-                  <Text style={styles.allDoneText}>Our survey partners are having a brief outage. No action needed — surveys will reappear automatically once they recover.</Text>
+                  <Text style={styles.allDoneText}>
+                    {formatProviderList(degradedProviders)} {degradedProviders.length === 1 ? "is" : "are"} temporarily unavailable. No action needed — surveys will reappear automatically once {degradedProviders.length === 1 ? "it recovers" : "they recover"}.
+                  </Text>
                   <Pressable
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); refetchExternal(); }}
                     style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1, marginTop: 12 }]}
@@ -348,7 +357,7 @@ export default function SurveysScreen() {
                     <View style={[styles.degradedBanner, { marginTop: 12 }]}>
                       <Feather name="alert-triangle" size={15} color="#F5A623" />
                       <Text style={styles.degradedBannerText}>
-                        Some survey sources are temporarily unavailable, which may be reducing the number of surveys available right now.
+                        {formatProviderList(degradedProviders)} {degradedProviders.length === 1 ? "is" : "are"} temporarily unavailable, which may be reducing the number of surveys right now.
                       </Text>
                     </View>
                   )}
@@ -383,7 +392,7 @@ export default function SurveysScreen() {
                 <View style={styles.degradedBanner}>
                   <Feather name="alert-triangle" size={15} color="#F5A623" />
                   <Text style={styles.degradedBannerText}>
-                    Some survey sources are temporarily unavailable. The surveys shown below are still active — more may appear once all providers recover.
+                    {formatProviderList(degradedProviders)} {degradedProviders.length === 1 ? "is" : "are"} temporarily unavailable. The surveys shown below are still active — more may appear once {degradedProviders.length === 1 ? "it recovers" : "they recover"}.
                   </Text>
                 </View>
               )}

@@ -75,7 +75,10 @@ export function registerSurveyRoutes(app: Express): void {
 
       const degradedProviders = results
         .filter((r) => r.error)
-        .map((r) => r.provider);
+        .map((r) => {
+          const status = providerStatuses.find((s) => s.provider === r.provider);
+          return status?.name ?? r.provider;
+        });
 
       res.json({
         surveys: clamped,
