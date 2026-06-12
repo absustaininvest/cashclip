@@ -913,6 +913,8 @@ export default function EarnScreen() {
   const handleWatchAd = useCallback(async (ad: (typeof adVideos)[0]) => {
     if (adLoading) return;
 
+    setLastWatchedAdId(null);
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (isAdMobReady()) {
