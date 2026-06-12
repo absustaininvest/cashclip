@@ -86,6 +86,25 @@ export function getAdUnavailabilityReason(): string | null {
 let lpInitialized = false;
 let lpRewardedAvailable = false;
 let lpUserId: string | null = null;
+
+type FillChangeCallback = (fillAvailable: boolean) => void;
+let fillChangeCallback: FillChangeCallback | null = null;
+
+export function setFillChangeCallback(cb: FillChangeCallback | null): void {
+  fillChangeCallback = cb;
+}
+
+export function getAdFillState(): {
+  lpInitialized: boolean;
+  rewardedFillAvailable: boolean;
+  adSystemActive: boolean;
+} {
+  return {
+    lpInitialized,
+    rewardedFillAvailable: lpRewardedAvailable,
+    adSystemActive: isAdMobAvailable && lpInitialized,
+  };
+}
 // Set to true by onAdRewarded, consumed and cleared by onAdClosed
 let lpEarnedRewardThisSession = false;
 let pendingRewardResolve: ((rewarded: boolean) => void) | null = null;
@@ -174,9 +193,11 @@ export async function initializeAdMob(): Promise<boolean> {
       IronSource.setLevelPlayRewardedVideoListener({
         onAdAvailable: () => {
           lpRewardedAvailable = true;
+          fillChangeCallback?.(true);
         },
         onAdUnavailable: () => {
           lpRewardedAvailable = false;
+          fillChangeCallback?.(false);
         },
         onAdOpened: () => {
           adShowStartTime = Date.now();
@@ -248,11 +269,12 @@ export async function initializeAdMob(): Promise<boolean> {
       " If rewarded ads still don't load, check the Unity Game ID and mediation placement in the IronSource dashboard."
     );
 
-    // Check initial fill after init
+    // Check initial fill after init and notify reporter
     try {
       const available = await IronSource.isRewardedVideoAvailable();
       lpRewardedAvailable = !!available;
       console.log(`[AdInit] Rewarded ad immediately available after init: ${!!available}`);
+      fillChangeCallback?.(!!available);
     } catch {}
 
     // Pre-warm interstitial for the first natural break

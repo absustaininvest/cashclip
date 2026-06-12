@@ -772,6 +772,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // ─── In-memory ad fill state (client-reported) ────────────────────────────
+  // The CashClip app POSTs the rewarded-fill state whenever LevelPlay fires an
+  // onAdAvailable / onAdUnavailable event.  We keep only the most recent report
+  // (fill is a property of the ad network, not of individual users).
+  const adFillState: {
+    rewardedFillAvailable: boolean | null;
+    reportedAt: number | null;
+    reportedByUserId: string | null;
+  } = { rewardedFillAvailable: null, reportedAt: null, reportedByUserId: null };
+
+  /**
+   * POST /api/earn/ad-fill
+   *
+   * The CashClip app calls this whenever the LevelPlay rewarded-fill state
+   * changes (onAdAvailable / onAdUnavailable).  Requires a valid user JWT.
+   * Body: { rewardedFillAvailable: boolean }
+   */
+  app.post("/api/earn/ad-fill", authMiddleware, (req: AuthRequest, res) => {
+    const { rewardedFillAvailable } = req.body as { rewardedFillAvailable?: unknown };
+    if (typeof rewardedFillAvailable !== "boolean") {
+      res.status(400).json({ error: "rewardedFillAvailable must be a boolean" });
+      return;
+    }
+    adFillState.rewardedFillAvailable = rewardedFillAvailable;
+    adFillState.reportedAt = Date.now();
+    adFillState.reportedByUserId = req.user?.id ?? null;
+    res.json({ ok: true });
+  });
+
   /**
    * GET /api/admin/ad-status
    *
@@ -781,10 +810,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * be toggled to "true" after verifying a native build has the adapters
    * compiled in.  Defaults to false (OTA / unknown) when not set.
    *
-   * Response shape: { lpNative, unityNative, adSystemActive }
-   *   lpNative       — LevelPlay (IronSource) native module is in the live build
-   *   unityNative    — Unity Ads native module is in the live build
-   *   adSystemActive — both native modules present AND IRONSOURCE_APP_KEY configured
+   * Also includes client-reported fill state from the most recent
+   * POST /api/earn/ad-fill call, surfaced here for the admin hub.
+   *
+   * Response shape: { lpNative, unityNative, adSystemActive, rewardedFillAvailable, fillReportedAt }
+   *   lpNative               — LevelPlay (IronSource) native module is in the live build
+   *   unityNative            — Unity Ads native module is in the live build
+   *   adSystemActive         — both native modules present AND IRONSOURCE_APP_KEY configured
+   *   rewardedFillAvailable  — most recent client-reported fill state (null = no report yet)
+   *   fillReportedAt         — unix ms timestamp of last fill report (null = no report yet)
    */
   app.get("/api/admin/ad-status", adminMiddleware, (_req, res) => {
     const parseBool = (v: string | undefined): boolean =>
@@ -793,7 +827,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const unityNative = parseBool(process.env.AD_UNITY_NATIVE);
     const ironsourceConfigured = Boolean(process.env.IRONSOURCE_APP_KEY);
     const adSystemActive = lpNative && unityNative && ironsourceConfigured;
-    res.json({ lpNative, unityNative, adSystemActive });
+    res.json({
+      lpNative,
+      unityNative,
+      adSystemActive,
+      rewardedFillAvailable: adFillState.rewardedFillAvailable,
+      fillReportedAt: adFillState.reportedAt,
+    });
   });
 
   /**

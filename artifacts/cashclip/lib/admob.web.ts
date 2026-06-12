@@ -53,3 +53,15 @@ export async function showInterstitialAd(_adUnitId?: string): Promise<boolean> {
 export async function maybeShowInterstitial(): Promise<boolean> {
   return false;
 }
+
+export function setFillChangeCallback(_cb: ((fillAvailable: boolean) => void) | null): void {
+  // no-op on web
+}
+
+export function getAdFillState(): {
+  lpInitialized: boolean;
+  rewardedFillAvailable: boolean;
+  adSystemActive: boolean;
+} {
+  return { lpInitialized: false, rewardedFillAvailable: false, adSystemActive: false };
+}

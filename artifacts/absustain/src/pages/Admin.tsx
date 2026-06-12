@@ -3894,6 +3894,8 @@ interface AdStatus {
   lpNative: boolean;
   unityNative: boolean;
   adSystemActive: boolean;
+  rewardedFillAvailable: boolean | null;
+  fillReportedAt: number | null;
 }
 
 interface AdmobAlert {
@@ -4441,6 +4443,22 @@ export function IntegrationHubPanel({
                 <p className="text-white/20 text-[10px] mt-1.5">Unity Ads</p>
                 <p className={`text-sm font-semibold ${adStatus?.unityNative ? "text-[#00E676]" : "text-white/20"}`}>
                   {adStatus === null ? "—" : adStatus.unityNative ? "Present" : "Absent"}
+                </p>
+                <p className="text-white/20 text-[10px] mt-1.5">Rewarded Fill</p>
+                <p className={`text-sm font-semibold ${
+                  adStatus === null || adStatus.rewardedFillAvailable === null
+                    ? "text-white/20"
+                    : adStatus.rewardedFillAvailable
+                      ? "text-[#00E676]"
+                      : "text-amber-400"
+                }`}>
+                  {adStatus === null
+                    ? "—"
+                    : adStatus.rewardedFillAvailable === null
+                      ? "No report"
+                      : adStatus.rewardedFillAvailable
+                        ? "Fill"
+                        : "No fill"}
                 </p>
               </div>
             </div>
