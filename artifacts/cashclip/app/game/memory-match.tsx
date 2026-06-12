@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import {
   MEMORY_COLUMNS as COLUMNS,
@@ -185,7 +185,7 @@ export default function MemoryMatchGame() {
   const [moves, setMoves] = useState(0);
   const [matchedPairs, setMatchedPairs] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-  const [reward, setReward] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const [timer, setTimer] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
   const [canPlay, setCanPlay] = useState(true);
@@ -210,12 +210,6 @@ export default function MemoryMatchGame() {
     };
   }, [gameStarted, gameOver]);
 
-  const calculateReward = useCallback((totalMoves: number): number => {
-    if (totalMoves < 10) return 0.15;
-    if (totalMoves < 15) return 0.10;
-    if (totalMoves < 20) return 0.05;
-    return 0.03;
-  }, []);
 
   const getPerformanceLabel = useCallback(
     (totalMoves: number): string => {
@@ -229,12 +223,12 @@ export default function MemoryMatchGame() {
 
   const bankedRef = useRef(false);
 
-  const bankReward = useCallback(async (totalMoves: number, desc: string) => {
+  const bankReward = useCallback(async (desc: string) => {
     if (bankedRef.current) return;
     bankedRef.current = true;
-    const pts = dollarsToPoints(calculateReward(totalMoves));
-    await claimGameReward("memory-match", pts, desc);
-  }, [calculateReward]);
+    const pts = await claimGameReward("memory-match", desc);
+    setEarnedPts(pts);
+  }, [claimGameReward]);
 
   const handleCardPress = useCallback(
     (cardId: number) => {
@@ -271,12 +265,10 @@ export default function MemoryMatchGame() {
             setChecking(false);
 
             if (newMatched === PAIRS) {
-              const earnedReward = calculateReward(newMoves);
-              setReward(earnedReward);
               setGameOver(true);
               if (timerRef.current) clearInterval(timerRef.current);
 
-              void bankReward(newMoves, `Memory Match - ${newMoves} moves`);
+              void bankReward(`Memory Match - ${newMoves} moves`);
 
               setTimeout(() => {
                 setShowResult(true);
@@ -309,7 +301,7 @@ export default function MemoryMatchGame() {
         }
       }
     },
-    [cards, selectedCards, moves, matchedPairs, checking, gameStarted, calculateReward]
+    [cards, selectedCards, moves, matchedPairs, checking, gameStarted]
   );
 
   const resetGame = useCallback(() => {
@@ -318,7 +310,7 @@ export default function MemoryMatchGame() {
     setMoves(0);
     setMatchedPairs(0);
     setGameOver(false);
-    setReward(0);
+    setEarnedPts(0);
     setTimer(0);
     setGameStarted(false);
     setChecking(false);
@@ -446,7 +438,7 @@ export default function MemoryMatchGame() {
               <View style={styles.resultStatItem}>
                 <Text style={styles.resultStatLabel}>{t.games.reward}</Text>
                 <Text style={[styles.resultStatValue, { color: Colors.primary }]}>
-                  {formatPoints(dollarsToPoints(calculateReward(moves)))}
+                  🎉 Wallet!
                 </Text>
               </View>
             </View>

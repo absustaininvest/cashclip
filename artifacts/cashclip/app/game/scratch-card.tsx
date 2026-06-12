@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useCelebration } from "@/lib/CelebrationContext";
-import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
@@ -31,11 +31,11 @@ interface CellData {
   revealed: boolean;
 }
 
-const SYMBOL_CONFIG: Record<SymbolType, { icon: string; color: string; reward: number }> = {
-  coin: { icon: "cash-outline", color: "#FFD600", reward: 0.10 },
-  gem: { icon: "diamond-outline", color: "#00E5FF", reward: 0.15 },
-  star: { icon: "star", color: "#FF9100", reward: 0.25 },
-  diamond: { icon: "diamond", color: "#E040FB", reward: 0.50 },
+const SYMBOL_CONFIG: Record<SymbolType, { icon: string; color: string }> = {
+  coin: { icon: "cash-outline", color: "#FFD600" },
+  gem: { icon: "diamond-outline", color: "#00E5FF" },
+  star: { icon: "star", color: "#FF9100" },
+  diamond: { icon: "diamond", color: "#E040FB" },
 };
 
 const WEIGHTED_SYMBOLS: SymbolType[] = [
@@ -145,7 +145,6 @@ function ScratchCell({
           ]}
         >
           <Ionicons name={config.icon as any} size={36} color={config.color} />
-          <Text style={[styles.cellReward, { color: config.color }]}>{formatPoints(dollarsToPoints(config.reward))}</Text>
         </Animated.View>
       </Animated.View>
     </TouchableOpacity>
@@ -163,6 +162,7 @@ export default function ScratchCardGame() {
   const [gameState, setGameState] = useState<"playing" | "won" | "lost" | "cooldown">("playing");
   const [matchedSymbol, setMatchedSymbol] = useState<SymbolType | null>(null);
   const [revealCount, setRevealCount] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const [canPlay, setCanPlay] = useState(true);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
@@ -199,17 +199,11 @@ export default function ScratchCardGame() {
   }, []);
 
   const bankReward = useCallback(
-    async (symbol: SymbolType) => {
-      const desc = `Scratch Card: matched 3 ${symbol}s`;
-      const pts = dollarsToPoints(SYMBOL_CONFIG[symbol].reward);
-      await claimGameReward("scratch-card", pts, desc);
-      celebrate({
-        tier: "epic",
-        label: `+${formatPoints(pts)} pts`,
-        title: "You Won!",
-      });
+    async (desc: string) => {
+      const pts = await claimGameReward("scratch-card", desc);
+      setEarnedPts(pts);
     },
-    [celebrate]
+    [claimGameReward]
   );
 
   const handleReveal = useCallback(
@@ -228,10 +222,11 @@ export default function ScratchCardGame() {
       if (matched && symbol) {
         setMatchedSymbol(symbol);
         setGameState("won");
-        void bankReward(symbol);
+        void bankReward(`Scratch Card: matched 3 ${symbol}s`);
         setTimeout(showResult, 500);
       } else if (newCount >= 9) {
         setGameState("lost");
+        void bankReward("Scratch Card: completed");
         setTimeout(showResult, 500);
       }
     },
@@ -295,9 +290,6 @@ export default function ScratchCardGame() {
                 ([key, config]) => (
                   <View key={key} style={styles.legendItem}>
                     <Ionicons name={config.icon as any} size={18} color={config.color} />
-                    <Text style={[styles.legendText, { color: config.color }]}>
-                      {formatPoints(dollarsToPoints(config.reward))}
-                    </Text>
                   </View>
                 )
               )}
@@ -320,20 +312,15 @@ export default function ScratchCardGame() {
                   <Ionicons name="trophy" size={48} color={Colors.accent} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                {matchedSymbol && (
-                  <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(SYMBOL_CONFIG[matchedSymbol].reward))}</Text>
-                )}
-                <Text style={styles.resultSubtext}>
-                  Added to pending — claim after 3 hours
-                </Text>
+                <Text style={styles.resultSubtext}>🎉 Check your Wallet!</Text>
               </>
             ) : (
               <>
-                <View style={styles.resultIconLose}>
-                  <Ionicons name="close-circle" size={48} color={Colors.error} />
+                <View style={styles.resultIconWin}>
+                  <Ionicons name="star" size={48} color={Colors.primary} />
                 </View>
-                <Text style={styles.resultTitle}>{t.games.noMatch}</Text>
-                <Text style={styles.resultSubtext}>{t.games.tryHarder}</Text>
+                <Text style={styles.resultTitle}>You Still Earned!</Text>
+                <Text style={styles.resultSubtext}>🎉 Check your Wallet!</Text>
               </>
             )}
 

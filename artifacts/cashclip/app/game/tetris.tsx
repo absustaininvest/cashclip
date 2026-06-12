@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
@@ -170,6 +170,7 @@ export default function TetrisGame() {
   const [nextPiece, setNextPiece] = useState<Piece>(randomPiece);
   const [position, setPosition] = useState<Position>({ row: 0, col: 3 });
   const [score, setScore] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const [lines, setLines] = useState(0);
   const [level, setLevel] = useState(1);
   const [gameState, setGameState] = useState<"playing" | "over" | "cooldown">("playing");
@@ -215,7 +216,7 @@ export default function TetrisGame() {
       intervalRef.current = null;
     }
     const totalLines = linesRef.current;
-    void claimGameReward("tetris", dollarsToPoints(0.05), `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
+    claimGameReward("tetris", `Tetris: ${totalLines} lines, score ${scoreRef.current}`).then(setEarnedPts);
   }, []);
 
   const spawnNewPiece = useCallback(() => {
@@ -459,7 +460,7 @@ export default function TetrisGame() {
             <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
             <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
             <Text style={styles.gameOverLines}>{t.games.lines}: {lines} | {t.games.level}: {level}</Text>
-            <Text style={styles.gameOverReward}>{formatPoints(dollarsToPoints(0.05))}</Text>
+            <Text style={styles.gameOverReward}>🎉 Check your Wallet!</Text>
             <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
 
             <TouchableOpacity testID="play-again-button" style={styles.playAgainBtn} onPress={handleNewGame}>

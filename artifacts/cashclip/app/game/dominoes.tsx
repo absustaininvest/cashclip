@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import { dominoPieceSize } from "./layout-sizing";
 
@@ -193,6 +193,7 @@ export default function DominoesGame() {
   const [canPlay, setCanPlay] = useState(true);
   const [message, setMessage] = useState("");
   const rewardRecorded = useRef(false);
+  const [earnedPts, setEarnedPts] = useState(0);
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
   const chainScrollRef = useRef<ScrollView>(null);
@@ -272,8 +273,7 @@ export default function DominoesGame() {
           : result === "draw"
           ? "Dominoes: Draw"
           : "Dominoes: Lost";
-      const pts = result === "won" ? dollarsToPoints(0.10) : result === "draw" ? dollarsToPoints(0.03) : 0;
-      void claimGameReward("dominoes", pts, desc);
+      claimGameReward("dominoes", desc).then(setEarnedPts);
       setTimeout(showResult, 500);
     },
     [showResult]
@@ -571,10 +571,9 @@ export default function DominoesGame() {
   const canRightPlace = selectedDomino && ends ? canPlace(selectedDomino, ends.right) : false;
   const bothEndsAvailable = canLeftPlace && canRightPlace && ends && ends.left !== ends.right;
 
-  const rewardDisplay = (state: typeof gameState) => {
-    const pts = state === "won" ? dollarsToPoints(0.10) : state === "draw" ? dollarsToPoints(0.03) : 0;
-    return pts > 0 ? <Text style={styles.resultReward}>{formatPoints(pts)}</Text> : null;
-  };
+  const rewardDisplay = () => (
+    <Text style={styles.resultReward}>🎉 Check your Wallet!</Text>
+  );
 
   const dominoSize = dominoPieceSize(SCREEN_WIDTH);
 
@@ -715,7 +714,7 @@ export default function DominoesGame() {
                   <Ionicons name="trophy" size={48} color={Colors.accent} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                {rewardDisplay(gameState)}
+                {rewardDisplay()}
               </>
             ) : gameState === "draw" ? (
               <>
@@ -723,7 +722,7 @@ export default function DominoesGame() {
                   <Ionicons name="remove-circle" size={48} color={Colors.warning} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.draw}</Text>
-                {rewardDisplay(gameState)}
+                {rewardDisplay()}
               </>
             ) : (
               <>
@@ -731,7 +730,7 @@ export default function DominoesGame() {
                   <Ionicons name="close-circle" size={48} color={Colors.error} />
                 </View>
                 <Text style={styles.resultTitle}>{t.games.youLose}</Text>
-                {rewardDisplay(gameState)}
+                {rewardDisplay()}
               </>
             )}
 

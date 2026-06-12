@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 
 import {
@@ -203,6 +203,7 @@ export default function BlockBlitzGame() {
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
   const [score, setScore] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const [linesCleared, setLinesCleared] = useState(0);
   const [combo, setCombo] = useState(0);
   const [gameState, setGameState] = useState<"playing" | "over" | "cooldown">("playing");
@@ -241,7 +242,8 @@ export default function BlockBlitzGame() {
     showResult();
     if (!bankedRef.current) {
       bankedRef.current = true;
-      await claimGameReward("block-blitz", dollarsToPoints(0.05), `Block Blitz: ${score} pts, ${linesCleared} lines`);
+      const pts = await claimGameReward("block-blitz", `Block Blitz: ${score} pts, ${linesCleared} lines`);
+      setEarnedPts(pts);
     }
   }, [score, linesCleared, showResult]);
 
@@ -486,7 +488,7 @@ export default function BlockBlitzGame() {
               <Ionicons name="cube" size={40} color="#FF6D00" />
             </View>
             <Text style={styles.resultTitle}>{t.games.gameOver}</Text>
-            <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(0.05))}</Text>
+            <Text style={styles.resultReward}>🎉 Check your Wallet!</Text>
             <Text style={styles.resultSubtext}>
               {score} {t.games.score} • {linesCleared} {t.games.lines}
             </Text>

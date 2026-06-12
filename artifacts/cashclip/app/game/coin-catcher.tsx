@@ -21,7 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import {
   COIN_CATCHER_CATCHER_HEIGHT as CATCHER_HEIGHT,
@@ -135,15 +135,14 @@ export default function CoinCatcherScreen() {
   }, []);
 
   const bankedRef = useRef(false);
+  const [earnedPts, setEarnedPts] = useState(0);
 
   const endGame = useCallback(() => {
     cleanup();
     setGameState("ended");
-    const finalScore = Math.max(0, scoreRef.current);
-    const reward = parseFloat(finalScore.toFixed(2));
     if (!bankedRef.current) {
       bankedRef.current = true;
-      void claimGameReward("coin-catcher", dollarsToPoints(reward), "Coin Catcher");
+      claimGameReward("coin-catcher", `Coin Catcher: ${Math.max(0, scoreRef.current)} coins`).then(setEarnedPts);
     }
   }, [cleanup]);
 
@@ -228,7 +227,6 @@ export default function CoinCatcherScreen() {
     return cleanup;
   }, [cleanup]);
 
-  const finalReward = Math.max(0, parseFloat(score.toFixed(2)));
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
@@ -334,24 +332,11 @@ export default function CoinCatcherScreen() {
           contentContainerStyle={[styles.centeredContent, { paddingBottom: bottomInset + 24 }]}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.iconCircle, { borderColor: finalReward > 0 ? Colors.primary : Colors.error }]}>
-            <Ionicons
-              name={finalReward > 0 ? "trophy" : "sad"}
-              size={64}
-              color={finalReward > 0 ? Colors.accent : Colors.error}
-            />
+          <View style={[styles.iconCircle, { borderColor: Colors.primary }]}>
+            <Ionicons name="trophy" size={64} color={Colors.accent} />
           </View>
-          <Text style={styles.resultTitle}>
-            {finalReward > 0 ? t.games.youWon : t.games.gameOver}
-          </Text>
-          {finalReward > 0 ? (
-            <>
-              <Text style={styles.rewardAmount}>{formatPoints(dollarsToPoints(finalReward))}</Text>
-              <Text style={styles.resultSubtitle}>{`${t.games.earned}: ${formatPoints(dollarsToPoints(finalReward))}`}</Text>
-            </>
-          ) : (
-            <Text style={styles.resultSubtitle}>{t.games.tryHarder}</Text>
-          )}
+          <Text style={styles.resultTitle}>{t.games.youWon}</Text>
+          <Text style={styles.rewardAmount}>🎉 Check your Wallet!</Text>
           <TouchableOpacity
             style={styles.playButton}
             onPress={() => { cleanup(); router.back(); }}

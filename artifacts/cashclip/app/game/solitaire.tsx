@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import { solitaireCardWidth } from "./layout-sizing";
 
@@ -217,6 +217,7 @@ export default function SolitaireGame() {
   const [canPlay, setCanPlay] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
   const rewardRecorded = useRef(false);
+  const [earnedPts, setEarnedPts] = useState(0);
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
 
@@ -261,8 +262,8 @@ export default function SolitaireGame() {
   const bankReward = useCallback(async (won: boolean, desc: string) => {
     if (bankedRef.current) return;
     bankedRef.current = true;
-    const pts = won ? dollarsToPoints(0.25) : 0;
-    await claimGameReward("solitaire", pts, desc);
+    const pts = await claimGameReward("solitaire", desc);
+    setEarnedPts(pts);
   }, []);
 
   const flipTopCard = (cols: Card[][]) => {
@@ -628,9 +629,7 @@ export default function SolitaireGame() {
             <Text style={styles.resultTitle}>
               {totalFoundation === 52 ? t.games.youWon : t.games.gameOver}
             </Text>
-            {totalFoundation === 52 && (
-              <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(0.25))}</Text>
-            )}
+            <Text style={styles.resultReward}>🎉 Check your Wallet!</Text>
             <Text style={styles.resultSubtext}>
               {moves} {t.games.moves} | {formatTime(timer)}
             </Text>

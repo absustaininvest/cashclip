@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import {
   TAP_FRENZY_AREA_TOP as PLAY_AREA_TOP,
@@ -40,13 +40,6 @@ interface Coin {
   spawnTime: number;
 }
 
-function getRewardTier(taps: number): number {
-  if (taps >= 31) return 0.25;
-  if (taps >= 21) return 0.15;
-  if (taps >= 11) return 0.08;
-  return 0.03;
-}
-
 function getPerformanceLabel(taps: number, t: any): string {
   if (taps >= 31) return t.games.perfect;
   if (taps >= 21) return t.games.great;
@@ -69,7 +62,7 @@ export default function TapFrenzyScreen() {
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
   const [canPlay, setCanPlay] = useState(true);
-  const [reward, setReward] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const coinsRef = useRef<Coin[]>([]);
   const [coins, setCoins] = useState<Coin[]>([]);
   const scoreRef = useRef(0);
@@ -181,13 +174,11 @@ export default function TapFrenzyScreen() {
     if (cleanerRef.current) clearInterval(cleanerRef.current);
 
     const finalScore = scoreRef.current;
-    const earnedReward = getRewardTier(finalScore);
-    setReward(earnedReward);
     setGameState("finished");
 
     if (!bankedRef.current) {
       bankedRef.current = true;
-      void claimGameReward("tap-frenzy", dollarsToPoints(earnedReward), `Tap Frenzy: ${finalScore} taps`);
+      claimGameReward("tap-frenzy", `Tap Frenzy: ${finalScore} taps`).then(setEarnedPts);
     }
     setCanPlay(false);
   }, []);
@@ -371,34 +362,11 @@ export default function TapFrenzyScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.rewardValue]}>{formatPoints(dollarsToPoints(reward))}</Text>
-              <Text style={styles.statLabel}>{t.games.earned}</Text>
+              <Text style={[styles.statValue, styles.rewardValue]}>🎉</Text>
+              <Text style={styles.statLabel}>Check Wallet!</Text>
             </View>
           </View>
 
-          <View style={styles.tierBreakdown}>
-            {[
-              { min: 0, max: 10, reward: "300 pts" },
-              { min: 11, max: 20, reward: "800 pts" },
-              { min: 21, max: 30, reward: "1,500 pts" },
-              { min: 31, max: 99, reward: "2,500 pts" },
-            ].map((tier, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.tierRow,
-                  score >= tier.min && score <= tier.max && styles.tierRowActive,
-                ]}
-              >
-                <Text style={styles.tierRange}>
-                  {tier.min}-{tier.max === 99 ? "+" : tier.max} {t.games.tap}s
-                </Text>
-                <Text style={[styles.tierReward, score >= tier.min && score <= tier.max && styles.tierRewardActive]}>
-                  {tier.reward}
-                </Text>
-              </View>
-            ))}
-          </View>
 
           <TouchableOpacity style={styles.doneButton} onPress={() => router.back()} testID="done-button">
             <Ionicons name="checkmark" size={24} color={Colors.background} />

@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -89,7 +89,7 @@ export default function TriviaGame() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [timeLeft, setTimeLeft] = useState(TIME_PER_QUESTION);
-  const [totalReward, setTotalReward] = useState(0);
+  const [earnedPts, setEarnedPts] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -207,18 +207,14 @@ export default function TriviaGame() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     const finalCorrect = correctCount + (lastWasCorrect ? 1 : 0);
-    let reward = finalCorrect * 0.01;
-    if (finalCorrect >= 8) reward += 0.05;
-    if (finalCorrect === 10) reward += 0.10;
-    reward = parseFloat(reward.toFixed(2));
 
     setCorrectCount(finalCorrect);
-    setTotalReward(reward);
     setGameState("finished");
 
     if (!bankedRef.current) {
       bankedRef.current = true;
-      await claimGameReward("trivia", dollarsToPoints(reward), `Trivia Quiz: ${finalCorrect}/10 correct`);
+      const pts = await claimGameReward("trivia", `Trivia Quiz: ${finalCorrect}/10 correct`);
+      setEarnedPts(pts);
     }
   }, [correctCount]);
 
@@ -382,12 +378,10 @@ export default function TriviaGame() {
       <Text style={styles.resultScore}>{correctCount}/{QUESTIONS_PER_ROUND}</Text>
       <Text style={styles.resultScoreLabel}>{t.games.correct}</Text>
 
-      {totalReward > 0 && (
-        <View style={styles.rewardBadge}>
-          <Ionicons name="cash" size={20} color={Colors.background} />
-          <Text style={styles.rewardBadgeText}>+{formatPoints(dollarsToPoints(totalReward))}</Text>
-        </View>
-      )}
+      <View style={styles.rewardBadge}>
+        <Ionicons name="cash" size={20} color={Colors.background} />
+        <Text style={styles.rewardBadgeText}>🎉 Check your Wallet!</Text>
+      </View>
 
       <View style={styles.finishedButtons}>
         <TouchableOpacity
