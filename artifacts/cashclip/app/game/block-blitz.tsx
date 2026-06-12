@@ -16,17 +16,14 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const GRID_SIZE = 8;
 const GRID_PAD = 16;
-// Width-based size: fill available width up to 420px cap
-const CELL_SIZE_BY_WIDTH = Math.floor((Math.min(SCREEN_WIDTH, 420) - GRID_PAD * 2 - GRID_SIZE) / GRID_SIZE);
-// Height-based size: leave ~260px for header, stats, piece tray, and safe-area padding;
-// divisor of 10 ≈ GRID_SIZE + tray-row factor (piece tray scales with cell size)
-const CELL_SIZE_BY_HEIGHT = Math.floor((SCREEN_HEIGHT - 260) / 10);
-// Use the smaller of the two so grid + tray fit without scrolling; minimum 22 for tap targets
-const CELL_SIZE = Math.max(Math.min(CELL_SIZE_BY_WIDTH, CELL_SIZE_BY_HEIGHT), 22);
-const MINI_CELL = Math.floor(CELL_SIZE * 0.55);
+
+function computeCellSize(w: number, h: number): number {
+  const byWidth = Math.floor((Math.min(w, 420) - GRID_PAD * 2 - GRID_SIZE) / GRID_SIZE);
+  const byHeight = Math.floor((h - 260) / 10);
+  return Math.max(Math.min(byWidth, byHeight), 22);
+}
 
 const PIECE_COLORS = [
   "#FF5252",
@@ -184,6 +181,17 @@ export default function BlockBlitzGame() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+
+  const [dimensions, setDimensions] = useState(() => Dimensions.get("window"));
+  const cellSize = computeCellSize(dimensions.width, dimensions.height);
+  const miniCell = Math.floor(cellSize * 0.55);
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions(window);
+    });
+    return () => sub.remove();
+  }, []);
 
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -404,6 +412,7 @@ export default function BlockBlitzGame() {
                     onPressIn={() => handleCellHover(r, c)}
                     style={[
                       styles.cell,
+                      { width: cellSize, height: cellSize },
                       cell !== 0 && { backgroundColor: cellColor },
                       cell !== 0 && styles.filledCell,
                       isHighlighted && styles.highlightCell,
@@ -436,6 +445,7 @@ export default function BlockBlitzGame() {
                         key={c}
                         style={[
                           styles.miniCell,
+                          { width: miniCell, height: miniCell },
                           cell === 1 && { backgroundColor: piece.color },
                           cell === 1 && styles.miniCellFilled,
                         ]}
@@ -463,7 +473,7 @@ export default function BlockBlitzGame() {
           <Animated.View
             style={[
               styles.resultCard,
-              { transform: [{ scale: resultScale }] },
+              { width: dimensions.width - 64, transform: [{ scale: resultScale }] },
             ]}
           >
             <View style={styles.resultIcon}>
@@ -562,8 +572,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.06)",
     backgroundColor: "rgba(255,255,255,0.02)",
@@ -631,8 +639,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   miniCell: {
-    width: MINI_CELL,
-    height: MINI_CELL,
     margin: 1,
     borderRadius: 2,
     backgroundColor: "transparent",
@@ -676,7 +682,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 32,
     alignItems: "center",
-    width: SCREEN_WIDTH - 64,
     maxWidth: 340,
     borderWidth: 1,
     borderColor: Colors.border,

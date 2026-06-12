@@ -15,16 +15,14 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
 const COLS = 10;
 const ROWS = 20;
-// Width-based size: fit 10 columns in the available width, cap at 28
-const CELL_SIZE_BY_WIDTH = Math.min(Math.floor((SCREEN_WIDTH - 32) / COLS), 28);
-// Height-based size: leave ~290px for header, stats, controls, and safe-area padding
-const CELL_SIZE_BY_HEIGHT = Math.floor((SCREEN_HEIGHT - 290) / ROWS);
-// Use the smaller of the two so the board + controls fit without scrolling; minimum 12 for playability
-const CELL_SIZE = Math.max(Math.min(CELL_SIZE_BY_WIDTH, CELL_SIZE_BY_HEIGHT), 12);
+
+function computeCellSize(w: number, h: number): number {
+  const byWidth = Math.min(Math.floor((w - 32) / COLS), 28);
+  const byHeight = Math.floor((h - 290) / ROWS);
+  return Math.max(Math.min(byWidth, byHeight), 12);
+}
 
 type Grid = (string | null)[][];
 
@@ -150,6 +148,16 @@ export default function TetrisGame() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+
+  const [dimensions, setDimensions] = useState(() => Dimensions.get("window"));
+  const cellSize = computeCellSize(dimensions.width, dimensions.height);
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions(window);
+    });
+    return () => sub.remove();
+  }, []);
 
   const [grid, setGrid] = useState<Grid>(createEmptyGrid);
   const [currentPiece, setCurrentPiece] = useState<Piece>(randomPiece);
@@ -354,8 +362,8 @@ export default function TetrisGame() {
                 style={[
                   styles.cell,
                   {
-                    width: CELL_SIZE,
-                    height: CELL_SIZE,
+                    width: cellSize,
+                    height: cellSize,
                     backgroundColor: cell || Colors.background,
                     borderColor: cell ? "rgba(255,255,255,0.15)" : Colors.border,
                   },
@@ -440,7 +448,7 @@ export default function TetrisGame() {
 
       {gameState === "over" && (
         <View style={styles.gameOverOverlay}>
-          <View style={styles.gameOverCard}>
+          <View style={[styles.gameOverCard, { width: dimensions.width - 64 }]}>
             <Ionicons name="game-controller" size={48} color={Colors.primary} />
             <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
             <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
@@ -619,7 +627,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 32,
     alignItems: "center",
-    width: SCREEN_WIDTH - 64,
     maxWidth: 340,
     borderWidth: 1,
     borderColor: Colors.border,
