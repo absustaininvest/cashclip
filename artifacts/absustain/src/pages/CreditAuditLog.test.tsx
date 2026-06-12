@@ -214,6 +214,66 @@ describe("CashClipUsersPanel — Manual Credit write path", () => {
     });
   });
 
+  it("shows an error toast and does not fire a POST when the amount field is empty", async () => {
+    const fetchMock = installCreditFetchMock({});
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    // Leave amount blank, fill in a reason, then try to submit.
+    await user.type(
+      screen.getByPlaceholderText("Reason (required for audit log)"),
+      "Goodwill credit",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await screen.findByText(
+      "Enter a non-zero amount (use a minus sign to correct down)",
+    );
+
+    const creditCall = fetchMock.mock.calls.find(([input, init]) => {
+      const url = new URL(String(input), "http://localhost");
+      return (
+        url.pathname === "/api/admin/credit" &&
+        ((init as RequestInit | undefined)?.method ?? "GET").toUpperCase() ===
+          "POST"
+      );
+    });
+    expect(creditCall).toBeUndefined();
+  });
+
+  it("shows an error toast and does not fire a POST when the reason field is blank", async () => {
+    const fetchMock = installCreditFetchMock({});
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    // Fill in an amount but leave the reason blank.
+    await user.type(
+      screen.getByPlaceholderText("$ (e.g. 5 or -2.50)"),
+      "5",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await screen.findByText("Add a reason — it's recorded in the audit log");
+
+    const creditCall = fetchMock.mock.calls.find(([input, init]) => {
+      const url = new URL(String(input), "http://localhost");
+      return (
+        url.pathname === "/api/admin/credit" &&
+        ((init as RequestInit | undefined)?.method ?? "GET").toUpperCase() ===
+          "POST"
+      );
+    });
+    expect(creditCall).toBeUndefined();
+  });
+
   it("shows an error toast and does not falsely report success when the credit request fails", async () => {
     installCreditFetchMock({
       creditResponse: {
