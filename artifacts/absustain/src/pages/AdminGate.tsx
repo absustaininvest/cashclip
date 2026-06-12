@@ -159,7 +159,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#06060E] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img
@@ -167,19 +167,19 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             alt="AB Sustainability"
             className="h-12 rounded mx-auto mb-4"
           />
-          <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-white">
+          <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-gray-900">
             Admin Dashboard
           </h1>
           {step === "password" ? (
-            <p className="text-white/40 text-sm mt-2">
+            <p className="text-gray-400 text-sm mt-2">
               Sign in to manage your business
             </p>
           ) : step === "backupUsed" ? (
-            <p className="text-white/40 text-sm mt-2">
+            <p className="text-gray-400 text-sm mt-2">
               Backup code accepted
             </p>
           ) : (
-            <p className="text-white/40 text-sm mt-2">
+            <p className="text-gray-400 text-sm mt-2">
               Enter your authenticator code or a backup code
             </p>
           )}
@@ -190,10 +190,10 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             <div className="flex items-start gap-3 bg-amber-400/5 border border-amber-400/20 rounded-xl px-4 py-3">
               <KeyRound className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-white/80 text-sm font-medium">
+                <p className="text-gray-700 text-sm font-medium">
                   You signed in with a backup code
                 </p>
-                <p className="text-white/50 text-xs mt-1">
+                <p className="text-gray-500 text-xs mt-1">
                   {backupRemaining === null
                     ? "That code has been used up and can't be reused."
                     : `That code is now used up. You have ${backupRemaining} backup code${backupRemaining === 1 ? "" : "s"} left.`}
@@ -212,21 +212,21 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                 <div className="flex items-start gap-3">
                   <KeyRound className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-white font-medium text-sm">
+                    <p className="text-gray-900 font-medium text-sm">
                       Save your new backup codes
                     </p>
-                    <p className="text-white/40 text-xs mt-1">
+                    <p className="text-gray-400 text-xs mt-1">
                       Each code works once in place of your authenticator code.
                       Store them somewhere safe — this is the only time they'll
                       be shown. All previous codes are now invalid.
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 bg-white/[0.05] border border-white/10 rounded-xl p-4">
+                <div className="grid grid-cols-2 gap-2 bg-gray-100 border border-gray-200 rounded-xl p-4">
                   {newBackupCodes.map((c) => (
                     <span
                       key={c}
-                      className="font-mono text-sm text-white/80 tracking-wider text-center select-all"
+                      className="font-mono text-sm text-gray-700 tracking-wider text-center select-all"
                     >
                       {c}
                     </span>
@@ -236,7 +236,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                   <button
                     type="button"
                     onClick={copyNewBackupCodes}
-                    className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
                   >
                     {copied ? (
                       <Check className="w-4 h-4" />
@@ -248,7 +248,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                   <button
                     type="button"
                     onClick={downloadNewBackupCodes}
-                    className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download
@@ -257,14 +257,14 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                 <button
                   type="button"
                   onClick={continueAfterBackup}
-                  className="w-full bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
+                  className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
                 >
                   I've saved these — continue to dashboard
                 </button>
               </div>
             ) : regenMode ? (
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-3">
-                <p className="text-white/60 text-sm">
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3">
+                <p className="text-gray-500 text-sm">
                   Enter a code from your authenticator app to generate a new set.
                   This invalidates all previous backup codes.
                 </p>
@@ -277,7 +277,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                   }
                   placeholder="000000"
                   autoFocus
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                  className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-center font-mono text-xl tracking-[0.3em] placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
                 />
                 {regenError && (
                   <p className="text-red-400 text-sm text-center">
@@ -289,9 +289,9 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                     type="checkbox"
                     checked={regenConfirmed}
                     onChange={(e) => setRegenConfirmed(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#00E676] cursor-pointer"
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-emerald-500 cursor-pointer"
                   />
-                  <span className="text-white/60 text-xs">
+                  <span className="text-gray-500 text-xs">
                     I understand all of my current backup codes will stop working
                     immediately.
                   </span>
@@ -305,7 +305,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                       setRegenConfirmed(false);
                       setRegenError("");
                     }}
-                    className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                    className="flex-1 bg-gray-100 text-gray-500 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
                   >
                     Cancel
                   </button>
@@ -313,7 +313,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                     type="button"
                     onClick={handleRegenerate}
                     disabled={regenCode.length !== 6 || !regenConfirmed || regenLoading}
-                    className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                    className="flex-1 bg-[#00E676] text-[#f9fafb] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                   >
                     {regenLoading ? "Generating..." : "Generate"}
                   </button>
@@ -329,7 +329,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                     setRegenConfirmed(false);
                     setRegenError("");
                   }}
-                  className="w-full flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-3 rounded-xl hover:bg-white/[0.08] transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-100 transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Regenerate backup codes now
@@ -337,7 +337,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                 <button
                   type="button"
                   onClick={continueAfterBackup}
-                  className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors"
+                  className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors"
                 >
                   Continue to dashboard
                 </button>
@@ -353,7 +353,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
               placeholder="Username"
               required
               autoComplete="username"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
             />
             <input
               type="password"
@@ -362,7 +362,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
               placeholder="Password"
               required
               autoComplete="current-password"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
             />
             {error && (
               <p className="text-red-400 text-sm text-center">{error}</p>
@@ -370,16 +370,16 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+              className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
         ) : (
           <form onSubmit={handleOtpSubmit} className="space-y-4">
-            <div className="flex items-center gap-2 bg-[#00E676]/5 border border-[#00E676]/20 rounded-xl px-4 py-3">
-              <ShieldCheck className="w-4 h-4 text-[#00E676] flex-shrink-0" />
-              <p className="text-white/60 text-sm">
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <p className="text-gray-500 text-sm">
                 Two-factor authentication required
               </p>
             </div>
@@ -400,9 +400,9 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
               placeholder="000000"
               required
               autoFocus
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.2em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-center font-mono text-2xl tracking-[0.2em] placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
             />
-            <p className="text-white/30 text-xs text-center">
+            <p className="text-gray-400 text-xs text-center">
               Enter the code from your authenticator app, or one of your backup
               codes if you've lost it.
             </p>
@@ -412,7 +412,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
             <button
               type="submit"
               disabled={loading || !isValidTwoFactorInput(otp)}
-              className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+              className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
             >
               {loading ? "Verifying..." : "Verify"}
             </button>
@@ -423,7 +423,7 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
                 setError("");
                 setOtp("");
               }}
-              className="w-full text-white/30 hover:text-white/60 text-sm transition-colors py-1"
+              className="w-full text-gray-400 hover:text-gray-500 text-sm transition-colors py-1"
             >
               ← Back to sign in
             </button>
@@ -450,8 +450,11 @@ export default function AdminGate() {
       document.head.appendChild(robots);
     }
     robots.setAttribute("content", "noindex, nofollow");
+    const prevBg = document.body.style.background;
+    document.body.style.background = "#f9fafb";
     return () => {
       document.title = prevTitle;
+      document.body.style.background = prevBg;
       if (hadRobots && prevRobots !== null) {
         robots!.setAttribute("content", prevRobots);
       } else if (robots && robots.parentNode) {
@@ -482,8 +485,8 @@ export default function AdminGate() {
 
   if (validating) {
     return (
-      <div className="min-h-screen bg-[#06060E] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/20 border-t-[#00E676] rounded-full animate-spin" />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-gray-300 border-t-[#00E676] rounded-full animate-spin" />
       </div>
     );
   }
@@ -493,8 +496,8 @@ export default function AdminGate() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#06060E] flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-white/20 border-t-[#00E676] rounded-full animate-spin" />
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-gray-300 border-t-[#00E676] rounded-full animate-spin" />
         </div>
       }
     >

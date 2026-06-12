@@ -304,47 +304,47 @@ function TwoFactorPanel({ token }: { token: string }) {
   return (
     <div className="max-w-md space-y-6">
       <div className="flex items-center gap-3 mb-2">
-        <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-          <Shield className="w-5 h-5 text-[#00E676]" />
+        <div className="p-2.5 rounded-xl bg-emerald-100">
+          <Shield className="w-5 h-5 text-emerald-600" />
         </div>
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
             Two-Factor Authentication
           </h2>
-          <p className="text-white/40 text-sm">
+          <p className="text-gray-400 text-sm">
             Add an extra layer of security to your admin account
           </p>
         </div>
       </div>
 
       {success && (
-        <div className="flex items-center gap-2 text-[#00E676] text-sm bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2 text-emerald-600 text-sm bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3">
           <Check className="w-4 h-4 flex-shrink-0" />
           {success}
         </div>
       )}
 
-      {enabled === null && <p className="text-white/30 text-sm">Loading...</p>}
+      {enabled === null && <p className="text-gray-400 text-sm">Loading...</p>}
 
       {backupCodes && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-4">
           <div className="flex items-start gap-3">
             <KeyRound className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-white font-medium text-sm">
+              <p className="text-gray-900 font-medium text-sm">
                 Save your backup codes
               </p>
-              <p className="text-white/40 text-xs mt-1">
+              <p className="text-gray-400 text-xs mt-1">
                 Each code works once in place of your authenticator code. Store
                 them somewhere safe — this is the only time they'll be shown.
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 bg-white/[0.05] border border-white/10 rounded-xl p-4">
+          <div className="grid grid-cols-2 gap-2 bg-gray-100 border border-gray-200 rounded-xl p-4">
             {backupCodes.map((c) => (
               <span
                 key={c}
-                className="font-mono text-sm text-white/80 tracking-wider text-center select-all"
+                className="font-mono text-sm text-gray-700 tracking-wider text-center select-all"
               >
                 {c}
               </span>
@@ -353,7 +353,7 @@ function TwoFactorPanel({ token }: { token: string }) {
           <div className="flex gap-3">
             <button
               onClick={copyBackupCodes}
-              className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+              className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
             >
               {copied ? (
                 <Check className="w-4 h-4" />
@@ -364,7 +364,7 @@ function TwoFactorPanel({ token }: { token: string }) {
             </button>
             <button
               onClick={downloadBackupCodes}
-              className="flex-1 flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+              className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
             >
               <Download className="w-4 h-4" />
               Download
@@ -372,7 +372,7 @@ function TwoFactorPanel({ token }: { token: string }) {
           </div>
           <button
             onClick={() => setBackupCodes(null)}
-            className="w-full bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
+            className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors text-sm"
           >
             I've saved these codes
           </button>
@@ -381,24 +381,24 @@ function TwoFactorPanel({ token }: { token: string }) {
 
       {enabled === true && !setupData && !backupCodes && (
         <div className="space-y-4">
-          <div className="bg-[#00E676]/5 border border-[#00E676]/20 rounded-2xl p-5 flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#00E676]/10">
-              <ShieldCheck className="w-5 h-5 text-[#00E676]" />
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-100">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-white font-medium text-sm">2FA is active</p>
-              <p className="text-white/40 text-xs mt-0.5">
+              <p className="text-gray-900 font-medium text-sm">2FA is active</p>
+              <p className="text-gray-400 text-xs mt-0.5">
                 Your account requires an authenticator code on every login
               </p>
             </div>
           </div>
 
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
             <div className="flex items-start gap-3">
-              <KeyRound className="w-5 h-5 text-white/40 flex-shrink-0 mt-0.5" />
+              <KeyRound className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-white font-medium text-sm">Backup codes</p>
-                <p className="text-white/40 text-xs mt-0.5">
+                <p className="text-gray-900 font-medium text-sm">Backup codes</p>
+                <p className="text-gray-400 text-xs mt-0.5">
                   {backupCount === null
                     ? "—"
                     : `${backupCount} unused code${backupCount === 1 ? "" : "s"} remaining`}
@@ -420,14 +420,14 @@ function TwoFactorPanel({ token }: { token: string }) {
                   setError("");
                   setSuccess("");
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-white/[0.05] text-white/70 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
               >
                 <RefreshCw className="w-4 h-4" />
                 Regenerate backup codes
               </button>
             ) : (
               <div className="space-y-3">
-                <p className="text-white/60 text-sm">
+                <p className="text-gray-500 text-sm">
                   Enter a code from your authenticator app to generate a new set.
                   This invalidates all previous backup codes.
                 </p>
@@ -439,7 +439,7 @@ function TwoFactorPanel({ token }: { token: string }) {
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
                   }
                   placeholder="000000"
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                  className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-center font-mono text-xl tracking-[0.3em] placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
                 />
                 {error && (
                   <p className="text-red-400 text-sm text-center">{error}</p>
@@ -449,9 +449,9 @@ function TwoFactorPanel({ token }: { token: string }) {
                     type="checkbox"
                     checked={regenConfirmed}
                     onChange={(e) => setRegenConfirmed(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#00E676] cursor-pointer"
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-emerald-500 cursor-pointer"
                   />
-                  <span className="text-white/60 text-xs">
+                  <span className="text-gray-500 text-xs">
                     I understand all of my current backup codes will stop working
                     immediately.
                   </span>
@@ -464,14 +464,14 @@ function TwoFactorPanel({ token }: { token: string }) {
                       setCode("");
                       setError("");
                     }}
-                    className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                    className="flex-1 bg-gray-100 text-gray-500 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleRegenerate}
                     disabled={code.length !== 6 || !regenConfirmed || loading}
-                    className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                    className="flex-1 bg-[#00E676] text-[#f9fafb] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                   >
                     {loading ? "Generating..." : "Generate"}
                   </button>
@@ -480,8 +480,8 @@ function TwoFactorPanel({ token }: { token: string }) {
             )}
           </div>
 
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
-            <p className="text-white/60 text-sm">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
+            <p className="text-gray-500 text-sm">
               To disable 2FA, enter a valid code from your authenticator app:
             </p>
             <input
@@ -493,7 +493,7 @@ function TwoFactorPanel({ token }: { token: string }) {
                 setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
               }
               placeholder="000000"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-red-500/50 transition-colors disabled:opacity-40"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-center font-mono text-xl tracking-[0.3em] placeholder-gray-400 focus:outline-none focus:border-red-500/50 transition-colors disabled:opacity-40"
             />
             {error && !regenMode && (
               <p className="text-red-400 text-sm text-center">{error}</p>
@@ -514,10 +514,10 @@ function TwoFactorPanel({ token }: { token: string }) {
           <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-white font-medium text-sm">
+              <p className="text-gray-900 font-medium text-sm">
                 2FA is not enabled
               </p>
-              <p className="text-white/40 text-xs mt-1">
+              <p className="text-gray-400 text-xs mt-1">
                 Your account is protected by password only. Enabling 2FA
                 significantly reduces the risk of unauthorized access.
               </p>
@@ -526,7 +526,7 @@ function TwoFactorPanel({ token }: { token: string }) {
           <button
             onClick={handleSetup}
             disabled={loading}
-            className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50 text-sm"
+            className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-50 text-sm"
           >
             {loading ? "Generating..." : "Set Up Two-Factor Authentication"}
           </button>
@@ -535,12 +535,12 @@ function TwoFactorPanel({ token }: { token: string }) {
 
       {setupData && (
         <div className="space-y-4">
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
             <div>
-              <p className="text-white font-medium text-sm mb-1">
+              <p className="text-gray-900 font-medium text-sm mb-1">
                 1. Scan this QR code with your authenticator app
               </p>
-              <p className="text-white/40 text-xs">
+              <p className="text-gray-400 text-xs">
                 Use Google Authenticator, Authy, or any TOTP-compatible app
               </p>
             </div>
@@ -549,28 +549,28 @@ function TwoFactorPanel({ token }: { token: string }) {
                 <img
                   src={qrDataUrl}
                   alt="Scan this QR code with your authenticator app"
-                  className="rounded-xl border border-white/10"
+                  className="rounded-xl border border-gray-200"
                   width={200}
                   height={200}
                 />
               ) : (
-                <div className="w-[200px] h-[200px] rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center">
-                  <span className="text-white/30 text-xs">Generating…</span>
+                <div className="w-[200px] h-[200px] rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">Generating…</span>
                 </div>
               )}
             </div>
             <div>
-              <p className="text-white/40 text-xs mb-1.5">
+              <p className="text-gray-400 text-xs mb-1.5">
                 Can't scan? Enter this key manually in your app:
               </p>
-              <div className="bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2.5 font-mono text-xs text-white/70 break-all select-all tracking-wider">
+              <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2.5 font-mono text-xs text-gray-600 break-all select-all tracking-wider">
                 {setupData.secret}
               </div>
             </div>
           </div>
 
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
-            <p className="text-white font-medium text-sm">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
+            <p className="text-gray-900 font-medium text-sm">
               2. Enter the 6-digit code from your app to confirm setup
             </p>
             <input
@@ -582,7 +582,7 @@ function TwoFactorPanel({ token }: { token: string }) {
               }
               placeholder="000000"
               autoFocus
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono text-xl tracking-[0.3em] placeholder-white/20 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-center font-mono text-xl tracking-[0.3em] placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
             />
             {error && (
               <p className="text-red-400 text-sm text-center">{error}</p>
@@ -594,14 +594,14 @@ function TwoFactorPanel({ token }: { token: string }) {
                   setCode("");
                   setError("");
                 }}
-                className="flex-1 bg-white/[0.05] text-white/60 font-medium py-2.5 rounded-xl hover:bg-white/[0.08] transition-colors text-sm"
+                className="flex-1 bg-gray-100 text-gray-500 font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleEnable}
                 disabled={code.length !== 6 || loading}
-                className="flex-1 bg-[#00E676] text-[#06060E] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                className="flex-1 bg-[#00E676] text-[#f9fafb] font-bold py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
               >
                 {loading ? "Enabling..." : "Enable 2FA"}
               </button>
@@ -625,16 +625,16 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-colors">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 hover:border-gray-300 transition-colors">
       <div className="flex items-center justify-between mb-3">
         <div className={`p-2.5 rounded-xl ${color}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
-      <p className="font-['Space_Grotesk'] text-3xl font-bold text-white">
+      <p className="font-['Space_Grotesk'] text-3xl font-bold text-gray-900">
         {value}
       </p>
-      <p className="text-white/40 text-sm mt-1">{label}</p>
+      <p className="text-gray-400 text-sm mt-1">{label}</p>
     </div>
   );
 }
@@ -655,16 +655,16 @@ function MiniCalendar() {
   for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Calendar className="w-4 h-4 text-[#00E676]" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+        <Calendar className="w-4 h-4 text-emerald-600" />
+        <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
           {month}
         </h3>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs">
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-          <div key={i} className="text-white/30 font-medium py-1">
+          <div key={i} className="text-gray-400 font-medium py-1">
             {d}
           </div>
         ))}
@@ -673,9 +673,9 @@ function MiniCalendar() {
             key={i}
             className={`py-1.5 rounded-lg transition-colors ${
               d === today
-                ? "bg-[#00E676] text-[#06060E] font-bold"
+                ? "bg-[#00E676] text-[#f9fafb] font-bold"
                 : d
-                  ? "text-white/60 hover:bg-white/[0.05] cursor-default"
+                  ? "text-gray-500 hover:bg-gray-100 cursor-default"
                   : ""
             }`}
           >
@@ -723,13 +723,13 @@ function RemindersPanel() {
   }
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Bell className="w-4 h-4 text-amber-400" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+        <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
           Reminders
         </h3>
-        <span className="ml-auto text-white/30 text-xs">
+        <span className="ml-auto text-gray-400 text-xs">
           {reminders.filter((r) => !r.done).length} active
         </span>
       </div>
@@ -740,18 +740,18 @@ function RemindersPanel() {
           onChange={(e) => setNewText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addReminder()}
           placeholder="Add a reminder..."
-          className="flex-1 bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+          className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
         />
         <button
           onClick={addReminder}
-          className="p-2 bg-[#00E676]/10 text-[#00E676] rounded-lg hover:bg-[#00E676]/20 transition-colors"
+          className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
         >
           <Plus className="w-4 h-4" />
         </button>
       </div>
       <div className="space-y-1.5 max-h-48 overflow-y-auto">
         {reminders.length === 0 ? (
-          <p className="text-white/20 text-xs text-center py-4">
+          <p className="text-gray-300 text-xs text-center py-4">
             No reminders yet
           </p>
         ) : (
@@ -761,20 +761,20 @@ function RemindersPanel() {
                 onClick={() => toggleReminder(r.id)}
                 className={`w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors ${
                   r.done
-                    ? "bg-[#00E676]/20 border-[#00E676]/40 text-[#00E676]"
-                    : "border-white/20 hover:border-white/40"
+                    ? "bg-emerald-100 border-emerald-300 text-emerald-600"
+                    : "border-gray-300 hover:border-white/40"
                 }`}
               >
                 {r.done && <Check className="w-3 h-3" />}
               </button>
               <span
-                className={`text-sm flex-1 ${r.done ? "text-white/30 line-through" : "text-white/70"}`}
+                className={`text-sm flex-1 ${r.done ? "text-gray-400 line-through" : "text-gray-600"}`}
               >
                 {r.text}
               </span>
               <button
                 onClick={() => deleteReminder(r.id)}
-                className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all"
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -804,7 +804,7 @@ function QuickActions() {
       label: "CashClip App",
       href: "https://cash-clip.app",
       icon: ExternalLink,
-      color: "text-[#00E676]",
+      color: "text-emerald-600",
     },
     {
       label: "AB Sustainability Site",
@@ -814,10 +814,10 @@ function QuickActions() {
     },
   ];
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquare className="w-4 h-4 text-blue-400" />
-        <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+        <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
           Quick Actions
         </h3>
       </div>
@@ -828,13 +828,13 @@ function QuickActions() {
             href={a.href}
             target={a.href.startsWith("http") ? "_blank" : undefined}
             rel={a.href.startsWith("http") ? "noopener noreferrer" : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.05] transition-colors group"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 transition-colors group"
           >
             <a.icon className={`w-4 h-4 ${a.color}`} />
-            <span className="text-white/60 text-sm group-hover:text-white transition-colors flex-1">
+            <span className="text-gray-500 text-sm group-hover:text-gray-900 transition-colors flex-1">
               {a.label}
             </span>
-            <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
+            <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400 transition-colors" />
           </a>
         ))}
       </div>
@@ -923,47 +923,47 @@ function VenturesPanel({ token }: { token: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
             Solera — Food Service Files
           </h2>
-          <p className="text-white/40 text-sm mt-1">
+          <p className="text-gray-400 text-sm mt-1">
             Upload restaurant files, proposals, and resources for the Ventures
             page.
           </p>
         </div>
-        <span className="text-white/30 text-sm">
+        <span className="text-gray-400 text-sm">
           {files.length} {files.length === 1 ? "file" : "files"}
         </span>
       </div>
 
       {/* Upload form */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-5">
-          <Upload className="w-4 h-4 text-[#00E676]" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          <Upload className="w-4 h-4 text-emerald-600" />
+          <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
             Upload New File
           </h3>
         </div>
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-white/40 text-xs mb-1.5">
+              <label className="block text-gray-400 text-xs mb-1.5">
                 Category
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-emerald-400 transition-colors"
               >
                 {VENTURE_CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-[#06060E]">
+                  <option key={c} value={c} className="bg-gray-50">
                     {c}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-white/40 text-xs mb-1.5">
+              <label className="block text-gray-400 text-xs mb-1.5">
                 Description (optional)
               </label>
               <input
@@ -971,16 +971,16 @@ function VenturesPanel({ token }: { token: string }) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief description..."
-                className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
               />
             </div>
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">
+            <label className="block text-gray-400 text-xs mb-1.5">
               File (PDF, images, Excel, Word, CSV — max 50 MB)
             </label>
             <div
-              className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-[#00E676]/30 transition-colors cursor-pointer"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#00E676]/30 transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
               {selectedFile ? (
@@ -989,10 +989,10 @@ function VenturesPanel({ token }: { token: string }) {
                     {fileIcon(selectedFile.type)}
                   </span>
                   <div className="text-left">
-                    <p className="text-white text-sm font-medium">
+                    <p className="text-gray-900 text-sm font-medium">
                       {selectedFile.name}
                     </p>
-                    <p className="text-white/40 text-xs">
+                    <p className="text-gray-400 text-xs">
                       {formatSize(selectedFile.size)}
                     </p>
                   </div>
@@ -1003,18 +1003,18 @@ function VenturesPanel({ token }: { token: string }) {
                       setSelectedFile(null);
                       if (fileInputRef.current) fileInputRef.current.value = "";
                     }}
-                    className="ml-2 text-white/30 hover:text-red-400 transition-colors"
+                    className="ml-2 text-gray-400 hover:text-red-400 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
                 <div>
-                  <Upload className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                  <p className="text-white/40 text-sm">
+                  <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-400 text-sm">
                     Click to choose a file
                   </p>
-                  <p className="text-white/20 text-xs mt-1">or drag and drop</p>
+                  <p className="text-gray-300 text-xs mt-1">or drag and drop</p>
                 </div>
               )}
               <input
@@ -1033,7 +1033,7 @@ function VenturesPanel({ token }: { token: string }) {
             </div>
           )}
           {uploadSuccess && (
-            <div className="flex items-center gap-2 text-[#00E676] text-sm bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 text-emerald-600 text-sm bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3">
               <Check className="w-4 h-4 flex-shrink-0" />
               {uploadSuccess}
             </div>
@@ -1041,7 +1041,7 @@ function VenturesPanel({ token }: { token: string }) {
           <button
             type="submit"
             disabled={!selectedFile || uploading}
-            className="bg-[#00E676] text-[#06060E] font-bold px-6 py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+            className="bg-[#00E676] text-[#f9fafb] font-bold px-6 py-2.5 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
           >
             {uploading ? "Uploading..." : "Upload File"}
           </button>
@@ -1049,15 +1049,15 @@ function VenturesPanel({ token }: { token: string }) {
       </div>
 
       {/* File list */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[0.06]">
-          <FileText className="w-4 h-4 text-white/40" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-200">
+          <FileText className="w-4 h-4 text-gray-400" />
+          <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
             Uploaded Files
           </h3>
           <button
             onClick={fetchFiles}
-            className="ml-auto text-white/30 hover:text-white transition-colors"
+            className="ml-auto text-gray-400 hover:text-gray-900 transition-colors"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
@@ -1065,14 +1065,14 @@ function VenturesPanel({ token }: { token: string }) {
           </button>
         </div>
         {loading ? (
-          <div className="text-center py-12 text-white/30 text-sm">
+          <div className="text-center py-12 text-gray-400 text-sm">
             Loading files...
           </div>
         ) : files.length === 0 ? (
           <div className="text-center py-12">
-            <FileText className="w-10 h-10 text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">No files uploaded yet</p>
-            <p className="text-white/20 text-xs mt-1">
+            <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No files uploaded yet</p>
+            <p className="text-gray-300 text-xs mt-1">
               Use the form above to upload your first file
             </p>
           </div>
@@ -1081,7 +1081,7 @@ function VenturesPanel({ token }: { token: string }) {
             {Object.entries(byCategory).map(([cat, catFiles]) => (
               <div key={cat}>
                 <div className="px-5 py-2 bg-white/[0.02]">
-                  <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+                  <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
                     {cat}
                   </span>
                 </div>
@@ -1094,19 +1094,19 @@ function VenturesPanel({ token }: { token: string }) {
                       {fileIcon(f.mimeType)}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">
+                      <p className="text-gray-900 text-sm font-medium truncate">
                         {f.originalName}
                       </p>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-white/30 text-xs">
+                        <span className="text-gray-400 text-xs">
                           {formatSize(f.size)}
                         </span>
                         {f.description && (
-                          <span className="text-white/30 text-xs truncate">
+                          <span className="text-gray-400 text-xs truncate">
                             • {f.description}
                           </span>
                         )}
-                        <span className="text-white/20 text-xs">
+                        <span className="text-gray-300 text-xs">
                           {new Date(f.uploadedAt).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
@@ -1133,7 +1133,7 @@ function VenturesPanel({ token }: { token: string }) {
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
-                        className="flex items-center gap-1.5 text-[#00E676]/60 hover:text-[#00E676] transition-colors text-xs"
+                        className="flex items-center gap-1.5 text-emerald-600/60 hover:text-emerald-600 transition-colors text-xs"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span className="hidden sm:block">Download</span>
@@ -1141,7 +1141,7 @@ function VenturesPanel({ token }: { token: string }) {
                       <button
                         onClick={() => handleDelete(f.id, f.originalName)}
                         disabled={deletingId === f.id}
-                        className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all disabled:opacity-50"
+                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all disabled:opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1205,23 +1205,23 @@ function ChangePasswordPanel({ token }: { token: string }) {
   return (
     <div className="max-w-md">
       <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-          <KeyRound className="w-5 h-5 text-[#00E676]" />
+        <div className="p-2.5 rounded-xl bg-emerald-100">
+          <KeyRound className="w-5 h-5 text-emerald-600" />
         </div>
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
             Change Password
           </h2>
-          <p className="text-white/40 text-sm">
+          <p className="text-gray-400 text-sm">
             Update your admin account password
           </p>
         </div>
       </div>
 
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+            <label className="block text-gray-500 text-xs font-medium mb-2 uppercase tracking-wider">
               Current Password
             </label>
             <div className="relative">
@@ -1231,12 +1231,12 @@ function ChangePasswordPanel({ token }: { token: string }) {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Enter current password"
                 required
-                className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 pr-11 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 pr-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowCurrent(!showCurrent)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 transition-colors"
               >
                 {showCurrent ? (
                   <EyeOff className="w-4 h-4" />
@@ -1248,7 +1248,7 @@ function ChangePasswordPanel({ token }: { token: string }) {
           </div>
 
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+            <label className="block text-gray-500 text-xs font-medium mb-2 uppercase tracking-wider">
               New Password
             </label>
             <div className="relative">
@@ -1258,12 +1258,12 @@ function ChangePasswordPanel({ token }: { token: string }) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 required
-                className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 pr-11 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+                className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 pr-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowNew(!showNew)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 transition-colors"
               >
                 {showNew ? (
                   <EyeOff className="w-4 h-4" />
@@ -1275,7 +1275,7 @@ function ChangePasswordPanel({ token }: { token: string }) {
           </div>
 
           <div>
-            <label className="block text-white/60 text-xs font-medium mb-2 uppercase tracking-wider">
+            <label className="block text-gray-500 text-xs font-medium mb-2 uppercase tracking-wider">
               Confirm New Password
             </label>
             <input
@@ -1284,7 +1284,7 @@ function ChangePasswordPanel({ token }: { token: string }) {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter new password"
               required
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
             />
           </div>
 
@@ -1295,9 +1295,9 @@ function ChangePasswordPanel({ token }: { token: string }) {
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-2 bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl px-4 py-3">
-              <Check className="w-4 h-4 text-[#00E676] flex-shrink-0" />
-              <p className="text-[#00E676] text-sm">{success}</p>
+            <div className="flex items-center gap-2 bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3">
+              <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <p className="text-emerald-600 text-sm">{success}</p>
             </div>
           )}
 
@@ -1306,7 +1306,7 @@ function ChangePasswordPanel({ token }: { token: string }) {
             disabled={
               loading || !currentPassword || !newPassword || !confirmPassword
             }
-            className="w-full bg-[#00E676] text-[#06060E] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40"
+            className="w-full bg-[#00E676] text-[#f9fafb] font-bold py-3 rounded-xl hover:bg-[#00E676]/90 transition-colors disabled:opacity-40"
           >
             {loading ? "Updating..." : "Update Password"}
           </button>
@@ -1349,14 +1349,14 @@ const INBOX_CATEGORIES: {
   icon: LucideIcon;
   color: string;
 }[] = [
-  { id: "all", label: "All", icon: Inbox, color: "text-white" },
+  { id: "all", label: "All", icon: Inbox, color: "text-gray-900" },
   {
     id: "corporate",
     label: "Corporate",
     icon: Building2,
     color: "text-blue-400",
   },
-  { id: "app", label: "CashClip", icon: Smartphone, color: "text-[#00E676]" },
+  { id: "app", label: "CashClip", icon: Smartphone, color: "text-emerald-600" },
   { id: "pr", label: "PR", icon: Megaphone, color: "text-pink-400" },
   {
     id: "support",
@@ -1586,10 +1586,10 @@ export function InboxPanel({ token }: { token: string }) {
 
   const catColor: Record<InboxMessage["category"], string> = {
     corporate: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    app: "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20",
+    app: "text-emerald-600 bg-emerald-100 border-emerald-200",
     pr: "text-pink-400 bg-pink-500/10 border-pink-500/20",
     support: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    other: "text-white/40 bg-white/5 border-white/10",
+    other: "text-gray-400 bg-white/5 border-gray-200",
   };
 
   const catLabel: Record<InboxMessage["category"], string> = {
@@ -1604,15 +1604,15 @@ export function InboxPanel({ token }: { token: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
             Inbox
           </h2>
-          <p className="text-white/40 text-sm mt-0.5">
+          <p className="text-gray-400 text-sm mt-0.5">
             {view === "inbox" ? (
               <>
                 Submissions — one view.
                 {fetchedAt && (
-                  <span className="ml-2 text-white/20">
+                  <span className="ml-2 text-gray-300">
                     Last synced {timeAgoShort(fetchedAt)} ago
                   </span>
                 )}
@@ -1626,7 +1626,7 @@ export function InboxPanel({ token }: { token: string }) {
           <button
             onClick={fetchMessages}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-sm disabled:opacity-40"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
@@ -1637,7 +1637,7 @@ export function InboxPanel({ token }: { token: string }) {
           <button
             onClick={fetchSentReplies}
             disabled={sentLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-sm disabled:opacity-40"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${sentLoading ? "animate-spin" : ""}`}
@@ -1648,13 +1648,13 @@ export function InboxPanel({ token }: { token: string }) {
       </div>
 
       {/* View switcher: Inbox vs Sent Replies */}
-      <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 w-fit">
+      <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-2xl p-1.5 w-fit">
         <button
           onClick={() => setView("inbox")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
             view === "inbox"
-              ? "bg-white/[0.08] text-white"
-              : "text-white/40 hover:text-white hover:bg-white/[0.04]"
+              ? "bg-gray-100 text-gray-900"
+              : "text-gray-400 hover:text-gray-900 hover:bg-white/[0.04]"
           }`}
         >
           <Inbox className="w-3.5 h-3.5" />
@@ -1664,8 +1664,8 @@ export function InboxPanel({ token }: { token: string }) {
           onClick={() => setView("sent")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
             view === "sent"
-              ? "bg-white/[0.08] text-white"
-              : "text-white/40 hover:text-white hover:bg-white/[0.04]"
+              ? "bg-gray-100 text-gray-900"
+              : "text-gray-400 hover:text-gray-900 hover:bg-white/[0.04]"
           }`}
         >
           <Mail className="w-3.5 h-3.5" />
@@ -1676,7 +1676,7 @@ export function InboxPanel({ token }: { token: string }) {
       {view === "inbox" && (
       <>
       {/* Category tabs */}
-      <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-2xl p-1.5 overflow-x-auto">
         {INBOX_CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const active = activeCategory === cat.id;
@@ -1689,8 +1689,8 @@ export function InboxPanel({ token }: { token: string }) {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 active
-                  ? "bg-white/[0.08] text-white"
-                  : "text-white/40 hover:text-white hover:bg-white/[0.04]"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-white/[0.04]"
               }`}
             >
               <Icon className={`w-3.5 h-3.5 ${active ? cat.color : ""}`} />
@@ -1698,8 +1698,8 @@ export function InboxPanel({ token }: { token: string }) {
               <span
                 className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
                   active
-                    ? "bg-white/10 text-white"
-                    : "bg-white/[0.05] text-white/30"
+                    ? "bg-white/10 text-gray-900"
+                    : "bg-gray-100 text-gray-400"
                 }`}
               >
                 {counts[cat.id] ?? 0}
@@ -1717,20 +1717,20 @@ export function InboxPanel({ token }: { token: string }) {
       )}
 
       {loading && messages.length === 0 ? (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-12 text-center">
-          <RefreshCw className="w-8 h-8 text-white/20 animate-spin mx-auto mb-3" />
-          <p className="text-white/40 text-sm">Connecting to mail server…</p>
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
+          <RefreshCw className="w-8 h-8 text-gray-300 animate-spin mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Connecting to mail server…</p>
         </div>
       ) : (
         <div
           className={`grid gap-4 ${selected ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}
         >
           {/* Message list */}
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="text-center py-16">
-                <Inbox className="w-10 h-10 text-white/10 mx-auto mb-3" />
-                <p className="text-white/30 text-sm">
+                <Inbox className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">
                   No messages in this inbox
                 </p>
               </div>
@@ -1756,12 +1756,12 @@ export function InboxPanel({ token }: { token: string }) {
                           msg.category === "corporate"
                             ? "bg-blue-500/15 text-blue-400"
                             : msg.category === "app"
-                              ? "bg-[#00E676]/15 text-[#00E676]"
+                              ? "bg-[#00E676]/15 text-emerald-600"
                               : msg.category === "pr"
                                 ? "bg-pink-500/15 text-pink-400"
                                 : msg.category === "support"
                                   ? "bg-amber-500/15 text-amber-400"
-                                  : "bg-white/10 text-white/40"
+                                  : "bg-white/10 text-gray-400"
                         }`}
                       >
                         {(msg.from[0] ?? "?").toUpperCase()}
@@ -1770,19 +1770,19 @@ export function InboxPanel({ token }: { token: string }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span
-                          className={`text-sm font-semibold truncate ${msg.seen ? "text-white/60" : "text-white"}`}
+                          className={`text-sm font-semibold truncate ${msg.seen ? "text-gray-500" : "text-gray-900"}`}
                         >
                           {msg.from}
                         </span>
                         {!msg.seen && (
                           <span className="w-2 h-2 rounded-full bg-[#00E676] flex-shrink-0" />
                         )}
-                        <span className="text-white/20 text-xs flex-shrink-0 ml-auto">
+                        <span className="text-gray-300 text-xs flex-shrink-0 ml-auto">
                           {timeAgoShort(msg.date)}
                         </span>
                       </div>
                       <p
-                        className={`text-sm truncate mb-1 ${msg.seen ? "text-white/40" : "text-white/80 font-medium"}`}
+                        className={`text-sm truncate mb-1 ${msg.seen ? "text-gray-400" : "text-gray-700 font-medium"}`}
                       >
                         {msg.subject}
                       </p>
@@ -1805,15 +1805,15 @@ export function InboxPanel({ token }: { token: string }) {
 
           {/* Message detail pane */}
           {selected && (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catColor[selected.category]}`}
                   >
                     {catLabel[selected.category]}
                   </span>
-                  <span className="text-white/30 text-xs">
+                  <span className="text-gray-400 text-xs">
                     {new Date(selected.date).toLocaleString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -1824,32 +1824,32 @@ export function InboxPanel({ token }: { token: string }) {
                 </div>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-white/30 hover:text-white transition-colors"
+                  className="text-gray-400 hover:text-gray-900 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="px-5 py-4 border-b border-white/[0.06] space-y-2">
-                <h3 className="font-['Space_Grotesk'] font-bold text-white text-base leading-snug">
+              <div className="px-5 py-4 border-b border-gray-200 space-y-2">
+                <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-base leading-snug">
                   {selected.subject}
                 </h3>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-white/40 text-xs">
+                  <div className="flex items-center gap-1.5 text-gray-400 text-xs">
                     <AtSign className="w-3 h-3" />
                     <span className="font-medium">{selected.fromEmail}</span>
                   </div>
-                  <span className="text-white/20 text-xs">→</span>
-                  <div className="flex items-center gap-1.5 text-white/30 text-xs">
+                  <span className="text-gray-300 text-xs">→</span>
+                  <div className="flex items-center gap-1.5 text-gray-400 text-xs">
                     <span>{selected.toEmail}</span>
                   </div>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-4 max-h-[480px]">
-                <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
                   {selected.body || selected.preview || "(No body content)"}
                 </p>
-                <div className="mt-6 pt-5 border-t border-white/[0.06] space-y-3">
-                    <div className="flex items-center gap-2 text-white/40 text-xs font-semibold uppercase tracking-wide">
+                <div className="mt-6 pt-5 border-t border-gray-200 space-y-3">
+                    <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wide">
                       <Mail className="w-3.5 h-3.5" />
                       Reply History
                       {replyHistory.length > 0 && (
@@ -1859,7 +1859,7 @@ export function InboxPanel({ token }: { token: string }) {
                       )}
                     </div>
                     {historyLoading && replyHistory.length === 0 ? (
-                      <div className="flex items-center gap-2 text-white/30 text-xs">
+                      <div className="flex items-center gap-2 text-gray-400 text-xs">
                         <RefreshCw className="w-3 h-3 animate-spin" />
                         Loading prior replies…
                       </div>
@@ -1869,7 +1869,7 @@ export function InboxPanel({ token }: { token: string }) {
                         <span>{historyError}</span>
                       </div>
                     ) : historyLoaded && replyHistory.length === 0 ? (
-                      <div className="text-white/30 text-xs">
+                      <div className="text-gray-400 text-xs">
                         No prior replies to this thread yet.
                       </div>
                     ) : (
@@ -1879,7 +1879,7 @@ export function InboxPanel({ token }: { token: string }) {
                           className="bg-[#00E676]/[0.04] border border-[#00E676]/15 rounded-xl px-4 py-3"
                         >
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="text-[#00E676]/90 text-xs font-semibold truncate">
+                            <span className="text-emerald-600/90 text-xs font-semibold truncate">
                               {r.adminUsername || r.adminEmail || "Admin"}
                             </span>
                             <span className="text-white/25 text-[11px] flex-shrink-0">
@@ -1891,7 +1891,7 @@ export function InboxPanel({ token }: { token: string }) {
                               })}
                             </span>
                           </div>
-                          <p className="text-white/60 text-sm leading-relaxed whitespace-pre-wrap">
+                          <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap">
                             {r.body}
                           </p>
                         </div>
@@ -1899,9 +1899,9 @@ export function InboxPanel({ token }: { token: string }) {
                     )}
                   </div>
               </div>
-              <div className="px-5 py-3 border-t border-white/[0.06] space-y-3">
+              <div className="px-5 py-3 border-t border-gray-200 space-y-3">
                 {replySent && !replyOpen && (
-                  <div className="flex items-center gap-2 text-[#00E676] text-xs">
+                  <div className="flex items-center gap-2 text-emerald-600 text-xs">
                     <Check className="w-3.5 h-3.5" />
                     Reply sent to {selected.fromEmail}
                   </div>
@@ -1910,23 +1910,23 @@ export function InboxPanel({ token }: { token: string }) {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={openReply}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors"
                     >
                       <Mail className="w-3.5 h-3.5" />
                       {replySent ? "Reply Again" : "Reply"}
                     </button>
                     <a
                       href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
-                      className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 text-white/60 rounded-xl text-xs font-medium hover:text-white hover:bg-white/[0.08] transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl text-xs font-medium hover:text-gray-900 hover:bg-gray-100 transition-colors"
                     >
                       Open in Webmail
                     </a>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-1.5 text-white/40 text-xs">
+                    <div className="flex items-center gap-1.5 text-gray-400 text-xs">
                       <span>Replying to</span>
-                      <span className="text-white/70 font-medium">{selected.fromEmail}</span>
+                      <span className="text-gray-600 font-medium">{selected.fromEmail}</span>
                     </div>
                     <textarea
                       value={replyBody}
@@ -1935,7 +1935,7 @@ export function InboxPanel({ token }: { token: string }) {
                       rows={6}
                       autoFocus
                       disabled={replySending}
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40 resize-y disabled:opacity-50"
+                      className="w-full bg-white/[0.04] border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-white/25 focus:outline-none focus:border-emerald-300 resize-y disabled:opacity-50"
                     />
                     {replyError && (
                       <div className="flex items-start gap-2 text-red-400 text-xs">
@@ -1947,7 +1947,7 @@ export function InboxPanel({ token }: { token: string }) {
                       <button
                         onClick={sendReply}
                         disabled={replySending || !replyBody.trim()}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {replySending ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -1962,7 +1962,7 @@ export function InboxPanel({ token }: { token: string }) {
                           setReplyError("");
                         }}
                         disabled={replySending}
-                        className="px-4 py-2 text-white/40 hover:text-white transition-colors text-xs disabled:opacity-40"
+                        className="px-4 py-2 text-gray-400 hover:text-gray-900 transition-colors text-xs disabled:opacity-40"
                       >
                         Cancel
                       </button>
@@ -1982,7 +1982,7 @@ export function InboxPanel({ token }: { token: string }) {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[220px] max-w-sm">
-              <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 value={sentRecipientInput}
                 onChange={(e) => setSentRecipientInput(e.target.value)}
@@ -1993,7 +1993,7 @@ export function InboxPanel({ token }: { token: string }) {
                   }
                 }}
                 placeholder="Filter by recipient email…"
-                className="w-full bg-white/[0.05] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-gray-300"
               />
             </div>
             <button
@@ -2001,7 +2001,7 @@ export function InboxPanel({ token }: { token: string }) {
                 setSentPage(0);
                 setSentRecipient(sentRecipientInput.trim());
               }}
-              className="px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm"
+              className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-sm"
             >
               Search
             </button>
@@ -2012,7 +2012,7 @@ export function InboxPanel({ token }: { token: string }) {
                 setSentPage(0);
               }}
               disabled={sentAdminsLoading}
-              className="bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/20 disabled:opacity-40 min-w-[160px]"
+              className="bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 focus:outline-none focus:border-gray-300 disabled:opacity-40 min-w-[160px]"
             >
               <option value="">All admins</option>
               {sentAdmins.map((a) => (
@@ -2029,7 +2029,7 @@ export function InboxPanel({ token }: { token: string }) {
                   setSentAdminId("");
                   setSentPage(0);
                 }}
-                className="px-3 py-2 text-white/40 hover:text-white transition-colors text-sm"
+                className="px-3 py-2 text-gray-400 hover:text-gray-900 transition-colors text-sm"
               >
                 Clear
               </button>
@@ -2044,30 +2044,30 @@ export function InboxPanel({ token }: { token: string }) {
           )}
 
           {sentLoading && sentReplies.length === 0 ? (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-12 text-center">
-              <RefreshCw className="w-8 h-8 text-white/20 animate-spin mx-auto mb-3" />
-              <p className="text-white/40 text-sm">Loading sent replies…</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
+              <RefreshCw className="w-8 h-8 text-gray-300 animate-spin mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">Loading sent replies…</p>
             </div>
           ) : !sentError && sentReplies.length === 0 ? (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl py-16 text-center">
-              <Mail className="w-10 h-10 text-white/10 mx-auto mb-3" />
-              <p className="text-white/30 text-sm">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl py-16 text-center">
+              <Mail className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">
                 {sentRecipient || sentAdminId
                   ? "No replies match the selected filters"
                   : "No replies have been sent yet"}
               </p>
             </div>
           ) : sentReplies.length > 0 ? (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.04]">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden divide-y divide-white/[0.04]">
               {sentReplies.map((r) => (
                 <div key={r.id} className="px-5 py-4">
                   <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[#00E676]/90 text-xs font-semibold truncate">
+                      <span className="text-emerald-600/90 text-xs font-semibold truncate">
                         {r.adminUsername || r.adminEmail || "Admin"}
                       </span>
-                      <span className="text-white/20 text-xs">→</span>
-                      <span className="text-white/50 text-xs truncate">
+                      <span className="text-gray-300 text-xs">→</span>
+                      <span className="text-gray-500 text-xs truncate">
                         {r.recipient}
                       </span>
                     </div>
@@ -2081,10 +2081,10 @@ export function InboxPanel({ token }: { token: string }) {
                       })}
                     </span>
                   </div>
-                  <p className="text-white/80 text-sm font-medium truncate mb-1">
+                  <p className="text-gray-700 text-sm font-medium truncate mb-1">
                     {r.subject}
                   </p>
-                  <p className="text-white/50 text-sm leading-relaxed whitespace-pre-wrap line-clamp-3">
+                  <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-wrap line-clamp-3">
                     {r.body}
                   </p>
                 </div>
@@ -2095,7 +2095,7 @@ export function InboxPanel({ token }: { token: string }) {
           {/* Pagination */}
           {sentTotal > SENT_PAGE_SIZE && (
             <div className="flex items-center justify-between gap-3">
-              <p className="text-white/30 text-xs">
+              <p className="text-gray-400 text-xs">
                 Showing {sentPage * SENT_PAGE_SIZE + 1}–
                 {Math.min((sentPage + 1) * SENT_PAGE_SIZE, sentTotal)} of{" "}
                 {sentTotal}
@@ -2104,7 +2104,7 @@ export function InboxPanel({ token }: { token: string }) {
                 <button
                   onClick={() => setSentPage((p) => Math.max(0, p - 1))}
                   disabled={sentPage === 0 || sentLoading}
-                  className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-xs disabled:opacity-30"
+                  className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-30"
                 >
                   Previous
                 </button>
@@ -2113,7 +2113,7 @@ export function InboxPanel({ token }: { token: string }) {
                   disabled={
                     (sentPage + 1) * SENT_PAGE_SIZE >= sentTotal || sentLoading
                   }
-                  className="px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-xs disabled:opacity-30"
+                  className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-30"
                 >
                   Next
                 </button>
@@ -2177,7 +2177,7 @@ export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-white/30 text-[10px] uppercase tracking-wider">
+        <tr className="text-gray-400 text-[10px] uppercase tracking-wider">
           <th className="text-left font-medium px-5 py-2">User</th>
           <th className="text-right font-medium px-3 py-2">Amount</th>
           <th className="text-left font-medium px-3 py-2">Reason</th>
@@ -2195,7 +2195,7 @@ export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
               className="border-t border-white/[0.04] align-top"
             >
               <td className="px-5 py-2.5">
-                <p className="text-white/80 text-xs font-medium break-all">
+                <p className="text-gray-700 text-xs font-medium break-all">
                   {r.username}
                 </p>
                 <p className="text-white/25 text-[10px] break-all">
@@ -2204,18 +2204,18 @@ export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
               </td>
               <td className="px-3 py-2.5 text-right whitespace-nowrap">
                 <span
-                  className={`text-xs font-semibold ${positive ? "text-[#00E676]" : "text-amber-400"}`}
+                  className={`text-xs font-semibold ${positive ? "text-emerald-600" : "text-amber-400"}`}
                 >
                   {positive ? "+" : "-"}${Math.abs(amt).toFixed(2)}
                 </span>
               </td>
-              <td className="px-3 py-2.5 text-white/60 text-xs max-w-[280px] break-words">
+              <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[280px] break-words">
                 {r.description ?? "—"}
               </td>
-              <td className="px-3 py-2.5 text-white/60 text-xs break-all">
+              <td className="px-3 py-2.5 text-gray-500 text-xs break-all">
                 {r.actorUsername ?? r.actorUserId ?? "—"}
               </td>
-              <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
+              <td className="px-5 py-2.5 text-right text-gray-400 text-[10px] whitespace-nowrap">
                 {new Date(r.createdAt).toLocaleString()}
               </td>
             </tr>
@@ -2697,7 +2697,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#06060E]" : "bg-red-500 text-white"}`}
+          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#f9fafb]" : "bg-red-500 text-gray-900"}`}
         >
           {toast.ok ? (
             <Check className="w-4 h-4" />
@@ -2711,13 +2711,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {/* Delete confirm modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-white/10 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-gray-200 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Delete User?
             </h3>
-            <p className="text-white/50 text-sm mb-1">
+            <p className="text-gray-500 text-sm mb-1">
               This will permanently delete{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 {confirmDelete.username}
               </span>{" "}
               and all their data — earnings, transactions, and withdrawals.
@@ -2726,13 +2726,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(confirmDelete)}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-gray-900 font-bold text-sm hover:bg-red-600 transition-colors"
               >
                 Delete
               </button>
@@ -2745,14 +2745,14 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {factoryTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
           <div className="bg-[#111118] border border-amber-500/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Factory Reset Account?
             </h3>
-            <p className="text-white/50 text-sm mb-1">
+            <p className="text-gray-500 text-sm mb-1">
               This sets a brand-new password and{" "}
-              <span className="text-white font-semibold">switches off 2FA</span>{" "}
+              <span className="text-gray-900 font-semibold">switches off 2FA</span>{" "}
               for{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 {factoryTarget.username}
               </span>
               , and signs out all of its active sessions.
@@ -2766,7 +2766,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               value={factoryPassphrase}
               onChange={(e) => setFactoryPassphrase(e.target.value)}
               placeholder="Master passphrase"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
             />
             {factoryError && (
               <p className="text-red-400 text-xs mb-2">{factoryError}</p>
@@ -2778,14 +2778,14 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                   setFactoryPassphrase("");
                   setFactoryError("");
                 }}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleFactoryReset}
                 disabled={factoryLoading}
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#06060E] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#f9fafb] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
               >
                 {factoryLoading ? "Resetting…" : "Factory Reset"}
               </button>
@@ -2797,12 +2797,12 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {/* Factory reset — result */}
       {factoryResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-emerald-200 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Account Reset ✓
             </h3>
-            <p className="text-white/50 text-sm mb-1">
-              <span className="text-white font-semibold">
+            <p className="text-gray-500 text-sm mb-1">
+              <span className="text-gray-900 font-semibold">
                 {factoryResult.username}
               </span>{" "}
               can now log in with this new password. 2FA is OFF — set up a fresh
@@ -2812,7 +2812,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               Copy it now — it won't be shown again.
             </p>
             <div className="flex items-center gap-2 mb-5">
-              <code className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-[#00E676] text-sm font-mono break-all">
+              <code className="flex-1 bg-black/40 border border-gray-200 rounded-xl px-3 py-2.5 text-emerald-600 text-sm font-mono break-all">
                 {factoryResult.password}
               </code>
               <button
@@ -2827,14 +2827,14 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                     );
                   }
                 }}
-                className="px-3 py-2.5 bg-white/[0.05] border border-white/10 text-white/70 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors"
+                className="px-3 py-2.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors"
               >
                 Copy
               </button>
             </div>
             <button
               onClick={() => setFactoryResult(null)}
-              className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
+              className="w-full py-2.5 rounded-xl bg-[#00E676] text-[#f9fafb] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
             >
               Done
             </button>
@@ -2846,13 +2846,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {backfillOpen && !backfillResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
           <div className="bg-[#111118] border border-amber-500/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Credit Past Referrers
             </h3>
-            <p className="text-white/50 text-sm mb-1">
+            <p className="text-gray-500 text-sm mb-1">
               This pays the referral bonus to referrers whose friend cashed out the
               qualifying amount before the feature went live. It's{" "}
-              <span className="text-white font-semibold">safe to re-run</span> —
+              <span className="text-gray-900 font-semibold">safe to re-run</span> —
               anyone already credited is skipped.
             </p>
             <p className="text-amber-400 text-xs mb-4">
@@ -2864,22 +2864,22 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               value={backfillPassphrase}
               onChange={(e) => setBackfillPassphrase(e.target.value)}
               placeholder="Master passphrase"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-amber-500/40 transition-colors mb-2"
             />
             {backfillPreview && (
-              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 mb-2 text-sm">
-                <p className="text-white/80">
+              <div className="bg-white/[0.04] border border-gray-200 rounded-xl px-3 py-2.5 mb-2 text-sm">
+                <p className="text-gray-700">
                   <span className="text-amber-400 font-bold">
                     {backfillPreview.candidates}
                   </span>{" "}
                   referrer{backfillPreview.candidates === 1 ? "" : "s"} would be
                   credited{" "}
-                  <span className="text-white font-semibold">
+                  <span className="text-gray-900 font-semibold">
                     ${backfillPreview.bonusPerReferral}
                   </span>{" "}
                   each.
                 </p>
-                <p className="text-white/40 text-xs mt-1">
+                <p className="text-gray-400 text-xs mt-1">
                   Based on referred users who cashed out $
                   {backfillPreview.qualifyAmount}+ before the feature shipped.
                 </p>
@@ -2891,7 +2891,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
             <div className="flex gap-3 mt-3">
               <button
                 onClick={closeBackfill}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -2910,7 +2910,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                     ? undefined
                     : "Preview first to enable Run"
                 }
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#06060E] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-[#f9fafb] font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
               >
                 {backfillLoading === "run" ? "Running…" : "Run"}
               </button>
@@ -2922,38 +2922,38 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       {/* Referral backfill — result */}
       {backfillResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-emerald-200 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Backfill Complete ✓
             </h3>
-            <p className="text-white/50 text-sm mb-4">
+            <p className="text-gray-500 text-sm mb-4">
               Credited{" "}
-              <span className="text-[#00E676] font-bold">
+              <span className="text-emerald-600 font-bold">
                 {backfillResult.credited}
               </span>{" "}
               referrer{backfillResult.credited === 1 ? "" : "s"}{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 ${backfillResult.bonusPerReferral}
               </span>{" "}
               each.
             </p>
             <div className="grid grid-cols-2 gap-2 mb-5 text-sm">
-              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-white/40 text-xs">Candidates</p>
-                <p className="text-white font-bold">{backfillResult.candidates}</p>
+              <div className="bg-white/[0.04] border border-gray-200 rounded-xl px-3 py-2.5">
+                <p className="text-gray-400 text-xs">Candidates</p>
+                <p className="text-gray-900 font-bold">{backfillResult.candidates}</p>
               </div>
-              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-white/40 text-xs">Credited</p>
-                <p className="text-[#00E676] font-bold">{backfillResult.credited}</p>
+              <div className="bg-white/[0.04] border border-gray-200 rounded-xl px-3 py-2.5">
+                <p className="text-gray-400 text-xs">Credited</p>
+                <p className="text-emerald-600 font-bold">{backfillResult.credited}</p>
               </div>
-              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-white/40 text-xs">Skipped</p>
-                <p className="text-white/70 font-bold">{backfillResult.skipped}</p>
+              <div className="bg-white/[0.04] border border-gray-200 rounded-xl px-3 py-2.5">
+                <p className="text-gray-400 text-xs">Skipped</p>
+                <p className="text-gray-600 font-bold">{backfillResult.skipped}</p>
               </div>
-              <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-white/40 text-xs">Failed</p>
+              <div className="bg-white/[0.04] border border-gray-200 rounded-xl px-3 py-2.5">
+                <p className="text-gray-400 text-xs">Failed</p>
                 <p
-                  className={`font-bold ${backfillResult.failed > 0 ? "text-red-400" : "text-white/70"}`}
+                  className={`font-bold ${backfillResult.failed > 0 ? "text-red-400" : "text-gray-600"}`}
                 >
                   {backfillResult.failed}
                 </p>
@@ -2962,19 +2962,19 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
             {(backfillResult.creditedReferrers.length > 0 ||
               backfillResult.skippedReferrals.length > 0 ||
               backfillResult.failedReferrals.length > 0) && (
-              <div className="mb-5 max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] divide-y divide-white/[0.06]">
+              <div className="mb-5 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/[0.02] divide-y divide-white/[0.06]">
                 {backfillResult.creditedReferrers.map((r, i) => (
                   <div
                     key={`credited-${i}`}
                     className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
                   >
                     <div className="min-w-0">
-                      <p className="text-white font-medium truncate">{r.referrer}</p>
-                      <p className="text-white/40 text-xs truncate">
+                      <p className="text-gray-900 font-medium truncate">{r.referrer}</p>
+                      <p className="text-gray-400 text-xs truncate">
                         for {r.referredFriend}
                       </p>
                     </div>
-                    <span className="shrink-0 text-[#00E676] font-bold">
+                    <span className="shrink-0 text-emerald-600 font-bold">
                       +${r.amount}
                     </span>
                   </div>
@@ -2985,12 +2985,12 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                     className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
                   >
                     <div className="min-w-0">
-                      <p className="text-white/70 font-medium truncate">{r.referrer}</p>
-                      <p className="text-white/40 text-xs truncate">
+                      <p className="text-gray-600 font-medium truncate">{r.referrer}</p>
+                      <p className="text-gray-400 text-xs truncate">
                         for {r.referredFriend}
                       </p>
                     </div>
-                    <span className="shrink-0 text-white/40 text-xs font-semibold uppercase tracking-wide">
+                    <span className="shrink-0 text-gray-400 text-xs font-semibold uppercase tracking-wide">
                       Skipped
                     </span>
                   </div>
@@ -3002,7 +3002,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                   >
                     <div className="min-w-0">
                       <p className="text-red-400 font-medium truncate">{r.referrer}</p>
-                      <p className="text-white/40 text-xs truncate">
+                      <p className="text-gray-400 text-xs truncate">
                         for {r.referredFriend}
                         {r.error ? ` — ${r.error}` : ""}
                       </p>
@@ -3017,14 +3017,14 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
             <div className="flex gap-2">
               <button
                 onClick={downloadBackfillCsv}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/15 text-white/70 font-semibold text-sm hover:border-white/30 hover:text-white transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/15 text-gray-600 font-semibold text-sm hover:border-white/30 hover:text-gray-900 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
                 Download CSV
               </button>
               <button
                 onClick={closeBackfill}
-                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#f9fafb] font-bold text-sm hover:bg-[#00E676]/90 transition-colors"
               >
                 Done
               </button>
@@ -3035,10 +3035,10 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white flex items-center gap-2">
-            <Smartphone className="w-5 h-5 text-[#00E676]" /> CashClip Users
+          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-emerald-600" /> CashClip Users
           </h2>
-          <p className="text-white/40 text-sm mt-1">
+          <p className="text-gray-400 text-sm mt-1">
             {total} total registered users
           </p>
         </div>
@@ -3049,11 +3049,11 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search by username or email…"
-              className="bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#00E676]/50 w-64 transition-colors"
+              className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-emerald-400 w-64 transition-colors"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-sm hover:bg-[#00E676]/20 transition-colors"
+              className="px-4 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-sm hover:bg-emerald-100 transition-colors"
             >
               Search
             </button>
@@ -3065,7 +3065,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                   setSearchInput("");
                   setPage(0);
                 }}
-                className="text-white/30 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-gray-900 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3073,7 +3073,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
           </form>
           <button
             onClick={() => fetchUsers(search, page)}
-            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -3081,19 +3081,19 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       </div>
 
       {/* Withdrawal Limits Card */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
             Withdrawal Limits
           </h3>
-          <span className="text-white/30 text-xs ml-auto">
+          <span className="text-gray-400 text-xs ml-auto">
             Enforced server-side at withdrawal request time
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">
+            <label className="block text-gray-400 text-xs mb-1.5">
               Max single withdrawal ($)
             </label>
             <input
@@ -3102,11 +3102,11 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               onChange={(e) =>
                 setLimitConfig((p) => ({ ...p, maxWithdrawal: e.target.value }))
               }
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-2 text-gray-900 text-sm focus:outline-none focus:border-emerald-400 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">
+            <label className="block text-gray-400 text-xs mb-1.5">
               Min balance to withdraw ($)
             </label>
             <input
@@ -3115,11 +3115,11 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               onChange={(e) =>
                 setLimitConfig((p) => ({ ...p, minBalance: e.target.value }))
               }
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-2 text-gray-900 text-sm focus:outline-none focus:border-emerald-400 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-white/40 text-xs mb-1.5">
+            <label className="block text-gray-400 text-xs mb-1.5">
               Max per-user daily earnings ($)
             </label>
             <input
@@ -3128,7 +3128,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               onChange={(e) =>
                 setLimitConfig((p) => ({ ...p, dailyLimit: e.target.value }))
               }
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]/50 transition-colors"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-2 text-gray-900 text-sm focus:outline-none focus:border-emerald-400 transition-colors"
             />
           </div>
         </div>
@@ -3145,27 +3145,27 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
           >
             {savingLimits ? "Saving…" : "Save Limits"}
           </button>
-          <p className="text-white/20 text-xs">
+          <p className="text-gray-300 text-xs">
             These values will be enforced when users request withdrawals.
           </p>
         </div>
       </div>
 
       {/* Referral Backfill Card */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-2">
           <Users className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Space_Grotesk'] font-bold text-white text-sm">
+          <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm">
             Credit Past Referrers
           </h3>
-          <span className="text-white/30 text-xs ml-auto">
+          <span className="text-gray-400 text-xs ml-auto">
             One-time, safe to re-run
           </span>
         </div>
-        <p className="text-white/40 text-xs mb-4 max-w-2xl">
+        <p className="text-gray-400 text-xs mb-4 max-w-2xl">
           Referral bonuses only started paying out automatically when the feature
           shipped. This finds users who were referred and already cashed out the
-          qualifying amount <span className="text-white/60">before</span> then, and
+          qualifying amount <span className="text-gray-500">before</span> then, and
           pays their referrer the bonus they missed. Preview first to see how many
           referrers would be credited — nothing is paid until you run it.
         </p>
@@ -3191,31 +3191,31 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       )}
 
       {/* Manual credit audit log — every admin credit & correction */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
-        <div className="border-b border-white/[0.06]">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden mb-6">
+        <div className="border-b border-gray-200">
           <button
             onClick={() => setShowAudit((s) => !s)}
             className="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
           >
             <div>
-              <h3 className="text-white text-sm font-semibold">
+              <h3 className="text-gray-900 text-sm font-semibold">
                 Manual Credit Audit Log
               </h3>
-              <p className="text-white/30 text-xs mt-0.5">
+              <p className="text-gray-400 text-xs mt-0.5">
                 Every admin credit &amp; correction — who, how much, why, and when. A receipt is emailed to the user and support@absustaininvest.com on each one.
               </p>
             </div>
-            <span className="text-white/30 text-xs whitespace-nowrap">
+            <span className="text-gray-400 text-xs whitespace-nowrap">
               {showAudit ? "Hide" : "Show"} ({auditRows.length})
             </span>
           </button>
           {showAudit && (
             <div className="px-5 pb-4 flex items-center gap-2 flex-wrap">
-              <label className="text-white/40 text-xs">Issued by</label>
+              <label className="text-gray-400 text-xs">Issued by</label>
               <select
                 value={auditActorFilter}
                 onChange={(e) => setAuditActorFilter(e.target.value)}
-                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-white/80 text-xs focus:outline-none focus:border-white/20"
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-gray-700 text-xs focus:outline-none focus:border-gray-300"
               >
                 <option value="">All admins</option>
                 {auditActors.map((a) => (
@@ -3227,7 +3227,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               {auditActorFilter && (
                 <button
                   onClick={() => setAuditActorFilter("")}
-                  className="text-white/40 hover:text-white/70 text-xs underline underline-offset-2 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 text-xs underline underline-offset-2 transition-colors"
                 >
                   Clear
                 </button>
@@ -3238,9 +3238,9 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
         {showAudit && (
           <div className="max-h-80 overflow-y-auto">
             {auditLoading ? (
-              <div className="px-5 py-6 text-white/30 text-sm">Loading audit log…</div>
+              <div className="px-5 py-6 text-gray-400 text-sm">Loading audit log…</div>
             ) : auditRows.length === 0 ? (
-              <div className="px-5 py-6 text-white/30 text-sm">
+              <div className="px-5 py-6 text-gray-400 text-sm">
                 {auditActorFilter
                   ? `No manual credits or corrections issued by ${auditActorFilter}.`
                   : "No manual credits or corrections recorded yet."}
@@ -3253,13 +3253,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       </div>
 
       {/* Combined payout per user — all offers */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h3 className="text-white text-sm font-semibold">
+            <h3 className="text-gray-900 text-sm font-semibold">
               Payout by User — All Offers Combined
             </h3>
-            <p className="text-white/40 text-xs mt-0.5">
+            <p className="text-gray-400 text-xs mt-0.5">
               Total paid across surveys, offerwalls, games, ads &amp; bonuses
             </p>
           </div>
@@ -3270,8 +3270,8 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                 onClick={() => setPayoutRange(r)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                   payoutRange === r
-                    ? "bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30"
-                    : "bg-white/[0.05] text-white/50 border border-white/10 hover:bg-white/[0.1]"
+                    ? "bg-[#00E676]/15 text-emerald-600 border border-[#00E676]/30"
+                    : "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-white/[0.1]"
                 }`}
               >
                 {r === "all" ? "All" : r}
@@ -3280,11 +3280,11 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
           </div>
         </div>
         {payoutLoading ? (
-          <div className="text-center py-10 text-white/30 text-sm">
+          <div className="text-center py-10 text-gray-400 text-sm">
             Loading payouts…
           </div>
         ) : payoutRows.length === 0 ? (
-          <div className="text-center py-10 text-white/30 text-sm">
+          <div className="text-center py-10 text-gray-400 text-sm">
             No payouts in this range
           </div>
         ) : (
@@ -3294,16 +3294,16 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                 key={p.userId}
                 className="grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-5 py-3"
               >
-                <span className="text-white/30 text-xs font-bold w-6">
+                <span className="text-gray-400 text-xs font-bold w-6">
                   {i + 1}
                 </span>
-                <span className="text-white text-sm font-semibold truncate">
+                <span className="text-gray-900 text-sm font-semibold truncate">
                   {p.username}
                 </span>
-                <span className="text-white/40 text-xs whitespace-nowrap">
+                <span className="text-gray-400 text-xs whitespace-nowrap">
                   {p.txCount} tx
                 </span>
-                <span className="text-[#00E676] text-sm font-bold tabular-nums">
+                <span className="text-emerald-600 text-sm font-bold tabular-nums">
                   ${p.totalPayout.toFixed(2)}
                 </span>
               </div>
@@ -3313,21 +3313,21 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       </div>
 
       {/* Top Searchers */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between gap-3">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-white text-sm font-semibold">Top Searchers</h3>
-            <p className="text-white/40 text-xs mt-0.5">
+            <h3 className="text-gray-900 text-sm font-semibold">Top Searchers</h3>
+            <p className="text-gray-400 text-xs mt-0.5">
               Users by in-app search query count — auto-refreshes every 60s
             </p>
           </div>
         </div>
         {searchPerUserLoading ? (
-          <div className="text-center py-10 text-white/30 text-sm">
+          <div className="text-center py-10 text-gray-400 text-sm">
             Loading…
           </div>
         ) : searchPerUserRows.length === 0 ? (
-          <div className="text-center py-10 text-white/30 text-sm">
+          <div className="text-center py-10 text-gray-400 text-sm">
             No search data yet
           </div>
         ) : (
@@ -3337,9 +3337,9 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                 key={r.userId}
                 className="grid grid-cols-[auto_1fr_auto] gap-3 items-center px-5 py-3"
               >
-                <span className="text-white/30 text-xs font-bold w-6">{i + 1}</span>
-                <span className="text-white text-sm font-semibold truncate">{r.username}</span>
-                <span className="text-white/60 text-xs tabular-nums whitespace-nowrap">
+                <span className="text-gray-400 text-xs font-bold w-6">{i + 1}</span>
+                <span className="text-gray-900 text-sm font-semibold truncate">{r.username}</span>
+                <span className="text-gray-500 text-xs tabular-nums whitespace-nowrap">
                   {r.queryCount} {r.queryCount === 1 ? "search" : "searches"}
                 </span>
               </div>
@@ -3349,9 +3349,9 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       </div>
 
       {/* Users table */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
         {/* Header row */}
-        <div className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 px-5 py-3 border-b border-white/[0.06] text-white/30 text-[11px] font-semibold uppercase tracking-wider">
+        <div className="grid grid-cols-[1fr_1.4fr_0.8fr_0.8fr_0.8fr_0.7fr_0.7fr_auto] gap-3 px-5 py-3 border-b border-gray-200 text-gray-400 text-[11px] font-semibold uppercase tracking-wider">
           <span>Username</span>
           <span>Email</span>
           <span>Balance</span>
@@ -3362,13 +3362,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
           <span></span>
         </div>
         {loading ? (
-          <div className="text-center py-16 text-white/30 text-sm">
+          <div className="text-center py-16 text-gray-400 text-sm">
             Loading users…
           </div>
         ) : users.length === 0 ? (
           <div className="text-center py-16">
-            <Users className="w-10 h-10 text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">
+            <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">
               {search ? "No users match your search" : "No users yet"}
             </p>
           </div>
@@ -3383,13 +3383,13 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                   }
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-[#00E676]/10 border border-[#00E676]/20 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[#00E676] font-bold text-xs">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                      <span className="text-emerald-600 font-bold text-xs">
                         {u.username.charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold truncate">
+                      <p className="text-gray-900 text-sm font-semibold truncate">
                         {u.username}
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -3411,11 +3411,11 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                           </button>
                         )}
                         {u.profileComplete ? (
-                          <span className="text-[10px] bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 rounded px-1.5 py-0.5">
+                          <span className="text-[10px] bg-emerald-100 text-emerald-600 border border-emerald-200 rounded px-1.5 py-0.5">
                             Verified
                           </span>
                         ) : (
-                          <span className="text-[10px] bg-white/[0.05] text-white/30 border border-white/10 rounded px-1.5 py-0.5">
+                          <span className="text-[10px] bg-gray-100 text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">
                             Incomplete
                           </span>
                         )}
@@ -3427,33 +3427,33 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                       <a
                         href={`mailto:${encodeURIComponent(u.email)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[#00E676]/80 hover:text-[#00E676] text-xs truncate block transition-colors"
+                        className="text-emerald-600/80 hover:text-emerald-600 text-xs truncate block transition-colors"
                       >
                         {u.email}
                       </a>
                     ) : (
-                      <span className="text-white/20 text-xs">—</span>
+                      <span className="text-gray-300 text-xs">—</span>
                     )}
                   </div>
                   <span
-                    className={`text-sm font-bold ${Number(u.balance) > 0 ? "text-[#00E676]" : "text-white/40"}`}
+                    className={`text-sm font-bold ${Number(u.balance) > 0 ? "text-emerald-600" : "text-gray-400"}`}
                   >
                     ${Number(u.balance).toFixed(2)}
                   </span>
-                  <span className="text-white/60 text-sm">
+                  <span className="text-gray-500 text-sm">
                     ${Number(u.totalEarned).toFixed(2)}
                   </span>
                   <span className="text-amber-300/70 text-sm">
                     ${Number(u.pending ?? 0).toFixed(2)}
                   </span>
-                  <span className="text-white/50 text-xs">
+                  <span className="text-gray-500 text-xs">
                     {u.country ?? "—"}
                   </span>
-                  <span className="text-white/30 text-xs">
+                  <span className="text-gray-400 text-xs">
                     {fmt(u.createdAt)}
                   </span>
                   <ChevronRight
-                    className={`w-4 h-4 text-white/20 transition-transform ${expandedId === u.id ? "rotate-90" : ""}`}
+                    className={`w-4 h-4 text-gray-300 transition-transform ${expandedId === u.id ? "rotate-90" : ""}`}
                   />
                 </div>
 
@@ -3488,10 +3488,10 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                         { label: "Role", value: u.role },
                       ].map(({ label, value }) => (
                         <div key={label}>
-                          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-0.5">
+                          <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">
                             {label}
                           </p>
-                          <p className="text-white/80 text-xs font-medium break-all">
+                          <p className="text-gray-700 text-xs font-medium break-all">
                             {value}
                           </p>
                         </div>
@@ -3499,7 +3499,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-white/[0.06]">
+                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
                       <div className="flex items-center gap-2 flex-1 min-w-[240px]">
                         <input
                           type="text"
@@ -3512,7 +3512,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                           }
                           placeholder="New password (min 8 chars)"
                           onClick={(e) => e.stopPropagation()}
-                          className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors font-mono"
+                          className="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors font-mono"
                         />
                         <button
                           onClick={(e) => {
@@ -3548,7 +3548,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                             }
                           }}
                           disabled={!resetPwdMap[u.id]}
-                          className="px-3 py-2 bg-white/[0.05] border border-white/10 text-white/70 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-30 whitespace-nowrap"
+                          className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 rounded-xl text-xs font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-30 whitespace-nowrap"
                           title="Copy password to clipboard"
                         >
                           Copy
@@ -3596,7 +3596,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                                 }))
                               }
                               placeholder="$ (e.g. 5 or -2.50)"
-                              className="w-28 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                              className="w-28 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
                             />
                             <input
                               type="text"
@@ -3608,7 +3608,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                                 }))
                               }
                               placeholder="Reason (required for audit log)"
-                              className="flex-1 min-w-[120px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                              className="flex-1 min-w-[120px] bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
                             />
                             <button
                               onClick={(e) => {
@@ -3616,7 +3616,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                                 handleCredit(u);
                               }}
                               disabled={actionLoading === `credit-${u.id}`}
-                              className="px-3 py-2 bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] rounded-xl text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-40 whitespace-nowrap"
+                              className="px-3 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-40 whitespace-nowrap"
                               title="Positive amount credits, negative amount corrects down. Recorded in the audit log + emailed."
                             >
                               {actionLoading === `credit-${u.id}`
@@ -3660,8 +3660,8 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.06]">
-            <span className="text-white/30 text-xs">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200">
+            <span className="text-gray-400 text-xs">
               Showing {page * PAGE_SIZE + 1}–
               {Math.min((page + 1) * PAGE_SIZE, total)} of {total}
             </span>
@@ -3669,7 +3669,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="px-3 py-1.5 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 ← Prev
               </button>
@@ -3686,7 +3686,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                   <button
                     key={p}
                     onClick={() => setPage(p)}
-                    className={`w-8 h-8 rounded-lg text-xs transition-colors ${p === page ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 font-bold" : "text-white/40 hover:text-white hover:bg-white/[0.05]"}`}
+                    className={`w-8 h-8 rounded-lg text-xs transition-colors ${p === page ? "bg-emerald-100 text-emerald-600 border border-emerald-200 font-bold" : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"}`}
                   >
                     {p + 1}
                   </button>
@@ -3695,7 +3695,7 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Next →
               </button>
@@ -3723,7 +3723,7 @@ const SECURITY_EVENT_META: Record<
 > = {
   totp_enabled: {
     label: "2FA Enabled",
-    color: "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20",
+    color: "text-emerald-600 bg-emerald-100 border-emerald-200",
   },
   totp_disabled: {
     label: "2FA Disabled",
@@ -3815,14 +3815,14 @@ function SecurityLogPanel({
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <History className="w-5 h-5 text-[#00E676]" />
+          <div className="p-2.5 rounded-xl bg-emerald-100">
+            <History className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
               Security Log
             </h2>
-            <p className="text-white/40 text-sm mt-0.5">
+            <p className="text-gray-400 text-sm mt-0.5">
               Account security events — who changed what, when, and from where.
             </p>
           </div>
@@ -3830,7 +3830,7 @@ function SecurityLogPanel({
         <button
           onClick={() => fetchEntries()}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors text-sm disabled:opacity-40"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-sm disabled:opacity-40"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
@@ -3841,7 +3841,7 @@ function SecurityLogPanel({
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-1.5 overflow-x-auto">
+        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-2xl p-1.5 overflow-x-auto">
           <button
             onClick={() => {
               setEventFilter("");
@@ -3849,8 +3849,8 @@ function SecurityLogPanel({
             }}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors ${
               eventFilter === ""
-                ? "bg-[#00E676] text-[#06060E]"
-                : "text-white/50 hover:text-white"
+                ? "bg-[#00E676] text-[#f9fafb]"
+                : "text-gray-500 hover:text-gray-900"
             }`}
           >
             All Events
@@ -3864,8 +3864,8 @@ function SecurityLogPanel({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors ${
                 eventFilter === ev
-                  ? "bg-[#00E676] text-[#06060E]"
-                  : "text-white/50 hover:text-white"
+                  ? "bg-[#00E676] text-[#f9fafb]"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
               {SECURITY_EVENT_META[ev]?.label ?? ev}
@@ -3884,7 +3884,7 @@ function SecurityLogPanel({
             value={actorFilter}
             onChange={(e) => setActorFilter(e.target.value)}
             placeholder="Filter by actor user ID…"
-            className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40"
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder:text-white/25 focus:outline-none focus:border-emerald-300"
           />
           {activeActorFilter && (
             <button
@@ -3894,7 +3894,7 @@ function SecurityLogPanel({
                 setActiveActorFilter("");
                 setPage(0);
               }}
-              className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+              className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
               title="Clear actor filter"
             >
               <X className="w-4 h-4" />
@@ -3909,16 +3909,16 @@ function SecurityLogPanel({
         </div>
       )}
 
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="text-center py-16 text-white/30">
+          <div className="text-center py-16 text-gray-400">
             Loading security events…
           </div>
         ) : entries.length === 0 ? (
           <div className="text-center py-16">
-            <Shield className="w-10 h-10 text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">No security events found</p>
-            <p className="text-white/20 text-xs mt-1">
+            <Shield className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No security events found</p>
+            <p className="text-gray-300 text-xs mt-1">
               2FA changes, backup-code regeneration, and password changes will
               appear here
             </p>
@@ -3928,7 +3928,7 @@ function SecurityLogPanel({
             {entries.map((e) => {
               const meta = SECURITY_EVENT_META[e.event] ?? {
                 label: e.event,
-                color: "text-white/40 bg-white/5 border-white/10",
+                color: "text-gray-400 bg-white/5 border-gray-200",
               };
               return (
                 <div
@@ -3946,18 +3946,18 @@ function SecurityLogPanel({
                         </span>
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1.5 text-white font-medium text-sm">
-                          <User className="w-3.5 h-3.5 text-white/30" />
+                        <span className="flex items-center gap-1.5 text-gray-900 font-medium text-sm">
+                          <User className="w-3.5 h-3.5 text-gray-400" />
                           {e.actorUsername ?? "Unknown user"}
                         </span>
                         {e.actorEmail && (
-                          <span className="flex items-center gap-1.5 text-white/40 text-xs">
-                            <Mail className="w-3.5 h-3.5 text-white/20" />
+                          <span className="flex items-center gap-1.5 text-gray-400 text-xs">
+                            <Mail className="w-3.5 h-3.5 text-gray-300" />
                             {e.actorEmail}
                           </span>
                         )}
-                        <span className="flex items-center gap-1.5 text-white/40 text-xs">
-                          <Globe className="w-3.5 h-3.5 text-white/20" />
+                        <span className="flex items-center gap-1.5 text-gray-400 text-xs">
+                          <Globe className="w-3.5 h-3.5 text-gray-300" />
                           {e.ip ?? "IP unavailable"}
                         </span>
                       </div>
@@ -3967,14 +3967,14 @@ function SecurityLogPanel({
                           setActiveActorFilter(e.actorUserId);
                           setPage(0);
                         }}
-                        className="text-white/20 hover:text-[#00E676] text-[10px] font-mono mt-1.5 transition-colors"
+                        className="text-gray-300 hover:text-emerald-600 text-[10px] font-mono mt-1.5 transition-colors"
                         title="Filter by this user"
                       >
                         {e.actorUserId}
                       </button>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-white/30 text-xs">
+                      <span className="text-gray-400 text-xs">
                         {formatDate(e.createdAt)}
                       </span>
                     </div>
@@ -3989,25 +3989,25 @@ function SecurityLogPanel({
       {/* Pagination */}
       {total > 0 && (
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <p className="text-white/30 text-xs">
+          <p className="text-gray-400 text-xs">
             Showing {rangeStart}–{rangeEnd} of {total} events
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0 || loading}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Prev
             </button>
-            <span className="text-white/40 text-xs">
+            <span className="text-gray-400 text-xs">
               Page {page + 1} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
               disabled={page + 1 >= totalPages || loading}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white/[0.05] border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Next
               <ChevronRight className="w-3.5 h-3.5" />
@@ -4203,16 +4203,16 @@ function DisplayRateCard({
   };
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-start gap-3 mb-4">
-        <div className="p-2 rounded-xl bg-[#00E676]/10">
-          <TrendingUp className="w-4 h-4 text-[#00E676]" />
+        <div className="p-2 rounded-xl bg-emerald-100">
+          <TrendingUp className="w-4 h-4 text-emerald-600" />
         </div>
         <div>
-          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-gray-900">
             Display Points Multiplier
           </h3>
-          <p className="text-white/40 text-sm">
+          <p className="text-gray-400 text-sm">
             How many on-screen points equal $1 in the app UI. Cosmetic only — never
             affects real cash owed. Takes effect on next app hydrate, no redeploy needed.
           </p>
@@ -4221,7 +4221,7 @@ function DisplayRateCard({
 
       <div className="space-y-3">
         <div>
-          <label className="block text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+          <label className="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
             Points per $1
           </label>
           <div className="flex gap-2">
@@ -4232,7 +4232,7 @@ function DisplayRateCard({
               step={100}
               value={value}
               onChange={(e) => { setValue(e.target.value); setErr(""); setSavedAt(null); }}
-              className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#00E676]/40 transition-colors"
+              className="flex-1 bg-white/[0.04] border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-emerald-300 transition-colors"
               placeholder="e.g. 10000"
             />
             <button
@@ -4242,7 +4242,7 @@ function DisplayRateCard({
               className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 dirty && !saving
                   ? "bg-[#00E676] text-black hover:bg-[#00E676]/90"
-                  : "bg-white/10 text-white/30 cursor-not-allowed"
+                  : "bg-white/10 text-gray-400 cursor-not-allowed"
               }`}
             >
               {saving ? "Saving…" : "Save"}
@@ -4259,12 +4259,12 @@ function DisplayRateCard({
           <p className="text-red-400 text-sm">{err}</p>
         )}
         {savedAt && !err && (
-          <p className="text-[#00E676] text-sm">
+          <p className="text-emerald-600 text-sm">
             ✓ Saved — new value is live on the next app refresh
           </p>
         )}
         <p className="text-white/25 text-xs">
-          Current active value: <span className="text-white/50 font-mono">{current.toLocaleString()} pts = $1</span>
+          Current active value: <span className="text-gray-500 font-mono">{current.toLocaleString()} pts = $1</span>
         </p>
       </div>
     </div>
@@ -4327,16 +4327,16 @@ function AdmobAlertEmailCard({
   };
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-start gap-3 mb-4">
-        <div className="p-2 rounded-xl bg-[#00E676]/10">
-          <Mail className="w-4 h-4 text-[#00E676]" />
+        <div className="p-2 rounded-xl bg-emerald-100">
+          <Mail className="w-4 h-4 text-emerald-600" />
         </div>
         <div>
-          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+          <h3 className="font-['Space_Grotesk'] text-lg font-bold text-gray-900">
             AdMob Alert Email
           </h3>
-          <p className="text-white/40 text-sm">
+          <p className="text-gray-400 text-sm">
             Where AdMob staleness / revenue-divergence alerts are emailed. Saved
             instantly — no redeploy needed.
           </p>
@@ -4345,12 +4345,12 @@ function AdmobAlertEmailCard({
 
       <div className="space-y-4">
         {/* On/off toggle */}
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white/[0.02] px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <Bell className="w-4 h-4 text-white/50" />
+            <Bell className="w-4 h-4 text-gray-500" />
             <div>
-              <p className="text-white text-sm font-medium">Email alerts</p>
-              <p className="text-white/40 text-xs">
+              <p className="text-gray-900 text-sm font-medium">Email alerts</p>
+              <p className="text-gray-400 text-xs">
                 {enabled ? "Alerts will be emailed" : "Email alerts are muted"}
               </p>
             </div>
@@ -4374,7 +4374,7 @@ function AdmobAlertEmailCard({
 
         {/* Recipient */}
         <div>
-          <label className="block text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+          <label className="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
             Recipient email
           </label>
           <input
@@ -4382,11 +4382,11 @@ function AdmobAlertEmailCard({
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             placeholder={settings.defaultRecipient}
-            className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#00E676]/40"
+            className="w-full bg-white/[0.04] border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm placeholder:text-white/25 focus:outline-none focus:border-emerald-300"
           />
-          <p className="text-white/30 text-xs mt-2">
+          <p className="text-gray-400 text-xs mt-2">
             Currently sending to{" "}
-            <span className="text-white/60">{settings.recipient}</span>
+            <span className="text-gray-500">{settings.recipient}</span>
             {settings.recipientSource === "default" && " (default)"}
             {settings.recipientSource === "env" && " (from environment)"}
             . Leave blank to use the default ({settings.defaultRecipient}).
@@ -4414,7 +4414,7 @@ function AdmobAlertEmailCard({
             {saving ? "Saving…" : "Save changes"}
           </button>
           {savedAt && !dirty && (
-            <span className="text-[#00E676] text-xs flex items-center gap-1">
+            <span className="text-emerald-600 text-xs flex items-center gap-1">
               <Check className="w-3 h-3" /> Saved
             </span>
           )}
@@ -4505,27 +4505,27 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
   }
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Bell className="w-4 h-4 text-white/40" />
-          <p className="text-white text-sm font-medium">Settlement Alert Snooze</p>
+          <Bell className="w-4 h-4 text-gray-400" />
+          <p className="text-gray-900 text-sm font-medium">Settlement Alert Snooze</p>
         </div>
         {loading ? (
-          <RefreshCw className="w-3.5 h-3.5 text-white/20 animate-spin" />
+          <RefreshCw className="w-3.5 h-3.5 text-gray-300 animate-spin" />
         ) : state?.snoozed ? (
           <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
             Snoozed
           </span>
         ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20">
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-600 border border-emerald-200">
             Active
           </span>
         )}
       </div>
 
       {!loading && state && (
-        <p className="text-white/40 text-xs leading-relaxed">
+        <p className="text-gray-400 text-xs leading-relaxed">
           {state.snoozed && state.snoozedUntil
             ? `Alert suppressed until ${formatUntil(state.snoozedUntil)}. The monitor will resume sending after this window.`
             : state.lastAlertedAt
@@ -4541,14 +4541,14 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
         </p>
       )}
       {success && (
-        <p className="text-[#00E676] text-xs flex items-center gap-1.5">
+        <p className="text-emerald-600 text-xs flex items-center gap-1.5">
           <Check className="w-3.5 h-3.5 flex-shrink-0" />
           {success}
         </p>
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-white/30 text-xs">Snooze for:</span>
+        <span className="text-gray-400 text-xs">Snooze for:</span>
         {SNOOZE_OPTIONS.map((opt) => {
           const isClear = opt.hours === null;
           return (
@@ -4558,7 +4558,7 @@ function SponsoredVisitHealthPanel({ token }: { token: string }) {
               onClick={() => applyAction(opt.hours)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${
                 isClear
-                  ? "bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white"
+                  ? "bg-white/[0.06] hover:bg-white/[0.10] text-gray-500 hover:text-gray-900"
                   : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20"
               }`}
             >
@@ -4678,20 +4678,20 @@ export function IntegrationHubPanel({
       <AdmobAlertEmailCard token={token} settings={alertEmail} onSaved={fetchHub} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <Activity className="w-5 h-5 text-[#00E676]" />
+          <div className="p-2.5 rounded-xl bg-emerald-100">
+            <Activity className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
               Integration Hub
             </h2>
-            <p className="text-white/40 text-sm">
+            <p className="text-gray-400 text-sm">
               Live health of every service, integration, and user session
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-white/30 text-xs">
+          <span className="text-gray-400 text-xs">
             {lastRefreshed
               ? `Last refreshed ${lastRefreshed.toLocaleTimeString("en-US", {
                   hour: "numeric",
@@ -4703,7 +4703,7 @@ export function IntegrationHubPanel({
           <button
             onClick={fetchHub}
             disabled={loading}
-            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
             title="Refresh now"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -4721,20 +4721,20 @@ export function IntegrationHubPanel({
       {/* Top status row: services + users online + last deploy */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Users online */}
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Wifi className="w-4 h-4 text-[#00E676]" />
-            <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+            <Wifi className="w-4 h-4 text-emerald-600" />
+            <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
               Users Online
             </span>
           </div>
           <div className="flex items-center gap-2.5">
             <StatusDot status={usersOnline && usersOnline > 0 ? "green" : "amber"} />
-            <span className="text-3xl font-bold text-white tabular-nums">
+            <span className="text-3xl font-bold text-gray-900 tabular-nums">
               {usersOnline == null ? "—" : usersOnline}
             </span>
           </div>
-          <p className="text-white/30 text-xs mt-2">
+          <p className="text-gray-400 text-xs mt-2">
             Active in the last {data?.onlineWindowMinutes ?? 5} minutes
           </p>
         </div>
@@ -4743,46 +4743,46 @@ export function IntegrationHubPanel({
         {(data?.services ?? []).map((svc) => (
           <div
             key={svc.id}
-            className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5"
+            className="bg-gray-50 border border-gray-200 rounded-2xl p-5"
           >
             <div className="flex items-center gap-2 mb-3">
               {svc.id === "website" ? (
-                <Globe className="w-4 h-4 text-white/50" />
+                <Globe className="w-4 h-4 text-gray-500" />
               ) : (
-                <Server className="w-4 h-4 text-white/50" />
+                <Server className="w-4 h-4 text-gray-500" />
               )}
-              <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
                 {svc.name}
               </span>
             </div>
             <div className="flex items-center gap-2.5">
               <StatusDot status={svc.up ? "green" : "red"} />
               <span
-                className={`text-lg font-bold ${svc.up ? "text-[#00E676]" : "text-red-400"}`}
+                className={`text-lg font-bold ${svc.up ? "text-emerald-600" : "text-red-400"}`}
               >
                 {svc.up ? "Operational" : "Down"}
               </span>
             </div>
-            <p className="text-white/30 text-xs mt-2 truncate">
+            <p className="text-gray-400 text-xs mt-2 truncate">
               {svc.detail ?? (svc.up ? "Reachable" : "Unreachable")}
             </p>
           </div>
         ))}
 
         {/* Last deployed */}
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Rocket className="w-4 h-4 text-white/50" />
-            <span className="text-white/40 text-xs font-semibold uppercase tracking-wider">
+            <Rocket className="w-4 h-4 text-gray-500" />
+            <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
               Last Deployed
             </span>
           </div>
-          <div className="text-lg font-bold text-white">
+          <div className="text-lg font-bold text-gray-900">
             {data?.version.lastDeployedAt
               ? hubTimeAgo(data.version.lastDeployedAt)
               : "Unknown"}
           </div>
-          <p className="text-white/30 text-xs mt-2">
+          <p className="text-gray-400 text-xs mt-2">
             App v{data?.version.current ?? "—"}
             {data?.version.lastDeployedAt && (
               <>
@@ -4846,12 +4846,12 @@ export function IntegrationHubPanel({
               : "";
         const textColor =
           dotStatus === "green"
-            ? "text-[#00E676]"
+            ? "text-emerald-600"
             : dotStatus === "amber"
               ? "text-amber-400"
-              : "text-white/40";
+              : "text-gray-400";
         return (
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-2.5 w-2.5 flex-shrink-0 mt-1">
@@ -4861,32 +4861,32 @@ export function IntegrationHubPanel({
                   <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
                 </span>
                 <div>
-                  <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
                     Ad Adapter Status
                   </p>
                   <p className={`text-base font-bold ${textColor}`}>{label}</p>
                   {detail && (
-                    <p className="text-white/30 text-xs mt-1 leading-relaxed max-w-xl">
+                    <p className="text-gray-400 text-xs mt-1 leading-relaxed max-w-xl">
                       {detail}
                     </p>
                   )}
                 </div>
               </div>
               <div className="flex-shrink-0 text-right">
-                <p className="text-white/20 text-[10px]">LevelPlay</p>
-                <p className={`text-sm font-semibold ${adStatus?.lpNative ? "text-[#00E676]" : "text-white/20"}`}>
+                <p className="text-gray-300 text-[10px]">LevelPlay</p>
+                <p className={`text-sm font-semibold ${adStatus?.lpNative ? "text-emerald-600" : "text-gray-300"}`}>
                   {adStatus === null ? "—" : adStatus.lpNative ? "Present" : "Absent"}
                 </p>
-                <p className="text-white/20 text-[10px] mt-1.5">Unity Ads</p>
-                <p className={`text-sm font-semibold ${adStatus?.unityNative ? "text-[#00E676]" : "text-white/20"}`}>
+                <p className="text-gray-300 text-[10px] mt-1.5">Unity Ads</p>
+                <p className={`text-sm font-semibold ${adStatus?.unityNative ? "text-emerald-600" : "text-gray-300"}`}>
                   {adStatus === null ? "—" : adStatus.unityNative ? "Present" : "Absent"}
                 </p>
-                <p className="text-white/20 text-[10px] mt-1.5">Rewarded Fill</p>
+                <p className="text-gray-300 text-[10px] mt-1.5">Rewarded Fill</p>
                 <p className={`text-sm font-semibold ${
                   adStatus === null || adStatus.rewardedFillAvailable === null
-                    ? "text-white/20"
+                    ? "text-gray-300"
                     : adStatus.rewardedFillAvailable
-                      ? "text-[#00E676]"
+                      ? "text-emerald-600"
                       : "text-amber-400"
                 }`}>
                   {adStatus === null
@@ -4902,7 +4902,7 @@ export function IntegrationHubPanel({
                   const stale = diffMs > 2 * 60 * 60 * 1000;
                   const label = hubTimeAgo(new Date(adStatus.fillReportedAt).toISOString());
                   return (
-                    <p className={`text-[10px] mt-0.5 ${stale ? "text-amber-400" : "text-white/20"}`}>
+                    <p className={`text-[10px] mt-0.5 ${stale ? "text-amber-400" : "text-gray-300"}`}>
                       reported {label}
                     </p>
                   );
@@ -4910,11 +4910,11 @@ export function IntegrationHubPanel({
               </div>
             </div>
             {dotStatus !== "green" && adStatus !== null && (
-              <p className="text-white/20 text-[10px] mt-3 border-t border-white/[0.05] pt-3">
+              <p className="text-gray-300 text-[10px] mt-3 border-t border-white/[0.05] pt-3">
                 To mark a native build as live: set{" "}
-                <span className="font-mono text-white/30">AD_LP_NATIVE=true</span>
+                <span className="font-mono text-gray-400">AD_LP_NATIVE=true</span>
                 {" and "}
-                <span className="font-mono text-white/30">AD_UNITY_NATIVE=true</span>
+                <span className="font-mono text-gray-400">AD_UNITY_NATIVE=true</span>
                 {" in production secrets, then re-publish the API."}
               </p>
             )}
@@ -4923,19 +4923,19 @@ export function IntegrationHubPanel({
       })()}
 
       {/* Integrations grid */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+            <h3 className="font-['Space_Grotesk'] text-lg font-bold text-gray-900">
               Integrations
             </h3>
             {data && (
-              <span className="text-white/30 text-sm">
+              <span className="text-gray-400 text-sm">
                 {data.integrations.green}/{data.integrations.total} healthy
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-white/40">
+          <div className="flex items-center gap-3 text-[10px] text-gray-400">
             <span className="flex items-center gap-1.5">
               <StatusDot status="green" /> Connected
             </span>
@@ -4949,33 +4949,33 @@ export function IntegrationHubPanel({
         </div>
 
         {loading && !data ? (
-          <div className="text-center py-12 text-white/30 text-sm">
+          <div className="text-center py-12 text-gray-400 text-sm">
             Loading integration status…
           </div>
         ) : !data || data.integrations.items.length === 0 ? (
-          <div className="text-center py-12 text-white/30 text-sm">
+          <div className="text-center py-12 text-gray-400 text-sm">
             No integrations to display.
           </div>
         ) : (
           <div className="space-y-6">
             {Object.entries(grouped).map(([category, items]) => (
               <div key={category}>
-                <p className="text-white/30 text-xs font-semibold uppercase tracking-wider mb-2.5">
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2.5">
                   {HUB_CATEGORY_LABELS[category] ?? category}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {items.map((it) => (
                     <div
                       key={it.id}
-                      className="flex items-center justify-between gap-3 bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3"
+                      className="flex items-center justify-between gap-3 bg-white/[0.02] border border-gray-200 rounded-xl px-4 py-3"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <StatusDot status={it.status} />
                         <div className="min-w-0">
-                          <p className="text-white text-sm font-medium truncate">
+                          <p className="text-gray-900 text-sm font-medium truncate">
                             {it.name}
                           </p>
-                          <p className="text-white/30 text-[11px]">
+                          <p className="text-gray-400 text-[11px]">
                             {it.configured
                               ? it.status === "amber"
                                 ? "Configured · provider unreachable"
@@ -4989,7 +4989,7 @@ export function IntegrationHubPanel({
                           )}
                         </div>
                       </div>
-                      <span className="text-white/20 text-[10px] flex-shrink-0">
+                      <span className="text-gray-300 text-[10px] flex-shrink-0">
                         {hubTimeAgo(it.lastCheckedAt)}
                       </span>
                     </div>
@@ -5003,13 +5003,13 @@ export function IntegrationHubPanel({
 
       {/* AdMob reporting alerts */}
       {admobCurrent.length > 0 && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+              <h3 className="font-['Space_Grotesk'] text-lg font-bold text-gray-900">
                 AdMob Reporting Alerts
               </h3>
-              <span className="text-white/30 text-sm">
+              <span className="text-gray-400 text-sm">
                 {admobFiring.length > 0
                   ? `${admobFiring.length} active`
                   : "All clear"}
@@ -5034,32 +5034,32 @@ export function IntegrationHubPanel({
                     {firing ? (
                       <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                     ) : (
-                      <Check className="w-4 h-4 text-[#00E676] flex-shrink-0 mt-0.5" />
+                      <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white text-sm font-medium">
+                        <p className="text-gray-900 text-sm font-medium">
                           {ADMOB_ALERT_LABELS[alert.condition]}
                         </p>
                         <span
                           className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                             firing
                               ? "bg-red-500/15 text-red-400"
-                              : "bg-[#00E676]/15 text-[#00E676]"
+                              : "bg-[#00E676]/15 text-emerald-600"
                           }`}
                         >
                           {firing ? "Firing" : "Resolved"}
                         </span>
                       </div>
-                      <p className="text-white/50 text-xs mt-1">
+                      <p className="text-gray-500 text-xs mt-1">
                         {admobAlertDetail(alert)}
                       </p>
-                      <p className="text-white/30 text-[11px] mt-1">
+                      <p className="text-gray-400 text-[11px] mt-1">
                         {alert.message}
                       </p>
                     </div>
                   </div>
-                  <span className="text-white/20 text-[10px] flex-shrink-0 flex items-center gap-1">
+                  <span className="text-gray-300 text-[10px] flex-shrink-0 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {hubTimeAgo(alert.firedAt)}
                   </span>
@@ -5072,7 +5072,7 @@ export function IntegrationHubPanel({
 
       <SponsoredVisitHealthPanel token={token} />
 
-      <p className="text-white/20 text-xs text-center">
+      <p className="text-gray-300 text-xs text-center">
         Auto-refreshes every {HUB_REFRESH_MS / 1000}s ·{" "}
         {allServicesUp ? "All core services operational" : "Service issue detected"}
       </p>
@@ -5111,11 +5111,11 @@ interface AdminCampaign {
 }
 
 const CAMPAIGN_STATUS_STYLES: Record<string, string> = {
-  active: "bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20",
+  active: "bg-emerald-100 text-emerald-600 border-emerald-200",
   pending: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   paused: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   rejected: "bg-red-500/10 text-red-400 border-red-500/20",
-  ended: "bg-white/[0.06] text-white/40 border-white/10",
+  ended: "bg-white/[0.06] text-gray-400 border-gray-200",
 };
 
 export function PublisherProgramPanel({ token }: { token: string }) {
@@ -5396,7 +5396,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#06060E]" : "bg-red-500 text-white"}`}
+          className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all ${toast.ok ? "bg-[#00E676] text-[#f9fafb]" : "bg-red-500 text-gray-900"}`}
         >
           {toast.ok ? (
             <Check className="w-4 h-4" />
@@ -5410,11 +5410,11 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       {/* Grant publisher access modal */}
       {grantOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-emerald-200 rounded-2xl p-6 max-w-md w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Grant Publisher Access
             </h3>
-            <p className="text-white/50 text-sm mb-4">
+            <p className="text-gray-500 text-sm mb-4">
               Find a CashClip user and grant them publisher status so they can
               create and run ad campaigns.
             </p>
@@ -5430,18 +5430,18 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                 value={grantSearchInput}
                 onChange={(e) => setGrantSearchInput(e.target.value)}
                 placeholder="Search by username or email"
-                className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                className="flex-1 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
               />
               <button
                 type="submit"
                 disabled={grantSearchLoading}
-                className="px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white/70 text-sm font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium hover:bg-white/[0.1] transition-colors disabled:opacity-50"
               >
                 <Search className="w-4 h-4" />
               </button>
             </form>
             <div className="mb-3">
-              <label className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+              <label className="text-gray-400 text-[10px] uppercase tracking-wider font-semibold">
                 Gift ad credits (optional)
               </label>
               <input
@@ -5451,16 +5451,16 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                 value={grantGiftCredits}
                 onChange={(e) => setGrantGiftCredits(e.target.value)}
                 placeholder="Defaults to $5.00 starter credits"
-                className="w-full mt-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors"
+                className="w-full mt-1 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
               />
             </div>
             <div className="max-h-64 overflow-y-auto space-y-2">
               {grantSearchLoading ? (
-                <p className="text-white/30 text-sm text-center py-6">
+                <p className="text-gray-400 text-sm text-center py-6">
                   Searching…
                 </p>
               ) : grantSearched && grantResults.length === 0 ? (
-                <p className="text-white/30 text-sm text-center py-6">
+                <p className="text-gray-400 text-sm text-center py-6">
                   No users found.
                 </p>
               ) : (
@@ -5469,25 +5469,25 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                   return (
                     <div
                       key={u.id}
-                      className="flex items-center justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5"
+                      className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5"
                     >
                       <div className="min-w-0">
-                        <div className="text-white text-sm font-medium truncate">
+                        <div className="text-gray-900 text-sm font-medium truncate">
                           {u.username}
                         </div>
-                        <div className="text-white/30 text-xs truncate">
+                        <div className="text-gray-400 text-xs truncate">
                           {u.email ?? "—"}
                         </div>
                       </div>
                       {already ? (
-                        <span className="text-white/30 text-xs whitespace-nowrap">
+                        <span className="text-gray-400 text-xs whitespace-nowrap">
                           Already a publisher
                         </span>
                       ) : (
                         <button
                           onClick={() => handleGrant(u)}
                           disabled={actionLoading === `grant-${u.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
                           <UserPlus className="w-3.5 h-3.5" />
                           {actionLoading === `grant-${u.id}`
@@ -5502,7 +5502,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
             </div>
             <button
               onClick={closeGrant}
-              className="w-full mt-4 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+              className="w-full mt-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
             >
               Close
             </button>
@@ -5513,22 +5513,22 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       {/* Add ad credits modal */}
       {creditTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-[#00E676]/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-emerald-200 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Add Ad Credits
             </h3>
-            <p className="text-white/50 text-sm mb-1">
+            <p className="text-gray-500 text-sm mb-1">
               Top up the ad-credit balance for{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 {creditTarget.username}
               </span>
               . Current balance{" "}
-              <span className="text-[#00E676] font-semibold">
+              <span className="text-emerald-600 font-semibold">
                 {money(creditTarget.adCredits)}
               </span>
               .
             </p>
-            <p className="text-white/30 text-xs mb-4">
+            <p className="text-gray-400 text-xs mb-4">
               Credits fund their campaigns. Max $500 per top-up.
             </p>
             <input
@@ -5539,7 +5539,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
               value={creditAmount}
               onChange={(e) => setCreditAmount(e.target.value)}
               placeholder="Amount in USD"
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-[#00E676]/40 transition-colors mb-2"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors mb-2"
             />
             {creditError && (
               <p className="text-red-400 text-xs mb-2">{creditError}</p>
@@ -5551,14 +5551,14 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                   setCreditAmount("");
                   setCreditError("");
                 }}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddCredits}
                 disabled={actionLoading === `credit-${creditTarget.id}`}
-                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#06060E] font-bold text-sm hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-[#00E676] text-[#f9fafb] font-bold text-sm hover:bg-[#00E676]/90 transition-colors disabled:opacity-50"
               >
                 {actionLoading === `credit-${creditTarget.id}`
                   ? "Adding…"
@@ -5572,32 +5572,32 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       {/* Revoke publisher confirm modal */}
       {revokeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="bg-[#111118] border border-white/10 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+          <div className="bg-[#111118] border border-gray-200 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Revoke Publisher Access?
             </h3>
-            <p className="text-white/50 text-sm mb-1">
+            <p className="text-gray-500 text-sm mb-1">
               This removes publisher status from{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 {revokeTarget.username}
               </span>
               . They will no longer be able to create or run campaigns.
             </p>
-            <p className="text-white/30 text-xs mb-6">
+            <p className="text-gray-400 text-xs mb-6">
               Their existing ad credits stay on the account and you can grant
               access again later.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setRevokeTarget(null)}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRevoke}
                 disabled={actionLoading === `revoke-${revokeTarget.id}`}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-gray-900 font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 {actionLoading === `revoke-${revokeTarget.id}`
                   ? "Revoking…"
@@ -5612,12 +5612,12 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       {rejectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
           <div className="bg-[#111118] border border-red-500/20 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="font-['Space_Grotesk'] font-bold text-white text-lg mb-2">
+            <h3 className="font-['Space_Grotesk'] font-bold text-gray-900 text-lg mb-2">
               Reject Campaign?
             </h3>
-            <p className="text-white/50 text-sm mb-3">
+            <p className="text-gray-500 text-sm mb-3">
               Reject{" "}
-              <span className="text-white font-semibold">
+              <span className="text-gray-900 font-semibold">
                 {rejectTarget.title}
               </span>
               . You can add an optional note explaining why — the publisher sees
@@ -5628,7 +5628,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
               onChange={(e) => setRejectNote(e.target.value)}
               placeholder="Reason (optional)"
               rows={3}
-              className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/25 focus:outline-none focus:border-red-500/40 transition-colors mb-2 resize-none"
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-sm placeholder-white/25 focus:outline-none focus:border-red-500/40 transition-colors mb-2 resize-none"
             />
             <div className="flex gap-3 mt-3">
               <button
@@ -5636,13 +5636,13 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                   setRejectTarget(null);
                   setRejectNote("");
                 }}
-                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmReject}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-gray-900 font-bold text-sm hover:bg-red-600 transition-colors"
               >
                 Reject
               </button>
@@ -5653,14 +5653,14 @@ export function PublisherProgramPanel({ token }: { token: string }) {
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <Megaphone className="w-5 h-5 text-[#00E676]" />
+          <div className="p-2.5 rounded-xl bg-emerald-100">
+            <Megaphone className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
               Publisher Program
             </h2>
-            <p className="text-white/40 text-sm">
+            <p className="text-gray-400 text-sm">
               Publishers, their ad credits, and campaign performance
             </p>
           </div>
@@ -5668,13 +5668,13 @@ export function PublisherProgramPanel({ token }: { token: string }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setGrantOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#00E676]/10 border border-[#00E676]/20 rounded-xl text-[#00E676] text-sm font-medium hover:bg-[#00E676]/20 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-600 text-sm font-medium hover:bg-emerald-100 transition-colors"
           >
             <UserPlus className="w-4 h-4" /> Grant Publisher
           </button>
           <button
             onClick={fetchData}
-            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -5686,7 +5686,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
           icon={Users}
           label="Publishers"
           value={publishers.length}
-          color="bg-[#00E676]/10 text-[#00E676]"
+          color="bg-emerald-100 text-emerald-600"
         />
         <StatCard
           icon={Megaphone}
@@ -5714,23 +5714,23 @@ export function PublisherProgramPanel({ token }: { token: string }) {
         </div>
       )}
 
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="text-center py-16 text-white/30">
+          <div className="text-center py-16 text-gray-400">
             Loading publishers...
           </div>
         ) : publishers.length === 0 ? (
           <div className="text-center py-16">
-            <Megaphone className="w-10 h-10 text-white/10 mx-auto mb-3" />
-            <p className="text-white/30 text-sm">No publishers yet</p>
-            <p className="text-white/20 text-xs mt-1">
+            <Megaphone className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No publishers yet</p>
+            <p className="text-gray-300 text-xs mt-1">
               Users granted publisher access will appear here
             </p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-white/30 text-[10px] uppercase tracking-wider border-b border-white/[0.06]">
+              <tr className="text-gray-400 text-[10px] uppercase tracking-wider border-b border-gray-200">
                 <th className="text-left font-medium px-5 py-3">Publisher</th>
                 <th className="text-right font-medium px-3 py-3">Ad Credits</th>
                 <th className="text-right font-medium px-3 py-3">Campaigns</th>
@@ -5754,34 +5754,34 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <ChevronRight
-                            className={`w-3.5 h-3.5 text-white/30 transition-transform ${open ? "rotate-90" : ""}`}
+                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`}
                           />
                           <div>
-                            <div className="text-white font-medium">
+                            <div className="text-gray-900 font-medium">
                               {p.username}
                             </div>
-                            <div className="text-white/30 text-xs">
+                            <div className="text-gray-400 text-xs">
                               {p.email ?? "—"}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-right font-bold text-[#00E676]">
+                      <td className="px-3 py-3 text-right font-bold text-emerald-600">
                         {money(p.adCredits)}
                       </td>
-                      <td className="px-3 py-3 text-right text-white/70">
+                      <td className="px-3 py-3 text-right text-gray-600">
                         {Number(p.campaignCount ?? 0)}
                       </td>
-                      <td className="px-3 py-3 text-right text-white/70">
+                      <td className="px-3 py-3 text-right text-gray-600">
                         {money(p.totalBudget)}
                       </td>
-                      <td className="px-3 py-3 text-right text-white/70">
+                      <td className="px-3 py-3 text-right text-gray-600">
                         {money(p.totalSpent)}
                       </td>
-                      <td className="px-3 py-3 text-right text-white/70">
+                      <td className="px-3 py-3 text-right text-gray-600">
                         {Number(p.totalClicks ?? 0)}
                       </td>
-                      <td className="px-3 py-3 text-right text-white/40 text-xs">
+                      <td className="px-3 py-3 text-right text-gray-400 text-xs">
                         {p.publisherGrantedAt
                           ? fmtDate(p.publisherGrantedAt)
                           : "—"}
@@ -5795,7 +5795,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                               setCreditAmount("");
                               setCreditError("");
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors whitespace-nowrap"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors whitespace-nowrap"
                           >
                             <Gift className="w-3.5 h-3.5" /> Credits
                           </button>
@@ -5815,22 +5815,22 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                       <tr className="bg-white/[0.015]">
                         <td colSpan={8} className="px-5 py-4">
                           {userCampaigns.length === 0 ? (
-                            <p className="text-white/30 text-xs py-2">
+                            <p className="text-gray-400 text-xs py-2">
                               No campaigns created yet.
                             </p>
                           ) : (
                             <div className="space-y-2">
-                              <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+                              <p className="text-gray-400 text-[10px] uppercase tracking-wider font-semibold">
                                 Campaigns ({userCampaigns.length})
                               </p>
                               {userCampaigns.map((c) => (
                                 <div
                                   key={c.id}
-                                  className="flex items-center justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5"
+                                  className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5"
                                 >
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-white text-sm font-medium truncate">
+                                      <span className="text-gray-900 text-sm font-medium truncate">
                                         {c.title}
                                       </span>
                                       <span
@@ -5844,7 +5844,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                                       target="_blank"
                                       rel="noreferrer"
                                       onClick={(e) => e.stopPropagation()}
-                                      className="text-[#00E676]/70 hover:text-[#00E676] text-xs flex items-center gap-1 mt-0.5 truncate"
+                                      className="text-emerald-600/70 hover:text-emerald-600 text-xs flex items-center gap-1 mt-0.5 truncate"
                                     >
                                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                       <span className="truncate">{c.targetUrl}</span>
@@ -5852,19 +5852,19 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                                   </div>
                                   <div className="flex items-center gap-5 flex-shrink-0 text-right">
                                     <div>
-                                      <div className="text-white/30 text-[9px] uppercase">Budget</div>
-                                      <div className="text-white/70 text-xs">{money(c.totalBudget)}</div>
+                                      <div className="text-gray-400 text-[9px] uppercase">Budget</div>
+                                      <div className="text-gray-600 text-xs">{money(c.totalBudget)}</div>
                                     </div>
                                     <div>
-                                      <div className="text-white/30 text-[9px] uppercase">Spent</div>
-                                      <div className="text-white/70 text-xs">{money(c.spent)}</div>
+                                      <div className="text-gray-400 text-[9px] uppercase">Spent</div>
+                                      <div className="text-gray-600 text-xs">{money(c.spent)}</div>
                                     </div>
                                     <div>
-                                      <div className="text-white/30 text-[9px] uppercase">Clicks</div>
-                                      <div className="text-white/70 text-xs">{Number(c.clicks ?? 0)}</div>
+                                      <div className="text-gray-400 text-[9px] uppercase">Clicks</div>
+                                      <div className="text-gray-600 text-xs">{Number(c.clicks ?? 0)}</div>
                                     </div>
                                     <div
-                                      className="flex items-center gap-1.5 border-l border-white/10 pl-4"
+                                      className="flex items-center gap-1.5 border-l border-gray-200 pl-4"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       {c.status !== "active" && (
@@ -5874,7 +5874,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                                           }
                                           disabled={actionLoading === `camp-${c.id}`}
                                           title="Approve / activate"
-                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676] text-xs font-medium hover:bg-[#00E676]/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                                         >
                                           <Play className="w-3.5 h-3.5" /> Approve
                                         </button>
@@ -5922,19 +5922,19 @@ export function PublisherProgramPanel({ token }: { token: string }) {
       </div>
 
       {/* Publisher program audit log */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
-        <div className="border-b border-white/[0.06]">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
+        <div className="border-b border-gray-200">
           <button
             onClick={() => setShowAudit((s) => !s)}
             className="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition-colors"
           >
             <div>
-              <h3 className="text-white text-sm font-semibold">Publisher Audit Log</h3>
-              <p className="text-white/30 text-xs mt-0.5">
+              <h3 className="text-gray-900 text-sm font-semibold">Publisher Audit Log</h3>
+              <p className="text-gray-400 text-xs mt-0.5">
                 Every grant, revoke, ad-credit addition, and campaign status change — who did it and when.
               </p>
             </div>
-            <span className="text-white/30 text-xs whitespace-nowrap">
+            <span className="text-gray-400 text-xs whitespace-nowrap">
               {showAudit ? "Hide" : "Show"} ({auditTotal > 0 ? auditTotal : auditRows.length})
             </span>
           </button>
@@ -5942,13 +5942,13 @@ export function PublisherProgramPanel({ token }: { token: string }) {
         {showAudit && (
           <div className="max-h-80 overflow-y-auto">
             {auditLoading ? (
-              <div className="px-5 py-6 text-white/30 text-sm">Loading audit log…</div>
+              <div className="px-5 py-6 text-gray-400 text-sm">Loading audit log…</div>
             ) : auditRows.length === 0 ? (
-              <div className="px-5 py-6 text-white/30 text-sm">No publisher actions recorded yet.</div>
+              <div className="px-5 py-6 text-gray-400 text-sm">No publisher actions recorded yet.</div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-white/30 text-[10px] uppercase tracking-wider border-b border-white/[0.06]">
+                  <tr className="text-gray-400 text-[10px] uppercase tracking-wider border-b border-gray-200">
                     <th className="text-left font-medium px-5 py-2">Action</th>
                     <th className="text-left font-medium px-3 py-2">Target</th>
                     <th className="text-left font-medium px-3 py-2">Detail</th>
@@ -5965,7 +5965,7 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                       : r.action === "campaign_status" ? "Campaign status"
                       : r.action;
                     const actionColor =
-                      r.action === "grant_publisher" ? "text-[#00E676]"
+                      r.action === "grant_publisher" ? "text-emerald-600"
                       : r.action === "revoke_publisher" ? "text-red-400"
                       : r.action === "add_credits" ? "text-amber-400"
                       : "text-blue-400";
@@ -5986,16 +5986,16 @@ export function PublisherProgramPanel({ token }: { token: string }) {
                         <td className="px-5 py-2.5">
                           <span className={`text-xs font-semibold ${actionColor}`}>{actionLabel}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-white/60 text-xs break-all max-w-[140px]">
+                        <td className="px-3 py-2.5 text-gray-500 text-xs break-all max-w-[140px]">
                           {target}
                         </td>
-                        <td className="px-3 py-2.5 text-white/50 text-xs max-w-[180px] break-words">
+                        <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[180px] break-words">
                           {detailText}
                         </td>
-                        <td className="px-3 py-2.5 text-white/50 text-xs break-all">
+                        <td className="px-3 py-2.5 text-gray-500 text-xs break-all">
                           {r.actorUsername ?? r.actorUserId ?? "—"}
                         </td>
-                        <td className="px-5 py-2.5 text-right text-white/30 text-[10px] whitespace-nowrap">
+                        <td className="px-5 py-2.5 text-right text-gray-400 text-[10px] whitespace-nowrap">
                           {new Date(r.createdAt).toLocaleString()}
                         </td>
                       </tr>
@@ -6108,18 +6108,18 @@ function LevelPlayReconciliationWidget({ token }: { token: string }) {
     (data?.discrepancyPct === null || (data?.discrepancyPct ?? 0) <= 10);
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-white/60 text-sm font-semibold">
+        <p className="text-gray-500 text-sm font-semibold">
           LevelPlay vs DB reconciliation · last 7d
         </p>
         {!loading && data && (
           <span
             className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
               data.lpRevenue === null
-                ? "bg-white/[0.08] text-white/40"
+                ? "bg-gray-100 text-gray-400"
                 : inSync
-                  ? "bg-[#00E676]/15 text-[#00E676]"
+                  ? "bg-[#00E676]/15 text-emerald-600"
                   : "bg-red-500/15 text-red-400"
             }`}
           >
@@ -6133,7 +6133,7 @@ function LevelPlayReconciliationWidget({ token }: { token: string }) {
       </div>
 
       {loading && (
-        <p className="text-white/30 text-sm">Loading…</p>
+        <p className="text-gray-400 text-sm">Loading…</p>
       )}
 
       {!loading && error && (
@@ -6143,25 +6143,25 @@ function LevelPlayReconciliationWidget({ token }: { token: string }) {
       {!loading && data && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 DB revenue (ad_events)
               </p>
-              <p className="text-2xl font-bold text-white tabular-nums">
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">
                 {fmtMoney(data.dbRevenue)}
               </p>
-              <p className="text-white/30 text-xs mt-1">
+              <p className="text-gray-400 text-xs mt-1">
                 {data.dbImpressionCount} rows with revenue_micros
               </p>
             </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 LevelPlay reported
               </p>
-              <p className="text-2xl font-bold text-white tabular-nums">
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">
                 {data.lpRevenue !== null ? fmtMoney(data.lpRevenue) : "—"}
               </p>
-              <p className="text-white/30 text-xs mt-1">
+              <p className="text-gray-400 text-xs mt-1">
                 {data.lpConfigured
                   ? data.lpRevenue !== null
                     ? "from LevelPlay stats API"
@@ -6169,18 +6169,18 @@ function LevelPlayReconciliationWidget({ token }: { token: string }) {
                   : "set IRONSOURCE_SECRET_KEY to enable"}
               </p>
             </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Discrepancy
               </p>
               <p
                 className={`text-2xl font-bold tabular-nums ${
-                  data.alert ? "text-red-400" : "text-white"
+                  data.alert ? "text-red-400" : "text-gray-900"
                 }`}
               >
                 {data.discrepancyPct !== null ? fmtPct(data.discrepancyPct) : "—"}
               </p>
-              <p className="text-white/30 text-xs mt-1">
+              <p className="text-gray-400 text-xs mt-1">
                 {data.alert
                   ? "⚠ exceeds 10% — investigate"
                   : data.discrepancyPct !== null
@@ -6202,7 +6202,7 @@ function LevelPlayReconciliationWidget({ token }: { token: string }) {
             </div>
           )}
 
-          <p className="text-white/30 text-xs mt-3">
+          <p className="text-gray-400 text-xs mt-3">
             DB revenue = SUM(ad_events.revenue_micros) ÷ 1,000,000 from ARM impression-level postbacks.
             LevelPlay reported = publisher stats from the IronSource Reporting API for the same window.
             A gap under 10% is normal (reporting latency and finalization).
@@ -6223,12 +6223,12 @@ function RevenueStat({
   hint?: string;
 }) {
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-      <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+      <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
         {label}
       </p>
-      <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
-      {hint && <p className="text-white/30 text-xs mt-1">{hint}</p>}
+      <p className="text-2xl font-bold text-gray-900 tabular-nums">{value}</p>
+      {hint && <p className="text-gray-400 text-xs mt-1">{hint}</p>}
     </div>
   );
 }
@@ -6364,29 +6364,29 @@ function RevenuePanel({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-            <DollarSign className="w-5 h-5 text-[#00E676]" />
+          <div className="p-2.5 rounded-xl bg-emerald-100">
+            <DollarSign className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
               AdMob Revenue
             </h2>
-            <p className="text-white/40 text-sm">
+            <p className="text-gray-400 text-sm">
               Official AdMob earnings, synced and reconciled against the app's
               reported revenue
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-white/[0.05] border border-white/10 rounded-xl overflow-hidden">
+          <div className="flex bg-gray-100 border border-gray-200 rounded-xl overflow-hidden">
             {[7, 30, 90].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
                 className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
                   days === d
-                    ? "bg-[#00E676]/20 text-[#00E676]"
-                    : "text-white/50 hover:text-white"
+                    ? "bg-emerald-100 text-emerald-600"
+                    : "text-gray-500 hover:text-gray-900"
                 }`}
               >
                 {d}d
@@ -6396,7 +6396,7 @@ function RevenuePanel({
           <button
             onClick={fetchRevenue}
             disabled={loading}
-            className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+            className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
             title="Refresh now"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -6409,7 +6409,7 @@ function RevenuePanel({
           className={`flex items-center gap-2 text-xs rounded-xl px-4 py-2.5 border ${
             isStale
               ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
-              : "bg-white/[0.03] border-white/[0.06] text-white/50"
+              : "bg-gray-50 border-gray-200 text-gray-500"
           }`}
         >
           {isStale ? (
@@ -6429,7 +6429,7 @@ function RevenuePanel({
 
       {periods && (
         <div>
-          <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
+          <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
             Earnings · matches the CashClip phone admin
           </p>
           <div className="grid grid-cols-3 gap-4">
@@ -6459,7 +6459,7 @@ function RevenuePanel({
       )}
 
       {loading && !data && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-10 text-center text-white/40 text-sm">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
           Loading live AdMob data…
         </div>
       )}
@@ -6486,12 +6486,12 @@ function RevenuePanel({
       )}
 
       {!loading && data && configured && !showData && (data.noData || data.ok) && !data.error && (
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.04] mb-3">
-            <RefreshCw className="w-5 h-5 text-white/40" />
+            <RefreshCw className="w-5 h-5 text-gray-400" />
           </div>
-          <p className="text-white/70 text-sm font-semibold mb-1">No AdMob data synced yet</p>
-          <p className="text-white/40 text-xs max-w-sm mx-auto">
+          <p className="text-gray-600 text-sm font-semibold mb-1">No AdMob data synced yet</p>
+          <p className="text-gray-400 text-xs max-w-sm mx-auto">
             We haven't pulled any figures from AdMob for this period yet. Once the
             AdMob connection syncs, today / 7-day / 30-day earnings and the
             per-format breakdown will appear here. Nothing is assumed to be $0.
@@ -6527,8 +6527,8 @@ function RevenuePanel({
           </div>
 
           {byFormat.length > 0 && (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/60 text-sm font-semibold mb-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-500 text-sm font-semibold mb-4">
                 Earnings by ad format
               </p>
               <div className="space-y-3">
@@ -6540,21 +6540,21 @@ function RevenuePanel({
                   return (
                     <div key={f.adFormat}>
                       <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-white/80 font-medium">
+                        <span className="text-gray-700 font-medium">
                           {prettyFormat(f.adFormat)}
                         </span>
-                        <span className="text-white tabular-nums">
+                        <span className="text-gray-900 tabular-nums">
                           {fmtMoney(f.earnings)}{" "}
-                          <span className="text-white/30 text-xs">({pct}%)</span>
+                          <span className="text-gray-400 text-xs">({pct}%)</span>
                         </span>
                       </div>
-                      <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden">
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                         <div
                           className="h-full bg-[#00E676]/70 rounded-full"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <div className="flex gap-4 text-white/30 text-xs mt-1">
+                      <div className="flex gap-4 text-gray-400 text-xs mt-1">
                         <span>{fmtNum(f.impressions)} impressions</span>
                         <span>eCPM {fmtMoney(f.ecpm)}</span>
                       </div>
@@ -6566,15 +6566,15 @@ function RevenuePanel({
           )}
 
           {recon && (
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-white/60 text-sm font-semibold">
+                <p className="text-gray-500 text-sm font-semibold">
                   Reconciliation · official vs app-reported
                 </p>
                 <span
                   className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                     reconInSync
-                      ? "bg-[#00E676]/15 text-[#00E676]"
+                      ? "bg-[#00E676]/15 text-emerald-600"
                       : "bg-amber-500/15 text-amber-300"
                   }`}
                 >
@@ -6601,7 +6601,7 @@ function RevenuePanel({
                   }`}
                 />
               </div>
-              <p className="text-white/30 text-xs mt-3">
+              <p className="text-gray-400 text-xs mt-3">
                 Official AdMob estimated earnings compared with the revenue the app
                 reports per impression for the same period. Small gaps are normal
                 (AdMob figures are estimates and finalize later).
@@ -6609,8 +6609,8 @@ function RevenuePanel({
             </div>
           )}
 
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <p className="text-white/60 text-sm font-semibold mb-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+            <p className="text-gray-500 text-sm font-semibold mb-4">
               Daily earnings
             </p>
             <ResponsiveContainer width="100%" height={260}>
@@ -6656,8 +6656,8 @@ function RevenuePanel({
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <p className="text-white/60 text-sm font-semibold mb-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+            <p className="text-gray-500 text-sm font-semibold mb-4">
               Daily impressions
             </p>
             <ResponsiveContainer width="100%" height={220}>
@@ -6697,7 +6697,7 @@ function RevenuePanel({
             </ResponsiveContainer>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-white/30 text-xs">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-gray-400 text-xs">
             {data?.publisherId && <span>Account: {data.publisherId}</span>}
             {data?.range && (
               <span>
@@ -6821,8 +6821,8 @@ function Dashboard({
   ];
 
   return (
-    <div className="min-h-screen bg-[#06060E] text-white">
-      <header className="border-b border-white/[0.06] px-6 py-4">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <header className="border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
@@ -6834,13 +6834,13 @@ function Dashboard({
               <span className="font-['Space_Grotesk'] font-bold text-lg block leading-tight">
                 Admin Dashboard
               </span>
-              <span className="text-white/30 text-xs">
+              <span className="text-gray-400 text-xs">
                 AB Sustainability Investments
               </span>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-white/30 text-xs hidden sm:block">
+            <span className="text-gray-400 text-xs hidden sm:block">
               {new Date().toLocaleDateString("en-US", {
                 weekday: "long",
                 month: "long",
@@ -6850,7 +6850,7 @@ function Dashboard({
             </span>
             <button
               onClick={onLogout}
-              className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm"
+              className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors text-sm"
             >
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
@@ -6864,8 +6864,8 @@ function Dashboard({
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 tab === t.id
-                  ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
-                  : "text-white/40 hover:text-white hover:bg-white/[0.05]"
+                  ? "bg-emerald-100 text-emerald-600 border border-emerald-200"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
               }`}
             >
               <t.icon className="w-3.5 h-3.5" />
@@ -6883,7 +6883,7 @@ function Dashboard({
                 icon={TrendingUp}
                 label="Total Submissions"
                 value={leads.length}
-                color="bg-[#00E676]/10 text-[#00E676]"
+                color="bg-emerald-100 text-emerald-600"
               />
               <StatCard
                 icon={Users}
@@ -6911,21 +6911,21 @@ function Dashboard({
                     <h2 className="font-['Space_Grotesk'] text-xl font-bold">
                       Submissions
                     </h2>
-                    <p className="text-white/40 text-sm mt-0.5">
+                    <p className="text-gray-400 text-sm mt-0.5">
                       {leads.length} total {filter !== "all" ? filter : ""}{" "}
                       submissions
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 bg-white/[0.05] border border-white/10 rounded-xl p-1">
+                    <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
                       {(["all", "investor", "contact"] as const).map((f) => (
                         <button
                           key={f}
                           onClick={() => setFilter(f)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
                             filter === f
-                              ? "bg-[#00E676] text-[#06060E]"
-                              : "text-white/50 hover:text-white"
+                              ? "bg-[#00E676] text-[#f9fafb]"
+                              : "text-gray-500 hover:text-gray-900"
                           }`}
                         >
                           {f === "all"
@@ -6938,7 +6938,7 @@ function Dashboard({
                     </div>
                     <button
                       onClick={fetchLeads}
-                      className="p-2 bg-white/[0.05] border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
+                      className="p-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors"
                     >
                       <RefreshCw
                         className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
@@ -6951,18 +6951,18 @@ function Dashboard({
                     {error}
                   </div>
                 )}
-                <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden">
                   {loading ? (
-                    <div className="text-center py-16 text-white/30">
+                    <div className="text-center py-16 text-gray-400">
                       Loading submissions...
                     </div>
                   ) : leads.length === 0 ? (
                     <div className="text-center py-16">
-                      <Filter className="w-10 h-10 text-white/10 mx-auto mb-3" />
-                      <p className="text-white/30 text-sm">
+                      <Filter className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-400 text-sm">
                         No submissions yet
                       </p>
-                      <p className="text-white/20 text-xs mt-1">
+                      <p className="text-gray-300 text-xs mt-1">
                         Submissions from your website forms will appear here
                       </p>
                     </div>
@@ -6979,38 +6979,38 @@ function Dashboard({
                                 <span
                                   className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                                     lead.type === "investor"
-                                      ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
+                                      ? "bg-emerald-100 text-emerald-600 border border-emerald-200"
                                       : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                                   }`}
                                 >
                                   <Tag className="w-2.5 h-2.5" />
                                   {lead.type}
                                 </span>
-                                <span className="text-white/20 text-[10px]">
+                                <span className="text-gray-300 text-[10px]">
                                   {lead.source}
                                 </span>
                               </div>
                               <div className="flex items-center gap-3 flex-wrap">
-                                <span className="flex items-center gap-1.5 text-white font-medium text-sm">
-                                  <User className="w-3.5 h-3.5 text-white/30" />
+                                <span className="flex items-center gap-1.5 text-gray-900 font-medium text-sm">
+                                  <User className="w-3.5 h-3.5 text-gray-400" />
                                   {lead.name}
                                 </span>
                                 <a
                                   href={`mailto:${encodeURIComponent(lead.email)}`}
-                                  className="flex items-center gap-1.5 text-[#00E676] hover:underline text-xs"
+                                  className="flex items-center gap-1.5 text-emerald-600 hover:underline text-xs"
                                 >
                                   <Mail className="w-3.5 h-3.5" />
                                   {lead.email}
                                 </a>
                               </div>
                               {lead.message && (
-                                <p className="text-white/40 text-xs leading-relaxed border-l-2 border-white/10 pl-3 mt-2 line-clamp-2">
+                                <p className="text-gray-400 text-xs leading-relaxed border-l-2 border-gray-200 pl-3 mt-2 line-clamp-2">
                                   {lead.message}
                                 </p>
                               )}
                             </div>
                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                              <span className="text-white/20 text-[10px]">
+                              <span className="text-gray-300 text-[10px]">
                                 {timeAgo(lead.createdAt)}
                               </span>
                               <span className="text-white/15 text-[10px]">
@@ -7042,23 +7042,23 @@ function Dashboard({
         {tab === "account" && (
           <div className="max-w-md space-y-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2.5 rounded-xl bg-[#00E676]/10">
-                <User className="w-5 h-5 text-[#00E676]" />
+              <div className="p-2.5 rounded-xl bg-emerald-100">
+                <User className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="font-['Space_Grotesk'] text-xl font-bold text-white">
+                <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
                   Account
                 </h2>
-                <p className="text-white/40 text-sm">
+                <p className="text-gray-400 text-sm">
                   Manage your admin credentials
                 </p>
               </div>
             </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
                 Signed in as
               </p>
-              <p className="text-white font-medium text-sm">
+              <p className="text-gray-900 font-medium text-sm">
                 {loggedInAs ?? "Admin"}
               </p>
             </div>
