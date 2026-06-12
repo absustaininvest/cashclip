@@ -15,17 +15,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import {
+  TAP_FRENZY_AREA_TOP as PLAY_AREA_TOP,
+  TAP_FRENZY_AREA_BOTTOM as PLAY_AREA_BOTTOM,
+  TAP_FRENZY_COIN_SIZE as COIN_SIZE,
+  tapFrenzyPlayAreaHeight,
+} from "./layout-sizing";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const GAME_DURATION = 20;
 const SPAWN_INTERVAL = 800;
 const COIN_LIFETIME = 1500;
-const COIN_SIZE = 64;
 const COMBO_WINDOW = 1000;
-
-const PLAY_AREA_TOP = 120;
-const PLAY_AREA_BOTTOM = 100;
 
 interface Coin {
   id: string;
@@ -77,7 +79,7 @@ export default function TapFrenzyScreen() {
   const spawnerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cleanerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const playAreaHeight = SCREEN_HEIGHT - PLAY_AREA_TOP - PLAY_AREA_BOTTOM - topInset - bottomInset;
+  const playAreaHeight = tapFrenzyPlayAreaHeight(SCREEN_HEIGHT, topInset, bottomInset);
 
   useEffect(() => {
     canPlayGame("tap-frenzy").then(setCanPlay);

@@ -15,18 +15,22 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import {
+  MEMORY_COLUMNS as COLUMNS,
+  MEMORY_ROWS as ROWS,
+  MEMORY_CARD_GAP as CARD_GAP,
+  MEMORY_GRID_PADDING as GRID_PADDING,
+  memoryCardWidth,
+  memoryCardHeight,
+} from "./layout-sizing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const COLUMNS = 3;
-const ROWS = 4;
 const TOTAL_CARDS = COLUMNS * ROWS;
 const PAIRS = TOTAL_CARDS / 2;
 
-const CARD_GAP = 12;
-const GRID_PADDING = 24;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - CARD_GAP * (COLUMNS - 1)) / COLUMNS;
-const CARD_HEIGHT = CARD_WIDTH * 1.2;
+const CARD_WIDTH = memoryCardWidth(SCREEN_WIDTH);
+const CARD_HEIGHT = memoryCardHeight(SCREEN_WIDTH);
 
 interface CardSymbol {
   name: string;

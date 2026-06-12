@@ -22,11 +22,15 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import {
+  COIN_CATCHER_CATCHER_HEIGHT as CATCHER_HEIGHT,
+  COIN_CATCHER_ITEM_SIZE as ITEM_SIZE,
+  COIN_CATCHER_TOP_CHROME,
+  COIN_CATCHER_BOTTOM_CHROME,
+} from "./layout-sizing";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const CATCHER_WIDTH = 80;
-const CATCHER_HEIGHT = 40;
-const ITEM_SIZE = 36;
 const GAME_DURATION = 30;
 const SPAWN_INTERVAL = 800;
 const FALL_SPEED = 3;
@@ -89,8 +93,8 @@ export default function CoinCatcherScreen() {
   const spawnRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const playAreaTop = topInset + 60;
-  const playAreaBottom = SCREEN_HEIGHT - bottomInset - CATCHER_HEIGHT - 20;
+  const playAreaTop = topInset + COIN_CATCHER_TOP_CHROME;
+  const playAreaBottom = SCREEN_HEIGHT - bottomInset - COIN_CATCHER_BOTTOM_CHROME;
 
   useEffect(() => {
     canPlayGame("coin-catcher").then(setCanPlay);

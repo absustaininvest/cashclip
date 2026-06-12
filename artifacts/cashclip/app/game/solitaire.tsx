@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { solitaireCardWidth } from "./layout-sizing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -44,7 +45,7 @@ const SUIT_SYMBOLS: Record<Suit, string> = {
   clubs: "\u2663",
 };
 
-const CARD_WIDTH = Math.min(Math.floor((SCREEN_WIDTH - 48) / 7), 50);
+const CARD_WIDTH = solitaireCardWidth(SCREEN_WIDTH);
 const CARD_HEIGHT = Math.floor(CARD_WIDTH * 1.4);
 const STACK_OFFSET_DOWN = 16;
 const STACK_OFFSET_UP = 22;

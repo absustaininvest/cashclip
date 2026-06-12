@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
+import { dominoPieceSize } from "./layout-sizing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -573,7 +574,7 @@ export default function DominoesGame() {
     return pts > 0 ? <Text style={styles.resultReward}>{formatPoints(pts)}</Text> : null;
   };
 
-  const dominoSize = Math.min(30, (SCREEN_WIDTH - 100) / 10);
+  const dominoSize = dominoPieceSize(SCREEN_WIDTH);
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
