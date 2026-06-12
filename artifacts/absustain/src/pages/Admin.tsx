@@ -2145,6 +2145,7 @@ interface CashClipUser {
   educationLevel: string | null;
   ethnicity: string | null;
   referredBy: string | null;
+  isPublisher?: boolean;
 }
 
 export type CreditAuditRow = {
@@ -2225,7 +2226,7 @@ export function CreditAuditTable({ rows }: { rows: CreditAuditRow[] }) {
   );
 }
 
-export function CashClipUsersPanel({ token }: { token: string }) {
+export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: string; onNavigateToPublishers?: () => void }) {
   const [users, setUsers] = useState<CashClipUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -3391,11 +3392,23 @@ export function CashClipUsersPanel({ token }: { token: string }) {
                       <p className="text-white text-sm font-semibold truncate">
                         {u.username}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {u.role === "admin" && (
                           <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded px-1.5 py-0.5 font-bold">
                             ADMIN
                           </span>
+                        )}
+                        {u.isPublisher && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateToPublishers?.();
+                            }}
+                            title="Go to Publisher Program tab"
+                            className="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded px-1.5 py-0.5 font-bold hover:bg-purple-500/20 hover:text-purple-200 transition-colors cursor-pointer"
+                          >
+                            Publisher
+                          </button>
                         )}
                         {u.profileComplete ? (
                           <span className="text-[10px] bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 rounded px-1.5 py-0.5">
@@ -6734,7 +6747,7 @@ function Dashboard({
 
         {tab === "hub" && <IntegrationHubPanel token={token} onLogout={onLogout} />}
         {tab === "revenue" && <RevenuePanel token={token} onLogout={onLogout} />}
-        {tab === "cashclip" && <CashClipUsersPanel token={token} />}
+        {tab === "cashclip" && <CashClipUsersPanel token={token} onNavigateToPublishers={() => setTab("publishers")} />}
         {tab === "publishers" && <PublisherProgramPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}

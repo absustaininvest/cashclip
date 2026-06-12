@@ -2133,6 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           educationLevel: u.educationLevel ?? null,
           ethnicity: u.ethnicity ?? null,
           referredBy: u.referredBy ?? null,
+          isPublisher: u.isPublisher ?? false,
         })),
         total,
         limit,
