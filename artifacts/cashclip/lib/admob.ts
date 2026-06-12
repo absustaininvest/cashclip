@@ -283,8 +283,22 @@ export function preloadRewardedAd(_adUnitId?: string): void {
 export async function showRewardedAd(
   _adUnitId?: string
 ): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
-  if (!isAdMobReady()) return { rewarded: false };
-  if (!lpUserId) return { rewarded: false };
+  if (!isAdMobAvailable) {
+    console.warn("[AdInit] showRewardedVideo skipped — ad platform unavailable (platform/build guard)");
+    return { rewarded: false };
+  }
+  if (!lpInitialized) {
+    console.warn("[AdInit] showRewardedVideo skipped — LevelPlay not yet initialized (call initializeAdMob first)");
+    return { rewarded: false };
+  }
+  if (!lpRewardedAvailable) {
+    console.warn("[AdInit] showRewardedVideo skipped — no fill (lpRewardedAvailable=false); check Unity mediation placement configuration");
+    return { rewarded: false };
+  }
+  if (!lpUserId) {
+    console.warn("[AdInit] showRewardedVideo skipped — no userId (call setAdMobUserId before showing ads)");
+    return { rewarded: false };
+  }
 
   try {
     const IronSource = require("ironsource-mediation").default;
