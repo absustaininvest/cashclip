@@ -9,3 +9,4 @@ jobs:
           inputs:
             platform: ios
             profile: production
+            latest: true
