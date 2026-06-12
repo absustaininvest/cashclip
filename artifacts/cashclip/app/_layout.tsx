@@ -19,6 +19,10 @@ import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { OtaUpdateGate } from "@/components/OtaUpdateGate";
 import { CelebrationProvider } from "@/lib/CelebrationContext";
 import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
+import {
+  configureNotificationHandler,
+  requestNotificationPermission,
+} from "@/lib/streak-notifications";
 import LogRocket from "@logrocket/react-native";
 import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
@@ -61,6 +65,10 @@ try {
 
 SplashScreen.preventAutoHideAsync();
 
+// Configure how notifications appear when the app is already in the foreground.
+// Must be called before any notification can fire; fail-open wrapper is inside.
+configureNotificationHandler();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
@@ -77,6 +85,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) fetchConversionRate();
   }, [user]);
+
+  // Request notification permission once, after the user is authenticated.
+  // Fire-and-forget — a denial never blocks any feature (fail-open).
+  useEffect(() => {
+    if (user) {
+      requestNotificationPermission().catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (isLoading) return;

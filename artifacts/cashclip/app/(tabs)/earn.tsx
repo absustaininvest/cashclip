@@ -78,6 +78,10 @@ import {
   type PendingState,
   type ClaimMissionResult,
 } from "@/lib/earn-client";
+import {
+  scheduleStreakReminder,
+  cancelStreakReminder,
+} from "@/lib/streak-notifications";
 import { dollarsToPoints } from "@/lib/points";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -754,6 +758,23 @@ export default function EarnScreen() {
       preloadRewardedAd();
     }
   }, [user?.id]);
+
+  // Schedule (or clear) the streak-break reminder whenever the check-in state
+  // is known. Uses the already-translated strings so the notification matches
+  // the user's chosen language. Fully fail-open — a scheduling error never
+  // breaks the earn screen.
+  useEffect(() => {
+    if (checkinStreak > 0 && !checkedInToday) {
+      const title = t.earn.streakWarningTitle.replace(
+        "{{days}}",
+        String(checkinStreak),
+      );
+      const body = t.earn.streakWarningSubtext;
+      scheduleStreakReminder(checkinStreak, title, body).catch(() => {});
+    } else {
+      cancelStreakReminder().catch(() => {});
+    }
+  }, [checkinStreak, checkedInToday]);
 
   // Reload when the screen regains focus. If the user navigated away to play a
   // game, compare pending pts before/after to compute what was earned this session.
