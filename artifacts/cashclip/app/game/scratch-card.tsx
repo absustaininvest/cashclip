@@ -17,6 +17,10 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { useCelebration } from "@/lib/CelebrationContext";
 import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
 
+import {
+  computeScratchCellSize,
+} from "./layout-sizing";
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type SymbolType = "coin" | "gem" | "star" | "diamond";
@@ -112,7 +116,7 @@ function ScratchCell({
   });
 
   const config = SYMBOL_CONFIG[cell.symbol];
-  const cellSize = Math.min((SCREEN_WIDTH - 80) / 3, 100);
+  const cellSize = computeScratchCellSize(SCREEN_WIDTH);
 
   return (
     <TouchableOpacity

@@ -189,3 +189,19 @@ export function computeBlockCellSize(
   const byHeight = blockCellSizeByHeight(screenHeight);
   return Math.max(Math.min(byWidth, byHeight), BLOCK_MIN_CELL);
 }
+
+// ── Scratch Card ─────────────────────────────────────────────────────────────
+export const SCRATCH_GRID_COLS = 3;
+export const SCRATCH_H_PAD = 80;
+export const SCRATCH_MAX_CELL = 100;
+
+/**
+ * Cell size for Scratch Card's 3×3 grid.
+ * Capped at SCRATCH_MAX_CELL so cells don't grow unwieldy on wide screens.
+ */
+export function computeScratchCellSize(screenWidth: number): number {
+  return Math.min(
+    (screenWidth - SCRATCH_H_PAD) / SCRATCH_GRID_COLS,
+    SCRATCH_MAX_CELL,
+  );
+}
