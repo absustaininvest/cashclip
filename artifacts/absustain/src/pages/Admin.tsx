@@ -3869,6 +3869,7 @@ interface HubIntegration {
   latencyMs: number | null;
   status: "green" | "amber" | "red";
   lastCheckedAt: string;
+  adUnavailReason?: string | null;
 }
 
 interface HubService {
@@ -4404,6 +4405,11 @@ export function IntegrationHubPanel({
                                 : "Connected"
                               : "Credentials missing"}
                           </p>
+                          {it.adUnavailReason && (
+                            <p className="text-amber-400/70 text-[10px] mt-0.5 leading-tight">
+                              {it.adUnavailReason}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <span className="text-white/20 text-[10px] flex-shrink-0">

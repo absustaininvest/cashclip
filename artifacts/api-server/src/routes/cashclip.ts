@@ -652,6 +652,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         status = "green";
       }
+
+      // adUnavailReason: a short human-readable explanation for why the ad
+      // system may not be serving ads, surfaced on the hub card so the operator
+      // can diagnose without reading device/Metro logs.
+      //
+      // ironsource / admob are client-SDK integrations: the server can confirm
+      // the key is present but cannot verify the native adapter at runtime.
+      // When the key IS configured we surface that the native adapter must be
+      // in the app binary (the most common confusion point). When the provider
+      // is marked unreachable we describe that instead. Other integrations that
+      // have a real server-side probe leave this null.
+      let adUnavailReason: string | null = null;
+      if (s.id === "ironsource" || s.id === "admob") {
+        if (!s.connected) {
+          adUnavailReason = `${s.envKey} not configured`;
+        } else if (health && !health.reachable) {
+          adUnavailReason = "Provider endpoint unreachable";
+        } else {
+          // Key is present; verification is always "unsupported" for client SDKs
+          // because the native module presence can only be checked on-device.
+          adUnavailReason =
+            "Native adapter required — ad system active only when LevelPlay SDK is compiled into the app build";
+        }
+      }
+
       return {
         id: s.id,
         name: s.name,
@@ -662,6 +687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latencyMs: health?.latencyMs ?? null,
         status,
         lastCheckedAt: checkedAt,
+        adUnavailReason,
       };
     });
 

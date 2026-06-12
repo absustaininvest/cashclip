@@ -60,6 +60,29 @@ export const isAdMobAvailable =
   LP_NATIVE_AVAILABLE &&
   UNITY_NATIVE_AVAILABLE;
 
+/**
+ * Returns a short human-readable reason string when the LevelPlay ad system is
+ * unavailable, or null when it is ready. Derived from the same boolean guards
+ * that gate `isAdMobAvailable` so the diagnosis always matches the gate.
+ *
+ * Example values:
+ *   "Expo Go / web"              — running in Expo Go or a browser
+ *   "IronSource not in build"    — IronSourceMediation native module absent
+ *   "Unity native module not found" — Unity module missing (NativeEventEmitter crash guard)
+ */
+export function getAdUnavailabilityReason(): string | null {
+  if (isAdMobAvailable) return null;
+  if (
+    Platform.OS === "web" ||
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+  ) {
+    return "Expo Go / web";
+  }
+  if (!LP_NATIVE_AVAILABLE) return "IronSource not in build";
+  if (!UNITY_NATIVE_AVAILABLE) return "Unity native module not found";
+  return null;
+}
+
 let lpInitialized = false;
 let lpRewardedAvailable = false;
 let lpUserId: string | null = null;
