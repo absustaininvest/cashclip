@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,9 @@ import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
+import RewardSuccessModal from "@/components/RewardSuccessModal";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useCelebration } from "@/lib/CelebrationContext";
 import {
   fetchReferralStats,
   type ReferralStats,
@@ -29,14 +31,21 @@ import {
   getCurrentWeekStartMs,
   getTotalReferrals,
   getReferralEarnings,
+  getSeenQualifiedReferrals,
+  setSeenQualifiedReferrals,
 } from "@/lib/storage";
 
 export default function ReferralScreen() {
   const { t } = useLanguage();
+  const { celebrate } = useCelebration();
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [referralBonusVisible, setReferralBonusVisible] = useState(false);
+  const [referralBonusAmount, setReferralBonusAmount] = useState(0);
+  const [referralBonusCount, setReferralBonusCount] = useState(0);
+  const hasShownBonus = useRef(false);
 
   const loadData = useCallback(async () => {
     const live = await fetchReferralStats();
@@ -53,6 +62,20 @@ export default function ReferralScreen() {
       ).length;
       if (qualifiedThisWeek > 0) {
         await setWeeklyMissionProgress("weekly_referrals", qualifiedThisWeek);
+      }
+      // Show celebration overlay when the user has more qualified referrals than
+      // they last saw — this is the moment they discover the earned bonus.
+      if (!hasShownBonus.current) {
+        const prevSeen = await getSeenQualifiedReferrals();
+        const newlyQualified = live.qualifiedReferrals - prevSeen;
+        if (newlyQualified > 0) {
+          const bonus = newlyQualified * live.bonusPerReferral;
+          setReferralBonusCount(newlyQualified);
+          setReferralBonusAmount(bonus);
+          setReferralBonusVisible(true);
+          hasShownBonus.current = true;
+        }
+        await setSeenQualifiedReferrals(live.qualifiedReferrals);
       }
     } else {
       // Offline / unauthenticated: fall back to last cached totals so the
@@ -239,6 +262,22 @@ export default function ReferralScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <RewardSuccessModal
+        visible={referralBonusVisible}
+        amount={referralBonusAmount}
+        title="Referral Bonus!"
+        subtitle={`${referralBonusCount} friend${referralBonusCount > 1 ? "s" : ""} cashed out — your bonus is in your wallet!`}
+        buttonLabel="Awesome!"
+        onClose={() => {
+          setReferralBonusVisible(false);
+          celebrate({
+            tier: referralBonusAmount >= 1 ? "epic" : "nice",
+            label: `+$${referralBonusAmount.toFixed(2)}`,
+            title: "Referral Bonus!",
+          });
+        }}
+      />
     </View>
   );
 }

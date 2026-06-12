@@ -34,6 +34,7 @@ const KEYS = {
   WEEKLY_MISSIONS: "cashclip_weekly_missions",
   WEEKLY_MISSIONS_WEEK: "cashclip_weekly_missions_week",
   TOTAL_REFERRALS: "cashclip_total_referrals",
+  QUALIFIED_REFERRALS: "cashclip_qualified_referrals",
   SURVEYS_COMPLETED: "cashclip_surveys_completed",
   SURVEY_EARNINGS: "cashclip_survey_earnings",
   COMPLETED_SURVEY_IDS: "cashclip_completed_survey_ids",
@@ -296,6 +297,16 @@ export async function getReferralEarnings(): Promise<number> {
 export async function cacheReferralStats(totalJoined: number, earnings: number): Promise<void> {
   await setNumber(KEYS.TOTAL_REFERRALS, Math.max(0, Math.round(totalJoined)));
   await setNumber(KEYS.REFERRAL_EARNINGS, Math.max(0, earnings));
+}
+
+// Track the last-seen qualified referral count so the referral screen can
+// detect newly qualified friends and show a celebration overlay.
+export async function getSeenQualifiedReferrals(): Promise<number> {
+  return getNumber(KEYS.QUALIFIED_REFERRALS, 0);
+}
+
+export async function setSeenQualifiedReferrals(count: number): Promise<void> {
+  await setNumber(KEYS.QUALIFIED_REFERRALS, Math.max(0, Math.round(count)));
 }
 
 // ── DISPLAY / RESET HELPERS ───────────────────────────────────────────────────

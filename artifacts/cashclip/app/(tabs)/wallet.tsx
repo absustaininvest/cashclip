@@ -22,6 +22,7 @@ import * as Haptics from "expo-haptics";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
+import RewardSuccessModal from "@/components/RewardSuccessModal";
 import {
   getUserStats,
   getTransactions,
@@ -180,6 +181,8 @@ export default function WalletScreen() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawSuccessVisible, setWithdrawSuccessVisible] = useState(false);
+  const [withdrawSuccessAmount, setWithdrawSuccessAmount] = useState(0);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
@@ -328,21 +331,8 @@ export default function WalletScreen() {
 
       setShowWithdrawModal(false);
       const payout = selectedTier.totalPayout;
-      Alert.alert(
-        t.wallet.withdrawalSuccessful,
-        `$${payout.toFixed(2)} is on its way to ${paypalEmail.trim()} via PayPal — you'll receive it within minutes.`,
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              celebrate({
-                tier: "epic",
-                label: `$${payout.toFixed(2)}`,
-                title: "Cashing Out!",
-              }),
-          },
-        ],
-      );
+      setWithdrawSuccessAmount(payout);
+      setWithdrawSuccessVisible(true);
       await loadData();
     } catch (err: unknown) {
       const fallback = "Failed to submit withdrawal request";
@@ -680,6 +670,22 @@ export default function WalletScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <RewardSuccessModal
+        visible={withdrawSuccessVisible}
+        amount={withdrawSuccessAmount}
+        title="Cash Out Submitted!"
+        subtitle="Your payout is on its way via PayPal."
+        buttonLabel="Awesome!"
+        onClose={() => {
+          setWithdrawSuccessVisible(false);
+          celebrate({
+            tier: "epic",
+            label: `$${withdrawSuccessAmount.toFixed(2)}`,
+            title: "Cashing Out!",
+          });
+        }}
+      />
     </View>
   );
 }
