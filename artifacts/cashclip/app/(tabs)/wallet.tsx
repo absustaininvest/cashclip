@@ -187,26 +187,37 @@ export default function WalletScreen() {
   const [isConverting, setIsConverting] = useState(false);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [isFocused, setIsFocused] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
   const loadData = useCallback(async () => {
-    const [s, txns, srv, pending] = await Promise.all([
-      getUserStats(),
-      getTransactions(),
-      fetchServerBalance(),
-      refreshPendingFromServer(),
-    ]);
-    setStats(s);
-    setTransactions(txns);
-    if (srv) {
+    setLoadError(false);
+    try {
+      const [s, txns, srv, pending] = await Promise.all([
+        getUserStats(),
+        getTransactions(),
+        fetchServerBalance(),
+        refreshPendingFromServer(),
+      ]);
+      if (!srv) {
+        // fetchServerBalance caught internally and returned null — the server
+        // balance failed to load. Showing $0.00 would look like an empty wallet,
+        // which is misleading; treat this as a load error instead.
+        setLoadError(true);
+        setTransactions([]);
+        return;
+      }
+      setStats(s);
+      setTransactions(txns);
       setServerBalance(srv.balance);
       setServerTotalEarned(srv.totalEarned);
       setTiers(getWithdrawalTiers(srv.balance));
-    } else {
-      setTiers(getWithdrawalTiers(s.balance));
+      if (pending) setPendingState(pending);
+    } catch {
+      setLoadError(true);
+      setTransactions([]);
     }
-    if (pending) setPendingState(pending);
   }, []);
 
   const handleConvertNow = useCallback(async () => {
@@ -344,7 +355,24 @@ export default function WalletScreen() {
     }
   }, [selectedTier, paypalEmail, t, loadData, celebrate]);
 
-  if (!fontsLoaded || !stats) return null;
+  if (!fontsLoaded) return null;
+  if (!stats && loadError) {
+    return (
+      <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : 0, alignItems: "center", justifyContent: "center" }]}>
+        <Chipley pose="sad" size={112} />
+        <Text style={[styles.emptyTitle, { marginTop: 16 }]}>Couldn't load wallet</Text>
+        <Text style={[styles.emptySubtitle, { textAlign: "center", paddingHorizontal: 32 }]}>Check your connection and try again.</Text>
+        <Pressable
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadData(); }}
+          style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1, marginTop: 20 }]}
+        >
+          <Feather name="refresh-cw" size={16} color={Colors.background} />
+          <Text style={styles.retryBtnText}>Try Again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (!stats) return null;
 
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const displayBalance = serverBalance;
@@ -531,11 +559,26 @@ export default function WalletScreen() {
         renderItem={({ item }) => <TransactionItem item={item} t={t} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Chipley pose="sleep" size={96} />
-            <Text style={styles.emptyTitle}>{t.wallet.noTransactions}</Text>
-            <Text style={styles.emptySubtitle}>{t.wallet.watchAdsToStart}</Text>
-          </View>
+          loadError ? (
+            <View style={styles.emptyState}>
+              <Chipley pose="sad" size={96} />
+              <Text style={styles.emptyTitle}>Couldn't load wallet</Text>
+              <Text style={styles.emptySubtitle}>Check your connection and try again.</Text>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadData(); }}
+                style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1, marginTop: 8 }]}
+              >
+                <Feather name="refresh-cw" size={16} color={Colors.background} />
+                <Text style={styles.retryBtnText}>Try Again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Chipley pose="sleep" size={96} />
+              <Text style={styles.emptyTitle}>{t.wallet.noTransactions}</Text>
+              <Text style={styles.emptySubtitle}>{t.wallet.watchAdsToStart}</Text>
+            </View>
+          )
         }
       />
 
