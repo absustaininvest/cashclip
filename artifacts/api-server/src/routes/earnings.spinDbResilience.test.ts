@@ -23,6 +23,7 @@ const USER_ID = "user-1";
 const mockIssue = vi.fn();
 const mockConsume = vi.fn();
 const mockLoggerError = vi.fn();
+const mockTransaction = vi.fn();
 
 // Keep the REAL SpinChallengeStoreError class so `instanceof` checks in the
 // route match, but swap the issue/consume implementations for spies.
@@ -48,14 +49,17 @@ vi.mock("../auth", () => ({
   },
 }));
 
-// The complete route's transaction is never reached in these tests (consume
-// throws or rejects first), but provide a harmless stub so importing the module
-// doesn't need a live database.
+// The complete route's transaction is reached only when consume succeeds.
+// A vi.fn() lets tests configure the result; the default behaviour (no mock
+// set up) is to call through with an empty tx, which is fine for all cases
+// where consume throws or returns a non-ok status before the transaction runs.
 vi.mock("@workspace/db", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    db: { transaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({}) },
+    db: {
+      transaction: (...args: unknown[]) => mockTransaction(...args),
+    },
   };
 });
 
@@ -63,6 +67,12 @@ let app: Express;
 let SpinChallengeStoreError: typeof import("../lib/spinChallengeStore").SpinChallengeStoreError;
 
 beforeAll(async () => {
+  // Default transaction: pass-through with empty tx object (safe for all paths
+  // where the transaction is never reached because consume throws first).
+  mockTransaction.mockImplementation(
+    async (fn: (tx: unknown) => Promise<unknown>) => fn({}),
+  );
+
   const store = await import("../lib/spinChallengeStore");
   SpinChallengeStoreError = store.SpinChallengeStoreError;
   const { registerEarningsRoutes } = await import("./earnings");
@@ -73,6 +83,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Restore default pass-through after each test clears all mocks.
+  mockTransaction.mockImplementation(
+    async (fn: (tx: unknown) => Promise<unknown>) => fn({}),
+  );
 });
 
 describe("POST /api/earn/spin/begin — DB resilience", () => {
@@ -155,5 +169,49 @@ describe("POST /api/earn/spin/complete — DB resilience", () => {
 
     expect(res.status).toBe(400);
     expect(mockConsume).not.toHaveBeenCalled();
+  });
+
+  it("does not consume the challenge on a store error — a retry with the same token still succeeds", async () => {
+    const TOKEN = "b".repeat(64);
+
+    // ── Call 1: consume throws (brief DB blip) ───────────────────────────────
+    // The route must return 503 retryable. Because the consume query threw,
+    // the challenge row was never deleted from the store — the token is intact.
+    mockConsume.mockRejectedValueOnce(
+      new SpinChallengeStoreError("consume", new Error("connection reset")),
+    );
+
+    const failRes = await request(app)
+      .post("/api/earn/spin/complete")
+      .send({ challengeToken: TOKEN });
+
+    expect(failRes.status).toBe(503);
+    expect(failRes.body).toMatchObject({ retryable: true });
+
+    // ── Call 2: retry with the same token — now the store responds normally ──
+    // Because the first call never consumed the token, this retry can succeed.
+    // The transaction is pre-baked to return a successful earn result so we
+    // exercise the full happy-path response without a real database.
+    mockConsume.mockResolvedValueOnce({ status: "ok", points: 180 });
+    mockTransaction.mockResolvedValueOnce({
+      ok: true,
+      tokenId: "tok-retry-ok",
+      points: 180,
+      claimableAt: new Date().toISOString(),
+      dailyUsed: 1,
+      dailyCap: 12,
+    });
+
+    const retryRes = await request(app)
+      .post("/api/earn/spin/complete")
+      .send({ challengeToken: TOKEN });
+
+    expect(retryRes.status).toBe(201);
+    expect(retryRes.body.tokenId).toBe("tok-retry-ok");
+    // The same token was accepted: consume was called exactly twice (once
+    // throwing, once succeeding) — proving the first failure did not mark it used.
+    expect(mockConsume).toHaveBeenCalledTimes(2);
+    expect(mockConsume).toHaveBeenNthCalledWith(1, TOKEN, USER_ID, expect.any(Number));
+    expect(mockConsume).toHaveBeenNthCalledWith(2, TOKEN, USER_ID, expect.any(Number));
   });
 });
