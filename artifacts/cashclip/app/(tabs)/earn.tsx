@@ -74,6 +74,7 @@ import {
   formatPoints,
   formatCountdown,
   pointsToUsd,
+  recordEarnAction,
   type PendingState,
   type ClaimMissionResult,
 } from "@/lib/earn-client";
@@ -855,6 +856,7 @@ export default function EarnScreen() {
         setAdPreloaded(isRewardedAdPreloaded());
         if (result.rewarded) {
           await recordAdWatch();
+          await recordEarnAction("ad_view", "Video ad");
           if (begin.ok) {
             await completeAdView(begin.challengeToken, "Watched video");
           }
@@ -906,6 +908,7 @@ export default function EarnScreen() {
     trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
     trackAdRewardEarned("rewarded", reward, "rewarded");
     await recordAdWatch();
+    await recordEarnAction("ad_view", "Video ad");
     setShowModal(false);
     setWatchingAd(null);
     // Issue the small server-set earn token for the in-app ad completion. The

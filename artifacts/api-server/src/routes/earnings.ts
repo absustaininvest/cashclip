@@ -141,6 +141,9 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
   mission_weekly: { points: 500,  dailyCap: 4  },
   game:           { points: null, dailyCap: 10 },
   video:          { points: 5,    dailyCap: 50 },
+  // ad_view — small reward credited via /api/earnings/record when a client-side
+  // ad completes (AdMob or in-app fallback). 5 pts, 50/day cap limits abuse.
+  ad_view:        { points: 5,    dailyCap: 50 },
 };
 
 // Actions that may ONLY be credited by trusted server-to-server callbacks

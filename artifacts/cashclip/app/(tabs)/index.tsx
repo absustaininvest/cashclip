@@ -20,7 +20,7 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
 import { getUnreadNotificationCount, recordAdWatch } from "@/lib/storage";
-import { fetchServerBalance, fetchProfileComplete, beginAdView, completeAdView } from "@/lib/earn-client";
+import { fetchServerBalance, fetchProfileComplete, beginAdView, completeAdView, recordEarnAction } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
 import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
@@ -205,6 +205,7 @@ export default function HomeScreen() {
         const result = await showRewardedAd();
         if (result.rewarded) {
           await recordAdWatch();
+          await recordEarnAction("ad_view", "Video ad");
           if (begin.ok) {
             await completeAdView(begin.challengeToken, "Watched video");
           }
@@ -259,6 +260,7 @@ export default function HomeScreen() {
     const token = adChallengeRef.current;
     adChallengeRef.current = null;
     await recordAdWatch();
+    await recordEarnAction("ad_view", "Video ad");
     if (token) {
       const res = await completeAdView(token, "Watched video");
       if (res.ok) loadBalance();
