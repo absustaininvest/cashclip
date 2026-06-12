@@ -2304,6 +2304,10 @@ export function CashClipUsersPanel({ token }: { token: string }) {
   const [showAudit, setShowAudit] = useState(true);
   const [auditActorFilter, setAuditActorFilter] = useState("");
   const [auditActors, setAuditActors] = useState<string[]>([]);
+  const [searchPerUserRows, setSearchPerUserRows] = useState<
+    { userId: string; username: string; queryCount: number }[]
+  >([]);
+  const [searchPerUserLoading, setSearchPerUserLoading] = useState(true);
 
   const PAGE_SIZE = 25;
 
@@ -2413,6 +2417,28 @@ export function CashClipUsersPanel({ token }: { token: string }) {
   useEffect(() => {
     fetchAdjustments();
   }, [fetchAdjustments]);
+
+  const fetchSearchPerUser = useCallback(async () => {
+    setSearchPerUserLoading(true);
+    try {
+      const res = await fetch("/api/admin/search-per-user?limit=10", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setSearchPerUserRows(data.rows ?? []);
+    } catch {
+      setSearchPerUserRows([]);
+    } finally {
+      setSearchPerUserLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchSearchPerUser();
+    const id = setInterval(fetchSearchPerUser, 60_000);
+    return () => clearInterval(id);
+  }, [fetchSearchPerUser]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -3278,6 +3304,42 @@ export function CashClipUsersPanel({ token }: { token: string }) {
                 </span>
                 <span className="text-[#00E676] text-sm font-bold tabular-nums">
                   ${p.totalPayout.toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Top Searchers */}
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-white text-sm font-semibold">Top Searchers</h3>
+            <p className="text-white/40 text-xs mt-0.5">
+              Users by in-app search query count — auto-refreshes every 60s
+            </p>
+          </div>
+        </div>
+        {searchPerUserLoading ? (
+          <div className="text-center py-10 text-white/30 text-sm">
+            Loading…
+          </div>
+        ) : searchPerUserRows.length === 0 ? (
+          <div className="text-center py-10 text-white/30 text-sm">
+            No search data yet
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {searchPerUserRows.map((r, i) => (
+              <div
+                key={r.userId}
+                className="grid grid-cols-[auto_1fr_auto] gap-3 items-center px-5 py-3"
+              >
+                <span className="text-white/30 text-xs font-bold w-6">{i + 1}</span>
+                <span className="text-white text-sm font-semibold truncate">{r.username}</span>
+                <span className="text-white/60 text-xs tabular-nums whitespace-nowrap">
+                  {r.queryCount} {r.queryCount === 1 ? "search" : "searches"}
                 </span>
               </div>
             ))}
