@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, index } from "drizzle-orm/pg-core";
 
 // Shared store for the spin wheel's anti-cheat challenge tokens.
 // /api/earn/spin/begin issues a token; /api/earn/spin/complete consumes it.
@@ -11,6 +11,9 @@ export const spinChallenges = pgTable(
     userId: text("user_id").notNull(),
     issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // Predetermined reward (picked at begin, used at complete so the wheel
+    // animates to the exact segment the server already decided).
+    points: integer("points"),
   },
   (t) => [index("spin_challenges_expires_at_idx").on(t.expiresAt)],
 );

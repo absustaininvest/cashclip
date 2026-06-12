@@ -70,6 +70,23 @@ export declare const spinChallenges: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        points: import("drizzle-orm/pg-core").PgColumn<{
+            name: "points";
+            tableName: "spin_challenges";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
     };
     dialect: "pg";
 }>;

@@ -32,22 +32,26 @@ export class SpinChallengeStoreError extends Error {
 
 /**
  * Persist a freshly issued challenge token. `issuedAt` is stamped by the DB
- * (NOW()) and the row expires `ttlMs` later.
+ * (NOW()) and the row expires `ttlMs` later. `points` is the predetermined
+ * reward amount picked at begin-time so completeSpin can use the same value
+ * instead of re-rolling (keeping the visual wheel segment in sync).
  */
 export async function issueSpinChallenge(
   token: string,
   userId: string,
   ttlMs: number,
+  points: number,
 ): Promise<void> {
   const ttlSecs = Math.ceil(ttlMs / 1000);
   try {
     await db.execute(sql`
-      INSERT INTO spin_challenges (token, user_id, issued_at, expires_at)
+      INSERT INTO spin_challenges (token, user_id, issued_at, expires_at, points)
       VALUES (
         ${token},
         ${userId},
         NOW(),
-        NOW() + (${ttlSecs} * INTERVAL '1 second')
+        NOW() + (${ttlSecs} * INTERVAL '1 second'),
+        ${points}
       )
     `);
   } catch (err) {
@@ -56,7 +60,7 @@ export async function issueSpinChallenge(
 }
 
 export type SpinChallengeConsumeResult =
-  | { status: "ok" }
+  | { status: "ok"; points: number | null }
   | { status: "not_found" }
   | { status: "wrong_user" }
   | { status: "expired" }
@@ -90,6 +94,7 @@ export async function consumeSpinChallenge(
     const sel = await db.execute(sql`
       SELECT
         user_id,
+        points,
         (NOW() > expires_at)                                AS expired,
         EXTRACT(EPOCH FROM (NOW() - issued_at)) < ${minSecs} AS too_early,
         GREATEST(0, EXTRACT(EPOCH FROM (issued_at + (${minSecs} * INTERVAL '1 second') - NOW()))) AS retry_after_secs
@@ -101,6 +106,7 @@ export async function consumeSpinChallenge(
 
     const row = sel.rows[0] as {
       user_id: string;
+      points: number | null;
       expired: boolean;
       too_early: boolean;
       retry_after_secs: string | number;
@@ -124,7 +130,7 @@ export async function consumeSpinChallenge(
     `);
     if (del.rows.length === 0) return { status: "not_found" };
 
-    return { status: "ok" };
+    return { status: "ok", points: row.points };
   } catch (err) {
     throw new SpinChallengeStoreError("consume", err);
   }

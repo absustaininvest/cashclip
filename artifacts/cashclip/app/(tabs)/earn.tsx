@@ -781,8 +781,16 @@ export default function EarnScreen() {
     }
     const challengeToken = begin.ok ? begin.challengeToken : null;
 
-    // Spin animation — visual only, reward is server-determined
-    const segmentIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length);
+    // Find the wheel segment that matches the server-predetermined prize.
+    // Falls back to a random segment only if the server didn't return points
+    // (e.g. legacy challenge during a brief deploy transition).
+    const serverPoints = begin.ok ? begin.points : null;
+    const serverSegmentIndex = serverPoints != null
+      ? WHEEL_SEGMENTS.findIndex(s => s.value === serverPoints)
+      : -1;
+    const segmentIndex = serverSegmentIndex >= 0
+      ? serverSegmentIndex
+      : Math.floor(Math.random() * WHEEL_SEGMENTS.length);
     const segmentAngle = (segmentIndex * 360) / WHEEL_SEGMENTS.length;
     const targetRotation = 360 * 5 + (360 - segmentAngle);
 

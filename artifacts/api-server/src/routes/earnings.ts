@@ -535,9 +535,10 @@ export function registerEarningsRoutes(app: Express): void {
       try {
         const { randomBytes } = await import("node:crypto");
         const challengeToken = randomBytes(32).toString("hex");
-        await issueSpinChallenge(challengeToken, req.userId!, SPIN_CHALLENGE_TTL_MS);
-        logger.info({ userId: req.userId }, "spin challenge issued");
-        res.status(201).json({ challengeToken });
+        const pts = pickRandom(SPIN_POOL);
+        await issueSpinChallenge(challengeToken, req.userId!, SPIN_CHALLENGE_TTL_MS, pts);
+        logger.info({ userId: req.userId, points: pts }, "spin challenge issued");
+        res.status(201).json({ challengeToken, points: pts });
       } catch (err) {
         // A brief DB blip while issuing the challenge surfaces as a friendly,
         // retryable 503 (consistent with the sponsored-visit fail-closed policy)
@@ -645,7 +646,13 @@ export function registerEarningsRoutes(app: Express): void {
             return { ok: false, status: 429, error: "Spin cooldown active", nextAvailableAt: nextAt.toISOString() };
           }
 
-          const pts = pickRandom(SPIN_POOL);
+          // Use the predetermined points stored at begin-time so the visual
+          // wheel segment and the server reward are always in sync. Fall back
+          // to pickRandom only for legacy challenges issued without points
+          // (e.g. the brief transition window after a deploy).
+          const pts = consumed.status === "ok" && consumed.points != null
+            ? consumed.points
+            : pickRandom(SPIN_POOL);
           const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
           const snapshot = await snapshotRateString();
           const [token] = await tx.insert(earnTokens).values({

@@ -213,7 +213,7 @@ async function isRetryable503(res: Response): Promise<boolean> {
 }
 
 export type SpinBeginResult =
-  | { ok: true;  challengeToken: string }
+  | { ok: true;  challengeToken: string; points: number }
   | { ok: false; retryable: boolean };
 
 export async function beginSpin(): Promise<SpinBeginResult> {
@@ -221,9 +221,9 @@ export async function beginSpin(): Promise<SpinBeginResult> {
     try {
       const res = await apiRequestSafe("POST", "/api/earn/spin/begin", {});
       if (res.ok) {
-        const data = await res.json() as { challengeToken?: string };
-        return data.challengeToken
-          ? { ok: true, challengeToken: data.challengeToken }
+        const data = await res.json() as { challengeToken?: string; points?: number };
+        return data.challengeToken && data.points != null
+          ? { ok: true, challengeToken: data.challengeToken, points: data.points }
           : { ok: false, retryable: false };
       }
       const retryable = await isRetryable503(res);
