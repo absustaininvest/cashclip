@@ -33,6 +33,19 @@ const UNITY_NATIVE_AVAILABLE =
     NativeModules.RNUnityAds
   );
 
+// ─── Diagnostic: log module-presence state once at startup ───────────────────
+// These lines are the primary smoke-test signal for build ≥41.
+// In a native build with the Unity adapter compiled in you should see:
+//   [AdInit] LP_NATIVE_AVAILABLE = true  UNITY_NATIVE_AVAILABLE = true
+// If Unity is missing you will see UNITY_NATIVE_AVAILABLE = false and ads will
+// be disabled until the next native build that includes the adapter.
+console.log(
+  `[AdInit] LP_NATIVE_AVAILABLE = ${LP_NATIVE_AVAILABLE}  UNITY_NATIVE_AVAILABLE = ${UNITY_NATIVE_AVAILABLE}` +
+  (LP_NATIVE_AVAILABLE && !UNITY_NATIVE_AVAILABLE
+    ? "  ← Unity module absent; ad system will be disabled"
+    : "")
+);
+
 export const ADMOB_APP_ID = "";
 export const AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
 export const TEST_AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
@@ -108,8 +121,11 @@ export async function initializeAdMob(): Promise<boolean> {
   if (!isAdMobAvailable) {
     if (LP_NATIVE_AVAILABLE && !UNITY_NATIVE_AVAILABLE) {
       console.warn(
-        "LevelPlay: Unity Ads native module not found — ad system disabled to prevent NativeEventEmitter crash"
+        "[AdInit] LevelPlay: Unity Ads native module not found — ad system disabled to prevent NativeEventEmitter crash. " +
+        "Build ≥41 with the Unity adapter compiled in is required to enable ads."
       );
+    } else if (!LP_NATIVE_AVAILABLE) {
+      console.log("[AdInit] LevelPlay native module absent — running in OTA/web mode, ads disabled");
     }
     return false;
   }
@@ -204,11 +220,16 @@ export async function initializeAdMob(): Promise<boolean> {
 
     await IronSource.init(appKey);
     lpInitialized = true;
+    console.log(
+      "[AdInit] LevelPlay init succeeded — UNITY_NATIVE_AVAILABLE = true, ads are ACTIVE." +
+      " If rewarded ads still don't load, check the Unity Game ID and mediation placement in the IronSource dashboard."
+    );
 
     // Check initial fill after init
     try {
       const available = await IronSource.isRewardedVideoAvailable();
       lpRewardedAvailable = !!available;
+      console.log(`[AdInit] Rewarded ad immediately available after init: ${!!available}`);
     } catch {}
 
     // Pre-warm interstitial for the first natural break
