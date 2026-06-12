@@ -185,6 +185,33 @@ const reply = {
 };
 
 describe("POST /api/admin/inbox/reply — duplicate guard against the REAL dedupe_slots table", () => {
+  it("concurrent identical POSTs: exactly one 200 + one 409, one email, one persist", async () => {
+    // Fire both requests at the exact same instant. The real INSERT ... ON CONFLICT
+    // is atomic at the Postgres level, so exactly one reservation wins count=1
+    // (duplicate=false → 200) and the other loses count=2 (duplicate=true → 409).
+    const [a, b] = await Promise.all([
+      asAdmin(request(app).post("/api/admin/inbox/reply").send(reply)),
+      asAdmin(request(app).post("/api/admin/inbox/reply").send(reply)),
+    ]);
+
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const winner = a.status === 200 ? a : b;
+    const loser = a.status === 409 ? a : b;
+    expect(winner.body.ok).toBe(true);
+    expect(loser.body.duplicate).toBe(true);
+
+    // The real table must have exactly one slot row at count 2 (one winner + one
+    // duplicate bump) — never two separate rows, never count 3+.
+    expect(await slotCount()).toBe(1);
+    expect((await onlySlot()).count).toBe(2);
+
+    // Only one email was sent and only one reply was persisted to history.
+    expect(mockSendSupportReply).toHaveBeenCalledTimes(1);
+    expect(mockCreateSupportReply).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a second identical POST within the window via the real table (one email, one persist)", async () => {
     const first = await asAdmin(request(app).post("/api/admin/inbox/reply").send(reply));
     expect(first.status).toBe(200);
