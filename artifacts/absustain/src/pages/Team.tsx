@@ -1,5 +1,6 @@
 import { Mail } from "lucide-react";
 import { useLang } from "../lib/i18n";
+import { Seo } from "../components/Seo";
 
 const team = [
   {
@@ -19,6 +20,11 @@ export default function Team() {
   const bios = [t.team.jbBio];
   return (
     <div className="pt-32 pb-24 px-6 max-w-5xl mx-auto min-h-[80vh]">
+      <Seo
+        title="Team | AB Sustainability Investments"
+        description="Meet the team behind AB Sustainability Investments LLC — the people building, operating, and growing our portfolio of sustainable technology and business ventures."
+        path="/team"
+      />
 
       <div className="text-center mb-20">
         <div className="section-label">{t.team.label}</div>

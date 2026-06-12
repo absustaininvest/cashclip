@@ -70,6 +70,13 @@ const pages = [
     path: "/contact",
   },
   {
+    name: "Team",
+    title: "Team | AB Sustainability Investments",
+    description:
+      "Meet the team behind AB Sustainability Investments LLC — the people building, operating, and growing our portfolio of sustainable technology and business ventures.",
+    path: "/team",
+  },
+  {
     name: "Press Kit",
     title: "Press Kit | AB Sustainability Investments",
     description:
@@ -312,6 +319,7 @@ describe("sitemap.xml", () => {
       "https://absustaininvest.com/",
       "https://absustaininvest.com/ventures",
       "https://absustaininvest.com/about",
+      "https://absustaininvest.com/team",
       "https://absustaininvest.com/investors",
       "https://absustaininvest.com/contact",
       "https://absustaininvest.com/press",

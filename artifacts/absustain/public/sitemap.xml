@@ -6,12 +6,17 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://absustaininvest.com/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://absustaininvest.com/ventures</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://absustaininvest.com/about</loc>
+    <loc>https://absustaininvest.com/team</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -23,7 +28,7 @@
   <url>
     <loc>https://absustaininvest.com/contact</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://absustaininvest.com/press</loc>
