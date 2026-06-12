@@ -1,5 +1,8 @@
 name: EAS Submit — iOS
 
+on:
+  workflow_call: {}
+
 jobs:
   submit:
     name: Submit iOS
