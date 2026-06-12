@@ -106,9 +106,17 @@ vi.mock("@expo-google-fonts/outfit", () => ({
   Outfit_600SemiBold: "Outfit_600SemiBold",
   Outfit_700Bold: "Outfit_700Bold",
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useFocusEffect: (cb: () => void) => cb(),
+}));
 
 vi.mock("@/components/SponsoredSection", () => ({ default: () => null }));
+vi.mock("@/components/Chipley", () => ({ default: () => null }));
+vi.mock("@/lib/CelebrationContext", () => ({
+  useCelebration: () => ({ celebrate: vi.fn() }),
+  CelebrationProvider: ({ children }: any) => children,
+}));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1", username: "tester" } }) }));
 vi.mock("@/lib/LanguageContext", async () => {
   const i18n: any = await vi.importActual("@/lib/i18n");
@@ -175,36 +183,121 @@ function collectStrings(node: any): string[] {
   return out;
 }
 
-// For each rendered star milestone badge, walk up to its day rung and read the
-// day number printed on that rung. With checkinStreak = 0 every rung is inactive
-// and renders its day number (not a checkmark), so the mapping is unambiguous.
-// The rung is the nearest ancestor that owns this day's "{reward} pts" text.
-function milestoneDayNumbers(root: TestRenderer.ReactTestInstance): number[] {
-  const stars = root.findAll(
-    (n: any) => n.type === "Icon" && n.props.name === "star",
+// Like collectStrings but also coerces numbers to strings so that JSX
+// interpolations such as `{reward} pts` (children: [100, " pts"]) are captured.
+function collectText(node: any): string {
+  const parts: string[] = [];
+  const visit = (n: any) => {
+    if (n == null) return;
+    if (typeof n === "string" || typeof n === "number") {
+      parts.push(String(n));
+      return;
+    }
+    (n.children ?? []).forEach(visit);
+  };
+  (node.children ?? []).forEach(visit);
+  return parts.join("");
+}
+
+// Return the rung Views in DOM order.
+//
+// The react-native mock wraps every host element in a functional component, so
+// the real element tree is deeper than the JSX looks:
+//
+//   Functional View (rung)          ← JSX <View key={i} …>
+//     HOST "View"                   ← rendered by the functional wrapper
+//       Functional Icon or Text     ← JSX {isActive ? <Ionicons/> : <Text>{dayNum}</Text>}
+//         HOST "Icon" | HOST "Text"
+//       Functional Text             ← JSX <Text>{reward} pts</Text>
+//         HOST "Text" ("100 pts")   ← this is what findAll gives us
+//
+// So the HOST reward-text's parent is the functional Text wrapper and its
+// grandparent is the HOST "View" rung — not the functional View wrapper.
+//
+// A WheelSegment View also holds a "{N} pts" label Text but its sibling is a
+// dot View (no checkmark, no plain-digit day number), so it is excluded by the
+// subtree check below.
+function findDayRungs(
+  root: TestRenderer.ReactTestInstance,
+): TestRenderer.ReactTestInstance[] {
+  // HOST "Text" instances whose content is a bare "{reward} pts" label.
+  const rewardTexts = root.findAll(
+    (n: any) =>
+      n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
   );
-  return stars
-    .map((star) => {
-      let cur: any = star.parent;
-      while (cur) {
-        const texts = cur.findAll((n: any) => n.type === "Text");
-        const hasReward = texts.some((t: any) =>
-          /^\d+\s+pts$/.test(collectStrings(t).join("")),
-        );
-        if (hasReward) {
-          // This ancestor is the single day rung; read its day number.
-          for (const t of texts) {
-            const s = collectStrings(t).join("");
-            if (/^\d+$/.test(s)) return Number(s);
-          }
-          return null;
-        }
-        cur = cur.parent;
-      }
-      return null;
+
+  const seen = new Set<TestRenderer.ReactTestInstance>();
+  const rungs: TestRenderer.ReactTestInstance[] = [];
+
+  for (const t of rewardTexts) {
+    // HOST "Text" → Functional Text wrapper → HOST "View" (rung)
+    const rung: any = t.parent?.parent;
+    if (!rung || seen.has(rung)) continue;
+
+    // A ladder rung always has either a checkmark icon (isActive) or a
+    // plain day-number text (inactive/current) somewhere in its subtree.
+    // WheelSegment Views contain only a dot View and the label Text — neither.
+    const hasCheckmark =
+      rung.findAll(
+        (n: any) => n.type === "Icon" && n.props?.name === "checkmark",
+      ).length > 0;
+    const hasDayNumber =
+      rung.findAll(
+        (n: any) => n.type === "Text" && /^\d+$/.test(collectText(n)),
+      ).length > 0;
+
+    if (hasCheckmark || hasDayNumber) {
+      seen.add(rung);
+      rungs.push(rung);
+    }
+  }
+
+  return rungs;
+}
+
+// Does the given rung show a checkmark icon (isActive = true)?
+function rungHasCheckmark(rung: TestRenderer.ReactTestInstance): boolean {
+  return (
+    rung.findAll(
+      (n: any) => n.type === "Icon" && n.props.name === "checkmark",
+    ).length > 0
+  );
+}
+
+// Flatten the style prop (which may be an array with false values) into a list
+// of plain objects so we can inspect individual style keys.
+function flattenStyles(rung: TestRenderer.ReactTestInstance): any[] {
+  const raw: any[] = [].concat((rung as any).props?.style ?? []);
+  return raw.filter((s) => s && typeof s === "object");
+}
+
+// Does the rung carry the "isCurrent" highlight? dayCircleCurrent is the only
+// style in earn.tsx with borderStyle: "dashed".
+function rungHasCurrentStyle(rung: TestRenderer.ReactTestInstance): boolean {
+  return flattenStyles(rung).some((s) => s.borderStyle === "dashed");
+}
+
+// Does the rung carry the "isToday" highlight? dayCircleToday is the only style
+// in earn.tsx with borderWidth: 2 (milestone and current both use 1.5).
+function rungHasTodayStyle(rung: TestRenderer.ReactTestInstance): boolean {
+  return flattenStyles(rung).some((s) => s.borderWidth === 2);
+}
+
+// Return the 1-based day numbers of every rung that carries a milestone star
+// badge. Uses findDayRungs so the star search is scoped to identified ladder
+// rungs rather than walking the whole tree (which would also pick up the star
+// icons in AdCard reward pills and other non-ladder elements).
+function milestoneDayNumbers(root: TestRenderer.ReactTestInstance): number[] {
+  const rungs = findDayRungs(root);
+  return rungs
+    .map((rung, i) => {
+      const hasStar =
+        rung.findAll(
+          (n: any) => n.type === "Icon" && n.props.name === "star",
+        ).length > 0;
+      return hasStar ? i + 1 : null;
     })
-    .filter((n): n is number => n != null)
-    .sort((a, b) => a - b);
+    .filter((n): n is number => n != null);
 }
 
 async function flush() {
@@ -284,5 +377,162 @@ describe("Earn screen check-in streak ladder milestones", () => {
     const tr = await renderEarn();
 
     expect(milestoneDayNumbers(tr.root)).toEqual([]);
+  });
+});
+
+describe("Earn screen check-in streak ladder – reward amounts", () => {
+  it("renders each rung with the matching reward value from the server ladder, in order", async () => {
+    const ladder = [100, 150, 200, 250, 300, 350, 400];
+    hoisted.checkinStatus = {
+      checkinStreak: 3,
+      checkedInToday: false,
+      ladder,
+      milestoneEvery: 7,
+      milestoneBonus: 500,
+      nextReward: 250,
+      nextIsMilestone: false,
+    };
+
+    const tr = await renderEarn();
+    const rungs = findDayRungs(tr.root);
+
+    // One rung per ladder entry, in order.
+    expect(rungs).toHaveLength(ladder.length);
+
+    // Each rung's "{reward} pts" label matches the corresponding ladder value.
+    rungs.forEach((rung, i) => {
+      const rewardText = rung.findAll(
+        (n: any) =>
+          n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
+      );
+      expect(rewardText).toHaveLength(1);
+      expect(collectText(rewardText[0])).toBe(`${ladder[i]} pts`);
+    });
+  });
+
+  it("reflects a different ladder array when the server returns different values", async () => {
+    const ladder = [50, 75, 100, 125, 150, 175, 999];
+    hoisted.checkinStatus = {
+      checkinStreak: 0,
+      checkedInToday: false,
+      ladder,
+      milestoneEvery: 7,
+      milestoneBonus: 999,
+      nextReward: 50,
+      nextIsMilestone: false,
+    };
+
+    const tr = await renderEarn();
+    const rungs = findDayRungs(tr.root);
+
+    expect(rungs).toHaveLength(ladder.length);
+    rungs.forEach((rung, i) => {
+      const rewardText = rung.findAll(
+        (n: any) =>
+          n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
+      );
+      expect(collectText(rewardText[0])).toBe(`${ladder[i]} pts`);
+    });
+  });
+});
+
+describe("Earn screen check-in streak ladder – active and current highlighting", () => {
+  it("marks days up to the streak as active (checkmark) and the next rung as current (no checkmark)", async () => {
+    const ladder = [100, 120, 140, 160, 180, 200, 240];
+    const streak = 3;
+    hoisted.checkinStatus = {
+      checkinStreak: streak,
+      checkedInToday: false,
+      ladder,
+      milestoneEvery: 7,
+      milestoneBonus: 500,
+      nextReward: 160,
+      nextIsMilestone: false,
+    };
+
+    const tr = await renderEarn();
+    const rungs = findDayRungs(tr.root);
+
+    expect(rungs).toHaveLength(ladder.length);
+
+    // Days 1..streak: isActive → checkmark replaces the day number.
+    for (let i = 0; i < streak; i++) {
+      expect(rungHasCheckmark(rungs[i])).toBe(true);
+    }
+
+    // Day streak+1: isCurrent → NOT active, so no checkmark (day number shown).
+    expect(rungHasCheckmark(rungs[streak])).toBe(false);
+    // isCurrent also applies the dashed-border highlight style.
+    expect(rungHasCurrentStyle(rungs[streak])).toBe(true);
+    // No other rung carries the dashed-border current highlight.
+    for (let i = 0; i < ladder.length; i++) {
+      if (i === streak) continue;
+      expect(rungHasCurrentStyle(rungs[i])).toBe(false);
+    }
+
+    // Days beyond streak+1: also not active.
+    for (let i = streak + 1; i < ladder.length; i++) {
+      expect(rungHasCheckmark(rungs[i])).toBe(false);
+    }
+  });
+
+  it("marks the streak day itself as active (isToday) when already checked in today", async () => {
+    const ladder = [100, 120, 140, 160, 180, 200, 240];
+    const streak = 5;
+    hoisted.checkinStatus = {
+      checkinStreak: streak,
+      checkedInToday: true,
+      ladder,
+      milestoneEvery: 7,
+      milestoneBonus: 500,
+      nextReward: 200,
+      nextIsMilestone: false,
+    };
+
+    const tr = await renderEarn();
+    const rungs = findDayRungs(tr.root);
+
+    expect(rungs).toHaveLength(ladder.length);
+
+    // All days up to and including the streak day are active (isToday is a
+    // style variant of active — the checkmark still replaces the day number).
+    for (let i = 0; i < streak; i++) {
+      expect(rungHasCheckmark(rungs[i])).toBe(true);
+    }
+
+    // The streak day itself (rungs[streak - 1]) carries the isToday accent
+    // border (borderWidth: 2) — distinguishable from the plain active style.
+    expect(rungHasTodayStyle(rungs[streak - 1])).toBe(true);
+    // Earlier active days only get dayCircleActive (no borderWidth: 2).
+    for (let i = 0; i < streak - 1; i++) {
+      expect(rungHasTodayStyle(rungs[i])).toBe(false);
+    }
+
+    // Days past the streak are not active (no check-in has reached them yet).
+    for (let i = streak; i < ladder.length; i++) {
+      expect(rungHasCheckmark(rungs[i])).toBe(false);
+    }
+  });
+
+  it("shows no active rungs when streak is zero (fresh user)", async () => {
+    hoisted.checkinStatus = {
+      checkinStreak: 0,
+      checkedInToday: false,
+      ladder: [100, 120, 140, 160, 180, 200, 240],
+      milestoneEvery: 7,
+      milestoneBonus: 500,
+      nextReward: 100,
+      nextIsMilestone: false,
+    };
+
+    const tr = await renderEarn();
+    const rungs = findDayRungs(tr.root);
+
+    // No day has been completed yet — every rung shows a day number, not a checkmark.
+    for (const rung of rungs) {
+      expect(rungHasCheckmark(rung)).toBe(false);
+    }
+    // Day 1 is the current rung (isCurrent = dayNum === 0 + 1 = 1, checkedInToday false).
+    expect(rungs).toHaveLength(7);
   });
 });

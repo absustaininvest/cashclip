@@ -107,10 +107,18 @@ vi.mock("@expo-google-fonts/outfit", () => ({
   Outfit_600SemiBold: "Outfit_600SemiBold",
   Outfit_700Bold: "Outfit_700Bold",
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useFocusEffect: (cb: () => void) => cb(),
+}));
 
 // App-level dependencies.
 vi.mock("@/components/SponsoredSection", () => ({ default: () => null }));
+vi.mock("@/components/Chipley", () => ({ default: () => null }));
+vi.mock("@/lib/CelebrationContext", () => ({
+  useCelebration: () => ({ celebrate: vi.fn() }),
+  CelebrationProvider: ({ children }: any) => children,
+}));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1", username: "tester" } }) }));
 vi.mock("@/lib/LanguageContext", async () => {
   const i18n: any = await vi.importActual("@/lib/i18n");
