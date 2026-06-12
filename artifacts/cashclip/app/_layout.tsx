@@ -229,6 +229,9 @@ function RootLayout() {
                       consent screen must be visible so the user can interact with
                       it, otherwise the app would sit frozen behind the splash. */}
                   <TrackingConsentGate onConsentDone={() => {
+                    // LevelPlay (ironSource) replaces AdMob as the ad platform.
+                    // initializeAdMob() is the stable entry-point — internally it
+                    // now initialises the LevelPlay SDK instead.
                     initializeAdMob().then((initialized) => {
                       if (initialized) preloadRewardedAd();
                     });

@@ -261,6 +261,12 @@ function transition(
  * actually emitted this evaluation (may be empty).
  */
 export function evaluateAdmobAlerts(input: AdmobAlertInput): AdmobAlert[] {
+  // When ADMOB_ALERTS_DISABLED is set (e.g. migrating away from AdMob) skip
+  // all evaluation so stale alerts auto-clear and no new ones fire.
+  if (/^(1|true|yes|on)$/i.test((process.env.ADMOB_ALERTS_DISABLED ?? "").trim())) {
+    return [];
+  }
+
   const cfg = getAdmobAlertConfig();
   const now = input.now ?? Date.now();
   const fired: AdmobAlert[] = [];

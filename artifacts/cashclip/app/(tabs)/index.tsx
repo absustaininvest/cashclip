@@ -26,6 +26,7 @@ import SponsoredSection from "@/components/SponsoredSection";
 import NativeAdCard, { CARD_WIDTH, PLACEHOLDER_CARDS, adSlotReward } from "@/components/NativeAdCard";
 import RewardedAdModal from "@/components/RewardedAdModal";
 import InFeedBanner from "@/components/InFeedBanner";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 import Chipley from "@/components/Chipley";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -292,6 +293,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: webTopPad }]}>
+      <MaintenanceBanner />
       <FlatList
         data={adIndices}
         keyExtractor={(item) => item.id}
