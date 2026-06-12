@@ -773,6 +773,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
+   * GET /api/admin/ad-status
+   *
+   * Returns the native-adapter presence state for the live app build.
+   * Because native module presence can only be confirmed on-device, the server
+   * reflects operator-set env vars (AD_LP_NATIVE, AD_UNITY_NATIVE) that should
+   * be toggled to "true" after verifying a native build has the adapters
+   * compiled in.  Defaults to false (OTA / unknown) when not set.
+   *
+   * Response shape: { lpNative, unityNative, adSystemActive }
+   *   lpNative       — LevelPlay (IronSource) native module is in the live build
+   *   unityNative    — Unity Ads native module is in the live build
+   *   adSystemActive — both native modules present AND IRONSOURCE_APP_KEY configured
+   */
+  app.get("/api/admin/ad-status", adminMiddleware, (_req, res) => {
+    const parseBool = (v: string | undefined): boolean =>
+      v === "1" || v === "true" || v === "yes" || v === "on";
+    const lpNative = parseBool(process.env.AD_LP_NATIVE);
+    const unityNative = parseBool(process.env.AD_UNITY_NATIVE);
+    const ironsourceConfigured = Boolean(process.env.IRONSOURCE_APP_KEY);
+    const adSystemActive = lpNative && unityNative && ironsourceConfigured;
+    res.json({ lpNative, unityNative, adSystemActive });
+  });
+
+  /**
    * GET /api/admin/integrations/key-health
    *
    * Returns which persisted integration keys failed to decrypt on the most

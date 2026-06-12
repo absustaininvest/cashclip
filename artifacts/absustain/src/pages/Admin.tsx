@@ -3890,6 +3890,12 @@ interface HubData {
   integrations: { total: number; green: number; items: HubIntegration[] };
 }
 
+interface AdStatus {
+  lpNative: boolean;
+  unityNative: boolean;
+  adSystemActive: boolean;
+}
+
 interface AdmobAlert {
   id: string;
   condition: "stale_sync" | "revenue_divergence";
@@ -4146,6 +4152,7 @@ export function IntegrationHubPanel({
 }) {
   const [data, setData] = useState<HubData | null>(null);
   const [admobAlerts, setAdmobAlerts] = useState<AdmobAlert[]>([]);
+  const [adStatus, setAdStatus] = useState<AdStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -4155,7 +4162,7 @@ export function IntegrationHubPanel({
     setLoading(true);
     setError("");
     try {
-      const [hubRes, alertsRes, alertEmailRes] = await Promise.all([
+      const [hubRes, alertsRes, alertEmailRes, adStatusRes] = await Promise.all([
         fetch("/api/admin/integration-hub", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -4163,6 +4170,9 @@ export function IntegrationHubPanel({
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/admob/alert-email", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/ad-status", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -4184,6 +4194,9 @@ export function IntegrationHubPanel({
       }
       if (alertEmailRes.ok) {
         setAlertEmail((await alertEmailRes.json()) as AlertEmailSettings);
+      }
+      if (adStatusRes.ok) {
+        setAdStatus((await adStatusRes.json()) as AdStatus);
       }
       setLastRefreshed(new Date());
     } catch (err: any) {
@@ -4344,6 +4357,105 @@ export function IntegrationHubPanel({
           </p>
         </div>
       </div>
+
+      {/* Ad adapter status card */}
+      {(() => {
+        // dot color is determined solely by native module presence, not by
+        // whether the app key is configured — the task spec requires:
+        //   green = both LP + Unity native modules detected
+        //   amber = LevelPlay present but Unity absent
+        //   grey  = OTA build (no native modules)
+        const dotStatus: "green" | "amber" | "grey" =
+          adStatus === null
+            ? "grey"
+            : adStatus.lpNative && adStatus.unityNative
+              ? "green"
+              : adStatus.lpNative && !adStatus.unityNative
+                ? "amber"
+                : "grey";
+        const label =
+          adStatus === null
+            ? "Loading…"
+            : adStatus.lpNative && adStatus.unityNative
+              ? adStatus.adSystemActive
+                ? "Ad system active"
+                : "Native adapters present — key not configured"
+              : adStatus.lpNative && !adStatus.unityNative
+                ? "Unity native module absent"
+                : "OTA build — no native adapters";
+        const detail =
+          adStatus === null
+            ? null
+            : adStatus.lpNative && adStatus.unityNative
+              ? adStatus.adSystemActive
+                ? "LevelPlay + Unity compiled into live build · ads are serving"
+                : "Both native modules are present but IRONSOURCE_APP_KEY is not configured — ads won't initialize until the key is added and the API is re-published"
+              : adStatus.lpNative && !adStatus.unityNative
+                ? "LevelPlay is present but Unity Ads adapter is missing — ad revenue is $0 until a native build with the Unity pod/AAR ships"
+                : "Neither LevelPlay nor Unity native modules are in the live build — running on OTA update or an old binary";
+        const dotColor =
+          dotStatus === "green"
+            ? "bg-[#00E676]"
+            : dotStatus === "amber"
+              ? "bg-amber-400"
+              : "bg-white/20";
+        const pingColor =
+          dotStatus === "green"
+            ? "bg-[#00E676]/60"
+            : dotStatus === "amber"
+              ? "bg-amber-400/60"
+              : "";
+        const textColor =
+          dotStatus === "green"
+            ? "text-[#00E676]"
+            : dotStatus === "amber"
+              ? "text-amber-400"
+              : "text-white/40";
+        return (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0 mt-1">
+                  {dotStatus !== "grey" && (
+                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${pingColor}`} />
+                  )}
+                  <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                </span>
+                <div>
+                  <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">
+                    Ad Adapter Status
+                  </p>
+                  <p className={`text-base font-bold ${textColor}`}>{label}</p>
+                  {detail && (
+                    <p className="text-white/30 text-xs mt-1 leading-relaxed max-w-xl">
+                      {detail}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <p className="text-white/20 text-[10px]">LevelPlay</p>
+                <p className={`text-sm font-semibold ${adStatus?.lpNative ? "text-[#00E676]" : "text-white/20"}`}>
+                  {adStatus === null ? "—" : adStatus.lpNative ? "Present" : "Absent"}
+                </p>
+                <p className="text-white/20 text-[10px] mt-1.5">Unity Ads</p>
+                <p className={`text-sm font-semibold ${adStatus?.unityNative ? "text-[#00E676]" : "text-white/20"}`}>
+                  {adStatus === null ? "—" : adStatus.unityNative ? "Present" : "Absent"}
+                </p>
+              </div>
+            </div>
+            {dotStatus !== "green" && adStatus !== null && (
+              <p className="text-white/20 text-[10px] mt-3 border-t border-white/[0.05] pt-3">
+                To mark a native build as live: set{" "}
+                <span className="font-mono text-white/30">AD_LP_NATIVE=true</span>
+                {" and "}
+                <span className="font-mono text-white/30">AD_UNITY_NATIVE=true</span>
+                {" in production secrets, then re-publish the API."}
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Integrations grid */}
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
