@@ -99,6 +99,7 @@
     "expo-secure-store": "^15.0.8",
     "expo-tracking-transparency": "^6.0.8",
     "expo-updates": "~29.0.17",
+    "react-native-unity-ads": "^1.0.3",
     "vexo-analytics": "^1.5.7"
   }
 }
