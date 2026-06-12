@@ -265,6 +265,7 @@ export default function SurveysScreen() {
   );
   const providersList: any[] = (externalData as any)?.providers || [];
   const anyProviderConfigured = providersList.some((p) => p.configured);
+  const degradedProviders: string[] = (externalData as any)?.degradedProviders || [];
   const externalTotalReward = externalSurveys.reduce((sum: number, s: ExternalSurvey) => sum + s.reward, 0);
 
   return (
@@ -327,8 +328,32 @@ export default function SurveysScreen() {
           ) : externalSurveys.length === 0 ? (
             <View style={styles.allDoneCard}>
               <Chipley pose="sleep" size={96} />
-              <Text style={styles.allDoneTitle}>Surveys Coming Soon</Text>
-              <Text style={styles.allDoneText}>We're finishing up with survey availability. New surveys will appear here automatically — check back in a day or two.</Text>
+              {degradedProviders.length > 0 && degradedProviders.length === providersList.filter((p) => p.configured).length ? (
+                <>
+                  <Text style={styles.allDoneTitle}>Surveys Temporarily Unavailable</Text>
+                  <Text style={styles.allDoneText}>Our survey partners are having a brief outage. No action needed — surveys will reappear automatically once they recover.</Text>
+                  <Pressable
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); refetchExternal(); }}
+                    style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1, marginTop: 12 }]}
+                  >
+                    <Feather name="refresh-cw" size={16} color={Colors.background} />
+                    <Text style={styles.retryBtnText}>Check Again</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.allDoneTitle}>Surveys Coming Soon</Text>
+                  <Text style={styles.allDoneText}>We're finishing up with survey availability. New surveys will appear here automatically — check back in a day or two.</Text>
+                  {degradedProviders.length > 0 && (
+                    <View style={[styles.degradedBanner, { marginTop: 12 }]}>
+                      <Feather name="alert-triangle" size={15} color="#F5A623" />
+                      <Text style={styles.degradedBannerText}>
+                        Some survey sources are temporarily unavailable, which may be reducing the number of surveys available right now.
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           ) : (
             <>
@@ -353,6 +378,15 @@ export default function SurveysScreen() {
                   </View>
                 </View>
               </LinearGradient>
+
+              {degradedProviders.length > 0 && (
+                <View style={styles.degradedBanner}>
+                  <Feather name="alert-triangle" size={15} color="#F5A623" />
+                  <Text style={styles.degradedBannerText}>
+                    Some survey sources are temporarily unavailable. The surveys shown below are still active — more may appear once all providers recover.
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.infoCard}>
                 <Feather name="info" size={16} color={Colors.textSecondary} />
@@ -534,6 +568,12 @@ const styles = StyleSheet.create({
   allDoneCard: { alignItems: "center", paddingVertical: 40, gap: 8 },
   allDoneTitle: { fontFamily: "Outfit_700Bold", fontSize: 18, color: Colors.text },
   allDoneText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: Colors.textMuted, textAlign: "center" },
+  degradedBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "rgba(245,166,35,0.10)", borderRadius: 12, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: "rgba(245,166,35,0.30)",
+  },
+  degradedBannerText: { fontFamily: "Outfit_400Regular", fontSize: 13, color: "#F5A623", flex: 1, lineHeight: 18 },
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: "flex-end" },
   modalContent: {
     backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,

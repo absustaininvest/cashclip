@@ -132,87 +132,75 @@ export function sanitizeSurveyUrl(url: string | undefined, apiKey: string | unde
 }
 
 async function fetchPollfishSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
-  try {
-    const res = await fetch(`${config.baseUrl}/surveys/available`, {
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!res.ok) throw new Error(`Pollfish API error: ${res.status}`);
-    const data = await res.json() as any;
-    const surveys: ExternalSurvey[] = (data.surveys || []).map((s: any) => ({
-      id: `pollfish_${s.survey_id || s.id}`,
-      provider: "pollfish" as SurveyProviderKey,
-      providerName: "Pollfish",
-      title: s.survey_name || s.title || "Pollfish Survey",
-      description: s.description || "Complete this survey to earn a reward.",
-      reward: typeof s.reward_value === "number" ? s.reward_value : parseFloat(s.reward_value || "0.50"),
-      estimatedMinutes: s.loi || s.estimated_minutes || 5,
-      category: s.category || "General",
-      difficulty: (s.loi && s.loi <= 5 ? "easy" : s.loi <= 10 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.survey_url || `https://wss.pollfish.com/link/survey?survey_id=${s.survey_id || s.id}`, config.apiKey, "pollfish"),
-    }));
-    return surveys;
-  } catch (err) {
-    return [];
-  }
+  const res = await fetch(`${config.baseUrl}/surveys/available`, {
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`Pollfish API error: ${res.status}`);
+  const data = await res.json() as any;
+  const surveys: ExternalSurvey[] = (data.surveys || []).map((s: any) => ({
+    id: `pollfish_${s.survey_id || s.id}`,
+    provider: "pollfish" as SurveyProviderKey,
+    providerName: "Pollfish",
+    title: s.survey_name || s.title || "Pollfish Survey",
+    description: s.description || "Complete this survey to earn a reward.",
+    reward: typeof s.reward_value === "number" ? s.reward_value : parseFloat(s.reward_value || "0.50"),
+    estimatedMinutes: s.loi || s.estimated_minutes || 5,
+    category: s.category || "General",
+    difficulty: (s.loi && s.loi <= 5 ? "easy" : s.loi <= 10 ? "medium" : "hard") as "easy" | "medium" | "hard",
+    surveyUrl: sanitizeSurveyUrl(s.survey_url || `https://wss.pollfish.com/link/survey?survey_id=${s.survey_id || s.id}`, config.apiKey, "pollfish"),
+  }));
+  return surveys;
 }
 
 async function fetchCintSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
-  try {
-    const res = await fetch(`${config.baseUrl}/surveys/available`, {
-      headers: {
-        "X-Api-Key": config.apiKey!,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!res.ok) throw new Error(`Cint API error: ${res.status}`);
-    const data = await res.json() as any;
-    const surveys: ExternalSurvey[] = (data.surveys || data.items || []).map((s: any) => ({
-      id: `cint_${s.id || s.surveyId}`,
-      provider: "cint" as SurveyProviderKey,
-      providerName: "Cint",
-      title: s.name || s.title || "Cint Research Survey",
-      description: s.description || "Market research survey from Cint.",
-      reward: typeof s.cpi === "number" ? s.cpi : parseFloat(s.cpi || "1.00"),
-      estimatedMinutes: s.loi || s.length_of_interview || 8,
-      category: s.category || "Market Research",
-      difficulty: (s.loi && s.loi <= 6 ? "easy" : s.loi <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.link || s.survey_url || `https://survey.cint.com/${s.id || s.surveyId}`, config.apiKey, "cint"),
-    }));
-    return surveys;
-  } catch (err) {
-    return [];
-  }
+  const res = await fetch(`${config.baseUrl}/surveys/available`, {
+    headers: {
+      "X-Api-Key": config.apiKey!,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`Cint API error: ${res.status}`);
+  const data = await res.json() as any;
+  const surveys: ExternalSurvey[] = (data.surveys || data.items || []).map((s: any) => ({
+    id: `cint_${s.id || s.surveyId}`,
+    provider: "cint" as SurveyProviderKey,
+    providerName: "Cint",
+    title: s.name || s.title || "Cint Research Survey",
+    description: s.description || "Market research survey from Cint.",
+    reward: typeof s.cpi === "number" ? s.cpi : parseFloat(s.cpi || "1.00"),
+    estimatedMinutes: s.loi || s.length_of_interview || 8,
+    category: s.category || "Market Research",
+    difficulty: (s.loi && s.loi <= 6 ? "easy" : s.loi <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
+    surveyUrl: sanitizeSurveyUrl(s.link || s.survey_url || `https://survey.cint.com/${s.id || s.surveyId}`, config.apiKey, "cint"),
+  }));
+  return surveys;
 }
 
 async function fetchLucidSurveys(config: ProviderConfig): Promise<ExternalSurvey[]> {
-  try {
-    const res = await fetch(`${config.baseUrl}/surveys/available`, {
-      headers: {
-        Authorization: config.apiKey!,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!res.ok) throw new Error(`Lucid API error: ${res.status}`);
-    const data = await res.json() as any;
-    const surveys: ExternalSurvey[] = (data.AllSurveys || data.surveys || []).map((s: any) => ({
-      id: `lucid_${s.SurveyNumber || s.id}`,
-      provider: "lucid" as SurveyProviderKey,
-      providerName: "Lucid (Cint)",
-      title: s.SurveyName || s.title || "Lucid Research Survey",
-      description: s.SurveyBrief || s.description || "Research survey from Lucid marketplace.",
-      reward: typeof s.CPI === "number" ? s.CPI : parseFloat(s.CPI || "1.20"),
-      estimatedMinutes: s.LOI || s.loi || 10,
-      category: s.SurveyGroup || s.category || "Research",
-      difficulty: (s.LOI && s.LOI <= 6 ? "easy" : s.LOI <= 15 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.SurveyURL || s.survey_url || `https://www.samplicio.us/s/${s.SurveyNumber || s.id}`, config.apiKey, "lucid"),
-    }));
-    return surveys;
-  } catch (err) {
-    return [];
-  }
+  const res = await fetch(`${config.baseUrl}/surveys/available`, {
+    headers: {
+      Authorization: config.apiKey!,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`Lucid API error: ${res.status}`);
+  const data = await res.json() as any;
+  const surveys: ExternalSurvey[] = (data.AllSurveys || data.surveys || []).map((s: any) => ({
+    id: `lucid_${s.SurveyNumber || s.id}`,
+    provider: "lucid" as SurveyProviderKey,
+    providerName: "Lucid (Cint)",
+    title: s.SurveyName || s.title || "Lucid Research Survey",
+    description: s.SurveyBrief || s.description || "Research survey from Lucid marketplace.",
+    reward: typeof s.CPI === "number" ? s.CPI : parseFloat(s.CPI || "1.20"),
+    estimatedMinutes: s.LOI || s.loi || 10,
+    category: s.SurveyGroup || s.category || "Research",
+    difficulty: (s.LOI && s.LOI <= 6 ? "easy" : s.LOI <= 15 ? "medium" : "hard") as "easy" | "medium" | "hard",
+    surveyUrl: sanitizeSurveyUrl(s.SurveyURL || s.survey_url || `https://www.samplicio.us/s/${s.SurveyNumber || s.id}`, config.apiKey, "lucid"),
+  }));
+  return surveys;
 }
 
 export function buildCpxWallUrl(userId: string, appId: string, apiKey: string, username?: string, email?: string): string {
@@ -257,91 +245,84 @@ interface CpxFetchOpts {
 // JSON survey API (output_method=api). Each survey becomes its own card on the
 // Surveys tab. CPX returns a per-user, per-survey signed deep link in `href`.
 // `payout` is the user-facing payout in USD (the CPX app is configured in USD).
-// Falls back to the single offerwall card when the API returns nothing or errors
-// so the Surveys tab is never empty.
+// Throws on HTTP errors (caller aggregator marks CPX as degraded).
+// Falls back to the single offerwall card only when the API returns 0 surveys
+// (not an error condition — just no available surveys for this user right now).
 async function fetchCpxSurveys(config: ProviderConfig, userId: string, opts?: CpxFetchOpts): Promise<ExternalSurvey[]> {
   const appId = process.env.CPX_APP_ID;
   if (!appId || !config.apiKey || !userId) return [];
-  try {
-    const secureHash = md5hex(`${userId}-${config.apiKey}`);
-    const params = new URLSearchParams({
-      app_id: appId,
-      ext_user_id: userId,
-      secure_hash: secureHash,
-      output_method: "api",
-      limit: "20",
-    });
-    if (opts?.ipUser) params.set("ip_user", opts.ipUser);
-    if (opts?.userAgent) params.set("user_agent", opts.userAgent);
+  const secureHash = md5hex(`${userId}-${config.apiKey}`);
+  const params = new URLSearchParams({
+    app_id: appId,
+    ext_user_id: userId,
+    secure_hash: secureHash,
+    output_method: "api",
+    limit: "20",
+  });
+  if (opts?.ipUser) params.set("ip_user", opts.ipUser);
+  if (opts?.userAgent) params.set("user_agent", opts.userAgent);
 
-    const res = await fetch(`https://live-api.cpx-research.com/api/get-surveys.php?${params.toString()}`, {
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!res.ok) return [cpxWallCard(userId, appId, config.apiKey)];
+  const res = await fetch(`https://live-api.cpx-research.com/api/get-surveys.php?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(`CPX Research API error: ${res.status}`);
 
-    const data = await res.json() as any;
-    const list = Array.isArray(data?.surveys) ? data.surveys : [];
+  const data = await res.json() as any;
+  const list = Array.isArray(data?.surveys) ? data.surveys : [];
 
-    const surveys: ExternalSurvey[] = list
-      .map((s: any): ExternalSurvey | null => {
-        const id = String(s?.id ?? s?.survey_id ?? "").trim();
-        const rawUrl = String(s?.href ?? s?.href_new ?? "").trim();
-        const url = sanitizeSurveyUrl(rawUrl, config.apiKey, "cpx");
-        if (!id || !url) return null;
-        const reward = parseFloat(String(s?.payout ?? s?.payout_publisher_usd ?? "0")) || 0;
-        const minutes = parseInt(String(s?.loi ?? "5"), 10) || 5;
-        const category = String(s?.category || "Survey").trim() || "Survey";
-        return {
-          id: `cpx_${id}`,
-          provider: "cpx" as SurveyProviderKey,
-          providerName: "CPX Research",
-          title: `${category} Survey`,
-          description: `Earn $${reward.toFixed(2)} for about ${minutes} min — payout credited automatically.`,
-          reward,
-          estimatedMinutes: minutes,
-          category,
-          difficulty: cpxDifficulty(minutes),
-          surveyUrl: url,
-        };
-      })
-      .filter((s: ExternalSurvey | null): s is ExternalSurvey => s !== null);
+  const surveys: ExternalSurvey[] = list
+    .map((s: any): ExternalSurvey | null => {
+      const id = String(s?.id ?? s?.survey_id ?? "").trim();
+      const rawUrl = String(s?.href ?? s?.href_new ?? "").trim();
+      const url = sanitizeSurveyUrl(rawUrl, config.apiKey, "cpx");
+      if (!id || !url) return null;
+      const reward = parseFloat(String(s?.payout ?? s?.payout_publisher_usd ?? "0")) || 0;
+      const minutes = parseInt(String(s?.loi ?? "5"), 10) || 5;
+      const category = String(s?.category || "Survey").trim() || "Survey";
+      return {
+        id: `cpx_${id}`,
+        provider: "cpx" as SurveyProviderKey,
+        providerName: "CPX Research",
+        title: `${category} Survey`,
+        description: `Earn $${reward.toFixed(2)} for about ${minutes} min — payout credited automatically.`,
+        reward,
+        estimatedMinutes: minutes,
+        category,
+        difficulty: cpxDifficulty(minutes),
+        surveyUrl: url,
+      };
+    })
+    .filter((s: ExternalSurvey | null): s is ExternalSurvey => s !== null);
 
-    if (surveys.length === 0) return [cpxWallCard(userId, appId, config.apiKey)];
-    return surveys;
-  } catch {
-    return [cpxWallCard(userId, appId, config.apiKey)];
-  }
+  if (surveys.length === 0) return [cpxWallCard(userId, appId, config.apiKey)];
+  return surveys;
 }
 
 async function fetchBitlabsSurveys(config: ProviderConfig, userId: string): Promise<ExternalSurvey[]> {
-  try {
-    const url = new URL(`${config.baseUrl}/client/surveys`);
-    if (userId) url.searchParams.set("uid", userId);
-    const res = await fetch(url.toString(), {
-      headers: {
-        "X-Api-Token": config.apiKey!,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!res.ok) throw new Error(`BitLabs API error: ${res.status}`);
-    const data = await res.json() as any;
-    const list = data.data?.surveys || data.surveys || [];
-    const surveys: ExternalSurvey[] = list.map((s: any) => ({
-      id: `bitlabs_${s.id || s.network_id}`,
-      provider: "bitlabs" as SurveyProviderKey,
-      providerName: "BitLabs",
-      title: s.title || `BitLabs Survey (${s.category?.name || "General"})`,
-      description: s.description || "Quick paid survey from BitLabs.",
-      reward: typeof s.value === "number" ? s.value : parseFloat(s.value || s.cpi || "0.50"),
-      estimatedMinutes: parseInt(s.loi || s.length || "6", 10),
-      category: s.category?.name || "General",
-      difficulty: (parseInt(s.loi || "6", 10) <= 5 ? "easy" : parseInt(s.loi || "10", 10) <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
-      surveyUrl: sanitizeSurveyUrl(s.link || s.click_url, config.apiKey, "bitlabs"),
-    }));
-    return surveys;
-  } catch (err) {
-    return [];
-  }
+  const url = new URL(`${config.baseUrl}/client/surveys`);
+  if (userId) url.searchParams.set("uid", userId);
+  const res = await fetch(url.toString(), {
+    headers: {
+      "X-Api-Token": config.apiKey!,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`BitLabs API error: ${res.status}`);
+  const data = await res.json() as any;
+  const list = data.data?.surveys || data.surveys || [];
+  const surveys: ExternalSurvey[] = list.map((s: any) => ({
+    id: `bitlabs_${s.id || s.network_id}`,
+    provider: "bitlabs" as SurveyProviderKey,
+    providerName: "BitLabs",
+    title: s.title || `BitLabs Survey (${s.category?.name || "General"})`,
+    description: s.description || "Quick paid survey from BitLabs.",
+    reward: typeof s.value === "number" ? s.value : parseFloat(s.value || s.cpi || "0.50"),
+    estimatedMinutes: parseInt(s.loi || s.length || "6", 10),
+    category: s.category?.name || "General",
+    difficulty: (parseInt(s.loi || "6", 10) <= 5 ? "easy" : parseInt(s.loi || "10", 10) <= 12 ? "medium" : "hard") as "easy" | "medium" | "hard",
+    surveyUrl: sanitizeSurveyUrl(s.link || s.click_url, config.apiKey, "bitlabs"),
+  }));
+  return surveys;
 }
 
 export async function fetchExternalSurveys(userId: string, opts?: CpxFetchOpts): Promise<SurveyListResponse[]> {
@@ -364,9 +345,13 @@ export async function fetchExternalSurveys(userId: string, opts?: CpxFetchOpts):
     })
   );
 
-  return results
-    .filter((r): r is PromiseFulfilledResult<SurveyListResponse> => r.status === "fulfilled")
-    .map((r) => r.value);
+  return results.map((r, i) => {
+    if (r.status === "fulfilled") return r.value;
+    const provider = configured[i].key;
+    const message = r.reason instanceof Error ? r.reason.message : "Temporarily unavailable";
+    console.warn(`[Surveys] provider=${provider} degraded: ${message}`);
+    return { surveys: [], provider, error: "Temporarily unavailable" };
+  });
 }
 
 interface ProviderCompletionPayload {

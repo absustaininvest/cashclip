@@ -73,9 +73,14 @@ export function registerSurveyRoutes(app: Express): void {
         clamped.map((s) => ({ id: s.id, provider: s.provider, reward: s.reward, surveyUrl: s.surveyUrl }))
       );
 
+      const degradedProviders = results
+        .filter((r) => r.error)
+        .map((r) => r.provider);
+
       res.json({
         surveys: clamped,
         providers: providerStatuses,
+        degradedProviders,
         count: clamped.length,
       });
     } catch (err) {
