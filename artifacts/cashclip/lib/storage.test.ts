@@ -243,12 +243,17 @@ describe("withdraw enforces limits, deducts the balance, and records transaction
   });
 });
 
-// These are the anti-abuse guards that decide whether a cash-out is even allowed
-// to start: a multi-day new-account hold and a per-day withdrawal-count cap. They
-// are enforced by canWithdraw() reading the account-creation timestamp and the
-// per-day withdrawal counter that recordWithdrawalAttempt() maintains. A silent
-// break here lets an abusive account cash out before the hold ends or more often
-// than the daily cap allows, so each branch is pinned below.
+// canWithdraw() and recordWithdrawalAttempt() are CLIENT-SIDE UX pre-checks —
+// fast local hints that surface hold/cap messages before a request hits the
+// server. The authoritative enforcement lives on the server:
+//   • Hold:      POST /api/withdrawals checks user.createdAt (from DB) against
+//                NEW_ACCOUNT_HOLD_HOURS. Reinstalling the app cannot bypass this.
+//   • Daily cap: createWithdrawalAtomic() counts today's withdrawals in the DB
+//                against MAX_WITHDRAWALS_PER_DAY inside a locked transaction.
+// Breaking canWithdraw() silently makes the local UX less helpful (the user
+// hits the server before seeing the hint) but does NOT open a security hole —
+// the server will still reject ineligible requests. Keeping these tests ensures
+// the UX hints stay consistent with the server rules they mirror.
 const ACCOUNT_CREATED_KEY = "cashclip_account_created";
 const WITHDRAWAL_COUNT_KEY = "cashclip_withdrawal_count";
 const LAST_WITHDRAWAL_DATE_KEY = "cashclip_last_withdrawal_date";

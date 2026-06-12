@@ -911,8 +911,16 @@ export async function getGamesPlayedToday(): Promise<number> {
 }
 
 const DAILY_EARNING_CAP = 7.00;
-const WITHDRAWAL_HOLD_DAYS = 5;
-const MAX_DAILY_WITHDRAWALS = 1;
+
+// Client-side UX hint values — these mirror the server's defaults so the
+// local pre-checks are consistent with what the server will enforce.
+// The authoritative enforcement lives on the server (POST /api/withdrawals):
+//   hold  → user.createdAt from DB vs NEW_ACCOUNT_HOLD_HOURS (default 48 h)
+//   cap   → DB count of today's withdrawals vs MAX_WITHDRAWALS_PER_DAY (default 2)
+// Clearing local storage or reinstalling bypasses these hints; it does NOT
+// bypass the server. Keep these in sync with server defaults when they change.
+const WITHDRAWAL_HOLD_DAYS = 2;       // matches NEW_ACCOUNT_HOLD_HOURS = 48 h
+const MAX_DAILY_WITHDRAWALS = 2;      // matches MAX_WITHDRAWALS_PER_DAY = 2
 const SUSPICIOUS_EARNING_RATE = 5.00;
 
 export async function ensureAccountCreated(): Promise<void> {
@@ -962,6 +970,20 @@ export async function canEarnMore(): Promise<{ allowed: boolean; reason?: string
   return { allowed: true };
 }
 
+// Client-side UX pre-check for withdrawal eligibility. Used as a fast local
+// hint to surface hold/cap messages before the request even reaches the server.
+// IMPORTANT: this is NOT the security enforcement — the server re-checks both
+// rules authoritatively on every POST /api/withdrawals request.
+//
+// Limitations of the local check:
+//   • Hold check: ACCOUNT_CREATED in AsyncStorage is set the first time the
+//     user earns something (via ensureAccountCreated), NOT the actual DB
+//     registration time. Reinstalling the app resets it, so a long-time user
+//     who reinstalls may be shown a false "hold" warning that the server won't
+//     enforce. Treat this branch as advisory only.
+//   • Daily cap: more reliable — recordWithdrawalAttempt() is called after
+//     every successful withdrawal, so the local count stays in sync unless the
+//     app is reinstalled.
 export async function canWithdraw(): Promise<{ allowed: boolean; reason?: string }> {
   const accountAge = await getAccountAge();
   if (accountAge < WITHDRAWAL_HOLD_DAYS) {

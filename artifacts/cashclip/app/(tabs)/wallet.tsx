@@ -29,6 +29,8 @@ import {
   getWithdrawalTiers,
   getSeenQualifiedReferrals,
   setSeenQualifiedReferrals,
+  canWithdraw,
+  recordWithdrawalAttempt,
   type UserStats,
   type Transaction,
   type WithdrawalTier,
@@ -324,15 +326,29 @@ export default function WalletScreen() {
   }, []);
 
   const openWithdrawModal = useCallback(async () => {
-    const [integrity, srv] = await Promise.all([
+    const [integrity, srv, eligibility] = await Promise.all([
       checkDeviceIntegrity(),
       fetchServerBalance(),
+      // Client-side UX pre-check (advisory only — server enforces authoritatively).
+      // The daily-cap branch is reliable; the hold branch may be stale after a
+      // reinstall. Either way the server will catch any ineligible request.
+      canWithdraw(),
     ]);
 
     if (!integrity.clean) {
       Alert.alert(
         "Device Not Supported",
         "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+      );
+      return;
+    }
+
+    // Fast local hint for daily cap — skip for hold_period since the local
+    // ACCOUNT_CREATED timestamp resets on reinstall and may be unreliable.
+    if (!eligibility.allowed && eligibility.reason === "daily_limit") {
+      Alert.alert(
+        "Daily Limit Reached",
+        "You've already made your maximum withdrawals for today. Come back tomorrow!"
       );
       return;
     }
@@ -385,6 +401,11 @@ export default function WalletScreen() {
         amount: selectedTier.amount,
         paypalEmail: paypalEmail.trim(),
       });
+
+      // Keep the local daily-count hint in sync so canWithdraw() can give
+      // accurate feedback before the next open. Fire-and-forget — the server
+      // is the authoritative enforcer and a failure here is harmless.
+      recordWithdrawalAttempt().catch(() => {});
 
       setShowWithdrawModal(false);
       const payout = selectedTier.totalPayout;
