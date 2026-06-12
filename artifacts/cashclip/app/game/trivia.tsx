@@ -112,7 +112,7 @@ export default function TriviaGame() {
     setCorrectCount(0);
     setSelectedAnswer(null);
     setIsCorrect(null);
-    setTotalReward(0);
+    setEarnedPts(0);
     bankedRef.current = false;
     setTimeLeft(TIME_PER_QUESTION);
     setGameState("playing");
