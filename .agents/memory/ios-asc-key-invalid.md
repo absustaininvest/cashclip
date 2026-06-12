@@ -72,15 +72,14 @@ With the good Admin key this sailed past creds (`✔ Updated provisioning profil
 build queues. NOTE: this only fixes the build; the saved secret is still stale for
 everything else until a fresh session reloads the snapshot — re-verify later.
 
-## `eas submit` credential override (Jun 2026)
+## `eas submit` credential override — RESOLVED (Jun 2026)
 `eas submit` IGNORES the `EXPO_ASC_API_KEY_PATH`/`EXPO_ASC_KEY_ID`/`EXPO_ASC_ISSUER_ID`
-env vars that work for `eas build`. It always uses the EAS-stored key.
-**To bypass the EAS-stored key**, add ALL THREE fields to `submit.production.ios` in
-`eas.json`: `ascApiKeyPath` (local .p8 file path), `ascApiKeyIssuerId`, `ascApiKeyId`.
-The CLI reads the file locally and sends the key content to EAS servers. If the file
-path doesn't exist, it falls back to interactive prompt → fails in non-interactive mode.
-**Jun 2026 status:** both keys revoked at Apple — EAS-stored `87Z27CQ96U` and workspace
-`36377NCG8Z` both return 401. Verified with `@expo/apple-utils` Token class directly.
-Owner must create a new Team Admin key in ASC, update `APPLE_ASC_KEY_ID`+`APPLE_ASC_PRIVATE_KEY`
-secrets, re-drop the .p8 in chat, write to `/tmp/asc_key.p8`, add the three eas.json
-submit fields pointing to it, and run `eas submit --platform ios --latest --profile production --non-interactive`.
+env vars that work for `eas build`. It reads credentials from the EAS-stored key (set via
+`eas credentials --platform ios`) or from explicit fields in `submit.production.ios` in
+`eas.json` (`ascApiKeyPath`, `ascApiKeyIssuerId`, `ascApiKeyId`).
+
+**Current state (post-build-40):** `eas.json` submit block has NO local override fields —
+EAS uses its stored credential. The stored key must be the current Admin Team Key. If submit
+starts 401-ing again, run `eas credentials --platform ios` in `artifacts/cashclip/` to
+replace the EAS-stored key with a fresh Admin Team Key from ASC, and update the
+`APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` workspace secrets to match.
