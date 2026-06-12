@@ -128,15 +128,15 @@ describe("verifyProviderCompletion — guard branches (no network)", () => {
 
 // Providers whose verifier accepts a confirmation that carries a matching status
 // even when the provider omits the transaction/user echo back (lenient match).
-const LENIENT_PROVIDERS: { provider: "pollfish" | "cint" | "lucid"; envKey: string }[] = [
-  { provider: "pollfish", envKey: "POLLFISH_API_KEY" },
-  { provider: "cint", envKey: "CINT_API_KEY" },
-  { provider: "lucid", envKey: "LUCID_API_KEY" },
+const LENIENT_PROVIDERS: { provider: "pollfish" | "cint" | "lucid"; envKey: string; expectedPathPrefix: string }[] = [
+  { provider: "pollfish", envKey: "POLLFISH_API_KEY", expectedPathPrefix: "/v2/surveys/" },
+  { provider: "cint",     envKey: "CINT_API_KEY",     expectedPathPrefix: "/v1/surveys/" },
+  { provider: "lucid",    envKey: "LUCID_API_KEY",     expectedPathPrefix: "/supply/v1/surveys/" },
 ];
 
 describe.each(LENIENT_PROVIDERS)(
   "verifyProviderCompletion — $provider (configured, mocked fetch)",
-  ({ provider, envKey }) => {
+  ({ provider, envKey, expectedPathPrefix }) => {
     const surveyId = `${provider}_abc`;
     const transactionId = "tx-success-1";
     const userId = "user-42";
@@ -156,6 +156,21 @@ describe.each(LENIENT_PROVIDERS)(
       expect(res.verified).toBe(true);
       expect(res.error).toBeUndefined();
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls the verification URL with the survey ID and transaction ID in the correct path positions", async () => {
+      configure();
+      const fetchSpy = stubFetchResolving(
+        fakeResponse({
+          body: { status: "completed", transaction_id: transactionId, user_id: userId },
+        }),
+      );
+      await verifyProviderCompletion({ surveyId, provider, userId, transactionId });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const calledUrl: string = fetchSpy.mock.calls[0][0] as string;
+      const url = new URL(calledUrl);
+      const expectedPath = `${expectedPathPrefix}abc/completions/${transactionId}`;
+      expect(url.pathname).toBe(expectedPath);
     });
 
     it("verifies on a bare matching status even without txn/user echo", async () => {
