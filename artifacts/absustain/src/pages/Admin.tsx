@@ -1401,6 +1401,9 @@ export function InboxPanel({ token }: { token: string }) {
   const [sentPage, setSentPage] = useState(0);
   const [sentRecipientInput, setSentRecipientInput] = useState("");
   const [sentRecipient, setSentRecipient] = useState("");
+  const [sentAdminId, setSentAdminId] = useState("");
+  const [sentAdmins, setSentAdmins] = useState<{ id: string; username: string; email: string | null }[]>([]);
+  const [sentAdminsLoading, setSentAdminsLoading] = useState(false);
   const SENT_PAGE_SIZE = 25;
 
   const openReply = useCallback(() => {
@@ -1449,6 +1452,23 @@ export function InboxPanel({ token }: { token: string }) {
     }
   }, [selected?.messageId, fetchReplyHistory]);
 
+  const fetchSentAdmins = useCallback(async () => {
+    if (!token) return;
+    setSentAdminsLoading(true);
+    try {
+      const res = await fetch("/api/admin/users?limit=200", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const admins = (data.users ?? []).filter((u: any) => u.role === "admin");
+      setSentAdmins(admins.map((u: any) => ({ id: u.id, username: u.username, email: u.email ?? null })));
+    } catch {
+    } finally {
+      setSentAdminsLoading(false);
+    }
+  }, [token]);
+
   const fetchSentReplies = useCallback(async () => {
     setSentLoading(true);
     setSentError("");
@@ -1458,6 +1478,7 @@ export function InboxPanel({ token }: { token: string }) {
         offset: String(sentPage * SENT_PAGE_SIZE),
       });
       if (sentRecipient) params.set("recipient", sentRecipient);
+      if (sentAdminId) params.set("adminUserId", sentAdminId);
       const res = await fetch(
         `/api/admin/inbox/replies/all?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -1475,11 +1496,14 @@ export function InboxPanel({ token }: { token: string }) {
     } finally {
       setSentLoading(false);
     }
-  }, [token, sentPage, sentRecipient]);
+  }, [token, sentPage, sentRecipient, sentAdminId]);
 
   useEffect(() => {
-    if (view === "sent") fetchSentReplies();
-  }, [view, fetchSentReplies]);
+    if (view === "sent") {
+      fetchSentReplies();
+      fetchSentAdmins();
+    }
+  }, [view, fetchSentReplies, fetchSentAdmins]);
 
   const sendReply = useCallback(async () => {
     if (!selected) return;
@@ -1955,7 +1979,7 @@ export function InboxPanel({ token }: { token: string }) {
 
       {view === "sent" && (
         <div className="space-y-4">
-          {/* Recipient filter */}
+          {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[220px] max-w-sm">
               <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1981,11 +2005,28 @@ export function InboxPanel({ token }: { token: string }) {
             >
               Search
             </button>
-            {sentRecipient && (
+            <select
+              value={sentAdminId}
+              onChange={(e) => {
+                setSentAdminId(e.target.value);
+                setSentPage(0);
+              }}
+              disabled={sentAdminsLoading}
+              className="bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/20 disabled:opacity-40 min-w-[160px]"
+            >
+              <option value="">All admins</option>
+              {sentAdmins.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.username || a.email || a.id}
+                </option>
+              ))}
+            </select>
+            {(sentRecipient || sentAdminId) && (
               <button
                 onClick={() => {
                   setSentRecipientInput("");
                   setSentRecipient("");
+                  setSentAdminId("");
                   setSentPage(0);
                 }}
                 className="px-3 py-2 text-white/40 hover:text-white transition-colors text-sm"
@@ -2011,8 +2052,8 @@ export function InboxPanel({ token }: { token: string }) {
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl py-16 text-center">
               <Mail className="w-10 h-10 text-white/10 mx-auto mb-3" />
               <p className="text-white/30 text-sm">
-                {sentRecipient
-                  ? "No replies match this recipient"
+                {sentRecipient || sentAdminId
+                  ? "No replies match the selected filters"
                   : "No replies have been sent yet"}
               </p>
             </div>
