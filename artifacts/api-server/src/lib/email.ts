@@ -788,3 +788,35 @@ export async function sendSupportReply(options: {
   });
   logger.info({ to, subject }, "Support reply sent");
 }
+
+/**
+ * Notify a referrer that one of their referred friends cashed out and they
+ * earned a referral bonus. Fire-and-forget; skipped when email is unconfigured
+ * or the referrer has no email address on file.
+ */
+export function sendReferralBonusEarned(options: {
+  toEmail: string;
+  referrerUsername: string;
+  bonusUsd: string;
+}): void {
+  const { toEmail, referrerUsername, bonusUsd } = options;
+  const safeUsername = escapeHtml(referrerUsername);
+  const safeBonus = escapeHtml(bonusUsd);
+  sendBestEffort({
+    to: toEmail,
+    subject: `You earned $${bonusUsd} — your friend just cashed out on CashClip!`,
+    text: `Hi ${referrerUsername},\n\nGreat news! One of the friends you referred just made their first cash-out on CashClip. As a thank-you, we've added $${bonusUsd} to your balance.\n\nOpen the app to see your updated balance and keep sharing your referral link to earn more!\n\nThe CashClip Team`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #00E676;padding-bottom:12px">You earned a referral bonus! 🎉</h2>
+        <p style="color:#333">Hi ${safeUsername},</p>
+        <p style="color:#333">One of the friends you referred just made their first cash-out on CashClip. As a thank-you, we've added <strong>$${safeBonus}</strong> to your balance.</p>
+        <p style="color:#333">Open the app to see your updated balance — and keep sharing your referral link to earn more bonuses!</p>
+        <p style="color:#333">Thank you for spreading the word.<br><strong>The CashClip Team</strong></p>
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <p style="font-size:12px;color:#999">CashClip · cash-clip.app · support@absustaininvest.com</p>
+      </div>`,
+    replyTo: null,
+  });
+}

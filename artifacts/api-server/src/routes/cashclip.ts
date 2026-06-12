@@ -34,7 +34,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import { supportTicketRateLimiter } from "../lib/supportTicketRateLimit";
 import {
@@ -1447,8 +1447,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage
           .qualifyReferral({ referredUserId: req.userId!, bonusUsd: REFERRAL_BONUS_USD })
           .then((r) => {
-            if (r.credited) {
+            if (r.credited && r.referrerId) {
               req.log?.info({ referredUserId: req.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited");
+              const bonusStr = REFERRAL_BONUS_USD.toFixed(2);
+              storage.insertUserNotification({
+                userId: r.referrerId,
+                title: "Referral bonus earned! 🎉",
+                message: `Your friend just cashed out — you earned $${bonusStr}!`,
+                type: "referral",
+              }).catch((err) => {
+                req.log?.error({ err, referrerId: r.referrerId }, "Failed to insert referral notification");
+              });
+              if (r.referrerEmail) {
+                sendReferralBonusEarned({
+                  toEmail: r.referrerEmail,
+                  referrerUsername: r.referrerUsername ?? "there",
+                  bonusUsd: bonusStr,
+                });
+              }
             }
           })
           .catch((err) => {
@@ -5072,6 +5088,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       req.log?.error({ err }, "Record sponsored visit failed");
       res.status(500).json({ error: "Failed to record visit" });
+    }
+  });
+
+  /**
+   * GET /api/notifications
+   *
+   * Return the authenticated user's server-side in-app notifications, newest
+   * first. Capped at 50 entries. The app merges these with its local-only
+   * notification list (offline/client-generated items) on the client side.
+   */
+  app.get("/api/notifications", authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const rows = await storage.getUserNotifications(req.userId!);
+      res.json({
+        notifications: rows.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          read: n.read,
+          createdAt: n.createdAt.toISOString(),
+        })),
+      });
+    } catch (err) {
+      req.log?.error({ err }, "Failed to fetch notifications");
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  /**
+   * POST /api/notifications/:id/read
+   *
+   * Mark a single notification as read. Ownership-checked (userId must match)
+   * so a user cannot mark another user's notification as read.
+   */
+  app.post("/api/notifications/:id/read", authMiddleware, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    if (!id || typeof id !== "string") {
+      res.status(400).json({ error: "Missing notification id" }); return;
+    }
+    try {
+      await storage.markUserNotificationRead(id, req.userId!);
+      res.json({ ok: true });
+    } catch (err) {
+      req.log?.error({ err }, "Failed to mark notification read");
+      res.status(500).json({ error: "Failed to mark notification read" });
+    }
+  });
+
+  /**
+   * POST /api/notifications/read-all
+   *
+   * Mark all of the authenticated user's server notifications as read.
+   */
+  app.post("/api/notifications/read-all", authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      await storage.markAllUserNotificationsRead(req.userId!);
+      res.json({ ok: true });
+    } catch (err) {
+      req.log?.error({ err }, "Failed to mark all notifications read");
+      res.status(500).json({ error: "Failed to mark all notifications read" });
     }
   });
 

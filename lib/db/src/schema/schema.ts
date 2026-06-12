@@ -680,3 +680,25 @@ export const appSettings = pgTable("app_settings", {
 
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
+
+// Server-side in-app notifications. Written server-side (e.g. when a referral
+// bonus is credited) so the referrer sees it the next time they open the app,
+// regardless of whether they were online at the moment the event occurred.
+// Kept lightweight: title + message + semantic type + read flag.
+export const userNotifications = pgTable(
+  "user_notifications",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    type: text("type").notNull().default("reward"),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("user_notif_user_idx").on(t.userId, t.createdAt),
+  }),
+);
+
+export type UserNotification = typeof userNotifications.$inferSelect;

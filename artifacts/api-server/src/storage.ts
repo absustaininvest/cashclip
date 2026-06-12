@@ -9,6 +9,7 @@ import {
   type AdEvent,
   type WebhookAuditEntry,
   type InsertWebhookAuditEntry,
+  type UserNotification,
   users,
   withdrawals,
   earningsLedger,
@@ -25,6 +26,7 @@ import {
   type InsertSupportReply,
   publisherAuditLog,
   campaigns,
+  userNotifications,
 } from "@workspace/db";
 import { db } from "@workspace/db";
 import { eq, ne, desc, and, or, sql, gte, lt, inArray, count, sum, between, ilike, isNotNull } from "drizzle-orm";
@@ -177,7 +179,16 @@ export interface IStorage {
   qualifyReferral(args: {
     referredUserId: string;
     bonusUsd: number;
-  }): Promise<{ credited: boolean; referrerId?: string }>;
+  }): Promise<{ credited: boolean; referrerId?: string; referrerUsername?: string; referrerEmail?: string | null }>;
+  insertUserNotification(args: {
+    userId: string;
+    title: string;
+    message: string;
+    type: string;
+  }): Promise<void>;
+  getUserNotifications(userId: string, limit?: number): Promise<UserNotification[]>;
+  markUserNotificationRead(id: string, userId: string): Promise<void>;
+  markAllUserNotificationsRead(userId: string): Promise<void>;
   getReferralBackfillCandidates(minWithdrawalUsd: number): Promise<
     { id: string; username: string; referredBy: string }[]
   >;
@@ -804,7 +815,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, referredUserId));
 
       const [referrer] = await tx
-        .select({ id: users.id })
+        .select({ id: users.id, username: users.username, email: users.email })
         .from(users)
         .where(eq(users.username, referred.referredBy))
         .limit(1);
@@ -830,8 +841,45 @@ export class DatabaseStorage implements IStorage {
         refId: referredUserId,
       });
 
-      return { credited: true as const, referrerId: referrer.id };
+      return {
+        credited: true as const,
+        referrerId: referrer.id,
+        referrerUsername: referrer.username,
+        referrerEmail: referrer.email,
+      };
     });
+  }
+
+  async insertUserNotification(args: {
+    userId: string;
+    title: string;
+    message: string;
+    type: string;
+  }): Promise<void> {
+    await db.insert(userNotifications).values(args);
+  }
+
+  async getUserNotifications(userId: string, limit = 50): Promise<UserNotification[]> {
+    return db
+      .select()
+      .from(userNotifications)
+      .where(eq(userNotifications.userId, userId))
+      .orderBy(desc(userNotifications.createdAt))
+      .limit(limit);
+  }
+
+  async markUserNotificationRead(id: string, userId: string): Promise<void> {
+    await db
+      .update(userNotifications)
+      .set({ read: true })
+      .where(and(eq(userNotifications.id, id), eq(userNotifications.userId, userId)));
+  }
+
+  async markAllUserNotificationsRead(userId: string): Promise<void> {
+    await db
+      .update(userNotifications)
+      .set({ read: true })
+      .where(eq(userNotifications.userId, userId));
   }
 
   // One-time backfill helper: find referred users who completed a qualifying

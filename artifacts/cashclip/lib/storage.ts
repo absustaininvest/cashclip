@@ -6,6 +6,7 @@ import {
   displayPointsToDollars,
   formatPoints,
 } from "./points";
+import { apiRequest } from "./query-client";
 
 // Re-export the shared display helpers so existing importers of "@/lib/storage"
 // keep working while the single source of truth lives in "./points".
@@ -641,9 +642,37 @@ export async function addNotification(notif: Omit<AppNotification, "id" | "read"
   await AsyncStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(list));
 }
 
+// Merge server notifications (from GET /api/notifications) with locally stored
+// ones. Server items are identified by their UUID-shaped ids; local items use
+// timestamp-based ids and are generated client-side (e.g. missions, promos).
+// The merged list is sorted newest-first. Fails silently — if the server is
+// unreachable the function still returns the local-only list.
+async function fetchAndMergeServerNotifications(local: AppNotification[]): Promise<AppNotification[]> {
+  try {
+    const res = await apiRequest("GET", "/api/notifications");
+    const data = await res.json();
+    const serverItems: AppNotification[] = (data.notifications ?? []).map((n: any) => ({
+      id: n.id as string,
+      title: n.title as string,
+      message: n.message as string,
+      type: (n.type ?? "reward") as AppNotification["type"],
+      read: !!n.read,
+      timestamp: new Date(n.createdAt).getTime(),
+    }));
+    // Deduplicate: server wins for ids that appear in both lists.
+    const serverIds = new Set(serverItems.map((n) => n.id));
+    const localOnly = local.filter((n) => !serverIds.has(n.id));
+    const merged = [...serverItems, ...localOnly].sort((a, b) => b.timestamp - a.timestamp);
+    return merged.slice(0, 100);
+  } catch {
+    return local;
+  }
+}
+
 export async function getNotifications(): Promise<AppNotification[]> {
   const raw = await AsyncStorage.getItem(KEYS.NOTIFICATIONS);
-  return raw ? JSON.parse(raw) : [];
+  const local: AppNotification[] = raw ? JSON.parse(raw) : [];
+  return fetchAndMergeServerNotifications(local);
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
@@ -651,18 +680,32 @@ export async function getUnreadNotificationCount(): Promise<number> {
   return notifications.filter((n) => !n.read).length;
 }
 
+// UUID detection: server notification ids are gen_random_uuid() UUIDs
+// (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). Local ids are numeric timestamps
+// concatenated with a random suffix. This is the cheapest split without
+// storing a separate flag.
+function isServerNotificationId(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 export async function markAllNotificationsRead(): Promise<void> {
-  const notifications = await getNotifications();
+  const raw = await AsyncStorage.getItem(KEYS.NOTIFICATIONS);
+  const notifications: AppNotification[] = raw ? JSON.parse(raw) : [];
   notifications.forEach((n) => (n.read = true));
   await AsyncStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+  apiRequest("POST", "/api/notifications/read-all").catch(() => {});
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  const notifications = await getNotifications();
+  const raw = await AsyncStorage.getItem(KEYS.NOTIFICATIONS);
+  const notifications: AppNotification[] = raw ? JSON.parse(raw) : [];
   const notif = notifications.find((n) => n.id === id);
   if (notif) {
     notif.read = true;
     await AsyncStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+  }
+  if (isServerNotificationId(id)) {
+    apiRequest("POST", `/api/notifications/${id}/read`).catch(() => {});
   }
 }
 
