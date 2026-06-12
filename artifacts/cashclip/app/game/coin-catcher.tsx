@@ -7,7 +7,6 @@ import {
   PanResponder,
   TouchableOpacity,
   Platform,
-  ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,8 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
-import { beginGame, completeGame } from "@/lib/earn-client";
+import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const CATCHER_WIDTH = 80;
@@ -83,9 +81,6 @@ export default function CoinCatcherScreen() {
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [canPlay, setCanPlay] = useState(true);
   const [items, setItems] = useState<FallingItem[]>([]);
-  const [serverPoints, setServerPoints] = useState<number | null>(null);
-  const [bankFailed, setBankFailed] = useState(false);
-
   const catcherX = useRef(SCREEN_WIDTH / 2 - CATCHER_WIDTH / 2);
   const catcherXAnim = useSharedValue(SCREEN_WIDTH / 2 - CATCHER_WIDTH / 2);
   const itemsRef = useRef<FallingItem[]>([]);
@@ -135,35 +130,16 @@ export default function CoinCatcherScreen() {
 
   const bankedRef = useRef(false);
 
-  // Game earn endpoints are currently disabled server-side (410).
-  // beginGame() will return { ok: false }; bankReward handles this
-  // gracefully — the player still gets the win UI but no server reward.
-  const bankReward = useCallback(async (desc: string) => {
-    if (bankedRef.current) return;
-    bankedRef.current = true;
-    const begin = await beginGame();
-    if (!begin.ok) { setBankFailed(true); return; }
-    const result = await completeGame(begin.challengeToken, desc);
-    if (result.ok) {
-      setServerPoints(result.token.points);
-      await recordGamePlay("coin-catcher", result.token.points, desc, { creditLocally: false });
-    } else {
-      setBankFailed(true);
-    }
-  }, []);
-
   const endGame = useCallback(() => {
     cleanup();
     setGameState("ended");
     const finalScore = Math.max(0, scoreRef.current);
     const reward = parseFloat(finalScore.toFixed(2));
-    if (reward > 0) {
-      void bankReward("Coin Catcher");
-    } else if (!bankedRef.current) {
+    if (!bankedRef.current) {
       bankedRef.current = true;
-      void recordGamePlay("coin-catcher", 0, "Coin Catcher", { creditLocally: false });
+      void recordGamePlay("coin-catcher", dollarsToPoints(reward), "Coin Catcher");
     }
-  }, [cleanup, bankReward]);
+  }, [cleanup]);
 
   const spawnItem = useCallback(() => {
     const margin = ITEM_SIZE;
@@ -181,8 +157,6 @@ export default function CoinCatcherScreen() {
   const startGame = useCallback(() => {
     setGameState("playing");
     setScore(0);
-    setServerPoints(null);
-    setBankFailed(false);
     bankedRef.current = false;
     setTimeLeft(GAME_DURATION);
     setItems([]);
@@ -365,21 +339,10 @@ export default function CoinCatcherScreen() {
             {finalReward > 0 ? t.games.youWon : t.games.gameOver}
           </Text>
           {finalReward > 0 ? (
-            bankFailed ? (
-              <Text style={styles.resultSubtitle}>
-                We couldn&apos;t add your reward right now. Please try again later.
-              </Text>
-            ) : serverPoints === null ? (
-              <>
-                <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
-                <Text style={styles.resultSubtitle}>Adding your reward…</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.rewardAmount}>{formatPoints(serverPoints)}</Text>
-                <Text style={styles.resultSubtitle}>{`${t.games.earned}: ${formatPoints(serverPoints)}`}</Text>
-              </>
-            )
+            <>
+              <Text style={styles.rewardAmount}>{formatPoints(dollarsToPoints(finalReward))}</Text>
+              <Text style={styles.resultSubtitle}>{`${t.games.earned}: ${formatPoints(dollarsToPoints(finalReward))}`}</Text>
+            </>
           ) : (
             <Text style={styles.resultSubtitle}>{t.games.tryHarder}</Text>
           )}

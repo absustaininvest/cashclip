@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
-  ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,8 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
-import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
-import { beginGame, completeGame } from "@/lib/earn-client";
+import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -157,9 +155,6 @@ export default function TetrisGame() {
   const [level, setLevel] = useState(1);
   const [gameState, setGameState] = useState<"playing" | "over" | "cooldown">("playing");
   const [canPlay, setCanPlay] = useState(true);
-  const [serverPoints, setServerPoints] = useState<number | null>(null);
-  const [bankFailed, setBankFailed] = useState(false);
-
   const gridRef = useRef(grid);
   const pieceRef = useRef(currentPiece);
   const nextPieceRef = useRef(nextPiece);
@@ -192,24 +187,6 @@ export default function TetrisGame() {
     });
   }, []);
 
-  // Game earn endpoints are currently disabled server-side (410).
-  // beginGame() will return { ok: false }; bankReward handles this
-  // gracefully — the player still gets the win UI but no server reward.
-  const bankReward = useCallback(async (desc: string) => {
-    const begin = await beginGame();
-    if (!begin.ok) {
-      setBankFailed(true);
-      return;
-    }
-    const result = await completeGame(begin.challengeToken, desc);
-    if (result.ok) {
-      setServerPoints(result.token.points);
-      await recordGamePlay("tetris", result.token.points, desc, { creditLocally: false });
-    } else {
-      setBankFailed(true);
-    }
-  }, []);
-
   const endGame = useCallback(() => {
     if (rewardRecorded.current) return;
     rewardRecorded.current = true;
@@ -219,8 +196,8 @@ export default function TetrisGame() {
       intervalRef.current = null;
     }
     const totalLines = linesRef.current;
-    void bankReward(`Tetris: ${totalLines} lines, score ${scoreRef.current}`);
-  }, [bankReward]);
+    void recordGamePlay("tetris", dollarsToPoints(0.05), `Tetris: ${totalLines} lines, score ${scoreRef.current}`);
+  }, []);
 
   const spawnNewPiece = useCallback(() => {
     const next = nextPieceRef.current;
@@ -336,8 +313,6 @@ export default function TetrisGame() {
     setScore(0);
     setLines(0);
     setLevel(1);
-    setServerPoints(null);
-    setBankFailed(false);
     rewardRecorded.current = false;
     const p = randomPiece();
     const np = randomPiece();
@@ -465,21 +440,8 @@ export default function TetrisGame() {
             <Text style={styles.gameOverTitle}>{t.games.gameOver}</Text>
             <Text style={styles.gameOverScore}>{t.games.score}: {score}</Text>
             <Text style={styles.gameOverLines}>{t.games.lines}: {lines} | {t.games.level}: {level}</Text>
-            {bankFailed ? (
-              <Text style={styles.gameOverRewardLabel}>
-                We couldn&apos;t add your reward right now. Please try again later.
-              </Text>
-            ) : serverPoints === null ? (
-              <>
-                <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
-                <Text style={styles.gameOverRewardLabel}>Adding your reward…</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.gameOverReward}>{formatPoints(serverPoints)}</Text>
-                <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
-              </>
-            )}
+            <Text style={styles.gameOverReward}>{formatPoints(dollarsToPoints(0.05))}</Text>
+            <Text style={styles.gameOverRewardLabel}>{t.games.earned}</Text>
 
             <TouchableOpacity testID="play-again-button" style={styles.playAgainBtn} onPress={handleNewGame}>
               <Text style={styles.playAgainText}>{t.games.playAgain}</Text>

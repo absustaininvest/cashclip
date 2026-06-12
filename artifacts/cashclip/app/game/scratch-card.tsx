@@ -7,7 +7,6 @@ import {
   Animated,
   Platform,
   Dimensions,
-  ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +16,6 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useCelebration } from "@/lib/CelebrationContext";
 import { recordGamePlay, canPlayGame, dollarsToPoints, formatPoints } from "@/lib/storage";
-import { beginGame, completeGame } from "@/lib/earn-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -161,17 +159,6 @@ export default function ScratchCardGame() {
   const [revealCount, setRevealCount] = useState(0);
   const [canPlay, setCanPlay] = useState(true);
 
-  // Server-authoritative reward flow (mirrors the spin wheel): a challenge token
-  // is issued at game start, then redeemed on a win. The SERVER decides the prize
-  // and drops it into the pending wallet — the on-screen symbols are cosmetic.
-  const [challengeToken, setChallengeToken] = useState<string | null>(null);
-  const [serverPoints, setServerPoints] = useState<number | null>(null);
-  const [bankFailed, setBankFailed] = useState(false);
-  // The reward challenge is requested on the player's FIRST reveal (not on mount)
-  // so the 60s challenge TTL starts at real engagement, never while the screen
-  // sits idle. We keep the in-flight promise so a very fast win can await it.
-  const beginPromiseRef = useRef<ReturnType<typeof beginGame> | null>(null);
-
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0.5)).current;
 
@@ -190,25 +177,6 @@ export default function ScratchCardGame() {
     return () => { cancelled = true; };
   }, []);
 
-  // Game earn endpoints are currently disabled server-side (410).
-  // beginGame() returns { ok: false }; ensureChallenge clears the ref so
-  // the win handler finds no token and bankReward skips the server call —
-  // the player still gets the win UI but no server reward.
-  const ensureChallenge = useCallback(() => {
-    if (!beginPromiseRef.current) {
-      const p = beginGame();
-      beginPromiseRef.current = p;
-      void p
-        .then((begin) => {
-          if (begin.ok) setChallengeToken(begin.challengeToken);
-          else beginPromiseRef.current = null;
-        })
-        .catch(() => {
-          beginPromiseRef.current = null;
-        });
-    }
-  }, []);
-
   const showResult = useCallback(() => {
     Animated.parallel([
       Animated.timing(resultOpacity, {
@@ -224,53 +192,23 @@ export default function ScratchCardGame() {
     ]).start();
   }, []);
 
-  // Redeem the win against the server-issued challenge. The server decides the
-  // actual prize (cosmetic symbols are not trusted) and credits it into the
-  // pending wallet; we then mark the play locally WITHOUT crediting a phantom
-  // local balance (creditLocally:false), since the server is the source of truth.
   const bankReward = useCallback(
     async (symbol: SymbolType) => {
       const desc = `Scratch Card: matched 3 ${symbol}s`;
-      // Resolve the challenge. Make sure an attempt is in flight (covers the
-      // case where the first begin already failed and cleared the ref), then
-      // await it — this also handles the very-fast-win race where the win lands
-      // before /begin responds. A brand-new begin here may make the server
-      // reject as "too early", but completeGame() waits and retries that.
-      let token = challengeToken;
-      if (!token) {
-        ensureChallenge();
-        const inflight = beginPromiseRef.current;
-        if (inflight) {
-          const begin = await inflight;
-          if (begin.ok) token = begin.challengeToken;
-        }
-      }
-      if (!token) {
-        setBankFailed(true);
-        return;
-      }
-      const result = await completeGame(token, desc);
-      if (result.ok) {
-        setServerPoints(result.token.points);
-        await recordGamePlay("scratch-card", result.token.points, desc, { creditLocally: false });
-        celebrate({
-          tier: "epic",
-          label: `+${formatPoints(result.token.points)} pts`,
-          title: "You Won!",
-        });
-      } else {
-        setBankFailed(true);
-      }
+      const pts = dollarsToPoints(SYMBOL_CONFIG[symbol].reward);
+      await recordGamePlay("scratch-card", pts, desc);
+      celebrate({
+        tier: "epic",
+        label: `+${formatPoints(pts)} pts`,
+        title: "You Won!",
+      });
     },
-    [challengeToken, ensureChallenge, celebrate]
+    [celebrate]
   );
 
   const handleReveal = useCallback(
     (index: number) => {
       if (gameState !== "playing") return;
-
-      // First scratch starts the reward clock (server challenge).
-      ensureChallenge();
 
       const newCells = [...cells];
       newCells[index] = { ...newCells[index], revealed: true };
@@ -291,7 +229,7 @@ export default function ScratchCardGame() {
         setTimeout(showResult, 500);
       }
     },
-    [cells, gameState, revealCount, showResult, bankReward, ensureChallenge]
+    [cells, gameState, revealCount, showResult, bankReward]
   );
 
   const handlePlayAgain = useCallback(() => {
@@ -302,10 +240,6 @@ export default function ScratchCardGame() {
     setCanPlay(false);
     setMatchedSymbol(null);
     setRevealCount(0);
-    setChallengeToken(null);
-    setServerPoints(null);
-    setBankFailed(false);
-    beginPromiseRef.current = null;
   }, []);
 
   return (
@@ -375,37 +309,18 @@ export default function ScratchCardGame() {
         >
           <Animated.View style={[styles.resultCard, { transform: [{ scale: resultScale }] }]}>
             {gameState === "won" ? (
-              bankFailed ? (
-                <>
-                  <View style={styles.resultIconLose}>
-                    <Ionicons name="cloud-offline-outline" size={48} color={Colors.error} />
-                  </View>
-                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                  <Text style={styles.resultSubtext}>
-                    We couldn&apos;t add your reward right now. Please try again later.
-                  </Text>
-                </>
-              ) : serverPoints === null ? (
-                <>
-                  <View style={styles.resultIconWin}>
-                    <Ionicons name="trophy" size={48} color={Colors.accent} />
-                  </View>
-                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 8 }} />
-                  <Text style={styles.resultSubtext}>Adding your reward…</Text>
-                </>
-              ) : (
-                <>
-                  <View style={styles.resultIconWin}>
-                    <Ionicons name="trophy" size={48} color={Colors.accent} />
-                  </View>
-                  <Text style={styles.resultTitle}>{t.games.youWon}</Text>
-                  <Text style={styles.resultReward}>{formatPoints(serverPoints)}</Text>
-                  <Text style={styles.resultSubtext}>
-                    Added to pending — claim after 3 hours
-                  </Text>
-                </>
-              )
+              <>
+                <View style={styles.resultIconWin}>
+                  <Ionicons name="trophy" size={48} color={Colors.accent} />
+                </View>
+                <Text style={styles.resultTitle}>{t.games.youWon}</Text>
+                {matchedSymbol && (
+                  <Text style={styles.resultReward}>{formatPoints(dollarsToPoints(SYMBOL_CONFIG[matchedSymbol].reward))}</Text>
+                )}
+                <Text style={styles.resultSubtext}>
+                  Added to pending — claim after 3 hours
+                </Text>
+              </>
             ) : (
               <>
                 <View style={styles.resultIconLose}>
