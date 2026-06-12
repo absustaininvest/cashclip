@@ -20,7 +20,7 @@ import {
 } from "../lib/integrationVerificationState";
 import { registerAuthRoutes, authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
 import { storage, SECURITY_AUDIT_EVENTS, type SecurityAuditEvent } from "../storage";
-import { db, updateUserProfileSchema, earnTokens } from "@workspace/db";
+import { db, updateUserProfileSchema, earnTokens, adEvents as adEventsTable } from "@workspace/db";
 import { snapshotRateString } from "../lib/pointsEconomy";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
@@ -56,7 +56,7 @@ import {
   isSnoozed,
 } from "../lib/sponsoredVisitMonitor";
 import { fetchInbox } from "../lib/inbox";
-import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe } from "drizzle-orm";
+import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe, sql as drizzleSql, gte as drizzleGte } from "drizzle-orm";
 
 interface RevenueSource {
   id: string;
@@ -903,6 +903,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * running POST /api/admin/integrations/rotate-secret, so the on-disk store
    * can no longer be read and those keys must be re-entered (or rotated).
    */
+  /**
+   * GET /api/admin/levelplay/revenue?days=7
+   *
+   * LevelPlay vs database revenue reconciliation.
+   *
+   * Always returns the DB-side total (SUM ad_events.revenue_micros). When
+   * IRONSOURCE_SECRET_KEY is set it also fetches the publisher stats from the
+   * LevelPlay Reporting API and computes a discrepancy percentage. If the gap
+   * exceeds 10% the `alert` field is true.
+   *
+   * Response shape:
+   *   days             — effective window (1–90, default 7)
+   *   dbRevenue        — SUM(revenue_micros)/1e6 for the window
+   *   dbImpressionCount — rows with revenue_micros set in the window
+   *   lpRevenue        — LevelPlay reported total (null = not configured or error)
+   *   lpConfigured     — true when IRONSOURCE_SECRET_KEY + IRONSOURCE_APP_KEY are set
+   *   lpError          — error message when the LP API call failed (null otherwise)
+   *   discrepancyPct   — |dbRevenue − lpRevenue| / lpRevenue × 100 (null when unavailable)
+   *   alert            — true when discrepancyPct > 10
+   */
+  app.get("/api/admin/levelplay/revenue", adminMiddleware, async (req: AuthRequest, res) => {
+    const rawDays = Number(req.query.days ?? 7);
+    const days = Number.isFinite(rawDays) && rawDays > 0
+      ? Math.min(90, Math.max(1, Math.round(rawDays)))
+      : 7;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    try {
+      // ── DB side ────────────────────────────────────────────────────────────
+      const [dbRow] = await db
+        .select({
+          totalMicros: drizzleSql<string>`COALESCE(SUM(${adEventsTable.revenueMicros}), 0)`,
+          impressionCount: drizzleSql<string>`COUNT(*) FILTER (WHERE ${adEventsTable.revenueMicros} IS NOT NULL)`,
+        })
+        .from(adEventsTable)
+        .where(drizzleGte(adEventsTable.createdAt, since));
+
+      const dbRevenue = Number((Number(dbRow?.totalMicros ?? 0) / 1_000_000).toFixed(6));
+      const dbImpressionCount = Number(dbRow?.impressionCount ?? 0);
+
+      // ── LevelPlay Reporting API ────────────────────────────────────────────
+      // Requires IRONSOURCE_SECRET_KEY (separate from the SDK App Key).
+      // LevelPlay auth: GET /advertisers/v2/auth with "secretkey" header → bearer token.
+      // Stats:          GET /publishers/v2/stats with the bearer token.
+      const secretKey = process.env.IRONSOURCE_SECRET_KEY;
+      const appKey = process.env.IRONSOURCE_APP_KEY;
+      const lpConfigured = Boolean(secretKey && appKey);
+      let lpRevenue: number | null = null;
+      let lpError: string | null = null;
+
+      if (lpConfigured) {
+        try {
+          const authRes = await fetch("https://api.ironsrc.com/advertisers/v2/auth", {
+            headers: { secretkey: secretKey! },
+          });
+          if (!authRes.ok) throw new Error(`LP auth HTTP ${authRes.status}`);
+          // The endpoint returns a bare quoted JSON string, e.g. "eyJ..."
+          const bearerToken = (await authRes.text()).replace(/^"|"$/g, "");
+
+          const fmt = (d: Date) => d.toISOString().slice(0, 10);
+          const params = new URLSearchParams({
+            startDate: fmt(since),
+            endDate: fmt(new Date()),
+            metrics: "revenue",
+            breakdowns: "day",
+            appKey: appKey!,
+          });
+          const statsRes = await fetch(
+            `https://api.ironsrc.com/publishers/v2/stats?${params}`,
+            { headers: { Authorization: `Bearer ${bearerToken}` } },
+          );
+          if (!statsRes.ok) throw new Error(`LP stats HTTP ${statsRes.status}`);
+          const rows = (await statsRes.json()) as { revenue?: number | string }[];
+          lpRevenue = Number(
+            rows.reduce((s, r) => s + (Number(r.revenue) || 0), 0).toFixed(6),
+          );
+        } catch (err) {
+          lpError = err instanceof Error ? err.message : String(err);
+          req.log?.warn({ err }, "LevelPlay reporting API fetch failed");
+        }
+      }
+
+      // ── Discrepancy ────────────────────────────────────────────────────────
+      let discrepancyPct: number | null = null;
+      let alert = false;
+      if (lpRevenue !== null && lpRevenue > 0) {
+        discrepancyPct = Number(
+          ((Math.abs(dbRevenue - lpRevenue) / lpRevenue) * 100).toFixed(2),
+        );
+        alert = discrepancyPct > 10;
+      }
+
+      res.json({ days, dbRevenue, dbImpressionCount, lpRevenue, lpConfigured, lpError, discrepancyPct, alert });
+    } catch (err) {
+      req.log?.error({ err }, "levelplay revenue reconciliation failed");
+      res.status(500).json({ error: "Revenue reconciliation query failed" });
+    }
+  });
+
   app.get("/api/admin/integrations/key-health", adminMiddleware, (_req, res) => {
     const health = getIntegrationKeyHealth();
     const failures = health.decryptionFailures.map((envKey) => {

@@ -6057,6 +6057,152 @@ interface AdMobFormatBreakdown {
   ecpm: number;
 }
 
+interface LevelPlayReconData {
+  days: number;
+  dbRevenue: number;
+  dbImpressionCount: number;
+  lpRevenue: number | null;
+  lpConfigured: boolean;
+  lpError: string | null;
+  discrepancyPct: number | null;
+  alert: boolean;
+}
+
+function LevelPlayReconciliationWidget({ token }: { token: string }) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<LevelPlayReconData | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/levelplay/revenue?days=7", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setData(await res.json());
+      } catch (err: any) {
+        setError(err?.message || "Failed to load LevelPlay revenue");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token]);
+
+  const fmtMoney = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n || 0);
+  const fmtPct = (n: number) => `${n.toFixed(2)}%`;
+
+  const inSync =
+    !data?.alert &&
+    (data?.discrepancyPct === null || (data?.discrepancyPct ?? 0) <= 10);
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-white/60 text-sm font-semibold">
+          LevelPlay vs DB reconciliation · last 7d
+        </p>
+        {!loading && data && (
+          <span
+            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+              data.lpRevenue === null
+                ? "bg-white/[0.08] text-white/40"
+                : inSync
+                  ? "bg-[#00E676]/15 text-[#00E676]"
+                  : "bg-red-500/15 text-red-400"
+            }`}
+          >
+            {data.lpRevenue === null
+              ? "LP not configured"
+              : inSync
+                ? "In sync"
+                : `Alert: ${fmtPct(data.discrepancyPct!)} gap`}
+          </span>
+        )}
+      </div>
+
+      {loading && (
+        <p className="text-white/30 text-sm">Loading…</p>
+      )}
+
+      {!loading && error && (
+        <p className="text-red-400/80 text-sm">{error}</p>
+      )}
+
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+                DB revenue (ad_events)
+              </p>
+              <p className="text-2xl font-bold text-white tabular-nums">
+                {fmtMoney(data.dbRevenue)}
+              </p>
+              <p className="text-white/30 text-xs mt-1">
+                {data.dbImpressionCount} rows with revenue_micros
+              </p>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+                LevelPlay reported
+              </p>
+              <p className="text-2xl font-bold text-white tabular-nums">
+                {data.lpRevenue !== null ? fmtMoney(data.lpRevenue) : "—"}
+              </p>
+              <p className="text-white/30 text-xs mt-1">
+                {data.lpConfigured
+                  ? data.lpRevenue !== null
+                    ? "from LevelPlay stats API"
+                    : data.lpError || "fetch failed"
+                  : "set IRONSOURCE_SECRET_KEY to enable"}
+              </p>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">
+                Discrepancy
+              </p>
+              <p
+                className={`text-2xl font-bold tabular-nums ${
+                  data.alert ? "text-red-400" : "text-white"
+                }`}
+              >
+                {data.discrepancyPct !== null ? fmtPct(data.discrepancyPct) : "—"}
+              </p>
+              <p className="text-white/30 text-xs mt-1">
+                {data.alert
+                  ? "⚠ exceeds 10% — investigate"
+                  : data.discrepancyPct !== null
+                    ? "within tolerance"
+                    : "need LevelPlay API key"}
+              </p>
+            </div>
+          </div>
+
+          {data.alert && (
+            <div className="mt-4 flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Revenue mismatch exceeds 10%. DB reports{" "}
+                <strong>{fmtMoney(data.dbRevenue)}</strong> but LevelPlay reports{" "}
+                <strong>{fmtMoney(data.lpRevenue!)}</strong> for the last 7 days.
+                Check for missed ARM postback events or precision loss in revenue_micros ingestion.
+              </span>
+            </div>
+          )}
+
+          <p className="text-white/30 text-xs mt-3">
+            DB revenue = SUM(ad_events.revenue_micros) ÷ 1,000,000 from ARM impression-level postbacks.
+            LevelPlay reported = publisher stats from the IronSource Reporting API for the same window.
+            A gap under 10% is normal (reporting latency and finalization).
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function RevenueStat({
   label,
   value,
@@ -6560,6 +6706,8 @@ function RevenuePanel({
           </div>
         </>
       )}
+
+      <LevelPlayReconciliationWidget token={token} />
     </div>
   );
 }
