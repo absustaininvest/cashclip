@@ -8,6 +8,7 @@ const HUB_URL = "/api/admin/integration-hub";
 const ALERTS_URL = "/api/admin/webhook-alerts";
 const ALERT_EMAIL_URL = "/api/admin/admob/alert-email";
 const AD_STATUS_URL = "/api/admin/ad-status";
+const ECONOMY_RATE_URL = "/api/economy/rate";
 
 const AD_STATUS_DEFAULT = { lpNative: false, unityNative: false, adSystemActive: false };
 
@@ -118,6 +119,14 @@ function installFetchMock(admobAlerts: any[]) {
         ok: true,
         status: 200,
         json: async () => AD_STATUS_DEFAULT,
+      } as Response;
+    }
+
+    if (u.startsWith(ECONOMY_RATE_URL)) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ displayPointsPerDollar: 10000 }),
       } as Response;
     }
 
@@ -433,6 +442,20 @@ describe("IntegrationHubPanel — resilience and auth", () => {
             }),
           } as Response;
         }
+        if (u.startsWith(AD_STATUS_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => AD_STATUS_DEFAULT,
+          } as Response;
+        }
+        if (u.startsWith(ECONOMY_RATE_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ displayPointsPerDollar: 10000 }),
+          } as Response;
+        }
         throw new Error(`Unexpected fetch call: ${u}`);
       }),
     );
@@ -490,6 +513,13 @@ describe("IntegrationHubPanel — resilience and auth", () => {
             json: async () => AD_STATUS_DEFAULT,
           } as Response;
         }
+        if (u.startsWith(ECONOMY_RATE_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ displayPointsPerDollar: 10000 }),
+          } as Response;
+        }
         throw new Error(`Unexpected fetch call: ${u}`);
       }),
     );
@@ -539,6 +569,20 @@ describe("IntegrationHubPanel — resilience and auth", () => {
             }),
           } as Response;
         }
+        if (u.startsWith(AD_STATUS_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => AD_STATUS_DEFAULT,
+          } as Response;
+        }
+        if (u.startsWith(ECONOMY_RATE_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ displayPointsPerDollar: 10000 }),
+          } as Response;
+        }
         throw new Error(`Unexpected fetch call: ${u}`);
       }),
     );
@@ -580,6 +624,20 @@ describe("IntegrationHubPanel — resilience and auth", () => {
               enabledSource: "setting",
               defaultRecipient: "",
             }),
+          } as Response;
+        }
+        if (u.startsWith(AD_STATUS_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => AD_STATUS_DEFAULT,
+          } as Response;
+        }
+        if (u.startsWith(ECONOMY_RATE_URL)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ displayPointsPerDollar: 10000 }),
           } as Response;
         }
         throw new Error(`Unexpected fetch call: ${u}`);
