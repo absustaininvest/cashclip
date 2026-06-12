@@ -365,3 +365,117 @@ describe("POST /api/earn/spin/complete — concurrent spins can't both pass the 
     expect(spinTokens.length).toBe(DAILY_CAP);
   });
 });
+
+// ── Concurrency: two quick spins can't both bypass the 2h cooldown ───────────
+// Two /complete calls fire at once when the user has NO recent spin (under the
+// daily cap and outside any cooldown). Without the row lock both transactions
+// would read "no recent spin" simultaneously and both insert — violating the
+// 2h cooldown. The lock serializes them so the second transaction, resuming
+// after the first commits, reads the just-inserted spin inside the 2h window
+// and is rejected with 429 "Spin cooldown active" (with nextAvailableAt).
+describe("POST /api/earn/spin/complete — concurrent spins can't both bypass the 2h cooldown", () => {
+  it("serializes two overlapping completions via the row lock: one inserts, the other gets cooldown 429", async () => {
+    // Both requests carry a valid, consumed challenge.
+    mockConsume.mockResolvedValue({ status: "ok" });
+
+    // Shared state: no spins at all — user is under the daily cap AND has no
+    // recent spin, so without the lock both would see "cooldown clear" at once.
+    const spinTokens: Array<{ earnedAt: Date }> = [];
+
+    // Single mutex models the per-user `FOR UPDATE` row lock.
+    let lockHeld = false;
+    const waiters: Array<() => void> = [];
+    const acquire = async () => {
+      if (!lockHeld) { lockHeld = true; return; }
+      await new Promise<void>((resolve) => waiters.push(resolve));
+    };
+    const release = () => {
+      const next = waiters.shift();
+      if (next) next();
+      else lockHeld = false;
+    };
+    const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+    let inserts = 0;
+
+    function makeCooldownTx() {
+      let selectIdx = 0;
+      let acquired = false;
+      return {
+        _release() { if (acquired) release(); },
+        // The route's sole execute call is the FOR UPDATE row lock. Acquiring the
+        // mutex here is what serializes the two transactions.
+        execute: vi.fn().mockImplementation(async () => {
+          await acquire();
+          acquired = true;
+          await tick(); // let the other request reach its acquire() before we proceed
+          return { rows: [] };
+        }),
+        select: vi.fn().mockImplementation(() => {
+          const idx = selectIdx++;
+          return {
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockImplementation(() => {
+                // First select = daily count; read from live shared state.
+                if (idx === 0) {
+                  return Promise.resolve([{ todayCount: spinTokens.length }]);
+                }
+                // Second select = 2h cooldown lookup (awaited via .limit).
+                // Reads live shared state so the second tx sees the spin the
+                // first tx just inserted.
+                const recent = spinTokens.filter(
+                  (t) => t.earnedAt.getTime() >= Date.now() - TWO_HOURS_MS,
+                );
+                return { limit: vi.fn().mockResolvedValue(recent.slice(0, 1)) };
+              }),
+            }),
+          };
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockImplementation(() => ({
+            returning: vi.fn().mockImplementation(async () => {
+              await tick(); // write latency, still inside the held lock
+              const newSpin = { earnedAt: new Date() };
+              spinTokens.push(newSpin);
+              inserts += 1;
+              return [{ id: `tok-${inserts}` }];
+            }),
+          })),
+        }),
+      };
+    }
+
+    mockTransaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) => {
+        const tx = makeCooldownTx();
+        try {
+          return await cb(tx);
+        } finally {
+          tx._release(); // commit/rollback releases the row lock
+        }
+      },
+    );
+
+    const [a, b] = await Promise.all([
+      request(app).post(COMPLETE).send({ challengeToken: TOKEN }),
+      request(app).post(COMPLETE).send({ challengeToken: TOKEN }),
+    ]);
+
+    // Exactly one winner (201) and one loser (429 cooldown).
+    expect([a.status, b.status].sort()).toEqual([201, 429]);
+
+    const winner = a.status === 201 ? a : b;
+    const loser  = a.status === 429 ? a : b;
+
+    expect(winner.body.tokenId).toBeDefined();
+    expect(loser.body.error).toBe("Spin cooldown active");
+    // nextAvailableAt must be set to the winner's earnedAt + 2h.
+    expect(loser.body.nextAvailableAt).toBeDefined();
+    const nextAt = new Date(loser.body.nextAvailableAt as string);
+    expect(nextAt.getTime()).toBeGreaterThan(Date.now());
+
+    // The lock guaranteed only one insertion despite both starting with no recent spin.
+    expect(inserts).toBe(1);
+    expect(spinTokens.length).toBe(1);
+  });
+});
