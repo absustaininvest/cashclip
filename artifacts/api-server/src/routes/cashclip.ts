@@ -48,6 +48,8 @@ import {
   setSetting,
   ADMOB_ALERT_EMAIL_KEY,
   ADMOB_ALERT_EMAIL_ENABLED_KEY,
+  AD_FILL_AVAILABLE_KEY,
+  AD_FILL_REPORTED_AT_KEY,
 } from "../lib/runtimeSettings";
 import {
   getSponsoredVisitAlertDebounce,
@@ -854,9 +856,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: "rewardedFillAvailable must be a boolean" });
       return;
     }
+    const now = Date.now();
     adFillState.rewardedFillAvailable = rewardedFillAvailable;
-    adFillState.reportedAt = Date.now();
+    adFillState.reportedAt = now;
     adFillState.reportedByUserId = req.user?.id ?? null;
+    // Fire-and-forget: persist so the value survives API restarts.
+    setSetting(AD_FILL_AVAILABLE_KEY, String(rewardedFillAvailable)).catch(() => {});
+    setSetting(AD_FILL_REPORTED_AT_KEY, String(now)).catch(() => {});
     res.json({ ok: true });
   });
 
@@ -886,12 +892,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const unityNative = parseBool(process.env.AD_UNITY_NATIVE);
     const ironsourceConfigured = Boolean(process.env.IRONSOURCE_APP_KEY);
     const adSystemActive = lpNative && unityNative && ironsourceConfigured;
+
+    // Fall back to the DB-persisted value (loaded into the runtime-settings cache
+    // at startup) when the in-memory state has not been set yet this process
+    // lifetime — i.e. immediately after an API restart before the first report.
+    let rewardedFillAvailable = adFillState.rewardedFillAvailable;
+    let fillReportedAt = adFillState.reportedAt;
+    if (rewardedFillAvailable === null) {
+      const persisted = getSetting(AD_FILL_AVAILABLE_KEY);
+      if (persisted !== null) {
+        rewardedFillAvailable = persisted === "true";
+        const persistedAt = getSetting(AD_FILL_REPORTED_AT_KEY);
+        fillReportedAt = persistedAt !== null ? Number(persistedAt) : null;
+      }
+    }
+
     res.json({
       lpNative,
       unityNative,
       adSystemActive,
-      rewardedFillAvailable: adFillState.rewardedFillAvailable,
-      fillReportedAt: adFillState.reportedAt,
+      rewardedFillAvailable,
+      fillReportedAt,
     });
   });
 
