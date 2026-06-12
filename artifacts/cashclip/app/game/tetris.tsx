@@ -15,11 +15,16 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const COLS = 10;
 const ROWS = 20;
-const CELL_SIZE = Math.min(Math.floor((SCREEN_WIDTH - 32) / COLS), 28);
+// Width-based size: fit 10 columns in the available width, cap at 28
+const CELL_SIZE_BY_WIDTH = Math.min(Math.floor((SCREEN_WIDTH - 32) / COLS), 28);
+// Height-based size: leave ~290px for header, stats, controls, and safe-area padding
+const CELL_SIZE_BY_HEIGHT = Math.floor((SCREEN_HEIGHT - 290) / ROWS);
+// Use the smaller of the two so the board + controls fit without scrolling; minimum 12 for playability
+const CELL_SIZE = Math.max(Math.min(CELL_SIZE_BY_WIDTH, CELL_SIZE_BY_HEIGHT), 12);
 
 type Grid = (string | null)[][];
 

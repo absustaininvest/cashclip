@@ -16,10 +16,16 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const GRID_SIZE = 8;
 const GRID_PAD = 16;
-const CELL_SIZE = Math.floor((Math.min(SCREEN_WIDTH, 420) - GRID_PAD * 2 - GRID_SIZE) / GRID_SIZE);
+// Width-based size: fill available width up to 420px cap
+const CELL_SIZE_BY_WIDTH = Math.floor((Math.min(SCREEN_WIDTH, 420) - GRID_PAD * 2 - GRID_SIZE) / GRID_SIZE);
+// Height-based size: leave ~260px for header, stats, piece tray, and safe-area padding;
+// divisor of 10 ≈ GRID_SIZE + tray-row factor (piece tray scales with cell size)
+const CELL_SIZE_BY_HEIGHT = Math.floor((SCREEN_HEIGHT - 260) / 10);
+// Use the smaller of the two so grid + tray fit without scrolling; minimum 22 for tap targets
+const CELL_SIZE = Math.max(Math.min(CELL_SIZE_BY_WIDTH, CELL_SIZE_BY_HEIGHT), 22);
 const MINI_CELL = Math.floor(CELL_SIZE * 0.55);
 
 const PIECE_COLORS = [
