@@ -1,3 +1,4 @@
+- [React 19 test-renderer remount trap](react19-testrenderer-remount.md) — react-test-renderer@19 remounts inside act(); use two TestRenderer.create() calls (shared storage) to prove second-loadData deduplication instead of onRefresh trigger.
 - [App Store review replies + Apple defense](appstore-review-replies.md) — owner-approved tone & exact templates for public review replies and the Apple "Report a Concern" note; reuse verbatim, don't re-derive.
 - [Domain registrar / DNS / email](domain-registrar.md) — registrar/domain/email provider is Zoho (owner-stated); DNS + email aliases managed there. Don't ask who the registrar is.
 - [absustain base path dev vs prod](absustain-base-path-dev-vs-prod.md) — dev serves at root (BASE_PATH=/), prod at both / and /absustain/; SEO canonical/sitemap use clean root URLs on absustaininvest.com; test dev at /about not /absustain/about.
