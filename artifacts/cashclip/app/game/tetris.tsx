@@ -15,13 +15,17 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const COLS = 10;
-const ROWS = 20;
+import {
+  TETRIS_COLS,
+  TETRIS_ROWS,
+  computeTetrisCellSize,
+} from "./layout-sizing";
+
+const COLS = TETRIS_COLS;
+const ROWS = TETRIS_ROWS;
 
 function computeCellSize(w: number, h: number): number {
-  const byWidth = Math.min(Math.floor((w - 32) / COLS), 28);
-  const byHeight = Math.floor((h - 290) / ROWS);
-  return Math.max(Math.min(byWidth, byHeight), 12);
+  return computeTetrisCellSize(w, h);
 }
 
 type Grid = (string | null)[][];

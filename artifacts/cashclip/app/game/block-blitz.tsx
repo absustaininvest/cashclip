@@ -16,13 +16,17 @@ import Colors from "@/constants/colors";
 import { useLanguage } from "@/lib/LanguageContext";
 import { recordGamePlay, canPlayGame, formatPoints, dollarsToPoints } from "@/lib/storage";
 
-const GRID_SIZE = 8;
-const GRID_PAD = 16;
+import {
+  BLOCK_GRID_SIZE,
+  BLOCK_GRID_PAD,
+  computeBlockCellSize,
+} from "./layout-sizing";
+
+const GRID_SIZE = BLOCK_GRID_SIZE;
+const GRID_PAD = BLOCK_GRID_PAD;
 
 function computeCellSize(w: number, h: number): number {
-  const byWidth = Math.floor((Math.min(w, 420) - GRID_PAD * 2 - GRID_SIZE) / GRID_SIZE);
-  const byHeight = Math.floor((h - 260) / 10);
-  return Math.max(Math.min(byWidth, byHeight), 22);
+  return computeBlockCellSize(w, h);
 }
 
 const PIECE_COLORS = [
