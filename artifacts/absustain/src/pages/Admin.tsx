@@ -2346,6 +2346,23 @@ export function CashClipUsersPanel({ token }: { token: string }) {
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
 
+  const fetchAdjustmentActors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/adjustments/actors", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const actors: Array<{ actorUserId: string; actorUsername: string | null }> = data.actors ?? [];
+      const names = actors
+        .map((a) => a.actorUsername ?? a.actorUserId)
+        .filter((n): n is string => !!n)
+        .sort((a, b) => a.localeCompare(b));
+      setAuditActors(names);
+    } catch {
+    }
+  }, [token]);
+
   const fetchAdjustments = useCallback(async () => {
     setAuditLoading(true);
     try {
@@ -2358,22 +2375,16 @@ export function CashClipUsersPanel({ token }: { token: string }) {
       const data = await res.json();
       const rows = data.adjustments ?? [];
       setAuditRows(rows);
-      if (!auditActorFilter) {
-        const names = Array.from(
-          new Set(
-            rows
-              .map((r: { actorUsername: string | null; actorUserId: string | null }) => r.actorUsername ?? r.actorUserId)
-              .filter((n: string | null): n is string => !!n),
-          ),
-        ).sort((a, b) => (a as string).localeCompare(b as string)) as string[];
-        setAuditActors(names);
-      }
     } catch {
       setAuditRows([]);
     } finally {
       setAuditLoading(false);
     }
   }, [token, auditActorFilter]);
+
+  useEffect(() => {
+    fetchAdjustmentActors();
+  }, [fetchAdjustmentActors]);
 
   useEffect(() => {
     fetchAdjustments();

@@ -27,7 +27,7 @@ import {
   campaigns,
 } from "@workspace/db";
 import { db } from "@workspace/db";
-import { eq, ne, desc, and, or, sql, gte, lt, inArray, count, sum, between, ilike } from "drizzle-orm";
+import { eq, ne, desc, and, or, sql, gte, lt, inArray, count, sum, between, ilike, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -114,6 +114,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(limit?: number, offset?: number): Promise<{ users: User[]; total: number }>;
   getAdjustmentLedger(limit?: number): Promise<Array<{ id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: Date }>>;
+  getAdjustmentActors(): Promise<Array<{ actorUserId: string; actorUsername: string | null }>>;
   createUser(user: InsertUser & { role?: string }): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<{ tokenVersion: number }>;
   incrementTokenVersion(id: string, expectedVersion?: number): Promise<{ tokenVersion: number } | null>;
@@ -985,6 +986,25 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(earningsLedger.createdAt))
       .limit(limit);
+  }
+
+  async getAdjustmentActors(): Promise<Array<{ actorUserId: string; actorUsername: string | null }>> {
+    const actorAlias = alias(users, "actor");
+    const rows = await db
+      .selectDistinct({
+        actorUserId: earningsLedger.actorUserId,
+        actorUsername: actorAlias.username,
+      })
+      .from(earningsLedger)
+      .leftJoin(actorAlias, eq(earningsLedger.actorUserId, actorAlias.id))
+      .where(
+        and(
+          eq(earningsLedger.type, "adjustment"),
+          isNotNull(earningsLedger.actorUserId),
+        ),
+      )
+      .orderBy(actorAlias.username);
+    return rows.filter((r): r is { actorUserId: string; actorUsername: string | null } => r.actorUserId !== null);
   }
 
   async createWithdrawal(data: {
