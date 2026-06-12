@@ -427,14 +427,14 @@ export default function WalletScreen() {
     return (
       <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : 0, alignItems: "center", justifyContent: "center" }]}>
         <Chipley pose="sad" size={112} />
-        <Text style={[styles.emptyTitle, { marginTop: 16 }]}>Couldn't load wallet</Text>
-        <Text style={[styles.emptySubtitle, { textAlign: "center", paddingHorizontal: 32 }]}>Check your connection and try again.</Text>
+        <Text style={[styles.emptyTitle, { marginTop: 16 }]}>{t.wallet.walletLoadError}</Text>
+        <Text style={[styles.emptySubtitle, { textAlign: "center", paddingHorizontal: 32 }]}>{t.wallet.walletLoadErrorSub}</Text>
         <Pressable
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadData(); }}
           style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1, marginTop: 20 }]}
         >
           <Feather name="refresh-cw" size={16} color={Colors.background} />
-          <Text style={styles.retryBtnText}>Try Again</Text>
+          <Text style={styles.retryBtnText}>{t.wallet.tryAgain}</Text>
         </Pressable>
       </View>
     );

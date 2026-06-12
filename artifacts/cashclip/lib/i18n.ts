@@ -123,6 +123,9 @@ const en = {
       readyToConvert: "Ready to convert!",
       estCashValue: "Est. cash value",
       valueGrowsWithRevenue: "Cash value grows with ad revenue",
+      walletLoadError: "Couldn't load wallet",
+      walletLoadErrorSub: "Check your connection and try again.",
+      tryAgain: "Try Again",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -672,6 +675,9 @@ const translations: Record<Language, Translations> = {
       readyToConvert: "¡Listo para convertir!",
       estCashValue: "Valor estimado",
       valueGrowsWithRevenue: "El valor crece con los ingresos por anuncios",
+      walletLoadError: "No se pudo cargar la billetera",
+      walletLoadErrorSub: "Verifica tu conexión e intenta de nuevo.",
+      tryAgain: "Intentar de Nuevo",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
