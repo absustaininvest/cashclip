@@ -293,6 +293,7 @@ export async function showRewardedAd(
   }
   if (!lpRewardedAvailable) {
     console.warn("[AdInit] showRewardedVideo skipped — no fill (lpRewardedAvailable=false); check Unity mediation placement configuration");
+    void trackAdLoadFailed("rewarded", "NO_FILL", "lpRewardedAvailable=false");
     return { rewarded: false };
   }
   if (!lpUserId) {

@@ -32,6 +32,7 @@ interface AdSummary {
   totalCompletions: number;
   totalRewardsEarned: number;
   totalFailures: number;
+  noFillCount: number;
   completionRate: number;
   avgRewardAmount: number;
   uniqueUsers: number;
@@ -374,6 +375,23 @@ export default function AdAnalyticsScreen() {
                   {(summary?.totalFailures ?? 0).toLocaleString()}
                 </Text>
                 <Text style={styles.statLabel}>{adLabels.failures}</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <View style={styles.statCardTop}>
+                  <View
+                    style={[
+                      styles.statIconBg,
+                      { backgroundColor: "rgba(255,152,0,0.12)" },
+                    ]}
+                  >
+                    <Feather name="wifi-off" size={18} color="#FF9800" />
+                  </View>
+                </View>
+                <Text style={styles.statValue}>
+                  {(summary?.noFillCount ?? 0).toLocaleString()}
+                </Text>
+                <Text style={styles.statLabel}>{adLabels.noFill}</Text>
               </View>
             </View>
 

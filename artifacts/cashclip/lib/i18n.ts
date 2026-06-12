@@ -316,6 +316,7 @@ const en = {
       days90: "90 Days",
       retry: "Retry",
       fillRate: "Fill Rate",
+      noFill: "No-fill Events",
       notAuthenticated: "Not authenticated",
     },
     games: {
@@ -860,6 +861,7 @@ const translations: Record<Language, Translations> = {
       days90: "90 Dias",
       retry: "Reintentar",
       fillRate: "Tasa de Llenado",
+      noFill: "Eventos sin Relleno",
       notAuthenticated: "No autenticado",
     },
     games: {

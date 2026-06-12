@@ -1644,6 +1644,7 @@ export class DatabaseStorage implements IStorage {
     totalCompletions: number;
     totalRewardsEarned: number;
     totalFailures: number;
+    noFillCount: number;
     completionRate: number;
     avgRewardAmount: number;
     uniqueUsers: number;
@@ -1676,6 +1677,15 @@ export class DatabaseStorage implements IStorage {
       .from(adEvents)
       .where(whereClause ? and(eq(adEvents.event, "load_failed"), whereClause) : eq(adEvents.event, "load_failed"));
 
+    const [noFillResult] = await db
+      .select({ value: count() })
+      .from(adEvents)
+      .where(
+        whereClause
+          ? and(eq(adEvents.event, "load_failed"), eq(adEvents.errorCode, "NO_FILL"), whereClause)
+          : and(eq(adEvents.event, "load_failed"), eq(adEvents.errorCode, "NO_FILL")),
+      );
+
     const [uniqueUsersResult] = await db
       .select({ value: sql<number>`count(distinct ${adEvents.userId})` })
       .from(adEvents)
@@ -1686,6 +1696,7 @@ export class DatabaseStorage implements IStorage {
     const rewardCount = Number(rewards?.cnt ?? 0);
     const totalRewards = parseFloat((rewardCount * REWARDED_AD_PAYOUT_USD).toFixed(2));
     const totalFailures = Number(failures?.value ?? 0);
+    const noFillCount = Number(noFillResult?.value ?? 0);
     const uniqueUsers = Number(uniqueUsersResult?.value ?? 0);
 
     return {
@@ -1693,6 +1704,7 @@ export class DatabaseStorage implements IStorage {
       totalCompletions,
       totalRewardsEarned: totalRewards,
       totalFailures,
+      noFillCount,
       completionRate: totalImpressions > 0 ? parseFloat(((totalCompletions / totalImpressions) * 100).toFixed(1)) : 0,
       avgRewardAmount: rewardCount > 0 ? REWARDED_AD_PAYOUT_USD : 0,
       uniqueUsers,
