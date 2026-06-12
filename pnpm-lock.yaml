@@ -447,6 +447,9 @@ importers:
       expo-updates:
         specifier: ~29.0.17
         version: 29.0.17(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      ironsource-mediation:
+        specifier: ^3.2.0
+        version: 3.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native-unity-ads:
         specifier: ^1.0.3
         version: 1.0.3
@@ -5478,6 +5481,13 @@ packages:
   ipaddr.js@1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
+
+  ironsource-mediation@3.2.0:
+    resolution: {integrity: sha512-OyzkeRuqM3gW6BJb0PT5mrD5+Efq/orHw8YYSXZcIM9d+xBTDEuwdiodd73iWwIE69RvOVBYHfghngjDeZTkmg==}
+    deprecated: This package is no longer support. Please use 'unity-levelplay-mediation' instead.
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   is-arrayish@0.2.1:
     resolution: {integrity: sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==}
@@ -13961,6 +13971,11 @@ snapshots:
   ip-address@10.1.1: {}
 
   ipaddr.js@1.9.1: {}
+
+  ironsource-mediation@3.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
   is-arrayish@0.2.1: {}
 
