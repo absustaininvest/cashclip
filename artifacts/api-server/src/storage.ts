@@ -1924,6 +1924,7 @@ export class DatabaseStorage implements IStorage {
     totalAttempts: number;
     impressions: number;
     failures: number;
+    noFillCount: number;
     fillRate: number;
     failureRate: number;
   }> {
@@ -1952,8 +1953,21 @@ export class DatabaseStorage implements IStorage {
         ),
       );
 
+    const [noFill] = await db
+      .select({ value: count() })
+      .from(adEvents)
+      .where(
+        and(
+          eq(adEvents.event, "load_failed"),
+          eq(adEvents.errorCode, "NO_FILL"),
+          gte(adEvents.createdAt, windowStart),
+          sql`${adEvents.createdAt} <= ${windowEnd}`,
+        ),
+      );
+
     const impressionCount = Number(impressions?.value ?? 0);
     const failureCount = Number(failures?.value ?? 0);
+    const noFillCount = Number(noFill?.value ?? 0);
     const totalAttempts = impressionCount + failureCount;
 
     return {
@@ -1963,6 +1977,7 @@ export class DatabaseStorage implements IStorage {
       totalAttempts,
       impressions: impressionCount,
       failures: failureCount,
+      noFillCount,
       fillRate: totalAttempts > 0 ? parseFloat(((impressionCount / totalAttempts) * 100).toFixed(1)) : 100,
       failureRate: totalAttempts > 0 ? parseFloat(((failureCount / totalAttempts) * 100).toFixed(1)) : 0,
     };
@@ -2037,11 +2052,20 @@ export class DatabaseStorage implements IStorage {
   async checkFillRateAlerts(opts: {
     windowMinutes?: number;
     failureThresholdPercent?: number;
+    noFillThresholdPercent?: number;
     minAttempts?: number;
   } = {}): Promise<{
     alert: boolean;
     severity: "ok" | "warning" | "critical";
     message: string;
+    noFillAlert: {
+      alert: boolean;
+      severity: "ok" | "warning" | "critical";
+      message: string;
+      noFillRate: number;
+      noFillCount: number;
+      threshold: number;
+    };
     stats: {
       windowMinutes: number;
       windowStart: Date;
@@ -2049,18 +2073,23 @@ export class DatabaseStorage implements IStorage {
       totalAttempts: number;
       impressions: number;
       failures: number;
+      noFillCount: number;
       fillRate: number;
       failureRate: number;
     };
     thresholds: {
       failureThresholdPercent: number;
       criticalThresholdPercent: number;
+      noFillThresholdPercent: number;
+      noFillCriticalThresholdPercent: number;
       minAttempts: number;
     };
   }> {
     const windowMinutes = opts.windowMinutes ?? 60;
     const failureThresholdPercent = opts.failureThresholdPercent ?? 30;
     const criticalThresholdPercent = failureThresholdPercent * 1.5;
+    const noFillThresholdPercent = opts.noFillThresholdPercent ?? 30;
+    const noFillCriticalThresholdPercent = noFillThresholdPercent * 1.5;
     const minAttempts = opts.minAttempts ?? 10;
 
     const stats = await this.getFillRateStats(windowMinutes);
@@ -2083,14 +2112,46 @@ export class DatabaseStorage implements IStorage {
       message = `Fill rate is ${stats.fillRate}% but sample size is small (${stats.totalAttempts} attempts, minimum ${minAttempts} required for alerting).`;
     }
 
+    const noFillRate = stats.totalAttempts > 0
+      ? parseFloat(((stats.noFillCount / stats.totalAttempts) * 100).toFixed(1))
+      : 0;
+
+    let noFillAlertActive = false;
+    let noFillSeverity: "ok" | "warning" | "critical" = "ok";
+    let noFillMessage = `No-fill rate is ${noFillRate}% over the last ${windowMinutes} minutes.`;
+
+    if (stats.totalAttempts >= minAttempts) {
+      if (noFillRate >= noFillCriticalThresholdPercent) {
+        noFillAlertActive = true;
+        noFillSeverity = "critical";
+        noFillMessage = `CRITICAL: No-fill rate is ${noFillRate}% (${stats.noFillCount}/${stats.totalAttempts} attempts) over the last ${windowMinutes} minutes. Ad inventory is severely thin.`;
+      } else if (noFillRate >= noFillThresholdPercent) {
+        noFillAlertActive = true;
+        noFillSeverity = "warning";
+        noFillMessage = `WARNING: No-fill rate is ${noFillRate}% (${stats.noFillCount}/${stats.totalAttempts} attempts) over the last ${windowMinutes} minutes. Ad inventory may be running low.`;
+      }
+    } else if (stats.totalAttempts > 0 && noFillRate >= noFillThresholdPercent) {
+      noFillMessage = `No-fill rate is ${noFillRate}% but sample size is small (${stats.totalAttempts} attempts, minimum ${minAttempts} required for alerting).`;
+    }
+
     return {
       alert,
       severity,
       message,
+      noFillAlert: {
+        alert: noFillAlertActive,
+        severity: noFillSeverity,
+        message: noFillMessage,
+        noFillRate,
+        noFillCount: stats.noFillCount,
+        threshold: noFillThresholdPercent,
+      },
       stats,
       thresholds: {
         failureThresholdPercent,
         criticalThresholdPercent,
+        noFillThresholdPercent,
+        noFillCriticalThresholdPercent,
         minAttempts,
       },
     };

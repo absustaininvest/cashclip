@@ -38,6 +38,22 @@ interface AdSummary {
   uniqueUsers: number;
 }
 
+interface NoFillAlertData {
+  alert: boolean;
+  severity: "ok" | "warning" | "critical";
+  message: string;
+  noFillRate: number;
+  noFillCount: number;
+  threshold: number;
+}
+
+interface FillRateAlertData {
+  alert: boolean;
+  severity: "ok" | "warning" | "critical";
+  message: string;
+  noFillAlert: NoFillAlertData;
+}
+
 interface TimelineDay {
   date: string;
   impressions: number;
@@ -164,6 +180,7 @@ export default function AdAnalyticsScreen() {
   const [summary, setSummary] = useState<AdSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelineDay[]>([]);
   const [perUser, setPerUser] = useState<PerUserRow[]>([]);
+  const [fillRateAlert, setFillRateAlert] = useState<FillRateAlertData | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -195,6 +212,7 @@ export default function AdAnalyticsScreen() {
       setSummary(data.summary);
       setTimeline(data.timeline || []);
       setPerUser(data.perUser || []);
+      setFillRateAlert(data.fillRateAlert ?? null);
     } catch (err: any) {
       setError(err?.message || "Failed to load analytics");
     } finally {
@@ -395,6 +413,43 @@ export default function AdAnalyticsScreen() {
                 <Text style={styles.statLabel}>{adLabels.noFill}</Text>
               </View>
             </View>
+
+            {fillRateAlert?.noFillAlert?.alert && (
+              <View
+                style={[
+                  styles.noFillAlertBanner,
+                  fillRateAlert.noFillAlert.severity === "critical"
+                    ? styles.noFillAlertCritical
+                    : styles.noFillAlertWarning,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    fillRateAlert.noFillAlert.severity === "critical"
+                      ? "alert-circle"
+                      : "warning"
+                  }
+                  size={18}
+                  color={
+                    fillRateAlert.noFillAlert.severity === "critical"
+                      ? "#FF5252"
+                      : "#FF9800"
+                  }
+                />
+                <View style={styles.noFillAlertBody}>
+                  <Text style={styles.noFillAlertTitle}>
+                    {fillRateAlert.noFillAlert.severity === "critical"
+                      ? adLabels.noFillAlertCriticalTitle
+                      : adLabels.noFillAlertWarningTitle}
+                  </Text>
+                  <Text style={styles.noFillAlertDesc}>
+                    {adLabels.noFillAlertDesc
+                      .replace("{rate}", String(fillRateAlert.noFillAlert.noFillRate))
+                      .replace("{threshold}", String(fillRateAlert.noFillAlert.threshold))}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <LinearGradient
               colors={["#0D2818", "#0A1A12"]}
@@ -647,6 +702,37 @@ const chartStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16, paddingTop: 8 },
+
+  noFillAlertBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  noFillAlertWarning: {
+    backgroundColor: "rgba(255,152,0,0.10)",
+    borderColor: "rgba(255,152,0,0.35)",
+  },
+  noFillAlertCritical: {
+    backgroundColor: "rgba(255,82,82,0.10)",
+    borderColor: "rgba(255,82,82,0.35)",
+  },
+  noFillAlertBody: { flex: 1, gap: 2 },
+  noFillAlertTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  noFillAlertDesc: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 17,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -319,6 +319,9 @@ const en = {
       fillRate: "Fill Rate",
       noFill: "No-fill Events",
       notAuthenticated: "Not authenticated",
+      noFillAlertWarningTitle: "Low Ad Inventory",
+      noFillAlertCriticalTitle: "Ad Inventory Critical",
+      noFillAlertDesc: "No-fill rate is {rate}% — exceeds the {threshold}% threshold. Check your ad network settings.",
     },
     games: {
       title: "Games",
@@ -865,6 +868,9 @@ const translations: Record<Language, Translations> = {
       fillRate: "Tasa de Llenado",
       noFill: "Eventos sin Relleno",
       notAuthenticated: "No autenticado",
+      noFillAlertWarningTitle: "Inventario de Anuncios Bajo",
+      noFillAlertCriticalTitle: "Inventario de Anuncios Critico",
+      noFillAlertDesc: "Tasa sin relleno es {rate}% — supera el umbral de {threshold}%. Revisa la configuracion de tu red de anuncios.",
     },
     games: {
       title: "Juegos",

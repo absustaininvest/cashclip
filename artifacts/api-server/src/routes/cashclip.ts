@@ -2533,10 +2533,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         60,
       );
 
+      const noFillThresholdPercent = Math.min(
+        Math.max(parseFloat(String(req.query.noFillThreshold || "30")) || 30, 1),
+        99,
+      );
+
       const [alertResult, trendBuckets] = await Promise.all([
         storage.checkFillRateAlerts({
           windowMinutes,
           failureThresholdPercent: thresholdPercent,
+          noFillThresholdPercent,
           minAttempts,
         }),
         storage.getFillRateTimeline(windowMinutes, bucketCount),
