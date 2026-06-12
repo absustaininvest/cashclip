@@ -103,16 +103,18 @@ function notifyMissionClaimFailed(result: ClaimMissionResult): void {
   );
 }
 
-// Visual-only wheel segments — actual reward is server-issued after spin
+// Visual-only wheel segments — actual reward is server-issued after spin.
+// Labels are intentionally "?" since the server picks the amount from its
+// demand pool; showing fixed numbers would be misleading.
 const WHEEL_SEGMENTS = [
-  { value: 50,  label: "50 pts",  color: "#E53935" },
-  { value: 80,  label: "80 pts",  color: "#FB8C00" },
-  { value: 100, label: "100 pts", color: "#FDD835" },
-  { value: 150, label: "150 pts", color: "#43A047" },
-  { value: 200, label: "200 pts", color: "#00ACC1" },
-  { value: 300, label: "300 pts", color: "#1E88E5" },
-  { value: 400, label: "400 pts", color: "#8E24AA" },
-  { value: 500, label: "500 pts", color: "#D81B60" },
+  { value: 50,  label: "?", color: "#E53935" },
+  { value: 80,  label: "?", color: "#FB8C00" },
+  { value: 100, label: "?", color: "#FDD835" },
+  { value: 150, label: "?", color: "#43A047" },
+  { value: 200, label: "?", color: "#00ACC1" },
+  { value: 300, label: "?", color: "#1E88E5" },
+  { value: 400, label: "?", color: "#8E24AA" },
+  { value: 500, label: "?", color: "#D81B60" },
 ];
 
 // Fallback check-in streak ladder (pts per consecutive day). The server is
@@ -167,14 +169,14 @@ function AdCard({
           </Text>
           <View style={styles.adReward}>
             <Ionicons name="star" size={13} color={Colors.primary} />
-            <Text style={styles.adRewardText}>+{formatPoints(dollarsToPoints(ad.reward))}</Text>
+            <Text style={styles.adRewardText}>🎉 Check Wallet!</Text>
           </View>
         </View>
         <View style={styles.watchBtnContainer}>
           {earnedPts != null ? (
             <View style={styles.adEarnedBadge}>
               <Feather name="check" size={12} color={Colors.primary} />
-              <Text style={styles.adEarnedText}>+{earnedPts} pts earned</Text>
+              <Text style={styles.adEarnedText}>🎉 Check your Wallet!</Text>
             </View>
           ) : (
             <>
@@ -1554,7 +1556,7 @@ export default function EarnScreen() {
             </Text>
           </View>
           <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
-            Earn 50 pts per ad · up to 30 ads/day
+            Watch ads to earn · up to 30 ads/day
           </Text>
           <View style={styles.goalBarBg}>
             <LinearGradient

@@ -121,6 +121,9 @@ args = "cd artifacts/cashclip && TMPDIR=/tmp/eas-build EXPO_TOKEN=$EXPO_TOKLAST 
 name = "EAS OTA Publish"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = """
@@ -129,10 +132,7 @@ cmd=${1:-}
 case $cmd in
   add|commit|merge|push|pull|fetch|checkout|reset|rebase|tag|stash|rm|mv) exit 0 ;;
   *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'Haptics on reward + check wallet prompt' --non-interactive"""
-
-[workflows.workflow.metadata]
-outputType = "console"
+esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'Remove hardcoded pts from video ad cards and daily goal label' --non-interactive"""
 
 [[ports]]
 localPort = 3001
