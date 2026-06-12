@@ -1,4 +1,4 @@
-// @vitest-environment node
+look// @vitest-environment node
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
