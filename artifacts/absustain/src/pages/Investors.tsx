@@ -17,6 +17,7 @@ export default function Investors() {
       title="Investor Relations | AB Sustainability Investments"
       description="Investor relations for AB Sustainability Investments LLC — explore investment opportunities, equity details, and the growth strategy behind our sustainable venture portfolio."
       path="/investors"
+      image={{ url: "https://absustaininvest.com/absustain/opengraph.jpg", width: 1280, height: 720 }}
     />
   );
   const [form, setForm] = useState({ name: "", email: "" });

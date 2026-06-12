@@ -9,6 +9,7 @@ export default function Solera() {
         title="Solera Restaurant | AB Sustainability Investments"
         description="Solera Restaurant — aged in tradition, served with soul. A modern hospitality and food service venture in Lake Worth Beach, FL, part of AB Sustainability Investments."
         path="/ventures/solera"
+        image={{ url: "https://absustaininvest.com/absustain/solera-logo.jpeg", width: 1116, height: 1140 }}
       />
 
       {/* Hero */}

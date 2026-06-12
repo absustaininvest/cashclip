@@ -11,6 +11,7 @@ export default function Ventures() {
         title="Ventures & Portfolio | AB Sustainability Investments"
         description="Explore the AB Sustainability Investments portfolio across technology, retail, and food service — including the CashClip mobile rewards app and Solera Restaurant."
         path="/ventures"
+        image={{ url: "https://absustaininvest.com/absustain/ab-logo.jpeg", width: 1320, height: 757 }}
       />
       <div className="text-center mb-20">
         <div className="section-label">{t.ventures.label}</div>

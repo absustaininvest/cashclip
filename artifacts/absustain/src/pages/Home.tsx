@@ -13,6 +13,7 @@ export default function Home() {
         title="AB Sustainability Investments LLC — Building Enduring Enterprises"
         description="AB Sustainability Investments LLC is a diversified holding company building sustainable technology, retail, and food service ventures, including the CashClip rewards app and Solera Restaurant."
         path="/"
+        image={{ url: "https://absustaininvest.com/absustain/opengraph.jpg", width: 1280, height: 720 }}
       />
       <section className="hero">
         <div className="hero-badge">
