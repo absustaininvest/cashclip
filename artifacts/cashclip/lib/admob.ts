@@ -194,7 +194,7 @@ export async function initializeAdMob(): Promise<boolean> {
     // revenue field (dollars) is converted to micros and cached so onAdRewarded
     // can attach the real per-impression value to the reward_earned analytics
     // event. ARM SDK Postbacks must be enabled in the IronSource dashboard
-    // (ironSource → Reporting → ARM) for revenue to be non-null.
+    // (Reporting → ARM → SDK Postbacks) for ImpressionData.revenue to be non-null.
     //
     // Correctness rules:
     //  1. We ALWAYS write lpLastImpressionRevenueMicros (including null for
@@ -202,13 +202,32 @@ export async function initializeAdMob(): Promise<boolean> {
     //     into a later reward event that has no revenue of its own.
     //  2. We only cache revenue for REWARDED impressions — other formats
     //     (interstitial, banner) must not pollute the rewarded revenue slot.
+    //
+    // Format detection covers both the modern SDK (adFormat = "REWARDED") and
+    // the deprecated adUnit string ("RewardedVideo") used by older native SDKs.
+    // If format is absent entirely we fail open (treat as rewarded) so a future
+    // SDK change never silently drops real revenue.
     try {
       IronSource.setImpressionDataListener({
-        onImpressionSuccess: (data?: { revenue?: number | null; adFormat?: string | null; adUnit?: string | null }) => {
-          // Scope to rewarded format. adFormat is the canonical field;
-          // fall back to the deprecated adUnit string for older SDK behaviour.
+        onImpressionSuccess: (data?: {
+          revenue?: number | null;
+          adFormat?: string | null;
+          adUnit?: string | null;
+          precision?: string | null;
+          adNetwork?: string | null;
+        }) => {
+          // Normalise format: prefer adFormat (AdFormat enum, e.g. "REWARDED"),
+          // fall back to legacy adUnit (e.g. "RewardedVideo" → "REWARDEDVIDEO").
           const fmt = (data?.adFormat ?? data?.adUnit ?? "").toUpperCase();
-          if (fmt && fmt !== "REWARDED") {
+          // Accept "REWARDED" (modern AdFormat enum) or "REWARDEDVIDEO"
+          // (deprecated adUnit value from older native SDK versions).
+          // When fmt is empty (unknown format) we fail open — better to cache
+          // a potentially non-rewarded value than to silently drop real revenue.
+          const isRewarded =
+            !fmt ||
+            fmt === "REWARDED" ||      // AdFormat.REWARDED (ironsource-mediation ≥3)
+            fmt === "REWARDEDVIDEO";   // legacy adUnit "RewardedVideo" (deprecated)
+          if (!isRewarded) {
             // Not a rewarded impression — leave cache untouched so the rewarded
             // slot isn't clobbered by an unrelated format's revenue.
             return;
@@ -217,8 +236,20 @@ export async function initializeAdMob(): Promise<boolean> {
           // stale values from a previous session cannot carry forward.
           if (data?.revenue != null && Number.isFinite(data.revenue) && data.revenue > 0) {
             lpLastImpressionRevenueMicros = Math.round(data.revenue * 1_000_000);
+            console.log(
+              `[ARM] Impression revenue cached: ${lpLastImpressionRevenueMicros} micros` +
+              ` ($${data.revenue.toFixed(6)}) network=${data?.adNetwork ?? "?"} precision=${data?.precision ?? "?"}`
+            );
           } else {
             lpLastImpressionRevenueMicros = null;
+            if (data != null) {
+              // Non-null data but null/zero revenue — ARM toggle may be off in dashboard
+              // (Reporting → ARM → SDK Postbacks). Enable it so revenue flows.
+              console.warn(
+                "[ARM] onImpressionSuccess fired but revenue is null/0. " +
+                "Enable ARM SDK Postbacks in the IronSource dashboard: Reporting → ARM → SDK Postbacks."
+              );
+            }
           }
         },
       });

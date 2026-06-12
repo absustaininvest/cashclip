@@ -26,8 +26,8 @@ export const PAYOUT_SHARE = 0.55;
 // Rolling window the ARPU rate is computed over.
 export const ARPU_WINDOW_DAYS = 7;
 // Gross ad revenue attributed per verified rewarded ad. This is a PROXY used
-// until real per-impression mediation revenue (AdMob paid-event `valueMicros`,
-// Unity bidding) is captured on ad_events — see computeRevenueUsd().
+// until real per-impression revenue from LevelPlay ARM (IronSource
+// ImpressionData.revenue) is captured on ad_events — see computeRevenueUsd().
 export const AD_REVENUE_PER_REWARD_USD = 0.012;
 
 // ── DISPLAY ECONOMY (cosmetic, owner-tunable) ─────────────────────────────────
@@ -149,19 +149,21 @@ export async function snapshotRateString(region = DEFAULT_REGION): Promise<strin
 
 // ── REVENUE MEASURE ───────────────────────────────────────────────────────────
 // Gross ad revenue over the window, computed from REAL money when available.
-// AdMob's paid-event reports per-impression revenue as `valueMicros` (1,000,000
-// micros = $1); because Unity competes via in-app bidding through AdMob
-// mediation, that figure already includes the winning Unity revenue. We record
-// it on ad_events.revenue_micros and SUM it here.
+// LevelPlay ARM (Ad Revenue Measurement) fires an ImpressionDataListener
+// callback per impression carrying revenue in dollars. The client converts this
+// to micros (1,000,000 micros = $1) and reports it on ad_events.revenue_micros.
+// ARM SDK Postbacks must be enabled in the IronSource dashboard
+// (Reporting → ARM → SDK Postbacks) for ImpressionData.revenue to be non-null.
 //
-// Transitional fallback: until a client build that reports valueMicros is live,
-// NO ad_events row carries real revenue at all, so there is nothing to SUM.
-// Returning 0 then would collapse the rate to the floor for everyone. So the
-// proxy is used ONLY while not a single row in the window has real revenue
-// recorded (revenueRows = 0). The moment real revenue starts flowing we switch
-// to the SUM and never use the proxy again — even a genuinely low/zero SUM over
-// real impressions is honored (we gate on "any real rows present", NOT sum>0,
-// so a valid low-value window can't wrongly inflate revenue via the proxy).
+// Transitional fallback: until a native build with LevelPlay ARM active ships
+// and data flows in, NO ad_events row carries real revenue, so there is nothing
+// to SUM. Returning 0 then would collapse the rate to the floor for everyone.
+// So the proxy is used ONLY while not a single row in the window has real
+// revenue recorded (revenueRows = 0). The moment real revenue starts flowing
+// we switch to the SUM and never use the proxy again — even a genuinely
+// low/zero SUM over real impressions is honored (we gate on "any real rows
+// present", NOT sum>0, so a valid low-value window can't wrongly inflate
+// revenue via the proxy).
 export async function computeRevenueUsd(since: Date): Promise<number> {
   const [{ realMicros, revenueRows, rewardCount }] = await db
     .select({
