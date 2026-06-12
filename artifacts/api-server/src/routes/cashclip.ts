@@ -49,6 +49,12 @@ import {
   ADMOB_ALERT_EMAIL_KEY,
   ADMOB_ALERT_EMAIL_ENABLED_KEY,
 } from "../lib/runtimeSettings";
+import {
+  getSponsoredVisitAlertDebounce,
+  clearSponsoredVisitAlertDebounce,
+  writeLastAlerted,
+  isSnoozed,
+} from "../lib/sponsoredVisitMonitor";
 import { fetchInbox } from "../lib/inbox";
 import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe } from "drizzle-orm";
 
@@ -563,6 +569,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log?.error({ err }, "failed to update admob alert email settings");
       res.status(500).json({ error: "Failed to save alert email settings" });
+    }
+  });
+
+  /**
+   * GET /api/admin/health/sponsored-visits
+   *
+   * Returns the current state of the sponsored-visit alert debounce so the
+   * admin panel can show whether a snooze is active and when it expires.
+   */
+  app.get("/api/admin/health/sponsored-visits", adminMiddleware, (_req, res) => {
+    const debounce = getSponsoredVisitAlertDebounce();
+    const now = Date.now();
+    const snoozed = debounce != null && debounce.getTime() > now;
+    res.json({
+      snoozed,
+      snoozedUntil: snoozed ? debounce!.toISOString() : null,
+      lastAlertedAt: debounce && !snoozed ? debounce.toISOString() : null,
+    });
+  });
+
+  /**
+   * POST /api/admin/health/sponsored-visits/reset-alert
+   *
+   * Resets or snoozes the settlement-alert debounce.
+   *
+   *   • No body / snoozeHours absent or 0 → clears the debounce entirely so
+   *     the monitor can fire on the very next tick ("Reset debounce" / Clear).
+   *   • snoozeHours: 1–24 → sets the debounce timestamp to now + N hours so
+   *     the monitor stays quiet during a planned maintenance window.
+   */
+  app.post("/api/admin/health/sponsored-visits/reset-alert", adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const body = (req.body ?? {}) as { snoozeHours?: unknown };
+      const raw = body.snoozeHours;
+
+      if (raw !== undefined && raw !== null) {
+        const hours = Number(raw);
+        if (!Number.isFinite(hours) || !Number.isInteger(hours) || hours < 1 || hours > 24) {
+          res.status(400).json({ error: "snoozeHours must be an integer between 1 and 24" });
+          return;
+        }
+        await writeLastAlerted(hours);
+        const snoozedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+        req.log?.info({ snoozeHours: hours, snoozedUntil }, "Sponsored-visit alert snoozed");
+        res.json({ ok: true, action: "snoozed", snoozeHours: hours, snoozedUntil });
+      } else {
+        await clearSponsoredVisitAlertDebounce();
+        req.log?.info("Sponsored-visit alert debounce cleared");
+        res.json({ ok: true, action: "cleared" });
+      }
+    } catch (err) {
+      req.log?.error({ err }, "Failed to reset sponsored-visit alert debounce");
+      res.status(500).json({ error: "Failed to update alert debounce" });
     }
   });
 

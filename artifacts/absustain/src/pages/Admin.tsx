@@ -4197,6 +4197,153 @@ function AdmobAlertEmailCard({
   );
 }
 
+interface SponsoredVisitSnoozeState {
+  snoozed: boolean;
+  snoozedUntil: string | null;
+  lastAlertedAt: string | null;
+}
+
+const SNOOZE_OPTIONS: { label: string; hours: number | null }[] = [
+  { label: "2h", hours: 2 },
+  { label: "4h", hours: 4 },
+  { label: "8h", hours: 8 },
+  { label: "Clear", hours: null },
+];
+
+function SponsoredVisitHealthPanel({ token }: { token: string }) {
+  const [state, setState] = useState<SponsoredVisitSnoozeState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function fetchState() {
+    try {
+      const res = await fetch("/api/admin/health/sponsored-visits", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setState(await res.json());
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchState();
+  }, [token]);
+
+  async function applyAction(hours: number | null) {
+    setActing(true);
+    setError("");
+    setSuccess("");
+    try {
+      const body: Record<string, unknown> = {};
+      if (hours !== null) body.snoozeHours = hours;
+      const res = await fetch("/api/admin/health/sponsored-visits/reset-alert", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "Failed to update");
+        return;
+      }
+      if (json.action === "snoozed") {
+        setSuccess(`Alert snoozed for ${hours}h`);
+      } else {
+        setSuccess("Debounce cleared — monitor can fire on next tick");
+      }
+      await fetchState();
+    } catch {
+      setError("Request failed");
+    } finally {
+      setActing(false);
+      setTimeout(() => setSuccess(""), 4000);
+    }
+  }
+
+  function formatUntil(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4 text-white/40" />
+          <p className="text-white text-sm font-medium">Settlement Alert Snooze</p>
+        </div>
+        {loading ? (
+          <RefreshCw className="w-3.5 h-3.5 text-white/20 animate-spin" />
+        ) : state?.snoozed ? (
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+            Snoozed
+          </span>
+        ) : (
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20">
+            Active
+          </span>
+        )}
+      </div>
+
+      {!loading && state && (
+        <p className="text-white/40 text-xs leading-relaxed">
+          {state.snoozed && state.snoozedUntil
+            ? `Alert suppressed until ${formatUntil(state.snoozedUntil)}. The monitor will resume sending after this window.`
+            : state.lastAlertedAt
+              ? `Last alert sent ${formatUntil(state.lastAlertedAt)}. Monitor is active.`
+              : "No debounce set. Monitor will fire when conditions are met."}
+        </p>
+      )}
+
+      {error && (
+        <p className="text-red-400 text-xs flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          {error}
+        </p>
+      )}
+      {success && (
+        <p className="text-[#00E676] text-xs flex items-center gap-1.5">
+          <Check className="w-3.5 h-3.5 flex-shrink-0" />
+          {success}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-white/30 text-xs">Snooze for:</span>
+        {SNOOZE_OPTIONS.map((opt) => {
+          const isClear = opt.hours === null;
+          return (
+            <button
+              key={opt.label}
+              disabled={acting || loading}
+              onClick={() => applyAction(opt.hours)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${
+                isClear
+                  ? "bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white"
+                  : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function IntegrationHubPanel({
   token,
   onLogout,
@@ -4674,6 +4821,8 @@ export function IntegrationHubPanel({
           </div>
         </div>
       )}
+
+      <SponsoredVisitHealthPanel token={token} />
 
       <p className="text-white/20 text-xs text-center">
         Auto-refreshes every {HUB_REFRESH_MS / 1000}s ·{" "}
