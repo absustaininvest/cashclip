@@ -60,6 +60,12 @@ uri = "file://artifacts/cashclip/assets/images/chip/chip-sleep.png"
 type = "image"
 title = "chip sleeping"
 
+[[generated]]
+id = "lWzrI5418Pv8Wc9hY1mpy"
+uri = "file://attached_assets/generated_images/investors-og.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "vuj1JMHRsMvoGT5TnUusG"
 uri = "file://exports/CashClip_AB_Project_Overview.mp4"
