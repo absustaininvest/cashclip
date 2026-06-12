@@ -4,6 +4,35 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { readdirSync } from "fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { PUBLIC_ROUTES } from "./src/public-routes";
+
+const SITE_BASE = "https://absustaininvest.com";
+
+function sitemapPlugin(): Plugin {
+  return {
+    name: "generate-sitemap",
+    generateBundle() {
+      const lastmod = new Date().toISOString().split("T")[0];
+      const urls = PUBLIC_ROUTES.map(({ path: p, changefreq, priority }) => {
+        const loc = p === "/" ? `${SITE_BASE}/` : `${SITE_BASE}${p}`;
+        return [
+          `  <url>`,
+          `    <loc>${loc}</loc>`,
+          `    <lastmod>${lastmod}</lastmod>`,
+          `    <changefreq>${changefreq}</changefreq>`,
+          `    <priority>${priority.toFixed(1)}</priority>`,
+          `  </url>`,
+        ].join("\n");
+      }).join("\n");
+      const xml =
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+        urls + "\n" +
+        `</urlset>\n`;
+      this.emitFile({ type: "asset", fileName: "sitemap.xml", source: xml });
+    },
+  };
+}
 
 const rawPort = process.env.PORT;
 const port = rawPort ? Number(rawPort) : 3000;
@@ -110,6 +139,7 @@ export default defineConfig({
   plugins: [
     antiClickjackPlugin(),
     archiveGuardPlugin(),
+    sitemapPlugin(),
     ...(MAINTENANCE_MODE ? [maintenancePlugin()] : []),
     react(),
     tailwindcss(),

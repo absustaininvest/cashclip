@@ -13,6 +13,7 @@ import Solera from "./pages/Solera";
 import CashClipPrivacy from "./pages/CashClipPrivacy";
 import CashClipTerms from "./pages/CashClipTerms";
 import { LanguageProvider } from "./lib/i18n";
+import { ROUTES } from "./public-routes";
 
 const AdminGate = lazy(() => import("./pages/AdminGate"));
 
@@ -31,7 +32,7 @@ function AnalyticsTracker() {
 function Router() {
   return (
     <Switch>
-      <Route path="/sc-portal">
+      <Route path={ROUTES.SC_PORTAL}>
         <Suspense fallback={null}>
           <AdminGate />
         </Suspense>
@@ -39,15 +40,15 @@ function Router() {
       <Route>
         <PageLayout>
           <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/ventures" component={Ventures} />
-            <Route path="/ventures/solera" component={Solera} />
-            <Route path="/about" component={About} />
-            <Route path="/investors" component={Investors} />
-            <Route path="/contact" component={Contact} />
-            <Route path="/press" component={PressKit} />
-            <Route path="/cashclip/privacy" component={CashClipPrivacy} />
-            <Route path="/cashclip/terms" component={CashClipTerms} />
+            <Route path={ROUTES.HOME} component={Home} />
+            <Route path={ROUTES.VENTURES} component={Ventures} />
+            <Route path={ROUTES.VENTURES_SOLERA} component={Solera} />
+            <Route path={ROUTES.ABOUT} component={About} />
+            <Route path={ROUTES.INVESTORS} component={Investors} />
+            <Route path={ROUTES.CONTACT} component={Contact} />
+            <Route path={ROUTES.PRESS} component={PressKit} />
+            <Route path={ROUTES.PRIVACY} component={CashClipPrivacy} />
+            <Route path={ROUTES.TERMS} component={CashClipTerms} />
             <Route component={NotFound} />
           </Switch>
         </PageLayout>
