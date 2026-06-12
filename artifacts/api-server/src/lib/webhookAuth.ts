@@ -42,6 +42,16 @@ const WEBHOOK_CONFIGS: Record<string, WebhookSecretConfig> = {
     secretEnvVar: "OFFERTORO_WEBHOOK_SECRET",
     secret: process.env.OFFERTORO_WEBHOOK_SECRET,
   },
+  lootably: {
+    provider: "lootably",
+    secretEnvVar: "LOOTABLY_WEBHOOK_SECRET",
+    secret: process.env.LOOTABLY_WEBHOOK_SECRET,
+  },
+  adjoe: {
+    provider: "adjoe",
+    secretEnvVar: "ADJOE_WEBHOOK_SECRET",
+    secret: process.env.ADJOE_WEBHOOK_SECRET,
+  },
   cpx: {
     provider: "cpx",
     secretEnvVar: "CPX_WEBHOOK_SECRET",
@@ -121,6 +131,26 @@ const PROVIDER_VERIFIERS: Record<string, ProviderVerifier> = {
     const payout = qs(req.query.payout ?? req.body?.payout);
     const expected = md5(`${offerId}${userId}${payout}${secret}`);
     return safeTimingEqual(sig, expected);
+  },
+
+  lootably(secret: string, req: Request): boolean {
+    const hashValue = qs(req.query.hash_value ?? req.body?.hash_value);
+    if (!hashValue) return false;
+    const txId = qs(req.query.transaction_id ?? req.body?.transaction_id);
+    const userId = qs(req.query.user_id ?? req.body?.user_id);
+    const payout = qs(req.query.payout ?? req.body?.payout);
+    const expected = md5(`${txId}${userId}${payout}${secret}`);
+    return safeTimingEqual(hashValue, expected);
+  },
+
+  adjoe(secret: string, req: Request): boolean {
+    const hashValue = qs(req.query.hash_value ?? req.body?.hash_value);
+    if (!hashValue) return false;
+    const txId = qs(req.query.transaction_id ?? req.body?.transaction_id);
+    const userId = qs(req.query.user_id ?? req.body?.user_id);
+    const payout = qs(req.query.payout ?? req.body?.payout);
+    const expected = md5(`${txId}${userId}${payout}${secret}`);
+    return safeTimingEqual(hashValue, expected);
   },
 
   cpx(secret: string, req: Request): boolean {

@@ -91,6 +91,8 @@ const SECRETS = {
   TAPJOY_WEBHOOK_SECRET: "tapjoy-secret-route",
   ADGATE_WEBHOOK_SECRET: "adgate-secret-route",
   OFFERTORO_WEBHOOK_SECRET: "offertoro-secret-route",
+  LOOTABLY_WEBHOOK_SECRET: "lootably-secret-route",
+  ADJOE_WEBHOOK_SECRET: "adjoe-secret-route",
 };
 
 beforeAll(() => {
@@ -156,6 +158,8 @@ beforeAll(async () => {
   mount("get",  "/api/offerwalls/webhook/tapjoy",  "tapjoy",    "tapjoy");
   mount("post", "/api/offerwalls/webhook/adgate",  "adgate",    "json");
   mount("post", "/api/offerwalls/webhook/offertoro", "offertoro", "json");
+  mount("post", "/api/offerwalls/webhook/lootably",  "lootably",  "json");
+  mount("post", "/api/offerwalls/webhook/adjoe",     "adjoe",     "json");
 });
 
 beforeEach(async () => {
@@ -308,6 +312,58 @@ describe("webhook routes — 403 on bad signature, 200 on good signature", () =>
       const res = await request(app)
         .post("/api/offerwalls/webhook/offertoro")
         .send({ offer_id: "o", user_id: "u", payout: "1", ot_sig });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe("POST /api/offerwalls/webhook/lootably (hash_value)", () => {
+    it("returns 403 when hash_value is missing", async () => {
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/lootably")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1" });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: "Forbidden" });
+    });
+
+    it("returns 403 when hash_value is wrong", async () => {
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/lootably")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1", hash_value: "deadbeef" });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: "Forbidden" });
+    });
+
+    it("returns 200 when hash_value MD5 matches", async () => {
+      const hash_value = md5(`tx${"u"}${"1"}${SECRETS.LOOTABLY_WEBHOOK_SECRET}`);
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/lootably")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1", hash_value });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe("POST /api/offerwalls/webhook/adjoe (hash_value)", () => {
+    it("returns 403 when hash_value is missing", async () => {
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/adjoe")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1" });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: "Forbidden" });
+    });
+
+    it("returns 403 when hash_value is wrong", async () => {
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/adjoe")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1", hash_value: "deadbeef" });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: "Forbidden" });
+    });
+
+    it("returns 200 when hash_value MD5 matches", async () => {
+      const hash_value = md5(`tx${"u"}${"1"}${SECRETS.ADJOE_WEBHOOK_SECRET}`);
+      const res = await request(app)
+        .post("/api/offerwalls/webhook/adjoe")
+        .send({ transaction_id: "tx", user_id: "u", payout: "1", hash_value });
       expect(res.status).toBe(200);
     });
   });

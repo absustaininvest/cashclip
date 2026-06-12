@@ -349,4 +349,50 @@ export function registerOfferwallRoutes(app: Express): void {
     }
     res.status(200).json({ status: "1" });
   });
+
+  app.post("/api/offerwalls/webhook/lootably", webhookRateLimiter, async (req: Request, res: Response) => {
+    const auth = verifyWebhook("lootably", req);
+    if (!auth.ok) {
+      logWebhookVerificationFailure(req, "lootably", auth.reason ?? "unknown");
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const { transaction_id, user_id, payout } = req.body;
+    if (transaction_id && user_id) {
+      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
+      const credited = await creditOfferViaWebhook(
+        "lootably",
+        String(user_id),
+        `lootably_${transaction_id}`,
+        Number.isFinite(reward) ? reward : undefined,
+        "[Lootably Webhook]",
+      );
+      if (!credited) {
+        await recordUnsettledOffer("lootably", String(user_id), `lootably_${transaction_id}`, Number.isFinite(reward) ? reward : undefined);
+      }
+    }
+    res.status(200).json({ status: "received" });
+  });
+
+  app.post("/api/offerwalls/webhook/adjoe", webhookRateLimiter, async (req: Request, res: Response) => {
+    const auth = verifyWebhook("adjoe", req);
+    if (!auth.ok) {
+      logWebhookVerificationFailure(req, "adjoe", auth.reason ?? "unknown");
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const { transaction_id, user_id, payout } = req.body;
+    if (transaction_id && user_id) {
+      const reward = typeof payout === "number" ? payout : typeof payout === "string" ? parseFloat(payout) : undefined;
+      const credited = await creditOfferViaWebhook(
+        "adjoe",
+        String(user_id),
+        `adjoe_${transaction_id}`,
+        Number.isFinite(reward) ? reward : undefined,
+        "[Adjoe Webhook]",
+      );
+      if (!credited) {
+        await recordUnsettledOffer("adjoe", String(user_id), `adjoe_${transaction_id}`, Number.isFinite(reward) ? reward : undefined);
+      }
+    }
+    res.status(200).json({ status: "received" });
+  });
 }
