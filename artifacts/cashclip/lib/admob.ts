@@ -18,6 +18,21 @@ import {
 // compiled into the binary (V40/V41 and earlier builds don't have it).
 const LP_NATIVE_AVAILABLE = Boolean(NativeModules.IronSourceMediation);
 
+// Unity Ads adapter wires its own NativeEventEmitter inside ironsource-mediation.
+// If the Unity native module is absent (e.g. adapter present in Gradle but not
+// yet linked, or running on a build without the Unity pod/AAR), constructing
+// that emitter throws "NativeEventEmitter requires a non-null argument" and
+// crashes the app before any JS guard can run.  Check for the module
+// explicitly and skip init when it is missing.
+// The module is typically registered as "UnityAds" by the Unity Ads SDK.
+const UNITY_NATIVE_AVAILABLE =
+  !LP_NATIVE_AVAILABLE || // skip check entirely when IronSource itself is absent
+  Boolean(
+    NativeModules.UnityAds ||
+    NativeModules.UnityAdsPlugin ||
+    NativeModules.RNUnityAds
+  );
+
 export const ADMOB_APP_ID = "";
 export const AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
 export const TEST_AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
@@ -29,7 +44,8 @@ export function getAdUnitId(_type: "rewarded" | "interstitial" | "banner" | "nat
 export const isAdMobAvailable =
   Platform.OS !== "web" &&
   Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
-  LP_NATIVE_AVAILABLE;
+  LP_NATIVE_AVAILABLE &&
+  UNITY_NATIVE_AVAILABLE;
 
 let lpInitialized = false;
 let lpRewardedAvailable = false;
@@ -89,7 +105,14 @@ async function resolveATTGranted(): Promise<boolean> {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 export async function initializeAdMob(): Promise<boolean> {
-  if (!isAdMobAvailable) return false;
+  if (!isAdMobAvailable) {
+    if (LP_NATIVE_AVAILABLE && !UNITY_NATIVE_AVAILABLE) {
+      console.warn(
+        "LevelPlay: Unity Ads native module not found — ad system disabled to prevent NativeEventEmitter crash"
+      );
+    }
+    return false;
+  }
   try {
     const IronSource = require("ironsource-mediation").default;
     const appKey = getAppKey();
@@ -106,68 +129,78 @@ export async function initializeAdMob(): Promise<boolean> {
 
     // Rewarded video listener — LevelPlay uses auto-load mode so the SDK
     // manages inventory. onAdAvailable/onAdUnavailable reflect fill state.
-    IronSource.setLevelPlayRewardedVideoListener({
-      onAdAvailable: () => {
-        lpRewardedAvailable = true;
-      },
-      onAdUnavailable: () => {
-        lpRewardedAvailable = false;
-      },
-      onAdOpened: () => {
-        adShowStartTime = Date.now();
-        trackAdImpression("rewarded");
-      },
-      onAdRewarded: () => {
-        // Fired before onAdClosed — set flag so onAdClosed can resolve correctly
-        lpEarnedRewardThisSession = true;
-        trackAdRewardEarned("rewarded", 1, "rewarded");
-      },
-      onAdClosed: () => {
-        const earned = lpEarnedRewardThisSession;
-        lpEarnedRewardThisSession = false;
-        const duration = Date.now() - adShowStartTime;
-        trackAdCompletion("rewarded", duration);
-        if (pendingRewardResolve) {
-          pendingRewardResolve(earned);
-          pendingRewardResolve = null;
-        }
-      },
-      onAdShowFailed: (error: unknown) => {
-        const err = error as { errorCode?: number; errorMessage?: string } | null;
-        trackAdLoadFailed("rewarded", String(err?.errorCode ?? ""), err?.errorMessage);
-        lpEarnedRewardThisSession = false;
-        if (pendingRewardResolve) {
-          pendingRewardResolve(false);
-          pendingRewardResolve = null;
-        }
-      },
-    });
+    // Each registration is wrapped independently so a failure in one listener's
+    // wiring does not abort the whole init or leave the app in a crashed state.
+    try {
+      IronSource.setLevelPlayRewardedVideoListener({
+        onAdAvailable: () => {
+          lpRewardedAvailable = true;
+        },
+        onAdUnavailable: () => {
+          lpRewardedAvailable = false;
+        },
+        onAdOpened: () => {
+          adShowStartTime = Date.now();
+          trackAdImpression("rewarded");
+        },
+        onAdRewarded: () => {
+          // Fired before onAdClosed — set flag so onAdClosed can resolve correctly
+          lpEarnedRewardThisSession = true;
+          trackAdRewardEarned("rewarded", 1, "rewarded");
+        },
+        onAdClosed: () => {
+          const earned = lpEarnedRewardThisSession;
+          lpEarnedRewardThisSession = false;
+          const duration = Date.now() - adShowStartTime;
+          trackAdCompletion("rewarded", duration);
+          if (pendingRewardResolve) {
+            pendingRewardResolve(earned);
+            pendingRewardResolve = null;
+          }
+        },
+        onAdShowFailed: (error: unknown) => {
+          const err = error as { errorCode?: number; errorMessage?: string } | null;
+          trackAdLoadFailed("rewarded", String(err?.errorCode ?? ""), err?.errorMessage);
+          lpEarnedRewardThisSession = false;
+          if (pendingRewardResolve) {
+            pendingRewardResolve(false);
+            pendingRewardResolve = null;
+          }
+        },
+      });
+    } catch (e) {
+      console.warn("LevelPlay: setLevelPlayRewardedVideoListener failed:", e);
+    }
 
-    IronSource.setLevelPlayInterstitialListener({
-      onAdReady: () => {},
-      onAdLoadFailed: (error: unknown) => {
-        const err = error as { errorCode?: number; errorMessage?: string } | null;
-        trackAdLoadFailed("interstitial", String(err?.errorCode ?? ""), err?.errorMessage);
-      },
-      onAdOpened: () => {
-        adShowStartTime = Date.now();
-        trackAdImpression("interstitial");
-      },
-      onAdClosed: () => {
-        const duration = Date.now() - adShowStartTime;
-        trackAdCompletion("interstitial", duration);
-        if (pendingInterstitialResolve) {
-          pendingInterstitialResolve(true);
-          pendingInterstitialResolve = null;
-        }
-      },
-      onAdShowFailed: () => {
-        if (pendingInterstitialResolve) {
-          pendingInterstitialResolve(false);
-          pendingInterstitialResolve = null;
-        }
-      },
-    });
+    try {
+      IronSource.setLevelPlayInterstitialListener({
+        onAdReady: () => {},
+        onAdLoadFailed: (error: unknown) => {
+          const err = error as { errorCode?: number; errorMessage?: string } | null;
+          trackAdLoadFailed("interstitial", String(err?.errorCode ?? ""), err?.errorMessage);
+        },
+        onAdOpened: () => {
+          adShowStartTime = Date.now();
+          trackAdImpression("interstitial");
+        },
+        onAdClosed: () => {
+          const duration = Date.now() - adShowStartTime;
+          trackAdCompletion("interstitial", duration);
+          if (pendingInterstitialResolve) {
+            pendingInterstitialResolve(true);
+            pendingInterstitialResolve = null;
+          }
+        },
+        onAdShowFailed: () => {
+          if (pendingInterstitialResolve) {
+            pendingInterstitialResolve(false);
+            pendingInterstitialResolve = null;
+          }
+        },
+      });
+    } catch (e) {
+      console.warn("LevelPlay: setLevelPlayInterstitialListener failed:", e);
+    }
 
     await IronSource.init(appKey);
     lpInitialized = true;
