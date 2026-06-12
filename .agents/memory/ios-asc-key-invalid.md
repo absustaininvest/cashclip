@@ -78,8 +78,42 @@ env vars that work for `eas build`. It reads credentials from the EAS-stored key
 `eas credentials --platform ios`) or from explicit fields in `submit.production.ios` in
 `eas.json` (`ascApiKeyPath`, `ascApiKeyIssuerId`, `ascApiKeyId`).
 
-**Current state (post-build-40):** `eas.json` submit block has NO local override fields —
-EAS uses its stored credential. The stored key must be the current Admin Team Key. If submit
-starts 401-ing again, run `eas credentials --platform ios` in `artifacts/cashclip/` to
-replace the EAS-stored key with a fresh Admin Team Key from ASC, and update the
-`APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` workspace secrets to match.
+**Current state (verified Jun 12 2026):** Two separate keys in use:
+
+| Key | Key ID | Role | Where stored | Purpose |
+|-----|--------|------|--------------|---------|
+| EAS submit key | `87Z27CQ96U` | APP_MANAGER | EAS (private key held by EAS, not in workspace secrets) | `eas submit` — uploading IPA to App Store Connect. App Manager is sufficient for this. |
+| Workspace secret | `36377NCG8Z` | Unknown | `APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` secrets | `eas build` — signing certs/profiles. **REVOKED at Apple (returns 401).** |
+
+**EAS submit key `87Z27CQ96U` validation evidence (Jun 12 2026):**
+- `eas submit --platform ios --latest --non-interactive` confirmed: EAS loaded key
+  `87Z27CQ96U` and moved past credential validation (`✔ App Store Connect API Key already
+  set up.`), then scheduled and submitted to Apple. Test runs errored at Apple's side (not
+  at auth), consistent with "already submitted" rejections for build 40 (which was already
+  uploaded on 2026-05-28).
+- EAS submission history query confirms: submission `3735d8dd` on 2026-05-28 has
+  `status=FINISHED` — direct evidence `87Z27CQ96U` successfully authenticated with Apple
+  to deliver build 40. Key does not auto-expire; valid unless manually revoked.
+- The EAS key's private key is held by EAS only — it cannot be read from the workspace.
+  Owner can confirm it's still Active in App Store Connect → Integrations → App Store
+  Connect API → Team Keys (look for `87Z27CQ96U` status).
+
+**The workspace secret key `36377NCG8Z` is revoked (401 confirmed Jun 12 2026).** This
+breaks the next `eas build` for cert/profile management. A new **Admin** Team Key is needed
+before queuing build ≥41. Process: create new key in ASC, save to `APPLE_ASC_KEY_ID` +
+`APPLE_ASC_PRIVATE_KEY` workspace secrets, AND run `eas credentials --platform ios` in
+`artifacts/cashclip/` to store it in EAS for builds.
+
+**Query to read EAS-stored submit key (via Expo GraphQL API):**
+```js
+// POST https://api.expo.dev/graphql  Authorization: Bearer $EXPO_TOKLAST
+query {
+  app { byId(appId: "aac2a3d9-56b6-49ab-b254-9b80e98bab2f") {
+    iosAppCredentials {
+      appStoreConnectApiKeyForSubmissions {
+        keyIdentifier name roles createdAt updatedAt
+      }
+    }
+  }}
+}
+```
