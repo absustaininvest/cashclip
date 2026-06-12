@@ -85,7 +85,7 @@ env vars that work for `eas build`. It reads credentials from the EAS-stored key
 | EAS submit key | `87Z27CQ96U` | APP_MANAGER | EAS (private key held by EAS, not in workspace secrets) | `eas submit` — uploading IPA to App Store Connect. App Manager is sufficient for this. |
 | Workspace secret | `36377NCG8Z` | Unknown | `APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` secrets | `eas build` — signing certs/profiles. **REVOKED at Apple (returns 401).** |
 
-**EAS submit key `87Z27CQ96U` validation evidence (Jun 12 2026):**
+**EAS submit key `87Z27CQ96U` validation evidence (Jun 12 2026 — re-confirmed active Jun 12 2026):**
 - `eas submit --platform ios --latest --non-interactive` confirmed: EAS loaded key
   `87Z27CQ96U` and moved past credential validation (`✔ App Store Connect API Key already
   set up.`), then scheduled and submitted to Apple. Test runs errored at Apple's side (not
