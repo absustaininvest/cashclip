@@ -100,9 +100,15 @@ env vars that work for `eas build`. It reads credentials from the EAS-stored key
 
 **The workspace secret key `36377NCG8Z` is revoked (401 confirmed Jun 12 2026).** This
 breaks the next `eas build` for cert/profile management. A new **Admin** Team Key is needed
-before queuing build ≥41. Process: create new key in ASC, save to `APPLE_ASC_KEY_ID` +
-`APPLE_ASC_PRIVATE_KEY` workspace secrets, AND run `eas credentials --platform ios` in
-`artifacts/cashclip/` to store it in EAS for builds.
+before queuing build ≥41.
+
+**Replacement process (Jun 2026):**
+1. Owner creates a new Admin Team Key in ASC → Integrations → App Store Connect API → Team Keys → (+).
+2. Download the `.p8`; the filename reveals the Key ID: `AuthKey_<KEY_ID>.p8`.
+3. Validate with `node scripts/validate-asc-key.js <file.p8> <KEY_ID> 45944549-8278-4477-a1c6-3348ec45c3f0` — want 200 on all three endpoints (apps, certificates, profiles).
+4. Save `APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY` workspace secrets (one at a time).
+5. Run `bash scripts/store-asc-key-in-eas.sh <file.p8>` to push the key into EAS credential storage.
+6. Revoke old key `36377NCG8Z` in ASC.
 
 **Query to read EAS-stored submit key (via Expo GraphQL API):**
 ```js
