@@ -10,9 +10,5 @@ export default defineConfig({
     // timeouts so individual files don't need ad-hoc per-hook timeouts.
     hookTimeout: 30000,
     testTimeout: 30000,
-    // Tolerate test files that currently contain no test cases (e.g. an
-    // in-progress stub) instead of failing the whole run with
-    // "No test suite found in file".
-    passWithNoTests: true,
   },
 });
