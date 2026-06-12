@@ -316,3 +316,346 @@ describe("InboxPanel sending a reply", () => {
     expect(countCalls(fetchMock, "/api/admin/inbox/reply")).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sent Replies audit log view
+// ---------------------------------------------------------------------------
+
+const sentReply1 = {
+  id: "sent-1",
+  adminUserId: "admin-1",
+  adminUsername: "alice",
+  adminEmail: "alice@absustaininvest.com",
+  recipient: "jane@example.com",
+  subject: "Re: Withdrawal question",
+  body: "Your withdrawal has been processed.",
+  inReplyTo: "msg-thread-1",
+  createdAt: new Date("2026-06-03T14:30:00Z").toISOString(),
+};
+
+const sentReply2 = {
+  id: "sent-2",
+  adminUserId: "admin-2",
+  adminUsername: "bob",
+  adminEmail: "bob@absustaininvest.com",
+  recipient: "john@example.com",
+  subject: "Re: Account issue",
+  body: "We have resolved your account issue.",
+  inReplyTo: "msg-thread-2",
+  createdAt: new Date("2026-06-04T09:00:00Z").toISOString(),
+};
+
+type SentBehavior =
+  | { kind: "list"; replies: any[]; total: number }
+  | { kind: "error"; message?: string };
+
+function installSentFetchMock(sentBehavior: SentBehavior) {
+  const fetchMock = vi.fn(async (url: string | URL, _init?: RequestInit) => {
+    const u = typeof url === "string" ? url : url.toString();
+    const path = u.split("?")[0];
+
+    if (path === "/api/admin/inbox/replies/all") {
+      if (sentBehavior.kind === "error") {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({
+            error: sentBehavior.message ?? "Failed to load sent replies",
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          replies: sentBehavior.replies,
+          total: sentBehavior.total,
+        }),
+      } as Response;
+    }
+
+    // Admin user list for the admin-filter dropdown — return empty list.
+    if (path === "/api/admin/users") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ users: [] }),
+      } as Response;
+    }
+
+    // Initial inbox fetch — return no messages so no thread is selected.
+    if (path === "/api/admin/inbox") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          messages: [],
+          fetchedAt: new Date("2026-06-04T00:00:00Z").toISOString(),
+        }),
+      } as Response;
+    }
+
+    throw new Error(`Unexpected fetch call: ${u}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function urlsFor(
+  fetchMock: ReturnType<typeof installSentFetchMock>,
+  path: string,
+): string[] {
+  return fetchMock.mock.calls
+    .map((c) => {
+      const u = typeof c[0] === "string" ? c[0] : (c[0] as URL).toString();
+      return u;
+    })
+    .filter((u) => u.split("?")[0] === path);
+}
+
+async function switchToSentView() {
+  render(<InboxPanel token={TOKEN} />);
+  const sentBtn = await screen.findByRole("button", { name: /Sent Replies/ });
+  fireEvent.click(sentBtn);
+}
+
+describe("InboxPanel sent replies view", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("renders sent replies with admin attribution, recipient, and timestamp", async () => {
+    installSentFetchMock({
+      kind: "list",
+      replies: [sentReply1, sentReply2],
+      total: 2,
+    });
+    await switchToSentView();
+
+    // Admin attribution (green username) is visible for each reply.
+    expect(await screen.findByText("alice")).toBeInTheDocument();
+    expect(screen.getByText("bob")).toBeInTheDocument();
+
+    // Recipient addresses appear next to the attribution arrow.
+    expect(screen.getByText("jane@example.com")).toBeInTheDocument();
+    expect(screen.getByText("john@example.com")).toBeInTheDocument();
+
+    // Reply bodies are rendered.
+    expect(
+      screen.getByText("Your withdrawal has been processed."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("We have resolved your account issue."),
+    ).toBeInTheDocument();
+
+    // A formatted timestamp (including year) appears for the first reply.
+    const expectedStamp = new Date(sentReply1.createdAt).toLocaleString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      },
+    );
+    expect(screen.getByText(expectedStamp)).toBeInTheDocument();
+  });
+
+  it("requests the next page with the correct offset params and replaces the list with page-2 content", async () => {
+    // Page 0 has 25 replies; page 1 has one unique reply. Total = 26 triggers pagination.
+    const page0Replies = Array.from({ length: 25 }, (_, i) => ({
+      ...sentReply1,
+      id: `sent-p0-${i}`,
+      recipient: `page0user${i}@example.com`,
+      body: `Page 0 reply ${i}`,
+      adminUsername: "alice",
+    }));
+    const page1Reply = {
+      ...sentReply2,
+      id: "sent-p1-0",
+      recipient: "page1user@example.com",
+      body: "Page 1 only reply",
+      adminUsername: "charlie",
+    };
+
+    // Use a custom fetch mock that returns different data depending on offset.
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : (url as URL).toString();
+      const path = u.split("?")[0];
+      const params = new URLSearchParams(u.includes("?") ? u.split("?")[1] : "");
+
+      if (path === "/api/admin/inbox/replies/all") {
+        const offset = parseInt(params.get("offset") ?? "0", 10);
+        if (offset === 0) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ replies: page0Replies, total: 26 }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ replies: [page1Reply], total: 26 }),
+        } as Response;
+      }
+      if (path === "/api/admin/users") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ users: [] }),
+        } as Response;
+      }
+      if (path === "/api/admin/inbox") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            messages: [],
+            fetchedAt: new Date("2026-06-04T00:00:00Z").toISOString(),
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch call: ${u}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InboxPanel token={TOKEN} />);
+    const sentBtn = await screen.findByRole("button", { name: /Sent Replies/ });
+    fireEvent.click(sentBtn);
+
+    // Page 0 content is visible initially.
+    await screen.findByText("Page 0 reply 0");
+
+    // "Next" button is enabled and we navigate to page 1.
+    const nextButton = await screen.findByRole("button", { name: /^Next$/ });
+    expect(nextButton).toBeEnabled();
+    fireEvent.click(nextButton);
+
+    // Page 1's unique reply appears and the page-0 content is gone.
+    expect(await screen.findByText("Page 1 only reply")).toBeInTheDocument();
+    expect(screen.queryByText("Page 0 reply 0")).not.toBeInTheDocument();
+
+    // The request for page 1 carried limit=25 and offset=25.
+    const allUrls = fetchMock.mock.calls
+      .map((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()))
+      .filter((u) => u.split("?")[0] === "/api/admin/inbox/replies/all");
+    expect(
+      allUrls.some((u) => u.includes("offset=25") && u.includes("limit=25")),
+    ).toBe(true);
+  });
+
+  it("applies the recipient filter to the request URL", async () => {
+    const fetchMock = installSentFetchMock({
+      kind: "list",
+      replies: [sentReply1],
+      total: 1,
+    });
+    await switchToSentView();
+
+    // Wait for the initial (unfiltered) load.
+    await waitFor(() =>
+      expect(urlsFor(fetchMock, "/api/admin/inbox/replies/all").length).toBeGreaterThan(0),
+    );
+
+    // Type a recipient address and submit via the Search button.
+    const filterInput = screen.getByPlaceholderText("Filter by recipient email…");
+    fireEvent.change(filterInput, { target: { value: "jane@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+
+    // A new request must include the encoded recipient query parameter.
+    await waitFor(() =>
+      expect(
+        urlsFor(fetchMock, "/api/admin/inbox/replies/all").some((u) =>
+          u.includes("recipient=jane%40example.com"),
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("also applies the recipient filter when submitted by pressing Enter", async () => {
+    const fetchMock = installSentFetchMock({
+      kind: "list",
+      replies: [sentReply1],
+      total: 1,
+    });
+    await switchToSentView();
+
+    await waitFor(() =>
+      expect(urlsFor(fetchMock, "/api/admin/inbox/replies/all").length).toBeGreaterThan(0),
+    );
+
+    const filterInput = screen.getByPlaceholderText("Filter by recipient email…");
+    fireEvent.change(filterInput, { target: { value: "jane@example.com" } });
+    fireEvent.keyDown(filterInput, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(
+        urlsFor(fetchMock, "/api/admin/inbox/replies/all").some((u) =>
+          u.includes("recipient=jane%40example.com"),
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("shows the unfiltered empty state when no replies have been sent", async () => {
+    installSentFetchMock({ kind: "list", replies: [], total: 0 });
+    await switchToSentView();
+
+    expect(
+      await screen.findByText("No replies have been sent yet"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the filtered empty state when active filters return no results", async () => {
+    installSentFetchMock({ kind: "list", replies: [], total: 0 });
+    await switchToSentView();
+
+    // Apply a recipient filter so the component enters the "filtered" branch.
+    const filterInput = screen.getByPlaceholderText("Filter by recipient email…");
+    fireEvent.change(filterInput, { target: { value: "nobody@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+
+    expect(
+      await screen.findByText("No replies match the selected filters"),
+    ).toBeInTheDocument();
+    // The unfiltered empty-state copy must NOT appear simultaneously.
+    expect(
+      screen.queryByText("No replies have been sent yet"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the server error message when GET /api/admin/inbox/replies/all returns non-OK", async () => {
+    installSentFetchMock({ kind: "error" });
+    await switchToSentView();
+
+    expect(
+      await screen.findByText("Failed to load sent replies"),
+    ).toBeInTheDocument();
+    // Neither empty-state variant should appear alongside the error.
+    expect(
+      screen.queryByText("No replies have been sent yet"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No replies match the selected filters"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a custom server error message when the API response includes one", async () => {
+    installSentFetchMock({
+      kind: "error",
+      message: "Database connection lost",
+    });
+    await switchToSentView();
+
+    expect(
+      await screen.findByText("Database connection lost"),
+    ).toBeInTheDocument();
+  });
+});
