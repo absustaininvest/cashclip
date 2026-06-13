@@ -83,7 +83,7 @@ function LearnMoreSection() {
 
           <Text style={styles.learnMoreHeading}>How it is tracked</Text>
           <Text style={styles.learnMoreText}>
-            When you allow tracking, CashClip shares your IDFA with Google AdMob and our offer partners. AdMob uses it to deliver personalized ads and attribute conversions. No personal information such as your name, email, or phone number is shared.
+            When you allow tracking, CashClip shares your IDFA with LevelPlay (ironSource mediation) and our offer partners. LevelPlay uses it to deliver personalized ads and attribute conversions across Unity Ads, Chartboost, and other demand partners. No personal information such as your name, email, or phone number is shared.
           </Text>
 
           <Text style={styles.learnMoreHeading}>What happens if you don't allow</Text>
@@ -157,7 +157,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
         if (dismissed) {
           // User has seen the gate before — request ATT silently and proceed.
           handledRef.current = true;
-          const newStatus = await requestATT().catch(() => "denied");
+          await requestATT().catch(() => {});
           await requestAdsConsent().catch(() => {});
           await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
           markDone();
