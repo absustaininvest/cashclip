@@ -54,6 +54,7 @@ import {
   Pause,
   Ban,
   Sparkles,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -6790,7 +6791,228 @@ type Tab =
   | "cashclip"
   | "publishers"
   | "security"
-  | "securitylog";
+  | "securitylog"
+  | "withdrawals";
+
+interface WithdrawalRow {
+  id: string;
+  userId: string;
+  username: string;
+  amount: string;
+  bonusPercent: string;
+  bonusAmount: string;
+  totalPayout: string;
+  paypalEmail: string;
+  status: string;
+  adminNote: string | null;
+  paypalBatchId: string | null;
+  createdAt: string;
+  processedAt: string | null;
+}
+
+function WithdrawalsPanel({ token }: { token: string }) {
+  const [rows, setRows] = useState<WithdrawalRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"pending" | "all" | "paid" | "rejected">("pending");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
+  const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setActionError(null);
+    try {
+      const url = statusFilter === "all"
+        ? "/api/admin/withdrawals"
+        : `/api/admin/withdrawals?status=${statusFilter}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      setRows(data.withdrawals ?? []);
+    } catch {
+      setActionError("Failed to load withdrawals.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handlePayout(id: string) {
+    setActingId(id);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${id}/payout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Payout failed");
+      await load();
+    } catch (e: any) {
+      setActionError(e.message);
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function handleReject(id: string) {
+    setActingId(id);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected", adminNote: rejectNote[id] ?? "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Reject failed");
+      await load();
+    } catch (e: any) {
+      setActionError(e.message);
+    } finally {
+      setActingId(null);
+      setShowRejectInput((p) => ({ ...p, [id]: false }));
+    }
+  }
+
+  const statusBadge: Record<string, string> = {
+    pending:  "bg-yellow-100 text-yellow-800",
+    approved: "bg-blue-100 text-blue-800",
+    paying:   "bg-blue-100 text-blue-800",
+    paid:     "bg-emerald-100 text-emerald-700",
+    rejected: "bg-red-100 text-red-700",
+  };
+
+  const pendingCount = rows.filter((r) => r.status === "pending").length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-100">
+            <ArrowUpRight className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">Withdrawal Queue</h2>
+            <p className="text-gray-400 text-sm">Review and pay out user withdrawal requests</p>
+          </div>
+        </div>
+        <button onClick={load} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {(["pending", "all", "paid", "rejected"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setStatusFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
+              statusFilter === f
+                ? "bg-gray-900 text-white"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            {f}{f === "pending" && pendingCount > 0 && statusFilter !== "pending" ? ` (${pendingCount})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {actionError && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{actionError}</div>
+      )}
+
+      {loading ? (
+        <div className="text-gray-400 text-sm py-8 text-center">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="py-16 text-center">
+          <ArrowUpRight className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">No {statusFilter === "all" ? "" : statusFilter} withdrawals</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((w) => (
+            <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-['Space_Grotesk'] font-bold text-gray-900">{w.username}</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusBadge[w.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      {w.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">{w.paypalEmail}</p>
+                  <p className="text-xs text-gray-300">{new Date(w.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-['Space_Grotesk'] font-bold text-2xl text-emerald-600">${w.totalPayout}</p>
+                  {parseFloat(w.bonusPercent) > 0 && (
+                    <p className="text-xs text-gray-400">${w.amount} + {w.bonusPercent}% bonus</p>
+                  )}
+                </div>
+              </div>
+
+              {w.adminNote && (
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">Note: {w.adminNote}</p>
+              )}
+              {w.paypalBatchId && (
+                <p className="text-xs text-gray-300">Batch ID: {w.paypalBatchId}</p>
+              )}
+
+              {w.status === "pending" && (
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => handlePayout(w.id)}
+                    disabled={actingId === w.id}
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    {actingId === w.id ? "Processing…" : "Pay via PayPal"}
+                  </button>
+                  {!showRejectInput[w.id] ? (
+                    <button
+                      onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: true }))}
+                      disabled={actingId === w.id}
+                      className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold disabled:opacity-50 transition-colors"
+                    >
+                      Reject
+                    </button>
+                  ) : (
+                    <div className="flex gap-2 flex-1 min-w-[200px]">
+                      <input
+                        type="text"
+                        placeholder="Reason (optional)"
+                        value={rejectNote[w.id] ?? ""}
+                        onChange={(e) => setRejectNote((p) => ({ ...p, [w.id]: e.target.value }))}
+                        className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <button
+                        onClick={() => handleReject(w.id)}
+                        disabled={actingId === w.id}
+                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: false }))}
+                        className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Dashboard({
   token,
@@ -6870,6 +7092,7 @@ function Dashboard({
     { id: "hub", label: "Integration Hub", icon: Activity },
     { id: "revenue", label: "AdMob Revenue", icon: DollarSign },
     { id: "cashclip", label: "CashClip Users", icon: Smartphone },
+    { id: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
     { id: "publishers", label: "Publisher Program", icon: Megaphone },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
@@ -7094,6 +7317,7 @@ function Dashboard({
         {tab === "hub" && <IntegrationHubPanel token={token} onLogout={onLogout} />}
         {tab === "revenue" && <RevenuePanel token={token} onLogout={onLogout} />}
         {tab === "cashclip" && <CashClipUsersPanel token={token} onNavigateToPublishers={() => setTab("publishers")} />}
+        {tab === "withdrawals" && <WithdrawalsPanel token={token} />}
         {tab === "publishers" && <PublisherProgramPanel token={token} />}
         {tab === "ventures" && <VenturesPanel token={token} />}
         {tab === "inbox" && <InboxPanel token={token} />}
