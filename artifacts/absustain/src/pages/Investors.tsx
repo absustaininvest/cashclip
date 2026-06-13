@@ -5,9 +5,19 @@ import { Seo } from "../components/Seo";
 import { trackEvent } from "../lib/analytics";
 
 const PRE_MONEY = 1_000_000;
+const ROUND_2_VALUATION = 2_500_000;
 
 function calcEquity(investment: number) {
   return ((investment / (PRE_MONEY + investment)) * 100).toFixed(2);
+}
+
+function calcRound2Value(investment: number) {
+  const pct = investment / (PRE_MONEY + investment);
+  return Math.round(pct * ROUND_2_VALUATION);
+}
+
+function calcMultiple(investment: number) {
+  return (calcRound2Value(investment) / investment).toFixed(1);
 }
 
 export default function Investors() {
@@ -51,10 +61,11 @@ export default function Investors() {
   ];
 
   const milestones = [
-    { label: "Today — Seed Round", value: "$1,000,000", color: "#00E676", note: "Pre-money valuation" },
-    { label: "CashClip live + 500 users", value: "+$500,000", color: "#00E676", note: "App Store live, user acquisition" },
-    { label: "Solera documented revenue", value: "+$250,000", color: "#D4A540", note: "Monthly revenue documented" },
-    { label: "Projected Round 2 Valuation", value: "$2,500,000", color: "#00E676", note: "90 days from funding" },
+    { label: "Today — Seed Round", value: "$1,000,000", color: "#00E676", note: "Pre-money valuation at close" },
+    { label: "CashClip 500+ users + documented ad revenue", value: "+$500,000", color: "#00E676", note: "App Store growth + first AdTech receipts" },
+    { label: "Solera venue secured + first monthly revenue", value: "+$500,000", color: "#D4A540", note: "Restaurant concept reopens; recurring revenue documented" },
+    { label: "Online Retail channel live (Amazon / Costco)", value: "+$500,000", color: "#F59E0B", note: "First SKUs selling; e-commerce revenue confirmed" },
+    { label: "Round 2 Valuation", value: "$2,500,000", color: "#00E676", note: "90 days from funding — 2.5× today's entry price" },
   ];
 
   return (
@@ -98,6 +109,7 @@ export default function Investors() {
                 <th className="text-left text-white/30 text-xs font-bold font-['Space_Grotesk'] tracking-widest uppercase pb-4 pr-6">{t.investors.equityStake}</th>
                 <th className="text-left text-white/30 text-xs font-bold font-['Space_Grotesk'] tracking-widest uppercase pb-4 pr-6">{t.investors.investorType}</th>
                 <th className="text-left text-white/30 text-xs font-bold font-['Space_Grotesk'] tracking-widest uppercase pb-4">{t.investors.postMoneyValue}</th>
+                <th className="text-left text-white/30 text-xs font-bold font-['Space_Grotesk'] tracking-widest uppercase pb-4 pl-6 hidden md:table-cell">Value @ Round 2</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -114,6 +126,12 @@ export default function Investors() {
                   </td>
                   <td className="py-4">
                     <span className="text-white/40 text-sm">${(PRE_MONEY + tier.amount).toLocaleString()}</span>
+                  </td>
+                  <td className="py-4 pl-6 hidden md:table-cell">
+                    <div>
+                      <span className="font-['Space_Grotesk'] font-bold text-sm text-[#00E676]">${calcRound2Value(tier.amount).toLocaleString()}</span>
+                      <span className="text-white/30 text-xs ml-1.5">{calcMultiple(tier.amount)}×</span>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -139,7 +157,7 @@ export default function Investors() {
                 <span>$10K</span><span>$500K</span>
               </div>
             </div>
-            <div className="flex gap-6 flex-shrink-0">
+            <div className="flex gap-6 flex-shrink-0 flex-wrap justify-center">
               <div className="text-center">
                 <p className="text-white/30 text-xs mb-1 font-['Space_Grotesk'] uppercase tracking-widest">{t.investors.youInvest}</p>
                 <p className="font-['Space_Grotesk'] font-bold text-2xl text-white">${customAmount.toLocaleString()}</p>
@@ -151,6 +169,11 @@ export default function Investors() {
               <div className="text-center">
                 <p className="text-white/30 text-xs mb-1 font-['Space_Grotesk'] uppercase tracking-widest">{t.investors.postMoney}</p>
                 <p className="font-['Space_Grotesk'] font-bold text-2xl text-white/60">${(PRE_MONEY + customAmount).toLocaleString()}</p>
+              </div>
+              <div className="text-center border-l border-white/10 pl-6">
+                <p className="text-white/30 text-xs mb-1 font-['Space_Grotesk'] uppercase tracking-widest">Value @ Round 2</p>
+                <p className="font-['Space_Grotesk'] font-bold text-2xl text-[#00E676]">${calcRound2Value(customAmount).toLocaleString()}</p>
+                <p className="text-white/30 text-xs mt-0.5">{calcMultiple(customAmount)}× return</p>
               </div>
             </div>
           </div>
@@ -247,9 +270,10 @@ export default function Investors() {
         <div className="space-y-4">
           {[
             { color: "#00E676", pct: "50%", amt: "$125,000", label: "CashClip Growth", desc: "User acquisition, ASO, influencer partnerships — first 5,000 active users" },
-            { color: "#D4A540", pct: "30%", amt: "$75,000", label: "Solera Expansion", desc: "Second location scout, catering buildout, brand marketing" },
+            { color: "#D4A540", pct: "25%", amt: "$62,500", label: "Solera Expansion", desc: "New venue buildout, catering infrastructure, brand marketing" },
             { color: "#F59E0B", pct: "10%", amt: "$25,000", label: "Online Retail Launch", desc: "First SKU sourcing, Amazon Business + Costco wholesale setup" },
-            { color: "#8A8A9A", pct: "5%", amt: "$12,500", label: "Operations & Legal", desc: "IP protection, contracts, accounting, corporate structure" },
+            { color: "#8A8A9A", pct: "10%", amt: "$25,000", label: "Operations & Legal", desc: "IP protection, contracts, accounting, corporate structure" },
+            { color: "#6B7280", pct: "5%", amt: "$12,500", label: "Technology Reserve", desc: "Infrastructure, platform upkeep, and contingency buffer" },
           ].map((u) => (
             <div key={u.label} className="flex items-center gap-5 p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
               <div className="w-12 text-center flex-shrink-0">
