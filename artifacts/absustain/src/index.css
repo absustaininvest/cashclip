@@ -354,6 +354,7 @@ a { text-decoration: none; color: inherit; }
 }
 .footer-emails {
   margin-top: 10px; font-size: 13px;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px;
 }
 .footer-emails a { color: rgba(255,255,255,0.35); transition: color 0.2s; }
 .footer-emails a:hover { color: #00E676; }
