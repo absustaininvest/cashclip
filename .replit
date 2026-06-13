@@ -115,7 +115,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/cashclip && TMPDIR=/tmp/eas-build EXPO_TOKEN=$EXPO_TOKLAST EXPO_ASC_API_KEY_PATH=/home/runner/workspace/.eas-tmp/creds/AuthKey_3685WS5P35.p8 EXPO_ASC_KEY_ID=3685WS5P35 EXPO_ASC_ISSUER_ID=45944549-8278-4477-a1c6-3348ec45c3f0 EXPO_APPLE_TEAM_TYPE=COMPANY_OR_ORGANIZATION EXPO_APPLE_TEAM_ID=FAX932PG78 pnpm exec eas build --platform ios --profile production --non-interactive"
+args = "mkdir -p /tmp/eas-build && cd artifacts/cashclip && TMPDIR=/tmp/eas-build EXPO_TOKEN=$EXPO_TOKLAST EXPO_ASC_API_KEY_PATH=/home/runner/workspace/.eas-tmp/creds/AuthKey_3685WS5P35.p8 EXPO_ASC_KEY_ID=3685WS5P35 EXPO_ASC_ISSUER_ID=45944549-8278-4477-a1c6-3348ec45c3f0 EXPO_APPLE_TEAM_TYPE=COMPANY_OR_ORGANIZATION EXPO_APPLE_TEAM_ID=FAX932PG78 pnpm exec eas build --platform ios --profile production --non-interactive"
 
 [[workflows.workflow]]
 name = "EAS OTA Publish"
