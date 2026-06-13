@@ -368,6 +368,9 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
     } catch (err) {
       logger.warn({ err, ip }, "adminMiddleware failed to clear console-token attempts");
     }
+    // Token verified — skip the Bearer check entirely.
+    next();
+    return;
   }
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "No token provided" });
