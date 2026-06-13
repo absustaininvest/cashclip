@@ -28,6 +28,8 @@ const PARTNERS: Partner[] = [
   { kind: "single", name: "Apple",          logo: "/logos/apple.svg",       bg: "#000" },
   { kind: "single", name: "Unity",          logo: "/logos/unity.svg",       bg: "#000" },
   { kind: "dual",   name: "LevelPlay",      logo1: "/logos/unity.svg",      logo2: fav("ironsource.com") },
+  { kind: "single", name: "Chartboost",     logo: fav("chartboost.com") },
+  { kind: "dual",   name: "Chartboost · Unity", logo1: fav("chartboost.com"), logo2: "/logos/unity.svg" },
   { kind: "single", name: "Tapjoy",         logo: fav("tapjoy.com") },
   { kind: "dual",   name: "Tapjoy · Unity", logo1: fav("tapjoy.com"),       logo2: "/logos/unity.svg" },
   { kind: "single", name: "PayPal",         logo: "/logos/paypal.svg" },
