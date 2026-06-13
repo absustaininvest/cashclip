@@ -16,8 +16,7 @@ const PARTNERS: Partner[] = [
   { kind: "single", name: "Unity",                  logo: "/logos/partner-unity.png" },
   { kind: "single", name: "LevelPlay",              logo: "/logos/partner-unity-ironsource.png" },
   { kind: "single", name: "Chartboost",             logo: fav("chartboost.com") },
-  { kind: "single", name: "Tapjoy",                 logo: "/logos/partner-tapjoy.png" },
-  { kind: "dual",   name: "Tapjoy · Unity",         logo1: "/logos/partner-tapjoy.png", logo2: "/logos/partner-unity-icon.png" },
+  { kind: "single", name: "Tapjoy · Unity",          logo: "/logos/partner-tapjoy-unity.png" },
   { kind: "single", name: "HyperWallet · PayPal",  logo: "/logos/partner-hyperwallet.jpeg" },
   { kind: "single", name: "Expo",                   logo: "/logos/expo-white.svg" },
 ];

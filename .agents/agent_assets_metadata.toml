@@ -287,3 +287,9 @@ id = "_9TP9uZNuVqP5kNtpqKTd"
 uri = "file://exports/CashClip_Covered_Fixes_Manuscript.pdf"
 type = "pdf"
 title = "CashClip — Covered Fixes Manuscript"
+
+[[outputs]]
+id = "xobyrvey8IgxqDoxyToqs"
+uri = "file://artifacts/absustain/public/logos/partner-tapjoy-unity.png"
+type = "image"
+title = "Tapjoy × Unity frame"
