@@ -383,29 +383,35 @@ a { text-decoration: none; color: inherit; }
 /* Single partner card */
 .partner-badge {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; padding: 14px 20px; border-radius: 14px; white-space: nowrap;
+  gap: 8px; padding: 12px 16px; border-radius: 14px; white-space: nowrap;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.10);
-  min-width: 120px; min-height: 88px;
+  min-width: 130px; min-height: 90px; max-width: 220px;
   transition: transform 0.18s, border-color 0.18s;
+  overflow: hidden;
 }
 .partner-badge:hover { transform: translateY(-2px); border-color: rgba(0,230,118,0.3); }
 .partner-logo {
-  width: 52px; height: 52px; object-fit: contain; flex-shrink: 0;
+  height: 54px; width: auto; max-width: 180px;
+  object-fit: contain; flex-shrink: 0;
+  border-radius: 6px;
   transition: opacity 0.2s;
 }
 .partner-label {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
-  color: rgba(255,255,255,0.5); font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.4); font-family: 'Space Grotesk', sans-serif;
   text-align: center; line-height: 1.2; text-transform: uppercase;
 }
 
 /* Dual partner card */
-.partner-badge--dual { min-width: 148px; }
+.partner-badge--dual { min-width: 150px; }
 .partner-dual-logos { display: flex; align-items: center; gap: 8px; }
-.partner-logo-sm { width: 38px; height: 38px; object-fit: contain; flex-shrink: 0; }
+.partner-logo-sm {
+  height: 40px; width: auto; max-width: 80px;
+  object-fit: contain; flex-shrink: 0; border-radius: 4px;
+}
 .partner-dual-sep {
-  width: 1px; height: 30px; background: rgba(255,255,255,0.15); flex-shrink: 0;
+  width: 1px; height: 32px; background: rgba(255,255,255,0.15); flex-shrink: 0;
 }
 
 /* Edge fade */
