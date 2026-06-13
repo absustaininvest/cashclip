@@ -11,13 +11,18 @@ import { LanguageProvider, useLanguage } from "@/lib/LanguageContext";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
-import { initializeAdMob, preloadRewardedAd } from "@/lib/admob";
+import { initializeAdMob, preloadRewardedAd, setFillChangeCallback } from "@/lib/admob";
+import { apiRequestSafe } from "@/lib/query-client";
 import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics";
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { OtaUpdateGate } from "@/components/OtaUpdateGate";
 import { CelebrationProvider } from "@/lib/CelebrationContext";
 import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
+import {
+  configureNotificationHandler,
+  requestNotificationPermission,
+} from "@/lib/streak-notifications";
 
 // ============================================================================
 // BUILD-29 DELIVERY COPY of app/_layout.tsx
@@ -39,6 +44,10 @@ import { hydrateDisplayRate, fetchConversionRate } from "@/lib/earn-client";
 
 SplashScreen.preventAutoHideAsync();
 
+// Configure how notifications appear when the app is already in the foreground.
+// Must be called before any notification can fire; fail-open wrapper is inside.
+configureNotificationHandler();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
@@ -55,6 +64,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) fetchConversionRate();
   }, [user]);
+
+  // Request notification permission once, after the user is authenticated.
+  // Fire-and-forget — a denial never blocks any feature (fail-open).
+  useEffect(() => {
+    if (user) {
+      requestNotificationPermission().catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -161,26 +178,38 @@ function RootLayout() {
             <GestureHandlerRootView style={{ flex: 1 }}>
               <StatusBar style="light" />
               <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                <ForceUpdateGate>
-                  {/* TrackingConsentGate shows Apple-style pre-permission screens
-                      first, fires the ATT prompt, then AdsConsent — fully
-                      serialized. Only after the user taps Continue does AdMob
-                      initialize. The native splash is hidden as soon as fonts are
-                      ready (see appReady above), NOT when consent resolves — the
-                      consent screen must be visible so the user can interact with
-                      it, otherwise the app would sit frozen behind the splash. */}
-                  <TrackingConsentGate onConsentDone={() => {
-                    initializeAdMob().then((initialized) => {
-                      if (initialized) preloadRewardedAd();
-                    });
-                  }}>
-                    <OtaUpdateGate>
+                <OtaUpdateGate>
+                  <ForceUpdateGate>
+                    {/* TrackingConsentGate shows Apple-style pre-permission screens
+                        first, fires the ATT prompt, then AdsConsent — fully
+                        serialized. Only after the user taps Continue does AdMob
+                        initialize. The native splash is hidden as soon as fonts are
+                        ready (see appReady above), NOT when consent resolves — the
+                        consent screen must be visible so the user can interact with
+                        it, otherwise the app would sit frozen behind the splash. */}
+                    <TrackingConsentGate onConsentDone={() => {
+                      // Register the fill-state reporter BEFORE init so the first
+                      // onAdAvailable event is captured.  The callback is fire-and-forget:
+                      // it POSTs to /api/earn/ad-fill with the current fill state so the
+                      // admin Integration Hub can show a colour-coded badge without
+                      // requiring log access.  Failures are silently swallowed.
+                      setFillChangeCallback((fillAvailable) => {
+                        apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
+                          .catch(() => {});
+                      });
+                      // LevelPlay (ironSource) replaces AdMob as the ad platform.
+                      // initializeAdMob() is the stable entry-point — internally it
+                      // now initialises the LevelPlay SDK instead.
+                      initializeAdMob().then((initialized) => {
+                        if (initialized) preloadRewardedAd();
+                      });
+                    }}>
                       <CelebrationProvider>
                         <RootLayoutNav />
                       </CelebrationProvider>
-                    </OtaUpdateGate>
-                  </TrackingConsentGate>
-                </ForceUpdateGate>
+                    </TrackingConsentGate>
+                  </ForceUpdateGate>
+                </OtaUpdateGate>
               </View>
             </GestureHandlerRootView>
           </AuthProvider>
