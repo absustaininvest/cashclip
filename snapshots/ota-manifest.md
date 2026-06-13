@@ -20,7 +20,9 @@ All groups on branch `production`, runtime `1.0.0`.
 
 | Date | Update Group ID | Message | Notes |
 |------|----------------|---------|-------|
-| Jun 13, 2026 | `9bdc4700-556d-4471-9247-711f381d7fcb` | Reconcile: 306729c9 | **LIVE** — full reconcile republish |
+| Jun 13, 2026 | `b92510af-7537-4f55-acde-b9e2e25de401` | OTA update | **LIVE** — AdMob banner restored, CTA "Learn More" |
+| Jun 13, 2026 | `aab4a553-53ed-48d3-a63b-ed59456c533c` | OTA update | Pts labels + pts badges restored |
+| Jun 13, 2026 | `9bdc4700-556d-4471-9247-711f381d7fcb` | Reconcile: 306729c9 | Full reconcile republish |
 | Jun 13, 2026 | `3ac6ac1f-083a-4c11-a730-ffd04ef831d2` | Reconcile: 17aaf3a7 | Consent gate fix republish |
 | Jun 13, 2026 | `19affa37-b6a7-4306-a656-ce913d333f63` | Reconcile: 875823df | Native iOS ad card badge fix republish |
 | Jun 13, 2026 | `0321fbf8-4b24-4d7f-94dd-de3ad080f6ee` | Reconcile: 3a354561 | All cleanup republish |

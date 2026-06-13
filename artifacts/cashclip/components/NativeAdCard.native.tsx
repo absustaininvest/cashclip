@@ -70,7 +70,7 @@ export default function NativeAdCard({ index, live, onPress }: NativeAdCardProps
         </View>
         <View style={styles.cardFooter}>
           <View style={styles.ctaBtn}>
-            <Text style={styles.ctaText}>{isLive ? "Watch & Earn" : "Coming soon"}</Text>
+            <Text style={styles.ctaText}>{isLive ? "Learn More" : "Coming soon"}</Text>
           </View>
         </View>
       </View>
