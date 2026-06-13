@@ -1,4 +1,4 @@
-import type { Storage } from "../storage.js";
+import type { IStorage } from "../storage.js";
 
 export type IssueType =
   | "game_credits"
@@ -274,7 +274,7 @@ export async function generateInboxDraft(
   fromEmail: string,
   subject: string,
   body: string,
-  storage: Storage,
+  storage: IStorage,
 ): Promise<DraftResult> {
   const combined = `${subject} ${body}`;
   const lang = detectLang(combined);
@@ -295,15 +295,15 @@ export async function generateInboxDraft(
         username: user.username,
         balanceUsd: fmtUsd(balance),
         totalEarnedUsd: fmtUsd(totalEarned),
-        accountAgeDays: daysSince(new Date(user.created_at)),
-        lastSeenDaysAgo: user.last_seen_at
-          ? daysSince(new Date(user.last_seen_at))
+        accountAgeDays: daysSince(new Date(user.createdAt)),
+        lastSeenDaysAgo: user.lastSeenAt
+          ? daysSince(new Date(user.lastSeenAt))
           : null,
-        emailVerified: !!user.email_verified,
+        emailVerified: !!user.emailVerified,
         withdrawalCount: withdrawals.length,
         recentEarningType: recentEntry?.type ?? null,
         recentEarningDaysAgo: recentEntry
-          ? daysSince(new Date(recentEntry.created_at))
+          ? daysSince(new Date(recentEntry.createdAt))
           : null,
       };
     }
