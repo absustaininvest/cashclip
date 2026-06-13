@@ -117,7 +117,7 @@ cmd=${1:-}
 case $cmd in
   add|commit|merge|push|pull|fetch|checkout|reset|rebase|tag|stash|rm|mv) exit 0 ;;
   *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'OTA update' --non-interactive"""
+esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && node -e \"const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.runtimeVersion='1.0.0';fs.writeFileSync('app.json',JSON.stringify(a,null,2))\" && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'OTA update' --non-interactive; node -e \"const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.runtimeVersion='1.1.0';fs.writeFileSync('app.json',JSON.stringify(a,null,2))\""""
 
 [[ports]]
 localPort = 3001
