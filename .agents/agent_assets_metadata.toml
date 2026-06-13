@@ -293,3 +293,9 @@ id = "xobyrvey8IgxqDoxyToqs"
 uri = "file://artifacts/absustain/public/logos/partner-tapjoy-unity.png"
 type = "image"
 title = "Tapjoy × Unity — final card"
+
+[[outputs]]
+id = "l7MCjzBDdwG4hmL4nYQa-"
+uri = "file://artifacts/absustain/public/logos/partner-googleplay.png"
+type = "image"
+title = "Google Play — background removed"
