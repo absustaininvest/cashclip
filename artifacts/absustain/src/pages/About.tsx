@@ -1,6 +1,7 @@
 import { ShieldCheck, Target, Zap } from "lucide-react";
 import { useLang } from "../lib/i18n";
 import { Seo } from "../components/Seo";
+import { PartnerMarquee } from "../components/PartnerMarquee";
 
 export default function About() {
   const { t } = useLang();
@@ -106,6 +107,12 @@ export default function About() {
           <span className="label">App Domain</span>
           <span className="value"><a href="https://cash-clip.app">cash-clip.app</a></span>
         </div>
+      </div>
+
+      {/* Sliding partner banner */}
+      <div className="mt-2 mb-8">
+        <p className="text-center text-white/20 text-xs font-['Space_Grotesk'] tracking-widest uppercase mb-4">Technology &amp; Platform Partners</p>
+        <PartnerMarquee />
       </div>
     </div>
   );

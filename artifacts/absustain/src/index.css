@@ -359,6 +359,38 @@ a { text-decoration: none; color: inherit; }
 .footer-emails a { color: rgba(255,255,255,0.35); transition: color 0.2s; }
 .footer-emails a:hover { color: #00E676; }
 
+/* ── Partner marquee ─────────────────────────────────── */
+.marquee-track-outer {
+  position: relative; overflow: hidden;
+  margin: 48px 0 8px;
+}
+.marquee-track { overflow: hidden; }
+.marquee-inner {
+  display: flex; gap: 12px; width: max-content;
+  animation: marquee-scroll 32s linear infinite;
+}
+.marquee-track-outer:hover .marquee-inner { animation-play-state: paused; }
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-badge {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 9999px; white-space: nowrap;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 13px; color: rgba(255,255,255,0.55);
+  font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+  transition: border-color 0.2s, color 0.2s;
+}
+.marquee-badge:hover { border-color: rgba(0,230,118,0.35); color: rgba(255,255,255,0.85); }
+.marquee-logo { width: 22px; height: 22px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
+.marquee-fade-left, .marquee-fade-right {
+  position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none;
+}
+.marquee-fade-left  { left: 0;  background: linear-gradient(to right, #050a0e, transparent); }
+.marquee-fade-right { right: 0; background: linear-gradient(to left,  #050a0e, transparent); }
+
 @media (max-width: 768px) {
   .nav { padding: 14px 20px; }
   .nav-links { gap: 20px; }
