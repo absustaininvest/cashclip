@@ -61,6 +61,8 @@ export function Seo({ title, description, path, image }: SeoProps) {
     upsertMeta("name", "robots", "index, follow");
     upsertCanonical(canonical);
 
+    upsertMeta("property", "og:type", "website");
+    upsertMeta("property", "og:site_name", "AB Sustainability Investments");
     upsertMeta("property", "og:title", title);
     upsertMeta("property", "og:description", description);
     upsertMeta("property", "og:url", canonical);
