@@ -49,8 +49,8 @@ const QUICK_ACCESS = [
 let surveyProfilePromptShown = false;
 
 const EARN_HIGHLIGHTS = [
-  { icon: "rotate-cw", label: "Spin", value: "Check your Wallet!", color: "#1E88E5", route: "/earn" },
-  { icon: "check-circle", label: "Check-in", value: "Daily reward", color: "#43A047", route: "/earn" },
+  { icon: "rotate-cw", label: "Spin", value: "Up to 500 pts", color: "#1E88E5", route: "/earn" },
+  { icon: "check-circle", label: "Check-in", value: "100 pts/day", color: "#43A047", route: "/earn" },
   { icon: "users", label: "Refer", value: "After $3 cashout", color: "#E53935", route: "/referral" },
 ];
 

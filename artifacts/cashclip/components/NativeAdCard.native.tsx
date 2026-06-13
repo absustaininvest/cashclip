@@ -56,6 +56,9 @@ export default function NativeAdCard({ index, live, onPress }: NativeAdCardProps
       <View style={styles.card}>
         <View style={[styles.thumbnail, { backgroundColor: card.color }]}>
           <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
+          <View style={styles.rewardBadge}>
+            <Text style={styles.rewardText}>★+{dollarsToPoints(reward)} pts</Text>
+          </View>
           <View style={styles.sponsoredBadge}>
             <Text style={styles.sponsoredText}>Ad</Text>
           </View>
