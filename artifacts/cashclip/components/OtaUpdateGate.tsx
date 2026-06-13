@@ -29,14 +29,27 @@ export function OtaUpdateGate({ children }: { children: React.ReactNode }) {
   const [available, setAvailable] = useState(false);
   const [reloading, setReloading] = useState(false);
   const checking = useRef(false);
+  // True only for the very first check that happens on cold launch.
+  // On launch: auto-apply silently so devices shed the old embedded bundle
+  // without the user having to tap anything.
+  // On foreground returns: show the prompt (user may be mid-session).
+  const isLaunchCheck = useRef(true);
 
   const checkForUpdate = useCallback(async () => {
     if (__DEV__ || !Updates.isEnabled || checking.current) return;
     checking.current = true;
+    const autoApply = isLaunchCheck.current;
+    isLaunchCheck.current = false;
     try {
       const result = await Updates.checkForUpdateAsync();
       if (result.isAvailable) {
         await Updates.fetchUpdateAsync();
+        if (autoApply) {
+          // Cold-start: reload immediately before user sees any UI.
+          // reloadAsync terminates the JS runtime so no finally needed.
+          await Updates.reloadAsync();
+          return;
+        }
         setAvailable(true);
       }
     } catch {

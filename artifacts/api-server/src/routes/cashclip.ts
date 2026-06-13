@@ -58,6 +58,7 @@ import {
   isSnoozed,
 } from "../lib/sponsoredVisitMonitor";
 import { fetchInbox } from "../lib/inbox";
+import { generateInboxDraft } from "../lib/inboxDraft.js";
 import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe, sql as drizzleSql, gte as drizzleGte } from "drizzle-orm";
 
 interface RevenueSource {
@@ -2737,6 +2738,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log?.error({ err, adminUserId: req.userId }, "Failed to load sent replies log");
       res.status(500).json({ error: "Failed to load sent replies" });
+    }
+  });
+
+  // OWL — support draft engine.
+  // Given a sender email + subject + body from the inbox, looks up the user's
+  // real account data and returns a data-backed draft reply the admin can edit
+  // before sending. No AI hallucination — every factual claim comes from the DB.
+  app.post("/api/admin/inbox/draft", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const fromEmail = typeof req.body?.fromEmail === "string" ? req.body.fromEmail.trim() : "";
+      const subject = typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
+      const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+
+      if (!fromEmail) {
+        res.status(400).json({ error: "fromEmail is required." });
+        return;
+      }
+
+      const result = await generateInboxDraft(fromEmail, subject, body, storage);
+      res.json(result);
+    } catch (err) {
+      req.log?.error({ err, adminUserId: req.userId }, "Failed to generate inbox draft");
+      res.status(500).json({ error: "Failed to generate draft." });
     }
   });
 

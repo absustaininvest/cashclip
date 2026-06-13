@@ -53,6 +53,7 @@ import {
   Play,
   Pause,
   Ban,
+  Sparkles,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -1394,6 +1395,8 @@ export function InboxPanel({ token }: { token: string }) {
   const [historyError, setHistoryError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [view, setView] = useState<"inbox" | "sent">("inbox");
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState("");
   const [sentReplies, setSentReplies] = useState<SupportReplyRecord[]>([]);
   const [sentTotal, setSentTotal] = useState(0);
   const [sentLoading, setSentLoading] = useState(false);
@@ -1411,7 +1414,41 @@ export function InboxPanel({ token }: { token: string }) {
     setReplyBody("");
     setReplyError("");
     setReplySent(false);
+    setDraftError("");
   }, []);
+
+  const draftReply = useCallback(async () => {
+    if (!selected || drafting) return;
+    setDrafting(true);
+    setDraftError("");
+    try {
+      const res = await fetch("/api/admin/inbox/draft", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fromEmail: selected.fromEmail,
+          subject: selected.subject,
+          body: selected.body ?? "",
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).error || "Failed to generate draft");
+      }
+      const data = await res.json();
+      setReplyBody(data.draft ?? "");
+      setReplyOpen(true);
+      setReplyError("");
+      setReplySent(false);
+    } catch (err: any) {
+      setDraftError(err.message ?? "Draft failed");
+    } finally {
+      setDrafting(false);
+    }
+  }, [selected, drafting, token]);
 
   const fetchReplyHistory = useCallback(
     async (messageId: string) => {
@@ -1907,20 +1944,41 @@ export function InboxPanel({ token }: { token: string }) {
                   </div>
                 )}
                 {!replyOpen ? (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={openReply}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors"
-                    >
-                      <Mail className="w-3.5 h-3.5" />
-                      {replySent ? "Reply Again" : "Reply"}
-                    </button>
-                    <a
-                      href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl text-xs font-medium hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                    >
-                      Open in Webmail
-                    </a>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        onClick={openReply}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        {replySent ? "Reply Again" : "Reply"}
+                      </button>
+                      <button
+                        onClick={draftReply}
+                        disabled={drafting}
+                        title="OWL: auto-draft a reply using real account data"
+                        className="flex items-center gap-2 px-4 py-2 bg-violet-50 border border-violet-200 text-violet-600 rounded-xl text-xs font-medium hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                      >
+                        {drafting ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        {drafting ? "Drafting…" : "OWL Draft"}
+                      </button>
+                      <a
+                        href={`mailto:${encodeURIComponent(selected.fromEmail)}?subject=Re: ${encodeURIComponent(selected.subject)}`}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl text-xs font-medium hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                      >
+                        Open in Webmail
+                      </a>
+                    </div>
+                    {draftError && (
+                      <div className="flex items-center gap-1.5 text-red-400 text-xs">
+                        <AlertCircle className="w-3 h-3" />
+                        {draftError}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
