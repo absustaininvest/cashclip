@@ -1,0 +1,1813 @@
+Update groups
+
+
+
+Find update by ID
+Update
+Commit
+Platforms
+Runtime
+Branch
+Reconcile: 306729c9
+
+3 minutes ago
+b2d60b5
+
+
+
+1.0.0
+
+production
+
+Reconcile: 17aaf3a7
+
+3 minutes ago
+7508565*
+
+
+
+1.0.0
+
+production
+
+Reconcile: 875823df
+
+3 minutes ago
+9b784f1*
+
+
+
+1.0.0
+
+production
+
+Reconcile: 3a354561
+
+4 minutes ago
+9b784f1*
+
+
+
+1.0.0
+
+production
+
+Reconcile: f1cf0886
+
+4 minutes ago
+90468f7*
+
+
+
+1.0.0
+
+production
+
+Republish "Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)" - group: 7c1adb51-3caa-46fc-b4d3-04ce738f2c8b
+
+21 minutes ago
+3d24705
+
+
+
+1.1.0
+
+production
+
+Republish "Fix admin modals not opening on iOS" - group: 8f168da2-3218-4d47-bd0e-7cf36c400a6a
+
+22 minutes ago
+1fb02e7
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Add Chipley coin mascot" - group: 9268d6f5-ece8-49a8-a42f-c817e1c5fbbe" - group: 6d34164f-e260-4dde-8e9b-b91328f3bab2
+
+25 minutes ago
+None
+
+
+
+1.0.0
+
+production
+
+OTA update
+
+41 minutes ago
+b2d60b5
+
+
+
+1.0.0
+
+production
+
+OTA update
+
+about 2 hours ago
+7508565*
+
+
+
+1.0.0
+
+production
+
+OTA update
+
+about 2 hours ago
+f1fb50b
+
+
+
+1.0.0
+
+production
+
+OTA update
+
+about 3 hours ago
+95eb2aa
+
+
+
+1.0.0
+
+production
+
+OTA update
+
+about 3 hours ago
+ebcfbbe*
+
+
+
+1.0.0
+
+production
+
+OTA: consent gate fix + auto-apply on launch
+
+about 4 hours ago
+5818304*
+
+
+
+1.0.0
+
+production
+
+OTA: consent gate fix + auto-apply on launch
+
+about 6 hours ago
+4b5363f*
+
+
+
+1.0.0
+
+production
+
+OTA: consent gate fix + auto-apply on launch
+
+about 8 hours ago
+c4e91fd*
+
+
+
+1.0.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+about 10 hours ago
+c5e660a
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+about 12 hours ago
+c662dab
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+about 21 hours ago
+ea63b3b
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+about 21 hours ago
+fca87e4
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+about 23 hours ago
+3d24705
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+1 day ago
+e5b09e8
+
+
+
+1.1.0
+
+production
+
+Build 29: fix native iOS ad card badge (NativeAdCard.native.tsx)
+
+1 day ago
+9b784f1*
+
+
+
+1.0.0
+
+production
+
+Build 29: all cleanup - no pts in games, spin, video cards, ad badges
+
+1 day ago
+9b784f1*
+
+
+
+1.0.0
+
+production
+
+Build 29: remove pts badges from all cards
+
+1 day ago
+90468f7*
+
+
+
+1.0.0
+
+production
+
+Remove hardcoded pts from home screen native ad card badges
+
+1 day ago
+90468f7*
+
+
+
+1.1.0
+
+production
+
+Remove hardcoded pts from video ad cards and daily goal label
+
+1 day ago
+3ecd8fb*
+
+
+
+1.1.0
+
+production
+
+Mystery wheel: ? labels, no fixed pts on spin or home card
+
+1 day ago
+3ecd8fb*
+
+
+
+1.1.0
+
+production
+
+Haptics on reward + check wallet prompt
+
+1 day ago
+3ecd8fb
+
+
+
+1.1.0
+
+production
+
+Haptics on reward + check wallet prompt
+
+1 day ago
+e336a95*
+
+
+
+1.1.0
+
+production
+
+Enable game + video earn rewards via server challenge
+
+1 day ago
+9afb9a7*
+
+
+
+1.1.0
+
+production
+
+Enable game + video earn rewards via server challenge
+
+1 day ago
+9afb9a7*
+
+
+
+1.1.0
+
+production
+
+Fix video card ads: show modal without challenge token, ad_view pays on completion
+
+2 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Fix video card ads: show modal without challenge token, ad_view pays on completion
+
+2 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Fix video card ads: show modal without challenge token, ad_view pays on completion
+
+2 days ago
+None
+
+
+
+1.1.0
+
+production
+
+HOTFIX: guard LevelPlay require — safe no-op on builds without native module
+
+2 days ago
+None
+
+
+
+1.1.0
+
+production
+
+Maintenance notice + remove AdMob (LevelPlay native build pending)
+
+2 days ago
+None
+
+
+
+1.1.0
+
+production
+
+Maintenance notice + remove AdMob (LevelPlay native build pending)
+
+2 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Maintenance notice + remove AdMob (LevelPlay native build pending)
+
+2 days ago
+0000000*
+
+
+
+1.0.0
+
+production
+
+Maintenance notice + remove AdMob (LevelPlay native build pending)
+
+2 days ago
+427ea98*
+
+
+
+1.0.0
+
+production
+
+Wire ad completion callbacks to server earn credits (ad_view)
+
+2 days ago
+4ec273b*
+
+
+
+1.0.0
+
+production
+
+Wire ad completion callbacks to server earn credits (ad_view)
+
+2 days ago
+4ec273b
+
+
+
+1.1.0
+
+production
+
+V40/V41 OTA: pending-points label 'Auto-converts ~3 hours after earning' (runtime 1.1.0)
+
+2 days ago
+None
+
+
+
+1.1.0
+
+production
+
+Wallet: balance refreshes on tab focus; live 3h hold countdown (Ready in Xh Ym -> Ready to convert)
+
+6 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Video credit fix: real-ad watches now pay via secure begin/complete server path (SSV not landing); points pending 3h then spendable
+
+6 days ago
+None
+
+
+
+1.0.0
+
+production
+
+V29 OTA test: Home shows real server balance; celebration+spin-fix+home-taps reproduced
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Chipley win-celebration overlay + mascot (TEST -> Project A)
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Chipley celebration: fire on REAL ad path (all users)" - group: 31017b99-6a12-4375-af14-25b4a956487c" - group: 23bffa5a-65c7-476d-a309-98f0fde65332
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Republish "Chipley celebration: fire on REAL ad path (all users)" - group: 31017b99-6a12-4375-af14-25b4a956487c
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Bigger running Chipley (harder to miss)
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Chipley celebration: fire on REAL ad path (all users)
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Republish "Chipley alive (running celebration) + bigger Chipley" - group: f3fec11b-07d8-4fb8-b457-886e8b1152a6
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Republish "Add Chipley coin mascot" - group: 9268d6f5-ece8-49a8-a42f-c817e1c5fbbe
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Chipley alive (running celebration) + bigger Chipley
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Add Chipley coin mascot
+
+8 days ago
+None
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 22-25 live (batch 8 of 8 - all 25 live)" - group: 4949e499-e4a5-455a-8759-1705b5c44b89
+
+10 days ago
+946a939
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 19-21 live (batch 7 of 8)" - group: 42d1c362-6faa-48e5-bdb6-2dac9b8e32a8" - group: 5c7b6a1b-cf8f-4dc8-84cc-5d210614fa0f
+
+10 days ago
+58a73f3
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 16-18 live (batch 6 of 8)" - group: ca5124aa-1f2b-4bda-9b85-e9595dfe173f" - group: a9253887-24c3-4705-a363-2cb17b5f6f15
+
+10 days ago
+200edfc
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 13-15 live (batch 5 of 8)" - group: c1ff7b6c-b810-4097-bb60-3861a397c241" - group: 37ba8b61-6243-468b-9394-a36e4b24e360
+
+10 days ago
+1b31b12
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 10-12 live (batch 4 of 8)" - group: 5661d767-7c33-4fb1-9301-c7b4b0795707" - group: 5f7c1a14-827c-44a0-949e-d64643d3f731
+
+10 days ago
+0c1a954
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 7-9 live (batch 3 of 8)" - group: 6ec7b401-c003-48fe-a357-c5c3d67a9626" - group: b4ee7337-b8ff-455b-be3e-5029b74ad968
+
+10 days ago
+0c1a954
+
+
+
+1.0.0
+
+production
+
+Republish "Republish "Home ad slots 4-6 live (batch 2 of 8)" - group: 0a1b84ff-f998-4d0a-a315-bed39242ae33" - group: 0ba24214-3d07-426f-ad08-2dd35fec0029
+
+10 days ago
+5bef3ca
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 1-3 live (batch 1 of 8)" - group: b40761d3-ce90-465a-aa90-260533ede178
+
+10 days ago
+5bef3ca
+
+
+
+1.0.0
+
+production
+
+Republish "VOL.37: honest game rewards, 25 ad slots, dismissible banner, defensive native imports" - group: ffb58f2b-afb1-4ad3-801e-968fdddfafa7
+
+10 days ago
+aebf0a0
+
+
+
+1.0.0
+
+production
+
+Fix in-app Admin/Ad-Analytics 'not authenticated' + sponsored/wallet token reads (secure storage)
+
+12 days ago
+2b05a54*
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 22-25 live (batch 8 of 8 - all 25 live)" - group: 4949e499-e4a5-455a-8759-1705b5c44b89
+
+12 days ago
+946a939
+
+
+
+1.0.0
+
+production
+
+Home ad slots 22-25 live (batch 8 of 8 - all 25 live)
+
+12 days ago
+946a939*
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 19-21 live (batch 7 of 8)" - group: 42d1c362-6faa-48e5-bdb6-2dac9b8e32a8
+
+12 days ago
+58a73f3
+
+
+
+1.0.0
+
+production
+
+Home ad slots 19-21 live (batch 7 of 8)
+
+12 days ago
+58a73f3*
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 1-3 live (batch 1 of 8)" - group: b40761d3-ce90-465a-aa90-260533ede178
+
+12 days ago
+5bef3ca
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 4-6 live (batch 2 of 8)" - group: 0a1b84ff-f998-4d0a-a315-bed39242ae33
+
+12 days ago
+5bef3ca
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 7-9 live (batch 3 of 8)" - group: 6ec7b401-c003-48fe-a357-c5c3d67a9626
+
+12 days ago
+0c1a954
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 10-12 live (batch 4 of 8)" - group: 5661d767-7c33-4fb1-9301-c7b4b0795707
+
+12 days ago
+0c1a954
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 13-15 live (batch 5 of 8)" - group: c1ff7b6c-b810-4097-bb60-3861a397c241
+
+12 days ago
+1b31b12
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 16-18 live (batch 6 of 8)" - group: ca5124aa-1f2b-4bda-9b85-e9595dfe173f
+
+12 days ago
+200edfc
+
+
+
+1.0.0
+
+production
+
+Republish "Home ad slots 16-18 live (batch 6 of 8)" - group: ca5124aa-1f2b-4bda-9b85-e9595dfe173f
+
+12 days ago
+200edfc
+
+
+
+1.0.0
+
+production
+
+Home ad slots 16-18 live (batch 6 of 8)
+
+12 days ago
+200edfc*
+
+
+
+1.0.0
+
+production
+
+Home ad slots 13-15 live (batch 5 of 8)
+
+12 days ago
+1b31b12*
+
+
+
+1.0.0
+
+production
+
+Home ad slots 10-12 live (batch 4 of 8)
+
+12 days ago
+0c1a954*
+
+
+
+1.0.0
+
+production
+
+Home ad slots 7-9 live (batch 3 of 8)
+
+12 days ago
+0c1a954*
+
+
+
+1.0.0
+
+production
+
+Home ad slots 4-6 live (batch 2 of 8)
+
+12 days ago
+5bef3ca*
+
+
+
+1.0.0
+
+production
+
+Home ad slots 1-3 live (batch 1 of 8)
+
+12 days ago
+5bef3ca*
+
+
+
+1.0.0
+
+production
+
+Home tiles: every tile reliably plays rewarded video + ad feedback (loading/timeout/none)
+
+12 days ago
+e0bc211*
+
+
+
+1.0.0
+
+production
+
+Real CPX/BitLabs surveys + ad reward crediting + smoother launch
+
+13 days ago
+None
+
+
+
+1.0.0
+
+production
+
+VOL.37: honest game rewards, 25 ad slots, dismissible banner, defensive native imports
+
+17 days ago
+aebf0a0*
+
+
+
+1.0.0
+
+production
+
+fix: ATT consent gate marks resolution on Continue so it stops reappearing
+
+17 days ago
+eeefc63*
+
+
+
+1.0.0
+
+production
+
+fix: registration now correctly shows verify-email screen; clear stale error banners on field edit
+
+18 days ago
+bd63802*
+
+
+
+1.0.0
+
+production
+
+Login: resend verification email + email_not_verified detection
+
+18 days ago
+f0c5afc*
+
+
+
+1.0.0
+
+production
+
+Login: resend verification email + email_not_verified detection
+
+18 days ago
+f0c5afc*
+
+
+
+1.0.0
+
+production
+
+Login: resend verification email + email_not_verified detection
+
+18 days ago
+f0c5afc*
+
+
+
+1.0.0
+
+production
+
+Fix registration: check-your-email screen + verify-email route
+
+18 days ago
+d474e9a*
+
+
+
+1.0.0
+
+production
+
+Fix: registration terms checkbox interaction fully corrected
+
+18 days ago
+360e3b4
+
+
+
+1.0.0
+
+production
+
+Fix: terms checkbox no longer toggled when tapping Terms/Privacy links
+
+18 days ago
+9a6ef7e*
+
+
+
+1.0.0
+
+production
+
+Fix: registration terms agreement error and email required field
+
+18 days ago
+9a6ef7e
+
+
+
+1.0.0
+
+production
+
+Fix: preload rewarded ad on home screen mount for instant first tap
+
+18 days ago
+5ed459d*
+
+
+
+1.0.0
+
+production
+
+Fix: preload rewarded ad on home screen mount for instant first tap
+
+18 days ago
+5ed459d*
+
+
+
+1.0.0
+
+production
+
+Feat: Google Ad Feed cards now launch fullscreen rewarded ad on tap
+
+18 days ago
+b782c50*
+
+
+
+1.0.0
+
+production
+
+Fix: tracking consent gate reappearing after denial
+
+18 days ago
+caab3d7
+
+
+
+1.0.0
+
+production
+
+Fix: remove fake verification notice and cap inflated reward amounts in ad analytics
+
+25 days ago
+ce7fe40
+
+
+
+1.0.0
+
+production
+
+Fix: remove fake verification notice and cap inflated reward amounts in ad analytics
+
+26 days ago
+7ef7159
+
+
+
+1.0.0
+
+production
+
+Fix: remove fake verification notice and cap inflated reward amounts in ad analytics
+
+26 days ago
+fa180e9*
+
+
+
+1.0.0
+
+production
+
+Fix: tracking consent screens now show on production builds
+
+26 days ago
+c3d554d*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+9b6adfc
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+361903a
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+0f59e52*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+0f59e52*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+f845d20*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+4f4c870
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+f2fc680*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+f2fc680*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+f2fc680*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+9ef9eae*
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+26 days ago
+dc2016a
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+4d8d172*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+dc1b237*
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+7408b0f
+
+
+
+1.0.0
+
+production
+
+Security: atomic campaign budget, visit token proof, CORS fix, rate limit, version gate, archive removed
+
+26 days ago
+71d3361*
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+26 days ago
+14ab5bb
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+26 days ago
+0c6b9e6
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+26 days ago
+3089504
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+26 days ago
+1b50786
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+664b203
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+27 days ago
+a8522c1
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+664b203
+
+
+
+1.0.0
+
+production
+
+Admin: verify email button for unverified users
+
+27 days ago
+664b203*
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+65e2f16
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+11e8a90
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+11e8a90
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+11e8a90
+
+
+
+1.0.0
+
+production
+
+$5 min/$7 daily payout cap; sponsored publisher cards on home tab replace earn-tab reroute
+
+27 days ago
+7327489
+
+
+
+1.0.0
+
+production
+
+Publisher Program: admin grant, campaign creation, sponsored cards in earn tab, ad credits, publisher dashboard
+
+27 days ago
+4490bbf
+
+
+
+1.0.0
+
+production
+
+Home screen video cards now serve real AdMob+Unity rewarded ads; improved video titles, channels and categories
+
+27 days ago
+a280320
+
+
+
+1.0.0
+
+production
+
+Home screen video cards now serve real AdMob+Unity rewarded ads; improved video titles, channels and categories
+
+27 days ago
+e23aa57*
+
+
+
+1.0.0
+
+production
+
+Home screen video cards now serve real AdMob+Unity rewarded ads; improved video titles, channels and categories
+
+27 days ago
+7112538*
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+27 days ago
+e4dbab1
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+63d5c14*
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+6e5c01c
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+fdf4c7d*
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+7cf73a0
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+2c1f89e
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+f019035
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+f019035
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+c8bb7ea
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+3cffd93
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+a9e5f34
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+09baba2
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+a5e01c1*
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+18feebe
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+e673159
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+6d63c40
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+98b2c9e
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+59963f0*
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+9368da1
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+015bcc7
+
+
+
+1.0.0
+
+production
+
+Permanently remove fake built-in survey brands and seed data
+
+28 days ago
+121149a
+
+
+
+1.0.0
+
+production
+
+Remove built-in fake surveys, fix admin tab bar, fix hook errors
+
+28 days ago
+f8e7992*
+
+
+
+1.0.0
+
+production
+
+Fix tracking screen showing repeatedly for users who have tracking enabled
+
+28 days ago
+fc6afce
+
+
+
+1.0.0
+
+production
+
+Fix tracking screen showing repeatedly for users who have tracking enabled
+
+28 days ago
+195ea4f
+
+
+
+1.0.0
+
+production
+
+Fix tracking screen showing repeatedly for users who have tracking enabled
+
+28 days ago
+8e92149*
+
+
+
+1.0.0
+
+production
+
+Fix tracking screen showing repeatedly for users who have tracking enabled
+
+28 days ago
+2ddc9b3*
+
+
+
+1.0.0
+
+production
+
+Fix tracking screen showing repeatedly for users who have tracking enabled
+
+28 days ago
+706065f*
+
+
+
+1.0.0
+
+production
+
+Fix admin modals not opening on iOS
+
+29 days ago
+1fb02e7
+
+
+
+1.0.0
+
+production
+
+Fix admin modals not opening on iOS
+
+29 days ago
+1fb02e7
+
+
+
+1.0.0
+
+production
+
+Fix admin modals not opening on iOS
+
+29 days ago
+1fb02e7
+
+
+
+1.0.0
+
+production
