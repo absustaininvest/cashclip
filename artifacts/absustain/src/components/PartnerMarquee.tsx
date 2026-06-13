@@ -16,7 +16,7 @@ function LogoBadge({ name, domain }: { name: string; domain: string }) {
   return (
     <div className="marquee-badge">
       <img
-        src={`https://logo.clearbit.com/${domain}`}
+        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
         alt={name}
         width={22}
         height={22}
