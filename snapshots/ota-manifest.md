@@ -16,46 +16,46 @@ Channel: `production` · Project A: `aac2a3d9-56b6-49ab-b254-9b80e98bab2f`
 
 ## OTA Checkpoint History (newest → oldest)
 
-### ✅ CURRENT — All builds, runtimeVersion 1.0.0
+All groups on branch `production`, runtime `1.0.0`.
 
-| Date | Update Group ID | Message |
-|------|----------------|---------|
-| Jun 13, 2026 | `306729c9-b506-4a26-8e17-c86a0997b340` | **CURRENT** — Full reconcile, all users |
-| Jun 13, 2026 | `17aaf3a7` | OTA update (consent gate fix + auto-apply on launch) |
-| Jun 12, 2026 | `875823df-0384-48fc-b65f-5d56a9124987` | Fix native iOS ad card badge (NativeAdCard.native.tsx) |
-| Jun 12, 2026 | `3a354561-31d9-4581-a5c2-61fcdce9edb5` | All cleanup — no pts in games, spin, video cards, ad badges |
-| Jun 12, 2026 | `f1cf0886-ab6a-41d3-9f5d-14ff00f50ae3` | Remove pts badges from all cards |
+| Date | Update Group ID | Message | Notes |
+|------|----------------|---------|-------|
+| Jun 13, 2026 | `9bdc4700-556d-4471-9247-711f381d7fcb` | Reconcile: 306729c9 | **LIVE** — full reconcile republish |
+| Jun 13, 2026 | `3ac6ac1f-083a-4c11-a730-ffd04ef831d2` | Reconcile: 17aaf3a7 | Consent gate fix republish |
+| Jun 13, 2026 | `19affa37-b6a7-4306-a656-ce913d333f63` | Reconcile: 875823df | Native iOS ad card badge fix republish |
+| Jun 13, 2026 | `0321fbf8-4b24-4d7f-94dd-de3ad080f6ee` | Reconcile: 3a354561 | All cleanup republish |
+| Jun 13, 2026 | `a6e372f6-2874-44f5-9ffe-3dfc982ba197` | Reconcile: f1cf0886 | Remove pts badges republish |
+| Jun 13, 2026 | `306729c9-b506-4a26-8e17-c86a0997b340` | OTA update | Full reconcile (original publish) |
+| Jun 13, 2026 | `17aaf3a7-0c0e-48ac-a731-bd987d2fed32` | OTA: consent gate fix + auto-apply on launch | |
+| Jun 12, 2026 | `875823df-0384-48fc-b65f-5d56a9124987` | Fix native iOS ad card badge | |
+| Jun 12, 2026 | `3a354561-31d9-4581-a5c2-61fcdce9edb5` | All cleanup — no pts in games, spin, video, ad badges | |
+| Jun 12, 2026 | `f1cf0886-ab6a-41d3-9f5d-14ff00f50ae3` | Remove pts badges from all cards | |
 
-### 🔒 KNOWN-GOOD BASELINE — Build 29 (Jun 3, 2026)
-
-| Date | Update Group ID | Notes |
-|------|----------------|-------|
-| Jun 3, 2026 | `991eb089-dd3a-4a72-a049-949743e5b6ea` | Republished stable build-29 OTA (good consent flow) |
-| Jun 1, 2026 | `26fa0d4c-44c7-49ca-9e7c-35a7cf835f86` | **GOLD SOURCE** — 36h stable, correct ATT consent, no re-ask |
-
-> Full restore instructions: `snapshots/original-29/RESTORE.md`
+> Jun 3 gold source groups (`26fa0d4c`, `991eb089`) were on Project B — no longer accessible for republish.
 
 ---
 
-## Emergency Rollback — All builds (runtimeVersion 1.0.0)
+## Emergency Rollback
 
-`app.json` runtimeVersion is permanently `1.0.0` — **no app.json change needed** for any rollback.
+`app.json` runtimeVersion is permanently `1.0.0` — **no app.json change needed**.
 
-To roll back to the Jun 3 gold source:
+Roll back to any checkpoint by republishing its group:
 
 ```bash
 cd artifacts/cashclip
-EXPO_TOKEN="$EXPO_TOKLAST" pnpm exec eas update:republish \
-  --group 26fa0d4c-44c7-49ca-9e7c-35a7cf835f86 \
-  --message "EMERGENCY: Restore Jun-3 known-good" --non-interactive
+PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update:republish \
+  --group <GROUP_ID> \
+  --message "ROLLBACK to <GROUP_ID>" \
+  --non-interactive
 ```
 
-To roll back to the Jun 3 republish (slightly newer than gold):
+To roll back to the pre-reconcile state (Jun 12 cleanup):
 
 ```bash
-EXPO_TOKEN="$EXPO_TOKLAST" pnpm exec eas update:republish \
-  --group 991eb089-dd3a-4a72-a049-949743e5b6ea \
-  --message "EMERGENCY: Restore Jun-3 republish" --non-interactive
+PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update:republish \
+  --group 875823df-0384-48fc-b65f-5d56a9124987 \
+  --message "ROLLBACK: Jun-12 cleanup" \
+  --non-interactive
 ```
 
 ---
@@ -64,6 +64,6 @@ EXPO_TOKEN="$EXPO_TOKLAST" pnpm exec eas update:republish \
 
 - **Never lower** `runtimeVersion` — `1.0.0` is permanent for all current live builds.
 - **Never reuse** a versionCode on Android (Play rejects it).
-- **OTA only covers JS/assets** — any native change (new SDK, new plugin, new permission) needs a new App Store/Play Store build.
-- After any emergency republish, verify on-device: delete app → reinstall → open twice.
+- **OTA only covers JS/assets** — any native change needs a new App Store/Play Store build.
+- After any rollback, verify on-device: delete app → reinstall → open twice.
 - **EAS OTA Publish workflow is one-shot** — restarting it fires a live publish immediately.
