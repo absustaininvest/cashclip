@@ -599,14 +599,17 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Decline Alert — "Continue Without" button label must stay in sync
+// Decline Alert — "Continue Without" button label, title, and message must stay
+// in sync with the component.
 //
-// declineDisclosures() fires Alert.alert() with a "Continue Without" cancel
-// button.  This constant is the single source of truth for that label.
-// Both the live-extraction test and the mismatch-simulation test reference it,
-// so renaming the button in the component causes an immediate failure here.
+// declineDisclosures() fires Alert.alert(title, message, buttons[]).
+// All three user-facing strings are pinned here as constants so any drift in
+// the component causes an immediate test failure.
 // ─────────────────────────────────────────────────────────────────────────────
 const DECLINE_CANCEL_LABEL = "Continue Without";
+const DECLINE_ALERT_TITLE = "This Will Reduce Your Earnings";
+const DECLINE_ALERT_MESSAGE =
+  "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.";
 
 describe('Decline Alert — "Continue Without" button label is consistent', () => {
   /**
@@ -687,6 +690,65 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
     // DECLINE_CANCEL_LABEL is the single reference point for this button name.
     // A rename in the component without updating that constant breaks this test.
     expect(extractedLabel).toBe(DECLINE_CANCEL_LABEL);
+  });
+
+  it("Alert title extracted from the live Alert call matches DECLINE_ALERT_TITLE", async () => {
+    const tr = await renderDisclosuresForDecline();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    const declineTextNode = tr.root.findAll(
+      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+    )[0];
+    expect(declineTextNode, '"Decline" button not found').toBeTruthy();
+    const declineBtnHost = declineTextNode.parent!.parent!;
+
+    await act(async () => {
+      declineBtnHost.props.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+
+    const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
+    const extractedTitle: string = alertCall[0];
+    expect(extractedTitle, "Alert title is empty").toBeTruthy();
+    expect(extractedTitle).toBe(DECLINE_ALERT_TITLE);
+  });
+
+  it("Alert message extracted from the live Alert call matches DECLINE_ALERT_MESSAGE", async () => {
+    const tr = await renderDisclosuresForDecline();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    const declineTextNode = tr.root.findAll(
+      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+    )[0];
+    expect(declineTextNode, '"Decline" button not found').toBeTruthy();
+    const declineBtnHost = declineTextNode.parent!.parent!;
+
+    await act(async () => {
+      declineBtnHost.props.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+
+    const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
+    const extractedMessage: string = alertCall[1];
+    expect(extractedMessage, "Alert message is empty").toBeTruthy();
+    expect(extractedMessage).toBe(DECLINE_ALERT_MESSAGE);
+  });
+
+  it("catches a mismatch when the Alert title is changed to something else", () => {
+    const changedTitle = "Warning: Earnings Will Drop";
+
+    expect(changedTitle).not.toBe(DECLINE_ALERT_TITLE);
+  });
+
+  it("catches a mismatch when the Alert message body is changed to something else", () => {
+    const changedMessage =
+      "Tracking is off. Your personalized ads will be limited.";
+
+    expect(changedMessage).not.toBe(DECLINE_ALERT_MESSAGE);
   });
 
   it("catches a mismatch when the Alert cancel button is renamed to something else", () => {
