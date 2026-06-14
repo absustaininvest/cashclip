@@ -264,14 +264,6 @@
       "privacyManifests": {
         "NSPrivacyTracking": true,
         "NSPrivacyTrackingDomains": [
-          "googleadservices.com",
-          "googlesyndication.com",
-          "doubleclick.net",
-          "google-analytics.com",
-          "googletagmanager.com",
-          "admob.com",
-          "googleads.g.doubleclick.net",
-          "pagead2.googlesyndication.com",
           "unityads.unity3d.com",
           "unity3d.com",
           "unity.com",

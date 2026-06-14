@@ -93,13 +93,19 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       // Read back the final status after the ATT dialog (or skip).
       // Treat authorized/granted AND denied/restricted the same: user has
       // already made their ATT choice — write the key and move on.
+      // "unavailable" means the read timed out (3 s race in att.ts). The iOS
+      // dialog was already shown, so the user did see it. Treat as a pass-
+      // through — the real status will be readable on next launch. Falling
+      // through to Disclosures here would force a redundant screen the user
+      // didn't expect after already responding to the system prompt.
       // build-29 silently passed through without writing any key on this path.
       const statusAfter = await getATTStatus();
       if (
         statusAfter === "authorized" ||
         statusAfter === "granted" ||
         statusAfter === "denied" ||
-        statusAfter === "restricted"
+        statusAfter === "restricted" ||
+        statusAfter === "unavailable"
       ) {
         await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
@@ -202,7 +208,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
           </View>
 
           <Text style={styles.legal}>
-            By tapping "Accept & Earn More" you agree to CashClip's Privacy Policy and
+            By tapping "Continue" you agree to CashClip's Privacy Policy and
             Terms of Service. Tracking is not required — you may decline and still use CashClip.
           </Text>
         </ScrollView>
