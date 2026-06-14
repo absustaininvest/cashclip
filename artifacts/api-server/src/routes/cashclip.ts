@@ -1488,6 +1488,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (!isPayPalConfigured()) {
+        res.status(503).json({
+          error: "Payouts are temporarily unavailable. Please check back soon — your balance is safe.",
+          code: "PAYPAL_NOT_CONFIGURED",
+        });
+        return;
+      }
+
       const dayStart = new Date();
       dayStart.setUTCHours(0, 0, 0, 0);
 

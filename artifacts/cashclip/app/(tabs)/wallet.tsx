@@ -66,6 +66,20 @@ function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   return rawMsg;
 }
 
+function extractApiErrorCode(rawMsg: string): string | null {
+  const colonIdx = rawMsg.indexOf(":");
+  if (colonIdx === -1) return null;
+  const tail = rawMsg.slice(colonIdx + 1).trim();
+  if (!tail.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(tail) as { code?: unknown };
+    if (parsed && typeof parsed.code === "string") return parsed.code;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function TransactionItem({ item, t }: { item: Transaction; t: Translations }) {
   const isPositive = item.amount > 0;
   const iconName =
@@ -186,6 +200,7 @@ export default function WalletScreen() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawErrorCode, setWithdrawErrorCode] = useState<string | null>(null);
   const [withdrawSuccessVisible, setWithdrawSuccessVisible] = useState(false);
   const [withdrawSuccessAmount, setWithdrawSuccessAmount] = useState(0);
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
@@ -372,6 +387,7 @@ export default function WalletScreen() {
     setSelectedTier(null);
     setPaypalEmail("");
     setWithdrawError(null);
+    setWithdrawErrorCode(null);
     setShowWithdrawModal(true);
   }, [t]);
 
@@ -394,6 +410,7 @@ export default function WalletScreen() {
 
     setSubmitting(true);
     setWithdrawError(null);
+    setWithdrawErrorCode(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
@@ -417,6 +434,7 @@ export default function WalletScreen() {
       const rawMsg = err instanceof Error ? err.message : fallback;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setWithdrawError(extractApiErrorMessage(rawMsg, fallback));
+      setWithdrawErrorCode(extractApiErrorCode(rawMsg));
     } finally {
       setSubmitting(false);
     }
@@ -675,14 +693,20 @@ export default function WalletScreen() {
             {withdrawError ? (
               <View style={styles.withdrawErrorState}>
                 <Chipley pose="sad" size={96} />
-                <Text style={styles.withdrawErrorTitle}>Withdrawal Failed</Text>
+                <Text style={styles.withdrawErrorTitle}>
+                  {withdrawErrorCode === "PAYPAL_NOT_CONFIGURED" ? "Payouts Unavailable" : "Withdrawal Failed"}
+                </Text>
                 <Text style={styles.withdrawErrorText}>{withdrawError}</Text>
                 <Pressable
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setWithdrawError(null); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setWithdrawError(null); setWithdrawErrorCode(null); }}
                   style={({ pressed }) => [styles.retryBtn, { opacity: pressed ? 0.8 : 1 }]}
                 >
-                  <Feather name="refresh-cw" size={16} color={Colors.background} />
-                  <Text style={styles.retryBtnText}>Try Again</Text>
+                  {withdrawErrorCode !== "PAYPAL_NOT_CONFIGURED" && (
+                    <Feather name="refresh-cw" size={16} color={Colors.background} />
+                  )}
+                  <Text style={styles.retryBtnText}>
+                    {withdrawErrorCode === "PAYPAL_NOT_CONFIGURED" ? "Close" : "Try Again"}
+                  </Text>
                 </Pressable>
               </View>
             ) : (
