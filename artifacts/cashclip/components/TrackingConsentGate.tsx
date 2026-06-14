@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
+import { secureGet, secureSet } from "@/lib/secure-store";
 
 const DONE_KEY = "consent_done_v3";
 
@@ -44,21 +45,31 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
     if (Platform.OS !== "ios") {
       // Android has no ATT dialog — always pass through immediately.
       // No need to write DONE_KEY: the Platform.OS guard re-fires on every
-      // launch and skips directly to finish() without hitting AsyncStorage.
+      // launch and skips directly to finish() without hitting SecureStore.
       finish();
       return;
     }
 
     (async () => {
-      // Already done? Pass straight through.
-      const done = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
-      if (done) { finish(); return; }
+      // ── Fast-path 1: key in SecureStore (Keychain) — survives reinstalls ───
+      // Written by any build that ships this version of the gate.
+      const doneSecure = await secureGet(DONE_KEY);
+      if (doneSecure) { finish(); return; }
 
-      // Also honour the two previous keys so existing users are never re-prompted.
+      // ── Fast-path 2: key in AsyncStorage — written by old builds (≤v39) ───
+      // Migrate it to SecureStore so future reinstalls also pass through.
+      const doneLegacyStorage = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
+      if (doneLegacyStorage) {
+        await secureSet(DONE_KEY, "1").catch(() => {});
+        finish();
+        return;
+      }
+
+      // ── Fast-path 3: even older legacy keys — migrate + skip ────────────
       const prev1 = await AsyncStorage.getItem("consent_fully_done_v2").catch(() => null);
       const prev2 = await AsyncStorage.getItem("tracking_consent_dismissed_v1").catch(() => null);
       if (prev1 || prev2) {
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
         return;
       }
@@ -69,7 +80,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       if (status === "denied" || status === "restricted") {
         // User previously denied system ATT prompt. iOS will never show it
         // again. Mark consent done so we never show the gate again either.
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
         return;
       }
@@ -90,7 +101,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
         statusAfter === "denied" ||
         statusAfter === "restricted"
       ) {
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
         return;
       }
@@ -116,7 +127,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
           text: "Continue Without",
           style: "cancel",
           onPress: async () => {
-            await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+            await secureSet(DONE_KEY, "1").catch(() => {});
             finish();
           },
         },
@@ -125,7 +136,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
   }
 
   async function acceptTerms() {
-    await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+    await secureSet(DONE_KEY, "1").catch(() => {});
     finish();
   }
 
