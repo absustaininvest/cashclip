@@ -446,6 +446,51 @@ describe("POST /api/withdrawals — sendWithdrawalRequestedUser called for every
     await new Promise((r) => setTimeout(r, 0));
     expect(mockSendWithdrawalRequestedUser).not.toHaveBeenCalled();
   });
+
+  it("uses the PayPal email as toEmail when user.email is null", async () => {
+    mockGetUser.mockResolvedValue(eligibleUser({ email: null }));
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("3.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "paypal-only@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["toEmail"]).toBe("paypal-only@paypal.com");
+  });
+
+  it("uses the PayPal email as toEmail when user.email is an empty string", async () => {
+    mockGetUser.mockResolvedValue(eligibleUser({ email: "" }));
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("3.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "paypal-only@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["toEmail"]).toBe("paypal-only@paypal.com");
+  });
+
+  it("uses the account email as toEmail when user.email is present (not PayPal email)", async () => {
+    mockGetUser.mockResolvedValue(eligibleUser({ email: "account@example.com" }));
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("3.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "different@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["toEmail"]).toBe("account@example.com");
+  });
 });
 
 // ── Withdrawal email delivery — admin notification ────────────────────────────
