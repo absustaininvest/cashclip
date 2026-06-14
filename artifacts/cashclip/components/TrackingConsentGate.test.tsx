@@ -416,4 +416,15 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
 
     expect(requestATTCalled).toBe(false);
   });
+
+  it("still calls finish() and renders children when DONE_KEY is already in storage (subsequent launch)", async () => {
+    store.set(DONE_KEY, "1");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
 });
