@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
@@ -66,6 +66,12 @@ try {
 
 SplashScreen.preventAutoHideAsync();
 
+// Holds the latest fill-change value that arrived before a token was available.
+// Module-level so it is shared between the consent-done callback (RootLayout)
+// and the flush effect inside AuthGate. Only one value is kept — the most
+// recent pre-auth fill state.
+let pendingFill: boolean | null = null;
+
 // Configure how notifications appear when the app is already in the foreground.
 // Must be called before any notification can fire; fail-open wrapper is inside.
 configureNotificationHandler();
@@ -74,6 +80,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const flushedRef = useRef(false);
 
   // Apply the last-known display rate immediately (cold/offline start), then
   // refresh it from the server once the user is authenticated so every surface
@@ -85,6 +92,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) fetchConversionRate();
+  }, [user]);
+
+  // Flush any fill-change event that fired before the JWT was available.
+  // Runs once when the user first becomes available; subsequent live
+  // fill-change events (which arrive after auth and carry their own POST)
+  // will have already cleared pendingFill, so this is a no-op for them.
+  useEffect(() => {
+    if (!user || flushedRef.current) return;
+    flushedRef.current = true;
+    if (pendingFill === null) return;
+    const value = pendingFill;
+    pendingFill = null;
+    apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: value }).catch(() => {});
   }, [user]);
 
   // Request notification permission once, after the user is authenticated.
@@ -243,7 +263,15 @@ function RootLayout() {
               <TrackingConsentGate onConsentDone={() => {
                 setFillChangeCallback((fillAvailable) => {
                   secureGet("cashclip_auth_token").then((token) => {
-                    if (!token) return;
+                    if (!token) {
+                      // No token yet — queue the most-recent fill value so
+                      // AuthGate can flush it once login completes.
+                      pendingFill = fillAvailable;
+                      return;
+                    }
+                    // Token available: send immediately and discard any queued
+                    // pre-auth value since this is now the authoritative state.
+                    pendingFill = null;
                     apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
                       .catch(() => {});
                   }).catch(() => {});
