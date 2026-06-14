@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
+import { getATTStatus, requestATT } from "@/lib/att";
 
 const DONE_KEY = "consent_done_v3";
 
@@ -22,26 +23,6 @@ type Step = "checking" | "disclosures" | "terms" | "done";
 interface Props {
   children: React.ReactNode;
   onConsentDone?: () => void;
-}
-
-async function getATTStatus(): Promise<string> {
-  try {
-    const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
-    const result = await Promise.race([
-      getTrackingPermissionsAsync(),
-      new Promise<{ status: string }>((r) => setTimeout(() => r({ status: "unavailable" }), 3000)),
-    ]);
-    return (result as { status: string }).status;
-  } catch {
-    return "unavailable";
-  }
-}
-
-async function requestATT(): Promise<void> {
-  try {
-    const { requestTrackingPermissionsAsync } = require("expo-tracking-transparency");
-    await requestTrackingPermissionsAsync();
-  } catch {}
 }
 
 function openTrackingSettings() {
