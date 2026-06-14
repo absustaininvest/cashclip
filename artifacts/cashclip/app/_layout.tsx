@@ -237,38 +237,37 @@ function RootLayout() {
             <GestureHandlerRootView style={{ flex: 1 }}>
               <StatusBar style="light" />
               <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                <OtaUpdateGate>
-                  <ForceUpdateGate>
-                    {/* TrackingConsentGate shows Apple-style pre-permission screens
-                        first, fires the ATT prompt, then AdsConsent — fully
-                        serialized. Only after the user taps Continue does AdMob
-                        initialize. The native splash is hidden as soon as fonts are
-                        ready (see appReady above), NOT when consent resolves — the
-                        consent screen must be visible so the user can interact with
-                        it, otherwise the app would sit frozen behind the splash. */}
-                    <TrackingConsentGate onConsentDone={() => {
-                      // Register the fill-state reporter BEFORE init so the first
-                      // onAdAvailable event is captured.  The callback is fire-and-forget:
-                      // it POSTs to /api/earn/ad-fill with the current fill state so the
-                      // admin Integration Hub can show a colour-coded badge without
-                      // requiring log access.  Failures are silently swallowed.
-                      setFillChangeCallback((fillAvailable) => {
-                        apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
-                          .catch(() => {});
-                      });
-                      // LevelPlay (ironSource) replaces AdMob as the ad platform.
-                      // initializeAdMob() is the stable entry-point — internally it
-                      // now initialises the LevelPlay SDK instead.
-                      initializeAdMob().then((initialized) => {
-                        if (initialized) preloadRewardedAd();
-                      });
-                    }}>
+                {/* TrackingConsentGate is the outermost gate intentionally.
+                    It must resolve (and write its done key) BEFORE OtaUpdateGate
+                    can reload the bundle mid-session, otherwise a rapid OTA push
+                    would interrupt consent before the key is saved and Apple's
+                    reviewer would see the ATT prompt again on the next launch.
+                    Consent first → key written → OTA can reload freely. */}
+                <TrackingConsentGate onConsentDone={() => {
+                  // Register the fill-state reporter BEFORE init so the first
+                  // onAdAvailable event is captured.  The callback is fire-and-forget:
+                  // it POSTs to /api/earn/ad-fill with the current fill state so the
+                  // admin Integration Hub can show a colour-coded badge without
+                  // requiring log access.  Failures are silently swallowed.
+                  setFillChangeCallback((fillAvailable) => {
+                    apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
+                      .catch(() => {});
+                  });
+                  // LevelPlay (ironSource) replaces AdMob as the ad platform.
+                  // initializeAdMob() is the stable entry-point — internally it
+                  // now initialises the LevelPlay SDK instead.
+                  initializeAdMob().then((initialized) => {
+                    if (initialized) preloadRewardedAd();
+                  });
+                }}>
+                  <OtaUpdateGate>
+                    <ForceUpdateGate>
                       <CelebrationProvider>
                         <RootLayoutNav />
                       </CelebrationProvider>
-                    </TrackingConsentGate>
-                  </ForceUpdateGate>
-                </OtaUpdateGate>
+                    </ForceUpdateGate>
+                  </OtaUpdateGate>
+                </TrackingConsentGate>
               </View>
             </GestureHandlerRootView>
           </AuthProvider>
