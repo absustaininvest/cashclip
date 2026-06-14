@@ -52,6 +52,39 @@ import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { t as tFn, type Translations } from "@/lib/i18n";
 
+const PAYPAL_DISPOSABLE_DOMAINS = new Set([
+  "mailinator.com","guerrillamail.com","guerrillamail.info","guerrillamail.biz",
+  "guerrillamail.de","guerrillamail.net","guerrillamail.org","guerrillamailblock.com",
+  "grr.la","sharklasers.com","spam4.me","maildrop.cc","dispostable.com",
+  "fakeinbox.com","tempmail.com","temp-mail.org","throwaway.email","getnada.com",
+  "mailnull.com","spamgourmet.com","trashmail.at","trashmail.io","trashmail.me",
+  "trashmail.net","trashmail.xyz","wegwerfmail.de","wegwerfmail.net","wegwerfmail.org",
+  "10minutemail.com","10minutemail.net","mailnesia.com","discard.email","filzmail.com",
+  "boun.cr","trbvm.com","yopmail.com","throwam.com",
+]);
+
+const SHORT_SLD_TRUSTED_TLDS = new Set([
+  "com","net","org","gov","edu","mil","int","io","app","dev",
+]);
+
+function isPlausiblePayPalDomain(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  const atIndex = normalized.lastIndexOf("@");
+  if (atIndex < 0) return false;
+  const domain = normalized.slice(atIndex + 1);
+  if (!domain) return false;
+  const labels = domain.split(".");
+  if (labels.length < 2) return false;
+  if (labels.some((l) => l.length < 2)) return false;
+  if (labels.length === 2) {
+    const sld = labels[0]!;
+    const tld = labels[1]!;
+    if (sld.length <= 3 && !SHORT_SLD_TRUSTED_TLDS.has(tld)) return false;
+  }
+  if (PAYPAL_DISPOSABLE_DOMAINS.has(domain)) return false;
+  return true;
+}
+
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   const colonIdx = rawMsg.indexOf(":");
   if (colonIdx === -1) return rawMsg || fallback;
@@ -198,6 +231,7 @@ export default function WalletScreen() {
   const [selectedTier, setSelectedTier] = useState<WithdrawalTier | null>(null);
   const [tiers, setTiers] = useState<WithdrawalTier[]>([]);
   const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalEmailError, setPaypalEmailError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawErrorCode, setWithdrawErrorCode] = useState<string | null>(null);
@@ -386,16 +420,44 @@ export default function WalletScreen() {
     setTiers(getWithdrawalTiers(effective));
     setSelectedTier(null);
     setPaypalEmail("");
+    setPaypalEmailError(null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
     setShowWithdrawModal(true);
   }, [t]);
+
+  const handlePaypalEmailChange = useCallback((value: string) => {
+    setPaypalEmail(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setPaypalEmailError(null);
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      setPaypalEmailError(null);
+      return;
+    }
+    if (!isPlausiblePayPalDomain(trimmed)) {
+      setPaypalEmailError(
+        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+      );
+    } else {
+      setPaypalEmailError(null);
+    }
+  }, []);
 
   const handleWithdraw = useCallback(async () => {
     if (!selectedTier || !paypalEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(paypalEmail.trim())) {
       Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
+      return;
+    }
+    if (!isPlausiblePayPalDomain(paypalEmail.trim())) {
+      setPaypalEmailError(
+        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+      );
       return;
     }
 
@@ -738,19 +800,25 @@ export default function WalletScreen() {
                     <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
                     <Text style={styles.paypalLabel}>PayPal Email</Text>
                   </View>
-                  <View style={styles.paypalInputWrapper}>
+                  <View style={[styles.paypalInputWrapper, !!paypalEmailError && styles.paypalInputWrapperError]}>
                     <TextInput
                       style={styles.paypalInput}
                       placeholder="your@email.com"
                       placeholderTextColor={Colors.textMuted}
                       value={paypalEmail}
-                      onChangeText={setPaypalEmail}
+                      onChangeText={handlePaypalEmailChange}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
                       testID="withdraw-paypal-email"
                     />
                   </View>
+                  {!!paypalEmailError && (
+                    <View style={styles.paypalEmailErrorRow}>
+                      <Feather name="alert-circle" size={13} color={Colors.error} />
+                      <Text style={styles.paypalEmailErrorText}>{paypalEmailError}</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.summaryCard}>
@@ -780,24 +848,24 @@ export default function WalletScreen() {
 
             <Pressable
               onPress={handleWithdraw}
-              disabled={!selectedTier || !paypalEmail.trim() || submitting}
+              disabled={!selectedTier || !paypalEmail.trim() || !!paypalEmailError || submitting}
               style={({ pressed }) => [
                 styles.confirmButton,
-                (!selectedTier || !paypalEmail.trim()) && styles.confirmButtonDisabled,
+                (!selectedTier || !paypalEmail.trim() || !!paypalEmailError) && styles.confirmButtonDisabled,
                 { opacity: pressed ? 0.9 : 1 },
               ]}
               testID="withdraw-confirm"
             >
               <LinearGradient
-                colors={selectedTier && paypalEmail.trim() ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
+                colors={selectedTier && paypalEmail.trim() && !paypalEmailError ? [Colors.primary, Colors.primaryDark] : [Colors.surfaceHighlight, Colors.surface]}
                 style={styles.confirmGradient}
               >
                 {submitting ? (
                   <ActivityIndicator color={Colors.background} />
                 ) : (
                   <>
-                    <Feather name="check-circle" size={18} color={selectedTier && paypalEmail.trim() ? Colors.background : Colors.textMuted} />
-                    <Text style={[styles.confirmText, (!selectedTier || !paypalEmail.trim()) && { color: Colors.textMuted }]}>
+                    <Feather name="check-circle" size={18} color={selectedTier && paypalEmail.trim() && !paypalEmailError ? Colors.background : Colors.textMuted} />
+                    <Text style={[styles.confirmText, (!selectedTier || !paypalEmail.trim() || !!paypalEmailError) && { color: Colors.textMuted }]}>
                       {selectedTier ? `${t.wallet.withdraw} $${selectedTier.totalPayout.toFixed(2)}` : t.wallet.selectAnAmount}
                     </Text>
                   </>
@@ -1017,7 +1085,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: 14, height: 48, justifyContent: "center",
   },
+  paypalInputWrapperError: { borderColor: Colors.error },
   paypalInput: { fontFamily: "Outfit_400Regular", fontSize: 15, color: Colors.text },
+  paypalEmailErrorRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 6 },
+  paypalEmailErrorText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.error, flex: 1 },
   paypalConfirmRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
   paypalConfirmText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary },
   confirmButton: { marginBottom: 8 },
