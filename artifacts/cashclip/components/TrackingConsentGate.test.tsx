@@ -66,7 +66,7 @@ vi.mock("@/constants/colors", () => ({
 }));
 
 // ── Import component under test ───────────────────────────────────────────────
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import { TrackingConsentGate } from "./TrackingConsentGate";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -95,6 +95,25 @@ function childrenVisible(root: TestRenderer.ReactTestInstance): boolean {
 /** True when the disclosures step is rendered. */
 function disclosuresVisible(root: TestRenderer.ReactTestInstance): boolean {
   return allText(root).some((t) => t.includes("Your Privacy") || t.includes("Accept & Earn More"));
+}
+
+/** True when the terms step is rendered. */
+function termsVisible(root: TestRenderer.ReactTestInstance): boolean {
+  return allText(root).some((t) => t.includes("Terms & Privacy") || t.includes("Accept & Enter CashClip"));
+}
+
+/**
+ * Find the first host TouchableOpacity node whose visible text includes `label`.
+ * Returns undefined if not found.
+ */
+function findButtonByLabel(
+  root: TestRenderer.ReactTestInstance,
+  label: string,
+): TestRenderer.ReactTestInstance | undefined {
+  return root.findAll(
+    (n) => n.type === "TouchableOpacity" && allText(n).some((t) => t.includes(label)),
+    { deep: true },
+  )[0];
 }
 
 /**
@@ -426,5 +445,194 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
     expect(childrenVisible(tr.root)).toBe(true);
     expect(disclosuresVisible(tr.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full interactive accept journey (fresh iOS install)
+// ATT "undetermined" → "undetermined" → disclosures → acceptDisclosures()
+// → terms → acceptTerms() → children visible
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — full accept journey (disclosures → terms → enter app)", () => {
+  /**
+   * Render the gate to the disclosures step.
+   *
+   * Two "undetermined" statuses are needed:
+   *   1st call  → triggers requestATT() + 600 ms settle delay
+   *   2nd call  → still "undetermined", so the code falls through to
+   *               setStep("disclosures") instead of calling finish()
+   */
+  async function renderToDisclosures(onConsentDone?: () => void) {
+    attStatuses.push("undetermined", "undetermined");
+    vi.useFakeTimers();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { onConsentDone }, CHILD),
+      );
+    });
+
+    // Drain microtasks up to the 600 ms setTimeout.
+    await act(async () => {
+      for (let i = 0; i < 15; i++) await Promise.resolve();
+    });
+
+    // Skip the ATT-settle delay.
+    await act(async () => { vi.advanceTimersByTime(700); });
+
+    // Drain remaining microtasks (2nd getATTStatus + setStep("disclosures")).
+    await act(async () => {
+      for (let i = 0; i < 15; i++) await Promise.resolve();
+    });
+
+    vi.useRealTimers();
+    return tr;
+  }
+
+  it("shows the disclosures screen after requestATT resolves with undetermined", async () => {
+    const tr = await renderToDisclosures();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+
+  it("tapping 'Accept & Earn More' advances to the Terms screen", async () => {
+    const tr = await renderToDisclosures();
+
+    const btn = findButtonByLabel(tr.root, "Accept & Earn More");
+    expect(btn).toBeDefined();
+
+    await act(async () => { await (btn!.props as any).onPress(); });
+    await flush();
+
+    expect(termsVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+
+  it("tapping 'Accept & Enter CashClip' on the terms screen renders children", async () => {
+    const onDone = vi.fn();
+    const tr = await renderToDisclosures(onDone);
+
+    const acceptBtn = findButtonByLabel(tr.root, "Accept & Earn More");
+    await act(async () => { await (acceptBtn!.props as any).onPress(); });
+    await flush();
+
+    const termsBtn = findButtonByLabel(tr.root, "Accept & Enter CashClip");
+    expect(termsBtn).toBeDefined();
+
+    await act(async () => { await (termsBtn!.props as any).onPress(); });
+    await flush();
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(termsVisible(tr.root)).toBe(false);
+  });
+
+  it("writes DONE_KEY after the full accept journey so the gate never re-appears", async () => {
+    const tr = await renderToDisclosures();
+
+    const acceptBtn = findButtonByLabel(tr.root, "Accept & Earn More");
+    await act(async () => { await (acceptBtn!.props as any).onPress(); });
+    await flush();
+
+    const termsBtn = findButtonByLabel(tr.root, "Accept & Enter CashClip");
+    await act(async () => { await (termsBtn!.props as any).onPress(); });
+    await flush();
+
+    void tr;
+    expect(store.get(DONE_KEY)).toBe("1");
+  });
+
+  it("calls onConsentDone exactly once at the end of the accept journey", async () => {
+    const onDone = vi.fn();
+    const tr = await renderToDisclosures(onDone);
+
+    const acceptBtn = findButtonByLabel(tr.root, "Accept & Earn More");
+    await act(async () => { await (acceptBtn!.props as any).onPress(); });
+    await flush();
+
+    const termsBtn = findButtonByLabel(tr.root, "Accept & Enter CashClip");
+    await act(async () => { await (termsBtn!.props as any).onPress(); });
+    await flush();
+
+    void tr;
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Decline path — user taps "Decline" then "Continue Without" in the Alert
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — decline path (Decline → Continue Without)", () => {
+  async function renderToDisclosures() {
+    attStatuses.push("undetermined", "undetermined");
+    vi.useFakeTimers();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { onConsentDone: undefined }, CHILD),
+      );
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 15; i++) await Promise.resolve();
+    });
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await act(async () => {
+      for (let i = 0; i < 15; i++) await Promise.resolve();
+    });
+
+    vi.useRealTimers();
+    return tr;
+  }
+
+  it("tapping 'Decline' opens an Alert (does not immediately advance)", async () => {
+    const tr = await renderToDisclosures();
+
+    const declineBtn = findButtonByLabel(tr.root, "Decline");
+    expect(declineBtn).toBeDefined();
+
+    await act(async () => { (declineBtn!.props as any).onPress(); });
+
+    expect((Alert.alert as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+    // Still on disclosures — Alert has not been dismissed yet.
+    expect(disclosuresVisible(tr.root)).toBe(true);
+  });
+
+  it("tapping 'Continue Without' in the Alert renders children", async () => {
+    const tr = await renderToDisclosures();
+
+    const declineBtn = findButtonByLabel(tr.root, "Decline");
+    await act(async () => { (declineBtn!.props as any).onPress(); });
+
+    // Extract the "Continue Without" button from Alert.alert's call args.
+    const alertMock = Alert.alert as ReturnType<typeof vi.fn>;
+    const [, , buttons] = alertMock.mock.calls[0] as [string, string, Array<{ text: string; onPress?: () => void }>];
+    const continueWithout = buttons.find((b) => b.text === "Continue Without");
+    expect(continueWithout).toBeDefined();
+
+    await act(async () => { await continueWithout!.onPress?.(); });
+    await flush();
+
+    expect(childrenVisible(tr.root)).toBe(true);
+  });
+
+  it("writes DONE_KEY when user selects 'Continue Without'", async () => {
+    const tr = await renderToDisclosures();
+
+    const declineBtn = findButtonByLabel(tr.root, "Decline");
+    await act(async () => { (declineBtn!.props as any).onPress(); });
+
+    const alertMock = Alert.alert as ReturnType<typeof vi.fn>;
+    const [, , buttons] = alertMock.mock.calls[0] as [string, string, Array<{ text: string; onPress?: () => void }>];
+    const continueWithout = buttons.find((b) => b.text === "Continue Without");
+
+    await act(async () => { await continueWithout!.onPress?.(); });
+    await flush();
+
+    void tr;
+    expect(store.get(DONE_KEY)).toBe("1");
   });
 });
