@@ -87,6 +87,11 @@ import { dollarsToPoints } from "@/lib/points";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DAILY_GOAL = 20;
 
+// Module-level store so the earned-pts badge survives tab navigation
+// (component state resets on unmount; these do not).
+let _lastWatchedAdId: string | null = null;
+let _lastWatchedAdPts: number = 0;
+
 // Explain to the user why a server-rejected mission claim didn't credit, so a
 // failed claim is visible rather than silently swallowed.
 function notifyMissionClaimFailed(result: ClaimMissionResult): void {
@@ -707,8 +712,8 @@ export default function EarnScreen() {
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [nextSpinTime, setNextSpinTime] = useState<number | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
-  const [lastWatchedAdId, setLastWatchedAdId] = useState<string | null>(null);
-  const [lastWatchedAdPts, setLastWatchedAdPts] = useState<number>(0);
+  const [lastWatchedAdId, setLastWatchedAdId] = useState<string | null>(_lastWatchedAdId);
+  const [lastWatchedAdPts, setLastWatchedAdPts] = useState<number>(_lastWatchedAdPts);
   const [lastGameEarnedPts, setLastGameEarnedPts] = useState<number | null>(null);
   const [lastCheckinEarnedPts, setLastCheckinEarnedPts] = useState<number | null>(null);
   const pendingPtsBeforeGamesRef = useRef<number | null>(null);
@@ -922,7 +927,10 @@ export default function EarnScreen() {
   const handleWatchAd = useCallback(async (ad: (typeof adVideos)[0]) => {
     if (adLoading) return;
 
+    _lastWatchedAdId = null;
+    _lastWatchedAdPts = 0;
     setLastWatchedAdId(null);
+    setLastWatchedAdPts(0);
     setLastCheckinEarnedPts(null);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -943,6 +951,8 @@ export default function EarnScreen() {
           if (begin.ok) {
             await completeAdView(begin.challengeToken, "Watched video");
           }
+          _lastWatchedAdId = ad.id;
+          _lastWatchedAdPts = Math.round(ad.reward * 1000);
           setLastWatchedAdId(ad.id);
           setLastWatchedAdPts(Math.round(ad.reward * 1000));
           await loadAll();
@@ -987,6 +997,8 @@ export default function EarnScreen() {
     const earned = await recordEarnAction("ad_view", "Video ad");
     if (tok) await completeAdView(tok, "Watched video");
     if (watchingAd) {
+      _lastWatchedAdId = watchingAd.id;
+      _lastWatchedAdPts = Math.round(watchingAd.reward * 1000);
       setLastWatchedAdId(watchingAd.id);
       setLastWatchedAdPts(Math.round(watchingAd.reward * 1000));
     }
