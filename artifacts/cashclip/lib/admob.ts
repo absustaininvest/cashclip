@@ -155,7 +155,9 @@ async function resolveATTGranted(): Promise<boolean> {
   try {
     const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
     const { status } = await getTrackingPermissionsAsync();
-    return status === "granted";
+    // expo-tracking-transparency returns "authorized" (the raw iOS ATT string),
+    // not the generic Expo PermissionStatus "granted". Accept both defensively.
+    return status === "authorized" || status === "granted";
   } catch {
     return false;
   }
