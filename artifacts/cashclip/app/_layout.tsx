@@ -233,23 +233,22 @@ function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
-          <AuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <StatusBar style="light" />
-              <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                {/* Structure matches build-29: AuthProvider wraps everything,
-                    TrackingConsentGate wraps the navigation. OtaUpdateGate sits
-                    inside TrackingConsentGate so consent key is always written
-                    before any OTA reload can fire. */}
-                <TrackingConsentGate onConsentDone={() => {
-                  setFillChangeCallback((fillAvailable) => {
-                    apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
-                      .catch(() => {});
-                  });
-                  initializeAdMob().then((initialized) => {
-                    if (initialized) preloadRewardedAd();
-                  });
-                }}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <StatusBar style="light" />
+            <View style={{ flex: 1, backgroundColor: Colors.background }}>
+              {/* TrackingConsentGate is outermost so zero auth activity fires
+                  before consent resolves. AuthProvider is inside so token reads
+                  and login redirects only start after consent is done. */}
+              <TrackingConsentGate onConsentDone={() => {
+                setFillChangeCallback((fillAvailable) => {
+                  apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
+                    .catch(() => {});
+                });
+                initializeAdMob().then((initialized) => {
+                  if (initialized) preloadRewardedAd();
+                });
+              }}>
+                <AuthProvider>
                   <OtaUpdateGate>
                     <ForceUpdateGate>
                       <CelebrationProvider>
@@ -257,10 +256,10 @@ function RootLayout() {
                       </CelebrationProvider>
                     </ForceUpdateGate>
                   </OtaUpdateGate>
-                </TrackingConsentGate>
-              </View>
-            </GestureHandlerRootView>
-          </AuthProvider>
+                </AuthProvider>
+              </TrackingConsentGate>
+            </View>
+          </GestureHandlerRootView>
         </LanguageProvider>
       </QueryClientProvider>
     </ErrorBoundary>
