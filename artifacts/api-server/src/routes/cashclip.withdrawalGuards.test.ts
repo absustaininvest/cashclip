@@ -33,6 +33,7 @@ const mockCreateWithdrawalAtomic = vi.fn();
 const mockGetWithdrawalById = vi.fn();
 const mockUpdateWithdrawalStatusIfStatus = vi.fn();
 const mockSendPayPalPayout = vi.fn();
+const mockIsPayPalConfigured = vi.fn().mockReturnValue(true);
 
 vi.mock("../storage", () => ({
   storage: {
@@ -46,7 +47,7 @@ vi.mock("../storage", () => ({
 
 vi.mock("../paypal", () => ({
   sendPayPalPayout: (...args: unknown[]) => mockSendPayPalPayout(...args),
-  isPayPalConfigured: () => true,
+  isPayPalConfigured: () => mockIsPayPalConfigured(),
   isPayPalWebhookConfigured: () => true,
   verifyPayPalWebhook: vi.fn().mockResolvedValue(true),
 }));
@@ -658,5 +659,17 @@ describe("POST /api/admin/withdrawals/:id/payout — sendPayPalAmbiguousAlert on
     expect(res.status).toBe(500);
     await new Promise((r) => setTimeout(r, 0));
     expect(mockSendPayPalAmbiguousAlert).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 and does not call sendPayPalPayout when PayPal is not configured", async () => {
+    mockIsPayPalConfigured.mockReturnValue(false);
+
+    const res = await adminRequest().send();
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: expect.stringContaining("PayPal") });
+    expect(mockSendPayPalPayout).not.toHaveBeenCalled();
+
+    mockIsPayPalConfigured.mockReturnValue(true);
   });
 });
