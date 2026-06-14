@@ -83,6 +83,8 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       const status = await getATTStatus();
       if (status === "undetermined") {
         await requestATT();
+        // Give iOS time to commit the ATT status before we read it back.
+        await new Promise<void>((r) => setTimeout(r, 600));
       }
 
       // If ATT is already authorized the user previously accepted tracking —
