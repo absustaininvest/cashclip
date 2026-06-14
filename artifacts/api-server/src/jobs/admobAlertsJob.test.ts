@@ -109,7 +109,6 @@ beforeEach(async () => {
   process.env.ADMOB_ALERT_MIN_EARNINGS_USD = "1";
   process.env.ADMOB_ALERT_COOLDOWN_MS = String(6 * HOUR);
   delete process.env.ADMIN_ALERT_WEBHOOK_URL;
-  delete process.env.ADMOB_ALERTS_DISABLED;
 
   ({ startAdmobAlertsJob } = await import("./admobAlertsJob"));
 });
