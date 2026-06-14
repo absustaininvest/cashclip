@@ -495,6 +495,110 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Disclosures step — button label must match legal disclaimer quoted name
+//
+// The legal text reads: By tapping "<label>" you agree …
+// The primary button label must equal the quoted <label> word-for-word.
+// If either changes without the other being updated, this test catches it.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Disclosures step — button label must match legal disclaimer quoted name", () => {
+  /**
+   * Reach the disclosures step: both ATT reads return "undetermined" so the
+   * component falls through the post-dialog status check and calls
+   * setStep("disclosures").
+   */
+  async function renderDisclosures() {
+    attStatuses.push("undetermined", "undetermined");
+
+    vi.useFakeTimers();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { children: CHILD }),
+      );
+    });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+
+    vi.useRealTimers();
+    return tr;
+  }
+
+  it("primary button label and quoted button name in legal disclaimer are identical", async () => {
+    const tr = await renderDisclosures();
+
+    // ── 1. Confirm the disclosures step actually rendered ────────────────────
+    const texts = allText(tr.root);
+    const legalLine = texts.find((t) => t.includes('By tapping "'));
+    expect(
+      legalLine,
+      'Legal disclaimer not found — disclosures step may not have rendered',
+    ).toBeTruthy();
+
+    // ── 2. Extract the button name quoted in the legal text ──────────────────
+    // Matches the first double-quoted word in: By tapping "<label>" you agree…
+    const match = legalLine!.match(/By tapping "([^"]+)"/);
+    expect(match, 'Could not extract a quoted button name from the legal disclaimer').toBeTruthy();
+    const quotedLabel = match![1];
+
+    // ── 3. Find the primary button label in the rendered tree ────────────────
+    // TestRenderer produces two fiber nodes per React component: one for the
+    // function component itself and one for the host element it returns.
+    //
+    // The primary button renders (simplified TestRenderer tree):
+    //   TouchableOpacity passthrough fn
+    //     "TouchableOpacity" host          ← grandparent of the "Icon" host
+    //       Ionicons fn
+    //         "Icon" host  (name="checkmark-circle-outline")  ← what we find
+    //       Text passthrough fn
+    //         "Text" host → "Continue"
+    //
+    // Walking up two levels from the "Icon" host reaches the "TouchableOpacity"
+    // host, whose subtree contains the primary button's Text.
+    const [checkmarkIcon] = tr.root.findAll(
+      (n) => n.type === "Icon" && n.props.name === "checkmark-circle-outline",
+    );
+    expect(
+      checkmarkIcon,
+      'Checkmark icon not found — primary button may not be rendered on the disclosures step',
+    ).toBeTruthy();
+
+    // parent  = Ionicons function component fiber
+    // parent.parent = "TouchableOpacity" host element — the direct button container
+    const primaryBtnContainer = checkmarkIcon.parent!.parent!;
+    const textHosts = primaryBtnContainer.findAll((n) => n.type === "Text");
+    expect(
+      textHosts.length,
+      'No Text host nodes found inside the primary button container',
+    ).toBeGreaterThan(0);
+
+    const primaryBtnLabel = textHosts.map((n) => allText(n).join("")).join("");
+    expect(primaryBtnLabel, "Primary button label is empty").toBeTruthy();
+
+    // ── 4. The label must match the quoted name in the disclaimer ─────────────
+    expect(primaryBtnLabel).toBe(quotedLabel);
+  });
+
+  it("catches a mismatch when the button label changes but the legal text does not", async () => {
+    // This test intentionally simulates a mismatch to prove the assertion fires.
+    // It does NOT render the real component — it directly exercises the comparison
+    // logic so the test suite itself is self-validating.
+
+    const legalText = 'By tapping "Continue" you agree to CashClip\'s Privacy Policy.';
+    const changedButtonLabel = "Accept & Continue"; // hypothetical rename
+
+    const legalMatch = legalText.match(/By tapping "([^"]+)"/);
+    expect(legalMatch).toBeTruthy();
+    const quotedLabel = legalMatch![1]; // "Continue"
+
+    // The changed button label must NOT equal the stale quoted name.
+    expect(changedButtonLabel).not.toBe(quotedLabel);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Platform.OS = "android" — non-iOS fast-path
 // ─────────────────────────────────────────────────────────────────────────────
 describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', () => {

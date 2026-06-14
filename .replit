@@ -59,6 +59,10 @@ args = "EAS OTA Publish"
 task = "workflow.run"
 args = "board-fit-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "cashclip-test"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -133,6 +137,17 @@ args = "pnpm --filter cashclip exec vitest run app/game/board-fit.test.tsx"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "cashclip-test"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/cashclip run test components/TrackingConsentGate.test.tsx"
 
 [[ports]]
 localPort = 3001
