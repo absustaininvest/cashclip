@@ -673,3 +673,26 @@ describe("POST /api/admin/withdrawals/:id/payout — sendPayPalAmbiguousAlert on
     mockIsPayPalConfigured.mockReturnValue(true);
   });
 });
+
+// ── PayPal credential guard — user-facing withdrawal route ────────────────────
+//
+// POST /api/withdrawals must return 503 with code PAYPAL_NOT_CONFIGURED when
+// isPayPalConfigured() is false. The guard must fire BEFORE any DB write so
+// createWithdrawalAtomic is never called when credentials are missing.
+
+describe("POST /api/withdrawals — isPayPalConfigured() guard", () => {
+  it("returns 503 with PAYPAL_NOT_CONFIGURED and does not call createWithdrawalAtomic when PayPal is not configured", async () => {
+    mockIsPayPalConfigured.mockReturnValue(false);
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send(VALID_BODY),
+    );
+
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe("PAYPAL_NOT_CONFIGURED");
+    // The guard must fire before any DB write — no atomic transaction attempted.
+    expect(mockCreateWithdrawalAtomic).not.toHaveBeenCalled();
+
+    mockIsPayPalConfigured.mockReturnValue(true);
+  });
+});
