@@ -10,26 +10,28 @@ import {
   ScrollView,
   Linking,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 
-const TRACKING_DISMISSED_KEY = "tracking_consent_dismissed_v1";
+// Permanent key — once set, gate never re-fires on any launch.
+const CONSENT_DONE_KEY = "consent_fully_done_v2";
 
-type ConsentState = "checking" | "needed" | "denied" | "done";
+type ConsentState = "checking" | "disclosures" | "terms" | "done";
 
 interface Props {
   children: React.ReactNode;
   onConsentDone?: () => void;
 }
 
-async function getTrackingStatus(): Promise<string> {
+async function getATTStatus(): Promise<string> {
   try {
     const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
     const timeout = new Promise<{ status: string }>((resolve) =>
-      setTimeout(() => resolve({ status: "unavailable" }), 3000),
+      setTimeout(() => resolve({ status: "unavailable" }), 3000)
     );
     const { status } = await Promise.race([getTrackingPermissionsAsync(), timeout]);
     return status;
@@ -38,360 +40,348 @@ async function getTrackingStatus(): Promise<string> {
   }
 }
 
-async function requestATT(): Promise<string> {
+async function requestATTPermission(): Promise<string> {
   try {
     const { requestTrackingPermissionsAsync } = require("expo-tracking-transparency");
     const { status } = await requestTrackingPermissionsAsync();
     return status;
-  } catch (e) {
-    console.warn("ATT request failed:", e);
+  } catch {
     return "denied";
   }
 }
 
-
-function waitForActive(settleMs: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    if (AppState.currentState === "active") {
-      setTimeout(resolve, settleMs);
-      return;
-    }
-    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
-      if (state === "active") {
-        sub.remove();
-        setTimeout(resolve, settleMs);
-      }
-    });
-  });
+// Opens Settings → Privacy & Security → Tracking directly (iOS 14+).
+// Falls back to the app-specific settings page if the deep link is unavailable.
+function openTrackingSettings() {
+  if (Platform.OS !== "ios") return;
+  Linking.openURL("App-Prefs:Privacy&path=TRACKING_USAGE").catch(() =>
+    Linking.openURL("app-settings:").catch(() => {})
+  );
 }
 
-function LearnMoreSection() {
-  const [expanded, setExpanded] = useState(false);
+// ─── Disclosures Screen ───────────────────────────────────────────────────────
 
+function DisclosuresScreen({
+  onAccept,
+  onDecline,
+}: {
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
   return (
-    <View style={styles.learnMoreContainer}>
-      <TouchableOpacity onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
-        <Text style={styles.learnMoreLink}>Learn More{expanded ? " ▲" : "..."}</Text>
-      </TouchableOpacity>
-
-      {expanded && (
-        <View style={styles.learnMoreBody}>
-          <Text style={styles.learnMoreHeading}>What is tracked</Text>
-          <Text style={styles.learnMoreText}>
-            CashClip uses Apple's Advertising Identifier (IDFA) — a device-level identifier — to link your in-app activity with ad networks. This lets advertisers show you ads relevant to your interests and measure how well their ads perform.
-          </Text>
-
-          <Text style={styles.learnMoreHeading}>How it is tracked</Text>
-          <Text style={styles.learnMoreText}>
-            When you allow tracking, CashClip shares your IDFA with LevelPlay (ironSource mediation) and our offer partners. LevelPlay uses it to deliver personalized ads and attribute conversions across Unity Ads, Chartboost, and other demand partners. No personal information such as your name, email, or phone number is shared.
-          </Text>
-
-          <Text style={styles.learnMoreHeading}>What happens if you don't allow</Text>
-          <Text style={styles.learnMoreText}>
-            Ads will still appear but will be non-personalized, and some offerwall and survey providers may not be able to match you with available offers. You can change your choice at any time in Settings → Privacy & Security → Tracking.
-          </Text>
-
-          <TouchableOpacity
-            onPress={() => {
-              if (Platform.OS !== "web") {
-                Linking.openURL("app-settings:");
-              }
-            }}
-            style={styles.settingsLink}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="settings-outline" size={14} color={Colors.primary} />
-            <Text style={styles.settingsLinkText}>Open Privacy Settings</Text>
-          </TouchableOpacity>
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerIconWrap}>
+          <Ionicons name="shield-checkmark-outline" size={52} color={Colors.primary} />
         </View>
-      )}
+
+        <Text style={styles.title}>Your Privacy & Earnings</Text>
+        <Text style={styles.subtitle}>
+          CashClip uses tracking to personalize your ads and match you with higher-paying
+          offers. Here's exactly what we access and why.
+        </Text>
+
+        <View style={styles.subtab}>
+          <View style={styles.subtabHeader}>
+            <Ionicons name="bar-chart-outline" size={20} color={Colors.primary} />
+            <Text style={styles.subtabTitle}>App Tracking (IDFA)</Text>
+          </View>
+          <Text style={styles.subtabBody}>
+            CashClip uses Apple's Advertising Identifier to link your in-app activity
+            with ad networks. This enables advertisers to show you relevant ads and
+            measure their performance — which is how you earn cash. No name, email, or
+            personal contact info is shared with advertisers.
+          </Text>
+        </View>
+
+        <View style={styles.subtab}>
+          <View style={styles.subtabHeader}>
+            <Ionicons name="cash-outline" size={20} color={Colors.primary} />
+            <Text style={styles.subtabTitle}>Ad Personalization</Text>
+          </View>
+          <Text style={styles.subtabBody}>
+            Allowing ad personalization matches you with the highest-paying surveys and
+            offers available for your profile through our ad network partners. Declining
+            limits you to non-personalized content and significantly reduces your earning
+            potential.
+          </Text>
+        </View>
+
+        <View style={styles.subtab}>
+          <View style={styles.subtabHeader}>
+            <Ionicons name="settings-outline" size={20} color={Colors.primary} />
+            <Text style={styles.subtabTitle}>Your Control</Text>
+          </View>
+          <Text style={styles.subtabBody}>
+            You can change your tracking preference at any time under{" "}
+            <Text style={styles.inlineLink} onPress={openTrackingSettings}>
+              Settings → Privacy & Security → Tracking
+            </Text>
+            {" "}or inside the app under Profile → Settings.
+          </Text>
+        </View>
+
+        <Text style={styles.legalNote}>
+          By tapping "Accept & Earn More" you agree to CashClip's Privacy Policy and
+          Terms of Service. Tracking is not required — you may decline and still use
+          CashClip.
+        </Text>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.primaryButton} onPress={onAccept} activeOpacity={0.85}>
+          <Ionicons name="checkmark-circle-outline" size={20} color="#000" style={{ marginRight: 8 }} />
+          <Text style={styles.primaryButtonText}>Accept & Earn More</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={onDecline} activeOpacity={0.7}>
+          <Text style={styles.secondaryButtonText}>Decline</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
+// ─── Terms & Conditions Screen ────────────────────────────────────────────────
+
+function TermsScreen({ onAccept }: { onAccept: () => void }) {
+  return (
+    <View style={styles.screen}>
+      <View style={styles.termsHeader}>
+        <Text style={styles.termsHeaderTitle}>Terms & Privacy</Text>
+        <Text style={styles.termsHeaderSub}>Please review before entering CashClip</Text>
+      </View>
+
+      <ScrollView
+        style={styles.termsScroll}
+        contentContainerStyle={styles.termsContent}
+        showsVerticalScrollIndicator
+      >
+        <Text style={styles.termsSectionTitle}>Terms of Service</Text>
+        <Text style={styles.termsBody}>
+          <Text style={styles.termsBold}>Eligibility. </Text>
+          You must be at least 18 years old and a legal resident of a supported country
+          to earn and withdraw funds. One account per person; creating multiple accounts
+          to exploit rewards is prohibited and results in permanent suspension.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Earning Rules. </Text>
+          Rewards are credited when CashClip receives verified confirmation from our ad
+          and survey partners. Client-side claims without server verification are not
+          credited. Fraudulent activity — including VPNs to spoof location, bot usage,
+          or automated clicks — results in balance forfeiture and account termination.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Withdrawals. </Text>
+          Minimum withdrawal is $3.00 via PayPal. New accounts are subject to a 3-day
+          hold on the first withdrawal. CashClip reviews transactions for fraud before
+          processing. Withdrawals may take up to 5 business days.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Account Termination. </Text>
+          CashClip may suspend or terminate accounts at its sole discretion for
+          violation of these terms, fraudulent activity, or platform abuse. Forfeited
+          balances from terminated accounts are not reimbursable.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Modifications. </Text>
+          CashClip may update these Terms at any time. Continued use of the app
+          constitutes acceptance of the revised Terms.
+        </Text>
+
+        <View style={styles.termsDivider} />
+
+        <Text style={styles.termsSectionTitle}>Privacy Policy</Text>
+        <Text style={styles.termsBody}>
+          <Text style={styles.termsBold}>What we collect. </Text>
+          CashClip collects your username, email address, device identifiers (IDFA when
+          permitted), IP address, and in-app activity (surveys completed, ads watched,
+          offers redeemed, withdrawal history).
+          {"\n\n"}
+          <Text style={styles.termsBold}>How we use it. </Text>
+          Your data is used to operate your account, credit earnings, verify payouts,
+          detect fraud, and deliver personalized advertising through our ad network
+          partners (LevelPlay / ironSource, Unity Ads, and survey/offerwall providers).
+          {"\n\n"}
+          <Text style={styles.termsBold}>Advertising partners. </Text>
+          When you allow tracking, your IDFA is shared with LevelPlay and our mediation
+          partners to personalize ads and measure campaign performance. No name, phone
+          number, or email is shared with advertisers.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Data retention. </Text>
+          Account data is retained while your account is active. You may request
+          deletion by contacting support@cash-clip.app. Fraud-related records may be
+          retained longer as required by law.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Security. </Text>
+          Passwords are hashed; tokens are signed and expire. PayPal payouts are
+          processed with two-factor verification. We do not store payment credentials
+          on our servers.
+          {"\n\n"}
+          <Text style={styles.termsBold}>Contact. </Text>
+          Questions or deletion requests: support@cash-clip.app
+        </Text>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.primaryButton} onPress={onAccept} activeOpacity={0.85}>
+          <Text style={styles.primaryButtonText}>Accept & Enter CashClip</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ─── Gate ─────────────────────────────────────────────────────────────────────
+
 export function TrackingConsentGate({ children, onConsentDone }: Props) {
-  const [consentState, setConsentState] = useState<ConsentState>("checking");
-  const handledRef = useRef(false);
-  const consentDoneFiredRef = useRef(false);
-  const consentDoneRef = useRef(false);
+  const [state, setState] = useState<ConsentState>("checking");
+  const doneFiredRef = useRef(false);
+  const doneRef = useRef(false);
+  const initDoneRef = useRef(false);
 
   function markDone() {
-    consentDoneRef.current = true;
-    setConsentState("done");
-    if (!consentDoneFiredRef.current) {
-      consentDoneFiredRef.current = true;
+    doneRef.current = true;
+    setState("done");
+    if (!doneFiredRef.current) {
+      doneFiredRef.current = true;
+      requestAdsConsent().catch(() => {});
       onConsentDone?.();
     }
   }
 
   useEffect(() => {
-    if (Platform.OS === "web") {
-      markDone();
-      return;
-    }
-
+    // Non-iOS platforms skip the gate entirely.
+    if (Platform.OS === "web") { markDone(); return; }
     if (Platform.OS !== "ios") {
       requestAdsConsent().catch(() => {});
       markDone();
       return;
     }
 
-    async function check() {
-      // Once done, never re-evaluate — prevents gate from reappearing on
-      // foreground transitions after the user has already resolved consent.
-      if (consentDoneRef.current) return;
+    async function initialize() {
+      if (initDoneRef.current) return;
+      initDoneRef.current = true;
 
-      const status = await getTrackingStatus();
-
-      if (status === "authorized" || status === "unavailable") {
+      // ① Permanent done key — if set, never show any consent screen again.
+      const done = await AsyncStorage.getItem(CONSENT_DONE_KEY).catch(() => null);
+      if (done) {
         markDone();
         return;
       }
 
-      // "undetermined" — if user has already been through the flow once
-      // (dismissed key set), silently re-request ATT without showing the
-      // custom gate again. Only show the gate on first-ever launch.
+      // ② Fire ATT native dialog NOW (while spinner is visible) if undetermined.
+      //    If ATT was previously denied/authorized iOS just returns immediately —
+      //    no dialog, no delay.
+      const status = await getATTStatus();
       if (status === "undetermined") {
-        if (handledRef.current) return;
-        const dismissed = await AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null);
-        if (dismissed) {
-          // User has seen the gate before — request ATT silently and proceed.
-          handledRef.current = true;
-          await requestATT().catch(() => {});
-          await requestAdsConsent().catch(() => {});
-          await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
-          markDone();
-          return;
-        }
-        setConsentState("needed");
-        return;
+        await requestATTPermission();
       }
 
-      // "denied" — only show the info screen the first time. If the user already
-      // acknowledged it (dismissed key set), skip straight to done.
-      const dismissed = await AsyncStorage.getItem(TRACKING_DISMISSED_KEY).catch(() => null);
-      if (dismissed) {
-        markDone();
-        return;
-      }
-
-      setConsentState("denied");
+      // ③ Always show disclosures regardless of ATT result.
+      setState("disclosures");
     }
 
-    check();
+    initialize();
 
-    // Re-check on foreground transitions — catches Settings → Privacy → Tracking
-    // changes. The consentDoneRef guard prevents the gate from reappearing once
-    // the user has fully resolved consent.
-    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") {
-        check();
+    // ④ Detect user returning from Settings with tracking enabled.
+    //    A 1 200 ms settle delay is required — iOS does not commit the new ATT
+    //    status to the keychain instantly; reading it immediately after the app
+    //    becomes active can still return the old "denied" value.
+    const sub = AppState.addEventListener("change", async (nextState: AppStateStatus) => {
+      if (nextState !== "active") return;
+      if (doneRef.current) return;
+
+      const done = await AsyncStorage.getItem(CONSENT_DONE_KEY).catch(() => null);
+      if (done) { markDone(); return; }
+
+      await new Promise<void>((r) => setTimeout(r, 1200));
+      const attStatus = await getATTStatus();
+      if (attStatus === "authorized") {
+        setState("terms");
       }
     });
 
     return () => sub.remove();
   }, []);
 
-  async function handleContinue() {
-    if (handledRef.current) return;
-    handledRef.current = true;
+  function handleDecline() {
+    Alert.alert(
+      "This Will Reduce Your Earnings",
+      "Tracking determines which ads and offers you're matched with. Without it you'll receive non-personalized content and may earn significantly less.\n\nYou can re-enable it anytime under Profile → Settings.",
+      [
+        {
+          text: "Open Tracking Settings",
+          onPress: openTrackingSettings,
+        },
+        {
+          text: "Continue Without",
+          style: "cancel",
+          onPress: () => {
+            // Permanently mark done so this never re-fires.
+            AsyncStorage.setItem(CONSENT_DONE_KEY, "1").catch(() => {});
+            markDone();
+          },
+        },
+      ]
+    );
+  }
 
-    await waitForActive(2000);
-    await requestATT();
-    await requestAdsConsent();
-
-    await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
+  async function handleTermsAccept() {
+    await AsyncStorage.setItem(CONSENT_DONE_KEY, "1").catch(() => {});
     markDone();
   }
 
-  async function handleContinueAnyway() {
-    await AsyncStorage.setItem(TRACKING_DISMISSED_KEY, "1").catch(() => {});
-    markDone();
-  }
-
-  if (consentState === "checking") {
+  if (state === "checking") {
     return (
-      <View style={styles.screen}>
-        <View style={styles.checkingWrap}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
+      <View style={[styles.screen, styles.checkingCenter]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
-  if (consentState === "needed") {
+  if (state === "disclosures") {
     return (
-      <View style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Permissions Needed</Text>
-
-          <Text style={styles.subtitle}>
-            By allowing the following, CashClip can deliver personalized rewards and maximize your cash earnings.
-          </Text>
-
-          <LearnMoreSection />
-
-          <View style={styles.divider} />
-
-          <View style={styles.permissionRow}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="bar-chart-outline" size={22} color="#fff" />
-            </View>
-            <View style={styles.permissionText}>
-              <Text style={styles.permissionTitle}>App Tracking</Text>
-              <Text style={styles.permissionDesc}>
-                By allowing CashClip to track your activity across other companies' apps and websites, you will receive personalized ads that reward you with real cash. CashClip requires this to create and deliver relevant ad campaigns and measure earnings.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.permissionRow}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="cash-outline" size={22} color="#fff" />
-            </View>
-            <View style={styles.permissionText}>
-              <Text style={styles.permissionTitle}>Ad Personalization</Text>
-              <Text style={styles.permissionDesc}>
-                By allowing ad personalization, CashClip also requires access to match you with the highest-paying surveys and offers available for your profile.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.noGatingNote}>
-            You can change this at any time in{" "}
-            <Text
-              style={styles.settingsInlineLink}
-              onPress={() => {
-                if (Platform.OS !== "web") {
-                  Linking.openURL("app-settings:");
-                }
-              }}
-            >
-              Settings → Privacy & Security → Tracking
-            </Text>
-            . Allowing tracking helps maximize your earnings but is not required to use CashClip.
-          </Text>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.button} onPress={handleContinue} activeOpacity={0.85}>
-            <Text style={styles.buttonText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <DisclosuresScreen
+        onAccept={() => setState("terms")}
+        onDecline={handleDecline}
+      />
     );
   }
 
-  if (consentState === "denied") {
-    return (
-      <View style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.deniedIconWrap}>
-            <Ionicons name="eye-off-outline" size={48} color="#606070" />
-          </View>
-
-          <Text style={styles.title}>Tracking is Off</Text>
-
-          <Text style={styles.subtitle}>
-            CashClip's tracking permission is currently turned off. Some offerwall and survey providers require tracking to match you with available offers and rewards.
-          </Text>
-
-          <View style={styles.divider} />
-
-          <View style={styles.permissionRow}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="bar-chart-outline" size={22} color="#fff" />
-            </View>
-            <View style={styles.permissionText}>
-              <Text style={styles.permissionTitle}>What you may be missing</Text>
-              <Text style={styles.permissionDesc}>
-                Personalized ads, higher-paying survey matches, and offerwall campaigns that use your device's ad identifier to qualify you for rewards.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.permissionRow}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="settings-outline" size={22} color="#fff" />
-            </View>
-            <View style={styles.permissionText}>
-              <Text style={styles.permissionTitle}>How to enable it</Text>
-              <Text style={styles.permissionDesc}>
-                Go to{" "}
-                <Text
-                  style={styles.settingsInlineLink}
-                  onPress={() => {
-                    if (Platform.OS !== "web") {
-                      Linking.openURL("app-settings:");
-                    }
-                  }}
-                >
-                  Settings → Privacy & Security → Tracking
-                </Text>
-                , find CashClip, and tap Allow.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.noGatingNote}>
-            You can change this at any time. Tracking is not required — you can still use CashClip without it.
-          </Text>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => {
-              if (Platform.OS !== "web") {
-                Linking.openURL("app-settings:");
-              }
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="settings-outline" size={18} color="#000" style={{ marginRight: 8 }} />
-            <Text style={styles.buttonText}>Open Settings</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleContinueAnyway} activeOpacity={0.7}>
-            <Text style={styles.secondaryButtonText}>Continue Without Tracking</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  if (state === "terms") {
+    return <TermsScreen onAccept={handleTermsAccept} />;
   }
 
   return <>{children}</>;
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#0A0A0F",
   },
-  checkingWrap: {
-    flex: 1,
+  checkingCenter: {
     alignItems: "center",
     justifyContent: "center",
   },
   scrollContent: {
-    paddingTop: 72,
-    paddingHorizontal: 28,
+    paddingTop: 64,
+    paddingHorizontal: 24,
     paddingBottom: 24,
   },
-  deniedIconWrap: {
+  headerIconWrap: {
     alignItems: "center",
     marginBottom: 20,
   },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontFamily: "Outfit_700Bold",
     color: "#FFFFFF",
-    marginBottom: 12,
     textAlign: "center",
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 15,
@@ -399,103 +389,53 @@ const styles = StyleSheet.create({
     color: "#A0A0B0",
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 8,
+    marginBottom: 28,
   },
-  learnMoreContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  learnMoreLink: {
-    fontSize: 14,
-    fontFamily: "Outfit_600SemiBold",
-    color: Colors.primary,
-  },
-  learnMoreBody: {
-    marginTop: 16,
-    backgroundColor: "#141420",
-    borderRadius: 12,
+  // White subtab cards
+  subtab: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     padding: 16,
-    width: "100%",
+    marginBottom: 12,
   },
-  learnMoreHeading: {
-    fontSize: 13,
-    fontFamily: "Outfit_700Bold",
-    color: "#FFFFFF",
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  learnMoreText: {
-    fontSize: 13,
-    fontFamily: "Outfit_400Regular",
-    color: "#A0A0B0",
-    lineHeight: 20,
-  },
-  settingsLink: {
+  subtabHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 16,
+    gap: 8,
+    marginBottom: 10,
   },
-  settingsLinkText: {
-    fontSize: 13,
+  subtabTitle: {
+    fontSize: 15,
     fontFamily: "Outfit_600SemiBold",
+    color: "#0A0A0F",
+  },
+  subtabBody: {
+    fontSize: 13,
+    fontFamily: "Outfit_400Regular",
+    color: "#3A3A4A",
+    lineHeight: 20,
+  },
+  inlineLink: {
     color: Colors.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#1E1E2E",
-    marginVertical: 20,
-  },
-  permissionRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 24,
-    gap: 14,
-  },
-  iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#1E1E2E",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    marginTop: 2,
-  },
-  permissionText: {
-    flex: 1,
-  },
-  permissionTitle: {
-    fontSize: 16,
     fontFamily: "Outfit_600SemiBold",
-    color: "#FFFFFF",
-    marginBottom: 4,
   },
-  permissionDesc: {
-    fontSize: 13,
-    fontFamily: "Outfit_400Regular",
-    color: "#A0A0B0",
-    lineHeight: 20,
-  },
-  noGatingNote: {
-    fontSize: 13,
+  legalNote: {
+    fontSize: 12,
     fontFamily: "Outfit_400Regular",
     color: "#606070",
-    lineHeight: 20,
     textAlign: "center",
-  },
-  settingsInlineLink: {
-    color: Colors.primary,
-    fontFamily: "Outfit_600SemiBold",
+    lineHeight: 18,
+    marginTop: 20,
+    paddingHorizontal: 8,
   },
   footer: {
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     paddingBottom: 48,
     paddingTop: 12,
     backgroundColor: "#0A0A0F",
     gap: 12,
   },
-  button: {
+  primaryButton: {
     backgroundColor: Colors.primary,
     borderRadius: Colors.radius.lg,
     paddingVertical: 18,
@@ -503,8 +443,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
   },
-  buttonText: {
-    fontSize: 18,
+  primaryButtonText: {
+    fontSize: 17,
     fontFamily: "Outfit_700Bold",
     color: "#000000",
   },
@@ -516,5 +456,53 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Outfit_600SemiBold",
     color: "#606070",
+  },
+  // Terms screen
+  termsHeader: {
+    paddingTop: 64,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1E2E",
+  },
+  termsHeaderTitle: {
+    fontSize: 24,
+    fontFamily: "Outfit_700Bold",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  termsHeaderSub: {
+    fontSize: 13,
+    fontFamily: "Outfit_400Regular",
+    color: "#606070",
+  },
+  termsScroll: {
+    flex: 1,
+  },
+  termsContent: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  termsSectionTitle: {
+    fontSize: 17,
+    fontFamily: "Outfit_700Bold",
+    color: "#FFFFFF",
+    marginBottom: 12,
+  },
+  termsBody: {
+    fontSize: 13,
+    fontFamily: "Outfit_400Regular",
+    color: "#A0A0B0",
+    lineHeight: 21,
+  },
+  termsBold: {
+    fontFamily: "Outfit_600SemiBold",
+    color: "#CCCCCC",
+  },
+  termsDivider: {
+    height: 1,
+    backgroundColor: "#1E1E2E",
+    marginVertical: 24,
   },
 });
