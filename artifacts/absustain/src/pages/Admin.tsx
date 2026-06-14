@@ -4644,6 +4644,7 @@ export function IntegrationHubPanel({
     secretSet: boolean;
     webhookSet: boolean;
     mode: string;
+    configured: boolean;
     fullyConfigured: boolean;
     status: string;
   } | null>(null);
@@ -5035,15 +5036,6 @@ export function IntegrationHubPanel({
                     PayPal Payouts
                   </p>
                   <p className={`text-base font-bold ${textColor}`}>{label}</p>
-                  {paypalStatus !== null && !fullyConfigured && (
-                    <p className="text-gray-400 text-xs mt-1 leading-relaxed max-w-xl">
-                      Set{" "}
-                      {!paypalStatus.clientIdSet && <><span className="font-mono text-gray-400">PAYPAL_CLIENT_ID</span>{" "}</>}
-                      {!paypalStatus.secretSet && <><span className="font-mono text-gray-400">PAYPAL_SECRET</span>{" "}</>}
-                      {!paypalStatus.webhookSet && <><span className="font-mono text-gray-400">PAYPAL_WEBHOOK_ID</span>{" "}</>}
-                      in production secrets, then re-publish the API to enable payouts.
-                    </p>
-                  )}
                   {paypalStatus !== null && fullyConfigured && !isLive && (
                     <p className="text-gray-400 text-xs mt-1">
                       Set <span className="font-mono">PAYPAL_MODE=live</span> in production secrets to go live.
@@ -5070,6 +5062,33 @@ export function IntegrationHubPanel({
                 </p>
               </div>
             </div>
+            {paypalStatus !== null && !paypalStatus.configured && (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                <p className="text-amber-800 text-sm font-semibold mb-1">⚠ Payouts are disabled</p>
+                <p className="text-amber-700 text-xs leading-relaxed">
+                  Users currently see a <span className="italic">"Payouts temporarily unavailable"</span> message.
+                  To enable live payouts, add all four secrets in{" "}
+                  <span className="font-semibold">Publishing → Production app secrets</span>, then re-publish the API:
+                </p>
+                <ul className="mt-2 space-y-0.5 text-xs text-amber-700">
+                  <li className={paypalStatus.clientIdSet ? "line-through text-amber-400" : ""}>
+                    <span className="font-mono">PAYPAL_CLIENT_ID</span> — client ID from developer.paypal.com
+                  </li>
+                  <li className={paypalStatus.secretSet ? "line-through text-amber-400" : ""}>
+                    <span className="font-mono">PAYPAL_SECRET</span> — secret key from developer.paypal.com
+                  </li>
+                  <li className={paypalStatus.webhookSet ? "line-through text-amber-400" : ""}>
+                    <span className="font-mono">PAYPAL_WEBHOOK_ID</span> — webhook ID (register URL:{" "}
+                    <span className="font-mono">https://api.cash-clip.app/api/paypal/webhook</span>)
+                  </li>
+                  <li>
+                    <span className="font-mono">PAYPAL_MODE</span> — set to{" "}
+                    <span className="font-mono">live</span> for real payouts (omit or use{" "}
+                    <span className="font-mono">sandbox</span> for testing)
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         );
       })()}
