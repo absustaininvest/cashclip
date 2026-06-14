@@ -38,13 +38,23 @@ Toggling iOS Settings → Tracking OFF then ON forces iOS to commit a fresh, dur
 `authorized` status. The running code then reads `authorized` and stops showing the
 gate. This proves the lever is the OS-level ATT status, and that current code honors it.
 
-## How to apply
-If owner reports consent re-asking: first determine the device isn't on the embedded
-fallback / mid-OTA. Restoring the good OTA group is the fix, NOT a code change. ATT must
-be requested while the app is ACTIVE (waitForActive) or the prompt is suppressed and
-status stays undetermined. Always confirm on-device after the OTA fully propagates.
+## Jun 2026 — Full v3 rewrite + architectural gate fix
 
-## Honest caveat
-The exact embedded build-29 JS is not in current git history (pre-transfer, wiped per
-replit.md footnote), so the embedded code isn't shown line-by-line. The dated fix
-history + observed behavior + the toggle test together establish the root cause.
+TrackingConsentGate was fully rewritten (v3, DONE_KEY = "consent_done_v3"):
+- Simple `checking→disclosures→terms→done` state machine, no AppState listeners
+- Migrates old keys: `consent_fully_done_v2` and `tracking_consent_dismissed_v1`
+- Post-ATT-dialog authorized check: after requestATT(), 600ms settle delay, re-reads
+  status; if "authorized"/"granted" → writes done key → skips disclosures/terms entirely
+- Handles the build-29 silent-authorized path (wrote NO key on authorized pass-through)
+
+**Critical architectural fix**: TrackingConsentGate moved to outermost position in
+`_layout.tsx`, wrapping OtaUpdateGate (previously OtaUpdateGate was outside it).
+This prevents OtaUpdateGate from reloading the bundle mid-consent before the key
+is written. Gate order: TrackingConsentGate → OtaUpdateGate → ForceUpdateGate → App.
+
+## How to apply
+If owner reports consent re-asking: confirm gate order in _layout.tsx (TrackingConsentGate
+must be outermost). Check which of the three keys is present. If none, the device
+is mid-consent on first launch — that's expected. ATT must be requested while the app
+is ACTIVE or the prompt is suppressed and status stays undetermined. Always confirm
+on-device after the OTA fully propagates.
