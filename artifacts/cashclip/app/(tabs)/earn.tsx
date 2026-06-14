@@ -375,12 +375,14 @@ function MilestoneRewardModal({
   visible,
   streak,
   bonus,
+  totalPts,
   onClose,
   t,
 }: {
   visible: boolean;
   streak: number;
   bonus: number;
+  totalPts: number;
   onClose: () => void;
   t: Translations;
 }) {
@@ -421,6 +423,9 @@ function MilestoneRewardModal({
             </Animated.View>
             <Text style={styles.milestoneTitle}>
               {t.earn.milestoneTitle.replace("{{days}}", String(streak))}
+            </Text>
+            <Text style={styles.milestoneTotalPts}>
+              +{totalPts} {t.earn.milestoneTotalEarned}
             </Text>
             <Text style={styles.milestoneAmount}>
               +{bonus} {t.earn.milestoneBonusLabel}
@@ -687,7 +692,7 @@ export default function EarnScreen() {
   const [dayRewards, setDayRewards] = useState<number[]>(DAY_REWARDS_FALLBACK);
   const [milestoneEvery, setMilestoneEvery] = useState(0);
   const [showMilestone, setShowMilestone] = useState(false);
-  const [milestoneCelebration, setMilestoneCelebration] = useState({ streak: 0, bonus: 0 });
+  const [milestoneCelebration, setMilestoneCelebration] = useState({ streak: 0, bonus: 0, totalPts: 0 });
   const [spinAvailable, setSpinAvailable] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinReward, setSpinReward] = useState(0); // pts from server
@@ -811,7 +816,7 @@ export default function EarnScreen() {
       setLastCheckinEarnedPts(server.points);
       if (server.milestoneBonus > 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setMilestoneCelebration({ streak: server.checkinStreak, bonus: server.milestoneBonus });
+        setMilestoneCelebration({ streak: server.checkinStreak, bonus: server.milestoneBonus, totalPts: server.points });
         setShowMilestone(true);
       }
     } else {
@@ -1670,6 +1675,7 @@ export default function EarnScreen() {
         visible={showMilestone}
         streak={milestoneCelebration.streak}
         bonus={milestoneCelebration.bonus}
+        totalPts={milestoneCelebration.totalPts}
         onClose={() => {
           setShowMilestone(false);
           celebrate({
@@ -2169,11 +2175,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
-  milestoneAmount: {
+  milestoneTotalPts: {
     fontFamily: "Outfit_700Bold",
-    fontSize: 40,
+    fontSize: 36,
+    color: Colors.primary,
+    marginTop: 10,
+  },
+  milestoneAmount: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 20,
     color: Colors.accent,
-    marginTop: 8,
+    marginTop: 4,
   },
   milestoneSubtext: {
     fontFamily: "Outfit_400Regular",
