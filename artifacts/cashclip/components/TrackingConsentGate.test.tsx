@@ -607,6 +607,7 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
 // the component causes an immediate test failure.
 // ─────────────────────────────────────────────────────────────────────────────
 const DECLINE_CANCEL_LABEL = "Continue Without";
+const DECLINE_OPEN_SETTINGS_LABEL = "Open Tracking Settings";
 const DECLINE_ALERT_TITLE = "This Will Reduce Your Earnings";
 const DECLINE_ALERT_MESSAGE =
   "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.";
@@ -766,6 +767,74 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
     // The renamed label must NOT match the expected constant — proving the
     // live-extraction assertion above would catch this drift.
     expect(cancelBtn!.text).not.toBe(DECLINE_CANCEL_LABEL);
+  });
+
+  it("open-settings button label extracted from the live Alert call matches DECLINE_OPEN_SETTINGS_LABEL", async () => {
+    const tr = await renderDisclosuresForDecline();
+
+    // ── 1. Confirm the disclosures step actually rendered ────────────────────
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    // ── 2. Find the "Decline" button and press it ────────────────────────────
+    const declineTextNode = tr.root.findAll(
+      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+    )[0];
+    expect(
+      declineTextNode,
+      '"Decline" secondary button text node not found in the disclosures step',
+    ).toBeTruthy();
+
+    const declineBtnHost = declineTextNode.parent!.parent!;
+    expect(
+      declineBtnHost.props.onPress != null,
+      '"TouchableOpacity" host above the Decline text has no onPress',
+    ).toBe(true);
+
+    await act(async () => {
+      declineBtnHost.props.onPress();
+    });
+
+    // ── 3. Alert.alert must have been called exactly once ────────────────────
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+
+    // ── 4. Extract the non-cancel button from the Alert call ─────────────────
+    const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
+    const alertButtons: Array<{ text: string; style?: string }> = alertCall[2];
+    expect(
+      Array.isArray(alertButtons),
+      'Alert.alert was not called with a buttons array as the third argument',
+    ).toBe(true);
+
+    const openSettingsBtn = alertButtons.find((b) => b.style !== "cancel");
+    expect(
+      openSettingsBtn,
+      'No non-cancel button found in the decline Alert — "Open Tracking Settings" button may be missing',
+    ).toBeTruthy();
+
+    const extractedLabel = openSettingsBtn!.text;
+    expect(extractedLabel, '"Open Tracking Settings" button text is empty').toBeTruthy();
+
+    // ── 5. The extracted label must equal the shared constant ─────────────────
+    // DECLINE_OPEN_SETTINGS_LABEL is the single reference point for this button name.
+    // A rename in the component without updating that constant breaks this test.
+    expect(extractedLabel).toBe(DECLINE_OPEN_SETTINGS_LABEL);
+  });
+
+  it("catches a mismatch when the open-settings button label is renamed to something else", () => {
+    // Simulate what the Alert buttons array would look like after a rename.
+    // This exercises the same non-cancel-button extraction logic as the live test,
+    // proving the assertion fires when the component drifts from DECLINE_OPEN_SETTINGS_LABEL.
+    const simulatedButtons: Array<{ text: string; style?: string }> = [
+      { text: "Go To Settings" }, // hypothetical rename
+      { text: "Continue Without", style: "cancel" },
+    ];
+
+    const openSettingsBtn = simulatedButtons.find((b) => b.style !== "cancel");
+    expect(openSettingsBtn).toBeTruthy();
+
+    // The renamed label must NOT match the expected constant — proving the
+    // live-extraction assertion above would catch this drift.
+    expect(openSettingsBtn!.text).not.toBe(DECLINE_OPEN_SETTINGS_LABEL);
   });
 });
 
