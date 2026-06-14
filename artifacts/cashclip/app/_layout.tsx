@@ -233,14 +233,14 @@ function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
+          <AuthProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
               <StatusBar style="light" />
               <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                {/* TrackingConsentGate is outermost and AuthProvider is inside it.
-                    This means ZERO auth activity (no token reads, no API calls,
-                    no login redirect) happens before consent resolves. On a fresh
-                    install the user sees consent first, then a stable login page —
-                    no background fluctuation before they tap anything. */}
+                {/* Structure matches build-29: AuthProvider wraps everything,
+                    TrackingConsentGate wraps the navigation. OtaUpdateGate sits
+                    inside TrackingConsentGate so consent key is always written
+                    before any OTA reload can fire. */}
                 <TrackingConsentGate onConsentDone={() => {
                   setFillChangeCallback((fillAvailable) => {
                     apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
@@ -250,18 +250,17 @@ function RootLayout() {
                     if (initialized) preloadRewardedAd();
                   });
                 }}>
-                  <AuthProvider>
-                    <OtaUpdateGate>
-                      <ForceUpdateGate>
-                        <CelebrationProvider>
-                          <RootLayoutNav />
-                        </CelebrationProvider>
-                      </ForceUpdateGate>
-                    </OtaUpdateGate>
-                  </AuthProvider>
+                  <OtaUpdateGate>
+                    <ForceUpdateGate>
+                      <CelebrationProvider>
+                        <RootLayoutNav />
+                      </CelebrationProvider>
+                    </ForceUpdateGate>
+                  </OtaUpdateGate>
                 </TrackingConsentGate>
               </View>
             </GestureHandlerRootView>
+          </AuthProvider>
         </LanguageProvider>
       </QueryClientProvider>
     </ErrorBoundary>

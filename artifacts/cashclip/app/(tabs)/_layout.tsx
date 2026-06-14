@@ -39,7 +39,12 @@ export default function TabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.background }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: Colors.background },
+              ]}
+            />
           ) : null,
       }}
     >
