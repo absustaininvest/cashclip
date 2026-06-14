@@ -683,6 +683,7 @@ export default function WalletScreen() {
             </View>
 
             <Pressable
+              testID="open-withdraw-modal"
               onPress={openWithdrawModal}
               style={({ pressed }) => [
                 styles.withdrawButton,

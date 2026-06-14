@@ -237,13 +237,14 @@ vi.mock("@/lib/query-client", () => ({
 // resolves cleanly even though no ad functions are exercised here.
 vi.mock("@/lib/admob", () => ({ maybeShowInterstitial: vi.fn(async () => {}) }));
 
-// ── earn-client: fetchReferralStats is the test lever ─────────────────────────
+// ── earn-client: fetchReferralStats / fetchServerBalance are test levers ───────
 // All other functions return safe empty defaults so loadData's server step
 // completes without errors.
 const fetchReferralStatsMock = vi.fn();
+const fetchServerBalanceMock = vi.fn();
 vi.mock("@/lib/earn-client", () => ({
   fetchReferralStats: (...args: any[]) => fetchReferralStatsMock(...args),
-  fetchServerBalance: vi.fn(async () => ({ balance: 0, totalEarned: 0 })),
+  fetchServerBalance: (...args: any[]) => fetchServerBalanceMock(...args),
   refreshPendingFromServer: vi.fn(async () => ({
     pending: [],
     claimable: [],
@@ -316,6 +317,7 @@ async function triggerRefresh(tr: TestRenderer.ReactTestRenderer) {
 beforeEach(() => {
   store.clear();
   fetchReferralStatsMock.mockReset();
+  fetchServerBalanceMock.mockReset().mockResolvedValue({ balance: 0, totalEarned: 0 });
   bonusFireCount = 0;
   capturedAmount = 0;
   prevModalVisible = false;
@@ -534,5 +536,72 @@ describe("Wallet referral bonus — second loadData in the same session does not
     await flush();
 
     expect(bonusFireCount).toBe(0);
+  });
+});
+
+// ── Suspicious-email warning banner in the withdrawal modal ───────────────────
+//
+// openWithdrawModal calls fetchServerBalance() and checks the returned
+// lastPaypalEmail against the PAYPAL_DISPOSABLE_DOMAINS list and the
+// isPlausiblePayPalDomain heuristic. When the saved email is flagged the
+// banner "Your saved PayPal email may not be accepted" is shown inside the
+// modal; when the email passes the check the banner must be absent.
+describe("Wallet withdrawal modal — suspicious-email warning banner", () => {
+  // Helper: render the screen, wait for initial load, then press the withdraw
+  // button and flush the async openWithdrawModal handler.
+  async function openModal(
+    tr: TestRenderer.ReactTestRenderer,
+  ): Promise<void> {
+    const withdrawBtn = tr.root.find(
+      (n) => n.props.testID === "open-withdraw-modal",
+    );
+    await act(async () => {
+      await withdrawBtn.props.onPress();
+    });
+    await flush();
+  }
+
+  it("shows the warning banner when the saved PayPal email is on a disposable domain", async () => {
+    fetchServerBalanceMock.mockResolvedValue({
+      balance: 5,
+      totalEarned: 5,
+      lastPaypalEmail: "user@mailinator.com",
+    });
+    fetchReferralStatsMock.mockResolvedValue(null);
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(WalletScreen));
+    });
+    await flush();
+
+    await openModal(tr);
+
+    const texts = allText(tr.root);
+    expect(
+      texts.some((t) => t.includes("may not be accepted")),
+    ).toBe(true);
+  });
+
+  it("does NOT show the warning banner when the saved PayPal email has a plausible domain", async () => {
+    fetchServerBalanceMock.mockResolvedValue({
+      balance: 5,
+      totalEarned: 5,
+      lastPaypalEmail: "user@gmail.com",
+    });
+    fetchReferralStatsMock.mockResolvedValue(null);
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(WalletScreen));
+    });
+    await flush();
+
+    await openModal(tr);
+
+    const texts = allText(tr.root);
+    expect(
+      texts.some((t) => t.includes("may not be accepted")),
+    ).toBe(false);
   });
 });
