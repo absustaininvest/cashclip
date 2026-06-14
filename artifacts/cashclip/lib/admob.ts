@@ -10,7 +10,6 @@ import {
 
 // LevelPlay (ironSource mediation) is the primary ad platform.
 // Unity Ads, Pangle, and Chartboost are demand sources managed by LevelPlay.
-// AdMob has been fully removed.
 
 // CRITICAL: check native module presence BEFORE ever calling
 // require("ironsource-mediation"). The package's top-level JS creates a
