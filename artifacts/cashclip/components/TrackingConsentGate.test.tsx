@@ -558,7 +558,7 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
     // Walking up two levels from the "Icon" host reaches the "TouchableOpacity"
     // host, whose subtree contains the primary button's Text.
     const [checkmarkIcon] = tr.root.findAll(
-      (n) => n.type === "Icon" && n.props.name === "checkmark-circle-outline",
+      (n) => (n.type as string) === "Icon" && n.props.name === "checkmark-circle-outline",
     );
     expect(
       checkmarkIcon,
@@ -568,7 +568,7 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
     // parent  = Ionicons function component fiber
     // parent.parent = "TouchableOpacity" host element — the direct button container
     const primaryBtnContainer = checkmarkIcon.parent!.parent!;
-    const textHosts = primaryBtnContainer.findAll((n) => n.type === "Text");
+    const textHosts = primaryBtnContainer.findAll((n) => (n.type as string) === "Text");
     expect(
       textHosts.length,
       'No Text host nodes found inside the primary button container',
@@ -647,7 +647,7 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
     //   TouchableOpacity fn → "TouchableOpacity" host (has onPress)
     //     Text fn → "Text" host → "Decline"
     const declineTextNode = tr.root.findAll(
-      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
     )[0];
     expect(
       declineTextNode,
