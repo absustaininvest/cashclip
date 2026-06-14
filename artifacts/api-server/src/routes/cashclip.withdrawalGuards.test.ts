@@ -742,3 +742,71 @@ describe("POST /api/withdrawals — paypalEmail input validation", () => {
     expect(mockCreateWithdrawalAtomic).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── Admin payout — stored email re-validation ─────────────────────────────────
+//
+// POST /api/admin/withdrawals/:id/payout must re-validate the stored paypalEmail
+// before dispatching to PayPal. Records inserted via migration or direct DB
+// writes may contain bad addresses; a 400 must be returned before any state
+// mutation or PayPal API call so the issue surfaces clearly instead of producing
+// an ambiguous PayPal error or a failed payout.
+
+describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation", () => {
+  const VALID_WITHDRAWAL = {
+    id: "wd-email-guard",
+    userId: USER_ID,
+    username: "testuser",
+    status: "pending",
+    amount: "3.00",
+    totalPayout: "3.00",
+    paypalEmail: "user@paypal.com",
+    paypalBatchId: null,
+  };
+
+  const INVALID_STORED_EMAILS: Array<{ label: string; paypalEmail: unknown }> = [
+    { label: "empty string",        paypalEmail: "" },
+    { label: "null",                paypalEmail: null },
+    { label: "no @ sign",           paypalEmail: "notanemail" },
+    { label: "missing domain part", paypalEmail: "user@" },
+    { label: "whitespace only",     paypalEmail: "   " },
+    { label: "double-@ address",    paypalEmail: "user@@example.com" },
+  ];
+
+  for (const { label, paypalEmail } of INVALID_STORED_EMAILS) {
+    it(`returns 400 and does NOT call sendPayPalPayout when stored email is "${label}"`, async () => {
+      mockGetWithdrawalById.mockResolvedValue({ ...VALID_WITHDRAWAL, paypalEmail });
+
+      const res = await request(app)
+        .post("/api/admin/withdrawals/wd-email-guard/payout")
+        .set("x-console-token", TEST_ADMIN_TOKEN);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/invalid/i);
+      expect(mockSendPayPalPayout).not.toHaveBeenCalled();
+      expect(mockUpdateWithdrawalStatusIfStatus).not.toHaveBeenCalled();
+    });
+  }
+
+  it("proceeds past email validation for a well-formed stored email", async () => {
+    mockGetWithdrawalById.mockResolvedValue(VALID_WITHDRAWAL);
+    mockUpdateWithdrawalStatusIfStatus.mockResolvedValue({ ...VALID_WITHDRAWAL, status: "paying" });
+    mockSendPayPalPayout.mockResolvedValue({ success: true, batchId: "batch-123" });
+    mockGetWithdrawalById
+      .mockResolvedValueOnce(VALID_WITHDRAWAL)
+      .mockResolvedValueOnce({ ...VALID_WITHDRAWAL, status: "paying" });
+
+    const res = await request(app)
+      .post("/api/admin/withdrawals/wd-email-guard/payout")
+      .set("x-console-token", TEST_ADMIN_TOKEN);
+
+    expect(mockSendPayPalPayout).toHaveBeenCalledTimes(1);
+    expect(mockSendPayPalPayout).toHaveBeenCalledWith(
+      VALID_WITHDRAWAL.id,
+      VALID_WITHDRAWAL.paypalEmail,
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(res.status).toBe(200);
+  });
+});

@@ -1781,6 +1781,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const trustedTotalPayout = tier.totalPayout.toFixed(2);
 
+      const paypalEmailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!withdrawal.paypalEmail || typeof withdrawal.paypalEmail !== "string" || !paypalEmailRe.test(withdrawal.paypalEmail.trim())) {
+        res.status(400).json({ error: "Stored PayPal email is invalid. Update the withdrawal record before retrying." }); return;
+      }
+
       const stableBatchId = withdrawal.paypalBatchId ?? `cashclip_${withdrawal.id}`;
 
       const claimed = await storage.updateWithdrawalStatusIfStatus(
