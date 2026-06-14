@@ -1,6 +1,6 @@
 // @vitest-environment node
 import React from "react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
 // React 19 requires this flag so act() flushes async effects in the node env.
@@ -66,6 +66,7 @@ vi.mock("@/constants/colors", () => ({
 }));
 
 // ── Import component under test ───────────────────────────────────────────────
+import { Platform } from "react-native";
 import { TrackingConsentGate } from "./TrackingConsentGate";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -378,5 +379,41 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     vi.useRealTimers();
 
     expect(disclosuresVisible(tr.root)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform.OS = "android" — non-iOS fast-path
+// ─────────────────────────────────────────────────────────────────────────────
+describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', () => {
+  beforeEach(() => {
+    (Platform as any).OS = "android";
+    (Platform as any).select = (o: any) => o.android ?? o.default;
+  });
+
+  afterEach(() => {
+    (Platform as any).OS = "ios";
+    (Platform as any).select = (o: any) => o.ios ?? o.default;
+  });
+
+  it("calls finish() immediately, renders children, and never shows the ATT/disclosure UI", async () => {
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT write DONE_KEY — Android re-uses the Platform.OS guard on every launch instead", async () => {
+    await renderGate();
+
+    expect(store.has(DONE_KEY)).toBe(false);
+  });
+
+  it("never calls requestATT() — Android has no ATT dialog", async () => {
+    await renderGate();
+
+    expect(requestATTCalled).toBe(false);
   });
 });

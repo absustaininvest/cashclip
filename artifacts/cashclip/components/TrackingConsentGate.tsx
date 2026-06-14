@@ -42,9 +42,9 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
 
   useEffect(() => {
     if (Platform.OS !== "ios") {
-      // Write the done key on Android too so this check never re-runs on
-      // subsequent launches (Android has no ATT dialog — always consented).
-      AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+      // Android has no ATT dialog — always pass through immediately.
+      // No need to write DONE_KEY: the Platform.OS guard re-fires on every
+      // launch and skips directly to finish() without hitting AsyncStorage.
       finish();
       return;
     }
