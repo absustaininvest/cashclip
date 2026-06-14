@@ -80,18 +80,32 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
       }
 
       // Fire ATT dialog now if undetermined (iOS only shows it once ever).
+      // If already denied/restricted skip the dialog — iOS won't show it again.
       const status = await getATTStatus();
+      if (status === "denied" || status === "restricted") {
+        // User previously denied system ATT prompt. iOS will never show it
+        // again. Mark consent done so we never show the gate again either.
+        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        finish();
+        return;
+      }
       if (status === "undetermined") {
         await requestATT();
         // Give iOS time to commit the ATT status before we read it back.
         await new Promise<void>((r) => setTimeout(r, 600));
       }
 
-      // If ATT is already authorized the user previously accepted tracking —
+      // Read back the final status after the ATT dialog (or skip).
+      // Treat authorized/granted AND denied/restricted the same: user has
+      // already made their ATT choice — write the key and move on.
       // build-29 silently passed through without writing any key on this path.
-      // Write the key now so this is never shown again.
       const statusAfter = await getATTStatus();
-      if (statusAfter === "authorized" || statusAfter === "granted") {
+      if (
+        statusAfter === "authorized" ||
+        statusAfter === "granted" ||
+        statusAfter === "denied" ||
+        statusAfter === "restricted"
+      ) {
         await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
         finish();
         return;
