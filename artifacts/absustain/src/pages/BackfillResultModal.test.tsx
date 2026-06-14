@@ -38,7 +38,6 @@ function installFetchMock(resultData: BackfillResultData) {
     if (path === "/api/admin/users") return jsonRes({ users: [], total: 0 });
     if (path === "/api/admin/payout-per-user") return jsonRes({ perUser: [] });
     if (path === "/api/admin/adjustments") return jsonRes({ adjustments: [] });
-    if (path === "/api/admin/adjustments/actors") return jsonRes({ actors: [] });
 
     if (path === "/api/admin/referrals/backfill" && method === "POST") {
       const body: BackfillBody = JSON.parse((init?.body as string) ?? "{}");

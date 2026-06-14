@@ -2133,16 +2133,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Audit log of every manual balance adjustment (credits + corrections).
-  app.get("/api/admin/adjustments/actors", adminMiddleware, async (_req: AuthRequest, res) => {
-    try {
-      const actors = await storage.getAdjustmentActors();
-      res.json({ actors });
-    } catch {
-      res.status(500).json({ error: "Failed to load adjustment actors" });
-    }
-  });
-
   app.get("/api/admin/adjustments", adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const parsed = Number(req.query["limit"] ?? 100);
