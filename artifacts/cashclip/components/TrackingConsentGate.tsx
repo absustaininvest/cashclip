@@ -85,6 +85,16 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
         await requestATT();
       }
 
+      // If ATT is already authorized the user previously accepted tracking —
+      // build-29 silently passed through without writing any key on this path.
+      // Write the key now so this is never shown again.
+      const statusAfter = await getATTStatus();
+      if (statusAfter === "authorized" || statusAfter === "granted") {
+        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        finish();
+        return;
+      }
+
       setStep("disclosures");
     })();
   }, []);
