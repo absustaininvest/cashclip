@@ -298,42 +298,6 @@ export function evaluateAdmobAlerts(input: AdmobAlertInput): AdmobAlert[] {
     }
   }
 
-  // ── Revenue divergence ──────────────────────────────────────────────────
-  // Evaluable only with a reconciliation whose percentage is defined and whose
-  // official earnings clear the minimum (so a few cents don't read as a huge
-  // percentage). When not evaluable we treat the condition as "not diverged" so
-  // a previously firing alert still resolves rather than getting stuck.
-  const recon = input.reconciliation;
-  const evaluable =
-    !!recon && recon.differencePct != null && recon.officialEarnings >= cfg.minEarningsUsd;
-  const diverged = evaluable && Math.abs(recon!.differencePct!) >= cfg.divergencePct;
-
-  const a = transition("revenue_divergence", diverged, now, cfg, (status, firstSeenAt, firedAt) => ({
-    id: `revenue_divergence::${firedAt}`,
-    condition: "revenue_divergence",
-    status,
-    message:
-      status === "resolved"
-        ? "AdMob official vs app-reported revenue is back within threshold."
-        : `AdMob official vs app-reported revenue diverged ${recon?.differencePct ?? "?"}% (threshold ${cfg.divergencePct}%).`,
-    firstSeenAt: new Date(firstSeenAt).toISOString(),
-    firedAt: new Date(firedAt).toISOString(),
-    cooldownMs: cfg.cooldownMs,
-    threshold: cfg.divergencePct,
-    detail: {
-      officialEarnings: recon?.officialEarnings ?? null,
-      appReportedEarnings: recon?.appReportedEarnings ?? null,
-      differenceAbs: recon?.differenceAbs ?? null,
-      differencePct: recon?.differencePct ?? null,
-      divergencePct: cfg.divergencePct,
-      currency: recon?.currency,
-    },
-  }));
-  if (a) {
-    fireAlert(a, cfg);
-    fired.push(a);
-  }
-
   return fired;
 }
 

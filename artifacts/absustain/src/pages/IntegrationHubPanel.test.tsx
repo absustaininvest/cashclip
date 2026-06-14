@@ -48,6 +48,10 @@ function staleSyncEvent(
   };
 }
 
+/**
+ * A revenue_divergence event — used only to verify that the UI silently
+ * ignores such events (the condition is permanently disabled server-side).
+ */
 function revenueDivergenceEvent(
   status: "firing" | "resolved",
   overrides: Record<string, unknown> = {},
@@ -202,11 +206,11 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders a stale_sync + revenue_divergence mix with correct per-condition state and detail strings", async () => {
+  it("renders only stale_sync and silently drops a revenue_divergence event from the server", async () => {
     installFetchMock([
-      // revenue_divergence currently firing (newest event for it)
+      // revenue_divergence firing — must be silently dropped by the UI.
       revenueDivergenceEvent("firing"),
-      // stale_sync resolved (newest event for it), older fire follows
+      // stale_sync resolved (newest event for it), older fire follows.
       staleSyncEvent("resolved", {
         firedAt: new Date("2026-06-06T05:00:00Z").toISOString(),
         detail: { ageMs: 2 * 3_600_000 },
@@ -222,21 +226,14 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     // detail derived from ageMs: 2h ago
     expect(within(staleRow).getByText("Last sync ~2.0h ago")).toBeInTheDocument();
 
-    const revRow = await findAlertRow("Revenue divergence");
-    expect(within(revRow).getByText("Firing")).toBeInTheDocument();
-    // detail derived from differencePct + currency-formatted earnings
-    expect(
-      within(revRow).getByText(
-        "Diverged 42% · official $100.00 vs app $142.00",
-      ),
-    ).toBeInTheDocument();
+    // revenue_divergence must not appear in the UI at all.
+    expect(screen.queryByText("Revenue divergence")).not.toBeInTheDocument();
 
-    // One condition still firing => one active.
-    expect(await screen.findByText("1 active")).toBeInTheDocument();
+    // Section summary: stale_sync is resolved — no active alerts.
+    expect(await screen.findByText("All clear")).toBeInTheDocument();
 
-    // Both conditions render exactly once.
+    // Only one condition row rendered.
     expect(screen.getAllByText("Reporting sync stale")).toHaveLength(1);
-    expect(screen.getAllByText("Revenue divergence")).toHaveLength(1);
 
     // Fetch cycle completed cleanly — no error banner.
     expect(
@@ -249,6 +246,23 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     renderPanel();
 
     // Wait for the hub to settle (services line renders once loaded).
+    await waitFor(() => {
+      expect(
+        screen.queryByText("AdMob Reporting Alerts"),
+      ).not.toBeInTheDocument();
+    });
+
+    // Fetch cycle completed cleanly — no error banner.
+    expect(
+      screen.queryByText(/showing the last known values where available/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the AdMob alerts section when only revenue_divergence events are present", async () => {
+    installFetchMock([revenueDivergenceEvent("firing")]);
+    renderPanel();
+
+    // All revenue_divergence events are dropped — section should be hidden.
     await waitFor(() => {
       expect(
         screen.queryByText("AdMob Reporting Alerts"),
@@ -294,25 +308,6 @@ describe("IntegrationHubPanel — AdMob alert state collapse", () => {
     const row = await findAlertRow("Reporting sync stale");
     expect(
       within(row).getByText("Reporting has never synced"),
-    ).toBeInTheDocument();
-
-    // Fetch cycle completed cleanly — no error banner.
-    expect(
-      screen.queryByText(/showing the last known values where available/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it("revenue_divergence with missing differencePct and earnings shows em-dash placeholders", async () => {
-    installFetchMock([
-      revenueDivergenceEvent("firing", {
-        detail: {},
-      }),
-    ]);
-    renderPanel();
-
-    const row = await findAlertRow("Revenue divergence");
-    expect(
-      within(row).getByText("official — vs app —"),
     ).toBeInTheDocument();
 
     // Fetch cycle completed cleanly — no error banner.

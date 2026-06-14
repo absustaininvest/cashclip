@@ -4727,9 +4727,12 @@ export function IntegrationHubPanel({
   // The endpoint returns a reverse-chronological log of fire/resolve events.
   // The latest event per condition is its CURRENT state, so a resolved
   // condition quiets down instead of lingering as an active alert.
+  // revenue_divergence is permanently disabled — skip any stale in-memory
+  // events that may have survived from before the last deploy.
   const admobCurrent: AdmobAlert[] = (() => {
     const seen = new Map<AdmobAlert["condition"], AdmobAlert>();
     for (const a of admobAlerts) {
+      if (a.condition === "revenue_divergence") continue;
       if (!seen.has(a.condition)) seen.set(a.condition, a);
     }
     return Array.from(seen.values());

@@ -5,10 +5,13 @@
  * operator over Zoho SMTP (the same channel as OTPs/support) so the owner reacts
  * without watching the hub. These tests mock the SMTP transport so the REAL
  * sendAdmobReportAlert is exercised without touching the network, and assert:
- *   - a firing condition sends an operator email,
+ *   - a firing stale_sync condition sends an operator email,
  *   - a resolved condition sends a "back to normal" email,
  *   - the email inherits the cooldown de-dup (no flood while sustained),
  *   - ADMOB_ALERT_EMAIL_DISABLED suppresses just the email.
+ *
+ * revenue_divergence is intentionally disabled and never fires; those cases
+ * are not tested here.
  */
 
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
@@ -22,21 +25,9 @@ vi.mock("nodemailer", () => ({
 import {
   evaluateAdmobAlerts,
   _resetAdmobAlertsForTests,
-  type AdmobReconciliationInput,
 } from "./admobAlerts";
 
 const HOUR = 60 * 60 * 1000;
-
-function recon(overrides: Partial<AdmobReconciliationInput> = {}): AdmobReconciliationInput {
-  return {
-    officialEarnings: 100,
-    appReportedEarnings: 100,
-    differenceAbs: 0,
-    differencePct: 0,
-    currency: "USD",
-    ...overrides,
-  };
-}
 
 // Flush the fire-and-forget email promise so assertions see the call.
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -79,26 +70,7 @@ describe("admobAlerts operator email", () => {
     expect(mail.subject).not.toContain("Resolved");
   });
 
-  it("emails the operator when a revenue_divergence condition fires", async () => {
-    const now = Date.now();
-    evaluateAdmobAlerts({
-      configured: true,
-      lastSyncedAt: new Date(now),
-      reconciliation: recon({
-        officialEarnings: 100,
-        appReportedEarnings: 50,
-        differenceAbs: 50,
-        differencePct: 50,
-      }),
-      now,
-    });
-    await flush();
-
-    expect(mockSendMail).toHaveBeenCalledTimes(1);
-    expect(mockSendMail.mock.calls[0][0].subject).toContain("AdMob revenue divergence");
-  });
-
-  it("sends a 'back to normal' email when a condition resolves", async () => {
+  it("sends a 'back to normal' email when a stale_sync condition resolves", async () => {
     const t0 = Date.now();
     evaluateAdmobAlerts({
       configured: true,
@@ -125,18 +97,17 @@ describe("admobAlerts operator email", () => {
     expect(String(mail.text)).toContain("resolved");
   });
 
-  it("does not re-email a sustained condition inside the cooldown", async () => {
+  it("does not re-email a sustained stale_sync inside the cooldown", async () => {
     const t0 = Date.now();
-    const div = recon({ officialEarnings: 100, appReportedEarnings: 50, differenceAbs: 50, differencePct: 50 });
-    evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0), reconciliation: div, now: t0 });
+    evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0 - 8 * HOUR), reconciliation: null, now: t0 });
     await flush();
     expect(mockSendMail).toHaveBeenCalledTimes(1);
 
-    // 1h later, still diverged, still inside the 6h cooldown → no second email.
+    // 1h later, still stale, still inside the 6h cooldown → no second email.
     evaluateAdmobAlerts({
       configured: true,
-      lastSyncedAt: new Date(t0 + HOUR),
-      reconciliation: div,
+      lastSyncedAt: new Date(t0 - 8 * HOUR),
+      reconciliation: null,
       now: t0 + HOUR,
     });
     await flush();

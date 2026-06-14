@@ -1,7 +1,7 @@
 /**
- * Tests that the scheduled AdMob-alerts job evaluates staleness / divergence on
- * its own cadence — so an operator never has to be staring at the hub for an
- * alert to fire (Task #397).
+ * Tests that the scheduled AdMob-alerts job evaluates staleness on its own
+ * cadence — so an operator never has to be staring at the hub for an alert to
+ * fire.
  *
  * The alert state-machine logic itself (firing/cooldown/resolve thresholds) is
  * covered by lib/admobAlerts.test.ts. This suite instead guards the *wiring*:
@@ -12,6 +12,9 @@
  *   - the advisory lock gates the work (a busy lock skips evaluation),
  *   - and end-to-end a stale lastSyncedAt drives the real admobAlerts state
  *     machine to record a firing stale_sync alert with no admin in the loop.
+ *
+ * revenue_divergence is intentionally disabled and never fires; those cases
+ * are not tested here.
  *
  * Storage, config state, the advisory lock and the logger are mocked. The
  * admobAlerts module is partially mocked: evaluateAdmobAlerts is wrapped in a
@@ -204,8 +207,7 @@ describe("startAdmobAlertsJob", () => {
     ).toBe(false);
   });
 
-  it("fires a revenue_divergence alert through the real state machine when official vs app revenue diverges beyond the threshold", async () => {
-    // No admin watching — the job alone must surface this.
+  it("never fires a revenue_divergence alert regardless of reconciliation data", async () => {
     getAdmobReconciliation.mockResolvedValue({
       officialEarnings: 100,
       appReportedEarnings: 50,
@@ -218,54 +220,9 @@ describe("startAdmobAlertsJob", () => {
     startAdmobAlertsJob();
     await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
 
-    const diverged = getRecentAdmobAlerts().find(
-      (a) => a.condition === "revenue_divergence",
-    );
-    expect(diverged).toBeTruthy();
-    expect(diverged!.status).toBe("firing");
-    expect(diverged!.threshold).toBe(25);
-    expect(diverged!.detail).toMatchObject({
-      officialEarnings: 100,
-      appReportedEarnings: 50,
-      differencePct: 50,
-    });
-  });
-
-  it("resolves a revenue_divergence alert automatically when earnings come back within threshold", async () => {
-    // Run 1: diverged — a firing alert must be recorded.
-    getAdmobReconciliation.mockResolvedValue({
-      officialEarnings: 100,
-      appReportedEarnings: 50,
-      differenceAbs: 50,
-      differencePct: 50,
-      currency: "USD",
-    });
-    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 5 });
-
-    startAdmobAlertsJob();
-    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
-
-    const firing = getRecentAdmobAlerts().find(
-      (a) => a.condition === "revenue_divergence" && a.status === "firing",
-    );
-    expect(firing).toBeTruthy();
-
-    // Run 2: back within threshold — the state machine must emit a resolved alert.
-    getAdmobReconciliation.mockResolvedValue({
-      officialEarnings: 100,
-      appReportedEarnings: 97,
-      differenceAbs: 3,
-      differencePct: 3,
-      currency: "USD",
-    });
-
-    await vi.advanceTimersByTimeAsync(EVALUATE_INTERVAL_MS);
-
-    const resolved = getRecentAdmobAlerts().find(
-      (a) => a.condition === "revenue_divergence" && a.status === "resolved",
-    );
-    expect(resolved).toBeTruthy();
-    expect(resolved!.threshold).toBe(25);
+    expect(
+      getRecentAdmobAlerts().some((a) => a.condition === "revenue_divergence"),
+    ).toBe(false);
   });
 
   it("resolves a stale_sync alert automatically when the sync comes back fresh", async () => {
@@ -291,24 +248,6 @@ describe("startAdmobAlertsJob", () => {
     );
     expect(resolved).toBeTruthy();
     expect(resolved!.threshold).toBe(6 * HOUR);
-  });
-
-  it("does not fire a revenue_divergence alert when reconciliation is within threshold", async () => {
-    getAdmobReconciliation.mockResolvedValue({
-      officialEarnings: 100,
-      appReportedEarnings: 95,
-      differenceAbs: 5,
-      differencePct: 5,
-      currency: "USD",
-    });
-    getAdmobSnapshotSummary.mockResolvedValue({ rowCount: 5 });
-
-    startAdmobAlertsJob();
-    await vi.advanceTimersByTimeAsync(INITIAL_DELAY_MS);
-
-    expect(
-      getRecentAdmobAlerts().some((a) => a.condition === "revenue_divergence"),
-    ).toBe(false);
   });
 
   it("catches a storage/DB error, logs it, and never throws out of the timer", async () => {

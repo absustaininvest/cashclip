@@ -1,15 +1,15 @@
 /**
- * Unit tests for the AdMob reporting operator alerts (Task #393).
+ * Unit tests for the AdMob reporting operator alerts.
  *
  * Covered:
  *   - stale_sync fires when no fresh snapshot has synced within the window
  *     (and never when AdMob is unconfigured — "no data" is expected then).
- *   - revenue_divergence fires when official vs app-reported diverges beyond
- *     the configured percentage, and is suppressed below the min-earnings floor
- *     and when the percentage is undefined (divide-by-zero on official = 0).
- *   - De-dup / rate-limit: a sustained condition re-alerts at most once per
- *     cooldown.
- *   - Resolve: a single `resolved` event is emitted when the condition clears.
+ *   - De-dup / rate-limit: a sustained stale_sync condition re-alerts at most
+ *     once per cooldown.
+ *   - Resolve: a single `resolved` event is emitted when stale_sync clears.
+ *
+ * revenue_divergence is intentionally disabled and never fires; those cases
+ * are not tested here.
  *
  * Pure in-memory; no DB. The notification POST path is disabled (no
  * ADMIN_ALERT_WEBHOOK_URL) so nothing leaves the process.
@@ -98,8 +98,8 @@ describe("admobAlerts", () => {
     });
   });
 
-  describe("revenue_divergence", () => {
-    it("fires when divergence exceeds the threshold", () => {
+  describe("revenue_divergence — permanently disabled", () => {
+    it("never fires even when divergence far exceeds the threshold", () => {
       const now = Date.now();
       const fired = evaluateAdmobAlerts({
         configured: true,
@@ -112,55 +112,19 @@ describe("admobAlerts", () => {
         }),
         now,
       });
-      const div = fired.find((a) => a.condition === "revenue_divergence");
-      expect(div).toBeTruthy();
-      expect(div!.status).toBe("firing");
-      expect(div!.threshold).toBe(25);
-      expect(div!.detail.differencePct).toBe(40);
+      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
     });
 
-    it("does not fire when divergence is within threshold", () => {
+    it("never fires even when divergence is at the configured threshold", () => {
       const now = Date.now();
       const fired = evaluateAdmobAlerts({
         configured: true,
         lastSyncedAt: new Date(now),
         reconciliation: recon({
           officialEarnings: 100,
-          appReportedEarnings: 90,
-          differenceAbs: 10,
-          differencePct: 10,
-        }),
-        now,
-      });
-      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
-    });
-
-    it("is suppressed below the min-earnings floor (noisy small numbers)", () => {
-      const now = Date.now();
-      const fired = evaluateAdmobAlerts({
-        configured: true,
-        lastSyncedAt: new Date(now),
-        reconciliation: recon({
-          officialEarnings: 0.5, // below the $1 floor
-          appReportedEarnings: 0.1,
-          differenceAbs: 0.4,
-          differencePct: 80,
-        }),
-        now,
-      });
-      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
-    });
-
-    it("is suppressed when the percentage is undefined (official earnings 0)", () => {
-      const now = Date.now();
-      const fired = evaluateAdmobAlerts({
-        configured: true,
-        lastSyncedAt: new Date(now),
-        reconciliation: recon({
-          officialEarnings: 0,
-          appReportedEarnings: 3,
-          differenceAbs: -3,
-          differencePct: null,
+          appReportedEarnings: 50,
+          differenceAbs: 50,
+          differencePct: 50,
         }),
         now,
       });
@@ -169,62 +133,51 @@ describe("admobAlerts", () => {
   });
 
   describe("de-dup / rate-limit", () => {
-    it("does not re-fire a sustained condition inside the cooldown", () => {
+    it("does not re-fire a sustained stale_sync inside the cooldown", () => {
       const t0 = Date.now();
-      const div = recon({ officialEarnings: 100, appReportedEarnings: 50, differenceAbs: 50, differencePct: 50 });
-      const first = evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0), reconciliation: div, now: t0 });
-      expect(first.filter((a) => a.condition === "revenue_divergence").length).toBe(1);
+      const first = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t0 - 8 * HOUR),
+        reconciliation: null,
+        now: t0,
+      });
+      expect(first.filter((a) => a.condition === "stale_sync").length).toBe(1);
 
-      // 1h later, still diverged, still inside the 6h cooldown → suppressed.
+      // 1h later, still stale, still inside the 6h cooldown → suppressed.
       const second = evaluateAdmobAlerts({
         configured: true,
-        lastSyncedAt: new Date(t0 + HOUR),
-        reconciliation: div,
+        lastSyncedAt: new Date(t0 - 8 * HOUR),
+        reconciliation: null,
         now: t0 + HOUR,
       });
-      expect(second.some((a) => a.condition === "revenue_divergence")).toBe(false);
+      expect(second.some((a) => a.condition === "stale_sync")).toBe(false);
 
-      // Only one divergence alert recorded total.
-      expect(getRecentAdmobAlerts().filter((a) => a.condition === "revenue_divergence").length).toBe(1);
+      // Only one stale_sync alert recorded total.
+      expect(getRecentAdmobAlerts().filter((a) => a.condition === "stale_sync").length).toBe(1);
     });
 
-    it("re-fires once the cooldown elapses while still active", () => {
+    it("re-fires stale_sync once the cooldown elapses while still active", () => {
       const t0 = Date.now();
-      const div = recon({ officialEarnings: 100, appReportedEarnings: 50, differenceAbs: 50, differencePct: 50 });
-      evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0), reconciliation: div, now: t0 });
+      evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t0 - 8 * HOUR),
+        reconciliation: null,
+        now: t0,
+      });
 
       const later = t0 + 7 * HOUR; // past the 6h cooldown
       const reFired = evaluateAdmobAlerts({
         configured: true,
-        lastSyncedAt: new Date(later),
-        reconciliation: div,
+        lastSyncedAt: new Date(t0 - 8 * HOUR),
+        reconciliation: null,
         now: later,
       });
-      expect(reFired.filter((a) => a.condition === "revenue_divergence" && a.status === "firing").length).toBe(1);
-      expect(getRecentAdmobAlerts().filter((a) => a.condition === "revenue_divergence").length).toBe(2);
+      expect(reFired.filter((a) => a.condition === "stale_sync" && a.status === "firing").length).toBe(1);
+      expect(getRecentAdmobAlerts().filter((a) => a.condition === "stale_sync").length).toBe(2);
     });
   });
 
   describe("resolve", () => {
-    it("emits a single resolved event when divergence clears", () => {
-      const t0 = Date.now();
-      const diverged = recon({ officialEarnings: 100, appReportedEarnings: 50, differenceAbs: 50, differencePct: 50 });
-      evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0), reconciliation: diverged, now: t0 });
-
-      // Now back within threshold.
-      const cleared = recon({ officialEarnings: 100, appReportedEarnings: 98, differenceAbs: 2, differencePct: 2 });
-      const t1 = t0 + HOUR;
-      const fired = evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t1), reconciliation: cleared, now: t1 });
-      const resolved = fired.find((a) => a.condition === "revenue_divergence");
-      expect(resolved).toBeTruthy();
-      expect(resolved!.status).toBe("resolved");
-
-      // Re-evaluating while clear emits nothing further.
-      const t2 = t1 + HOUR;
-      const again = evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t2), reconciliation: cleared, now: t2 });
-      expect(again.some((a) => a.condition === "revenue_divergence")).toBe(false);
-    });
-
     it("resolves a stale_sync alert when a fresh sync arrives", () => {
       const t0 = Date.now();
       evaluateAdmobAlerts({ configured: true, lastSyncedAt: new Date(t0 - 8 * HOUR), reconciliation: null, now: t0 });
