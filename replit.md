@@ -39,6 +39,10 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `EXPO_PUBLIC_VEXO_API_KEY` | Vexo Analytics client API key (Vexo app "Cash-Clip", repo `absustaininvest/cashclip`). Client-exposed by design; EXPO_PUBLIC so Expo inlines it into build 39. From the Vexo dashboard → App Settings → API KEY. |
 | `TIKTOK_APP_ID` | TikTok Marketing API app ID (advertiser-side, for advertising CashClip + measuring installs). Issued by TikTok only AFTER the app is approved (business verification gates approval). From business-api.tiktok.com → My Apps → CashClip. Used by the API server's TikTok OAuth (`/api/integrations/tiktok/*`). |
 | `TIKTOK_APP_SECRET` | TikTok Marketing API app secret — pairs with `TIKTOK_APP_ID` for the OAuth token exchange. Sensitive. Registered redirect URI: `https://api.cash-clip.app/api/integrations/tiktok/callback`. Must be added to the **production** deployment secrets and the API re-published to work live. |
+| `PAYPAL_CLIENT_ID` | PayPal Payouts API client ID — from developer.paypal.com → your app credentials. Required for user withdrawals. |
+| `PAYPAL_SECRET` | PayPal Payouts API secret — pairs with `PAYPAL_CLIENT_ID`. Also accepted as `PAYPAL_CLIENT_SECRET`. Required for user withdrawals. |
+| `PAYPAL_WEBHOOK_ID` | PayPal webhook ID — from developer.paypal.com → Webhooks. Register URL: `https://api.cash-clip.app/api/paypal/webhook`. Required for payout status callbacks. |
+| `PAYPAL_MODE` | Set to `live` for production payouts; omit or set to `sandbox` for testing. All four PayPal secrets must be in the **production** deployment secrets and the API re-published before any payout can succeed. |
 
 ## Apps / Artifacts
 

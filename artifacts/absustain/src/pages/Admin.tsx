@@ -4639,12 +4639,20 @@ export function IntegrationHubPanel({
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [alertEmail, setAlertEmail] = useState<AlertEmailSettings | null>(null);
   const [displayRate, setDisplayRate] = useState<number | null>(null);
+  const [paypalStatus, setPaypalStatus] = useState<{
+    clientIdSet: boolean;
+    secretSet: boolean;
+    webhookSet: boolean;
+    mode: string;
+    fullyConfigured: boolean;
+    status: string;
+  } | null>(null);
 
   const fetchHub = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [hubRes, alertsRes, alertEmailRes, adStatusRes, economyRes] = await Promise.all([
+      const [hubRes, alertsRes, alertEmailRes, adStatusRes, economyRes, paypalRes] = await Promise.all([
         fetch("/api/admin/integration-hub", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -4658,6 +4666,9 @@ export function IntegrationHubPanel({
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/economy/rate", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/integrations/paypal/status", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -4688,6 +4699,9 @@ export function IntegrationHubPanel({
         if (typeof eco.displayPointsPerDollar === "number") {
           setDisplayRate(eco.displayPointsPerDollar);
         }
+      }
+      if (paypalRes.ok) {
+        setPaypalStatus(await paypalRes.json());
       }
       setLastRefreshed(new Date());
     } catch (err: any) {
@@ -4974,6 +4988,88 @@ export function IntegrationHubPanel({
                 {" in production secrets, then re-publish the API."}
               </p>
             )}
+          </div>
+        );
+      })()}
+
+      {/* PayPal Payouts status card */}
+      {(() => {
+        const fullyConfigured = paypalStatus?.fullyConfigured ?? false;
+        const isLive = paypalStatus?.mode === "live";
+        const dotStatus: "green" | "amber" | "red" =
+          paypalStatus === null
+            ? "amber"
+            : fullyConfigured
+              ? "green"
+              : paypalStatus.clientIdSet || paypalStatus.secretSet
+                ? "amber"
+                : "red";
+        const label =
+          paypalStatus === null
+            ? "Loading…"
+            : fullyConfigured
+              ? isLive
+                ? "Live payouts active"
+                : "Sandbox mode — credentials set"
+              : paypalStatus.clientIdSet || paypalStatus.secretSet
+                ? "Partially configured — some secrets missing"
+                : "Not configured — payouts disabled";
+        const dotColor =
+          dotStatus === "green" ? "bg-[#00E676]" : dotStatus === "amber" ? "bg-amber-400" : "bg-red-400";
+        const pingColor =
+          dotStatus === "green" ? "bg-[#00E676]/60" : dotStatus === "amber" ? "bg-amber-400/60" : "";
+        const textColor =
+          dotStatus === "green" ? "text-emerald-600" : dotStatus === "amber" ? "text-amber-400" : "text-red-400";
+        return (
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0 mt-1">
+                  {dotStatus !== "red" && (
+                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${pingColor}`} />
+                  )}
+                  <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                </span>
+                <div>
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                    PayPal Payouts
+                  </p>
+                  <p className={`text-base font-bold ${textColor}`}>{label}</p>
+                  {paypalStatus !== null && !fullyConfigured && (
+                    <p className="text-gray-400 text-xs mt-1 leading-relaxed max-w-xl">
+                      Set{" "}
+                      {!paypalStatus.clientIdSet && <><span className="font-mono text-gray-400">PAYPAL_CLIENT_ID</span>{" "}</>}
+                      {!paypalStatus.secretSet && <><span className="font-mono text-gray-400">PAYPAL_SECRET</span>{" "}</>}
+                      {!paypalStatus.webhookSet && <><span className="font-mono text-gray-400">PAYPAL_WEBHOOK_ID</span>{" "}</>}
+                      in production secrets, then re-publish the API to enable payouts.
+                    </p>
+                  )}
+                  {paypalStatus !== null && fullyConfigured && !isLive && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Set <span className="font-mono">PAYPAL_MODE=live</span> in production secrets to go live.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <p className="text-gray-300 text-[10px]">Client ID</p>
+                <p className={`text-sm font-semibold ${paypalStatus?.clientIdSet ? "text-emerald-600" : "text-red-400"}`}>
+                  {paypalStatus === null ? "—" : paypalStatus.clientIdSet ? "Set" : "Missing"}
+                </p>
+                <p className="text-gray-300 text-[10px] mt-1.5">Secret</p>
+                <p className={`text-sm font-semibold ${paypalStatus?.secretSet ? "text-emerald-600" : "text-red-400"}`}>
+                  {paypalStatus === null ? "—" : paypalStatus.secretSet ? "Set" : "Missing"}
+                </p>
+                <p className="text-gray-300 text-[10px] mt-1.5">Webhook ID</p>
+                <p className={`text-sm font-semibold ${paypalStatus?.webhookSet ? "text-emerald-600" : "text-red-400"}`}>
+                  {paypalStatus === null ? "—" : paypalStatus.webhookSet ? "Set" : "Missing"}
+                </p>
+                <p className="text-gray-300 text-[10px] mt-1.5">Mode</p>
+                <p className={`text-sm font-semibold ${isLive ? "text-emerald-600" : "text-amber-400"}`}>
+                  {paypalStatus === null ? "—" : paypalStatus.mode}
+                </p>
+              </div>
+            </div>
           </div>
         );
       })()}

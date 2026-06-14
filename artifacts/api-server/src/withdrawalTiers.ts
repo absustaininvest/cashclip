@@ -36,7 +36,7 @@ export const MAX_WITHDRAWALS_PER_DAY = Math.max(
 // starting value is $60/day; override with DAILY_PAYOUT_FLOAT_USD. Read via a
 // function so a redeploy with a new env value takes effect on restart.
 export function getDailyPayoutFloatUsd(): number {
-  return readNonNegativeNumberEnv("DAILY_PAYOUT_FLOAT_USD", 60);
+  return readNonNegativeNumberEnv("DAILY_PAYOUT_FLOAT_USD", 200);
 }
 
 export interface ResolvedTier {

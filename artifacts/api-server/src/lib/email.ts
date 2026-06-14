@@ -790,6 +790,45 @@ export async function sendSupportReply(options: {
 }
 
 /**
+ * Alert the operator that a PayPal payout landed in an ambiguous state —
+ * the HTTP request was dispatched but the outcome (success or failure) is
+ * unknown due to a network timeout or connection drop. The withdrawal is
+ * locked in "paying" status and cannot be retried safely without a manual
+ * check in the PayPal dashboard. Fire-and-forget; never blocks the caller.
+ */
+export function sendPayPalAmbiguousAlert(alert: {
+  withdrawalId: string;
+  username: string;
+  amount: string;
+  paypalBatchId: string;
+}): void {
+  const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const safeId = escapeHtml(alert.withdrawalId);
+  const safeUsername = escapeHtml(alert.username);
+  const safeAmount = escapeHtml(alert.amount);
+  const safeBatchId = escapeHtml(alert.paypalBatchId);
+  sendBestEffort({
+    to,
+    subject: `[CashClip] ACTION REQUIRED — PayPal payout outcome uncertain for ${alert.username}`,
+    text: `A PayPal payout was dispatched but the outcome is unknown.\n\nWithdrawal ID: ${alert.withdrawalId}\nUser: ${alert.username}\nAmount: $${alert.amount}\nPayPal Batch ID: ${alert.paypalBatchId}\n\nThe withdrawal is locked in "paying" status. Log in to the PayPal dashboard and search for batch ID "${alert.paypalBatchId}" to confirm whether the payment went through. Then manually mark it paid or revert it to approved in /sc-portal.\n\n— CashClip operations`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #E53935;padding-bottom:12px">⚠️ PayPal Payout — Manual Verification Required</h2>
+        <p style="color:#333">A payout was dispatched to PayPal but the outcome could not be confirmed (network timeout or connection drop). The withdrawal is locked in <strong>paying</strong> status and cannot be retried automatically.</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:8px 0;font-weight:600;color:#555;width:140px">Withdrawal ID</td><td style="padding:8px 0;font-size:12px;color:#999">${safeId}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">User</td><td style="padding:8px 0">${safeUsername}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Amount</td><td style="padding:8px 0;font-size:18px;font-weight:700;color:#E53935">$${safeAmount}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">PayPal Batch ID</td><td style="padding:8px 0;font-family:monospace">${safeBatchId}</td></tr>
+        </table>
+        <p style="margin-top:20px;color:#333"><strong>Action required:</strong> Log in to the PayPal dashboard, search for batch ID <code>${safeBatchId}</code>, and confirm whether the payment went through. Then update the withdrawal status in <em>/sc-portal</em>.</p>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
+      </div>`,
+  });
+}
+
+/**
  * Notify a referrer that one of their referred friends cashed out and they
  * earned a referral bonus. Fire-and-forget; skipped when email is unconfigured
  * or the referrer has no email address on file.

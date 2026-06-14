@@ -25,7 +25,7 @@ import { db, updateUserProfileSchema, earnTokens, adEvents as adEventsTable } fr
 import { snapshotRateString } from "../lib/pointsEconomy";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
-import { sendPayPalPayout, isPayPalConfigured, verifyPayPalWebhook } from "../paypal";
+import { sendPayPalPayout, isPayPalConfigured, isPayPalWebhookConfigured, verifyPayPalWebhook } from "../paypal";
 import { isRelayEmail } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
@@ -35,7 +35,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned, sendPayPalAmbiguousAlert } from "../lib/email";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import { supportTicketRateLimiter } from "../lib/supportTicketRateLimit";
 import {
@@ -1527,9 +1527,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (result.reason === "FLOAT_EXCEEDED") {
           // Float discipline reached: total payouts for everyone today have hit
           // the daily revenue float. The user's balance is untouched — they just
-          // need to wait until the float refreshes tomorrow.
+          // need to wait until the float refreshes at midnight UTC.
           res.status(429).json({
-            error: "We've reached today's payout limit across all members. Your balance is safe — please come back tomorrow to withdraw. Thanks for your patience!",
+            error: "We've reached today's payout limit across all members. Your balance is safe — please come back after midnight UTC when the daily limit resets. Thanks for your patience!",
             code: "PAYOUT_FLOAT_REACHED",
           }); return;
         }
@@ -1538,9 +1538,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json({ withdrawal: result.withdrawal, balance: result.balance });
 
-      // Withdrawal emails are intentionally limited to the maxed-out $7 cashouts
-      // (the top payout tier) so routine $3/$5 requests don't spam either the
-      // user or the operator. Fire-and-forget; never block the response.
+      // Admin notification is gated to max-tier ($7) cashouts to avoid noise
+      // for routine $3/$5 requests. User confirmation is sent for every tier so
+      // users always know their request went through. Fire-and-forget.
       const isMaxCashout = tier.amount >= DAILY_WITHDRAWAL_MAX;
       if (isMaxCashout) {
         sendWithdrawalRequestedAdmin({
@@ -1550,15 +1550,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalPayout: tier.totalPayout.toFixed(2),
           paypalEmail: paypalEmail.trim(),
         }).catch(() => {});
-
-        const userContactEmail = user.email || paypalEmail.trim();
-        sendWithdrawalRequestedUser({
-          toEmail: userContactEmail,
-          username: user.username,
-          totalPayout: tier.totalPayout.toFixed(2),
-          paypalEmail: paypalEmail.trim(),
-        }).catch(() => {});
       }
+
+      const userContactEmail = user.email || paypalEmail.trim();
+      sendWithdrawalRequestedUser({
+        toEmail: userContactEmail,
+        username: user.username,
+        totalPayout: tier.totalPayout.toFixed(2),
+        paypalEmail: paypalEmail.trim(),
+      }).catch(() => {});
 
       // Referral qualification: if THIS user was referred and just completed a
       // cash-out of at least the qualifying amount ($3), credit their referrer
@@ -1825,6 +1825,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // back to "approved" — the withdrawal stays in "paying" so it cannot
         // be retried and potentially double-paid. An admin must verify the
         // payment status directly in PayPal and then manually resolve it.
+        sendPayPalAmbiguousAlert({
+          withdrawalId: claimed.id,
+          username: claimed.username,
+          amount: trustedTotalPayout,
+          paypalBatchId: stableBatchId,
+        });
         res.status(503).json({
           error: result.error || "PayPal payout outcome is uncertain",
           resolution: "The withdrawal is locked in 'paying' status. Check PayPal for batch ID: " + stableBatchId + " and manually mark it paid or approved via the admin panel once confirmed.",
@@ -1849,6 +1855,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       configured: isPayPalConfigured(),
       mode: process.env.PAYPAL_MODE || "sandbox",
       webhookConfigured: !!(process.env.PAYPAL_WEBHOOK_ID),
+    });
+  });
+
+  // Canonical PayPal status endpoint for the Integration Hub.
+  // Returns credential presence, mode, and webhook configuration so the
+  // operator can confirm payouts are wired before going live.
+  app.get("/api/admin/integrations/paypal/status", adminMiddleware, async (req: AuthRequest, res) => {
+    const clientIdSet = !!process.env.PAYPAL_CLIENT_ID;
+    const secretSet = !!(process.env.PAYPAL_SECRET || process.env.PAYPAL_CLIENT_SECRET);
+    const webhookSet = isPayPalWebhookConfigured();
+    const mode = process.env.PAYPAL_MODE || "sandbox";
+    const fullyConfigured = clientIdSet && secretSet && webhookSet;
+    res.json({
+      clientIdSet,
+      secretSet,
+      webhookSet,
+      mode,
+      configured: isPayPalConfigured(),
+      fullyConfigured,
+      status: fullyConfigured ? (mode === "live" ? "live" : "sandbox") : "incomplete",
     });
   });
 

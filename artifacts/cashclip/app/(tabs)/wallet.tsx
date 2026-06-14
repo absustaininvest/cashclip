@@ -453,7 +453,6 @@ export default function WalletScreen() {
   const progressToNext = displayBalance < 3
     ? (displayBalance / 3) * 100
     : 100;
-  const nextTierAmount = displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : displayBalance < 7 ? 7 : null;
   const nextTierBonus = 0;
 
   return (
@@ -556,19 +555,19 @@ export default function WalletScreen() {
               <Text style={styles.pointsAutoNote}>{t.wallet.valueGrowsWithRevenue}</Text>
             </View>
 
-            {nextTierAmount && (
+            {nextTierBonus > 0 && displayBalance < 7 && (
               <View style={styles.nextTierCard}>
                 <View style={styles.nextTierHeader}>
                   <Feather name="trending-up" size={14} color={Colors.accent} />
                   <Text style={styles.nextTierTitle}>
-                    {displayBalance < 3 ? t.wallet.reachToUnlock : tFn(t, "wallet.saveForBonus", { amount: nextTierAmount!, bonus: nextTierBonus })}
+                    {tFn(t, "wallet.saveForBonus", { amount: displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : 7, bonus: nextTierBonus })}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${Math.min(((displayBalance / (nextTierAmount || 1)) * 100), 100)}%` as any }]} />
+                  <View style={[styles.progressFill, { width: `${Math.min(((displayBalance / (displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : 7)) * 100), 100)}%` as any }]} />
                 </View>
                 <Text style={styles.nextTierProgress}>
-                  ${displayBalance.toFixed(2)} / ${(nextTierAmount || 1).toFixed(2)}
+                  ${displayBalance.toFixed(2)} / ${(displayBalance < 3 ? 3 : displayBalance < 5 ? 5 : 7).toFixed(2)}
                 </Text>
               </View>
             )}
@@ -688,9 +687,6 @@ export default function WalletScreen() {
               </View>
             ) : (
             <>
-            <Text style={styles.modalSubtitle}>
-              {t.wallet.higherAmountsBiggerBonuses}
-            </Text>
             <Text style={styles.modalBalance}>
               {t.wallet.available}: ${serverBalance.toFixed(2)}
             </Text>

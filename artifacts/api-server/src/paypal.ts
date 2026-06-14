@@ -1,4 +1,20 @@
 /**
+ * Required Production secrets for live PayPal payouts
+ * =====================================================
+ * Set all four of these in Publishing → Production app secrets, then
+ * re-publish the API. Until they are set every payout attempt will fail
+ * with "PayPal credentials not configured."
+ *
+ *   PAYPAL_CLIENT_ID       — Client ID from developer.paypal.com → your app
+ *   PAYPAL_SECRET          — Secret from developer.paypal.com → your app
+ *                            (also accepted as PAYPAL_CLIENT_SECRET)
+ *   PAYPAL_WEBHOOK_ID      — Webhook ID from developer.paypal.com → Webhooks
+ *                            (register URL: https://api.cash-clip.app/api/paypal/webhook)
+ *   PAYPAL_MODE            — Set to "live" for production payouts
+ *                            (omit or set to "sandbox" for testing)
+ */
+
+/**
  * Resolve the PayPal API base URL from `PAYPAL_MODE` at call time.
  *
  * This is intentionally a function rather than a module-level constant: a
