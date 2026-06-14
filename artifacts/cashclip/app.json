@@ -255,6 +255,9 @@
           },
           {
             "SKAdNetworkIdentifier": "zq492l623r.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "f38h382jlk.skadnetwork"
           }
         ]
       },
@@ -277,7 +280,9 @@
           "pangle.io",
           "pangleglobal.com",
           "byteoversea.com",
-          "isnssdk.com"
+          "isnssdk.com",
+          "chartboost.com",
+          "chartboostmobile.com"
         ],
         "NSPrivacyCollectedDataTypes": [
           {
@@ -431,7 +436,10 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "extraPods": [
+              { "name": "ISChartboostAdapter" }
+            ]
           },
           "android": {
             "minSdkVersion": 25,
@@ -441,7 +449,8 @@
             "kotlinVersion": "2.1.20",
             "extraMavenRepos": [
               "https://android-sdk.is.com/",
-              "https://artifact.bytedance.com/repository/pangle"
+              "https://artifact.bytedance.com/repository/pangle",
+              "https://cboost.jfrog.io/artifactory/chartboost-ads/"
             ]
           }
         }
