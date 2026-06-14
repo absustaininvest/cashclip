@@ -10,7 +10,13 @@ const ALERT_EMAIL_URL = "/api/admin/admob/alert-email";
 const AD_STATUS_URL = "/api/admin/ad-status";
 const ECONOMY_RATE_URL = "/api/economy/rate";
 
-const AD_STATUS_DEFAULT = { lpNative: false, unityNative: false, adSystemActive: false };
+const AD_STATUS_DEFAULT = {
+  lpNative: false,
+  unityNative: false,
+  adSystemActive: false,
+  rewardedFillAvailable: null,
+  fillReportedAt: null,
+};
 
 const HUB_DATA = {
   checkedAt: new Date("2026-06-07T00:00:00Z").toISOString(),

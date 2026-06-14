@@ -4964,7 +4964,7 @@ export function IntegrationHubPanel({
                         ? "Fill"
                         : "No fill"}
                 </p>
-                {adStatus !== null && adStatus.fillReportedAt !== null && (() => {
+                {adStatus !== null && adStatus.fillReportedAt != null && (() => {
                   const diffMs = Date.now() - adStatus.fillReportedAt;
                   const stale = diffMs > 2 * 60 * 60 * 1000;
                   const label = hubTimeAgo(new Date(adStatus.fillReportedAt).toISOString());
