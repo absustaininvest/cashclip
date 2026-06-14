@@ -696,3 +696,49 @@ describe("POST /api/withdrawals — isPayPalConfigured() guard", () => {
     mockIsPayPalConfigured.mockReturnValue(true);
   });
 });
+
+// ── PayPal email validation ───────────────────────────────────────────────────
+//
+// POST /api/withdrawals must reject clearly malformed paypalEmail values with
+// a 4xx before any DB write. A broken destination address must never reach
+// createWithdrawalAtomic — the rejection must be pre-emptive, server-side,
+// and not rely on PayPal's own API to surface the error later.
+
+describe("POST /api/withdrawals — paypalEmail input validation", () => {
+  const INVALID_EMAILS: Array<{ label: string; value: unknown }> = [
+    { label: "empty string",          value: "" },
+    { label: "absent field (null)",   value: null },
+    { label: "no @ sign",             value: "notanemail" },
+    { label: "starts with @",         value: "@nodomain" },
+    { label: "missing domain part",   value: "user@" },
+    { label: "whitespace only",       value: "   " },
+    { label: "@ with space in local", value: "user name@example.com" },
+    { label: "double-@ address",      value: "user@@example.com" },
+  ];
+
+  for (const { label, value } of INVALID_EMAILS) {
+    it(`rejects paypalEmail "${label}" with 400 and does not call createWithdrawalAtomic`, async () => {
+      const res = await withAuth(
+        request(app)
+          .post("/api/withdrawals")
+          .send({ amount: 3, paypalEmail: value }),
+      );
+
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+      // Must never reach the DB write path.
+      expect(mockCreateWithdrawalAtomic).not.toHaveBeenCalled();
+    });
+  }
+
+  it("accepts a well-formed paypalEmail and proceeds to createWithdrawalAtomic", async () => {
+    const res = await withAuth(
+      request(app)
+        .post("/api/withdrawals")
+        .send({ amount: 3, paypalEmail: "valid.user+tag@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockCreateWithdrawalAtomic).toHaveBeenCalledTimes(1);
+  });
+});
