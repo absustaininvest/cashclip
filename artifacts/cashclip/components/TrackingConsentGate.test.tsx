@@ -130,7 +130,7 @@ async function renderGate(onConsentDone?: () => void) {
   let tr!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     tr = TestRenderer.create(
-      React.createElement(TrackingConsentGate, { onConsentDone }, CHILD),
+      React.createElement(TrackingConsentGate, { onConsentDone, children: CHILD }),
     );
   });
   await flush();
@@ -416,7 +416,7 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     let tr!: TestRenderer.ReactTestRenderer;
     await act(async () => {
       tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: onDone }, CHILD),
+        React.createElement(TrackingConsentGate, { onConsentDone: onDone, children: CHILD }),
       );
     });
 
@@ -449,7 +449,7 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     let tr!: TestRenderer.ReactTestRenderer;
     await act(async () => {
       tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: undefined }, CHILD),
+        React.createElement(TrackingConsentGate, { onConsentDone: undefined, children: CHILD }),
       );
     });
 
@@ -476,7 +476,7 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     let tr!: TestRenderer.ReactTestRenderer;
     await act(async () => {
       tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: undefined }, CHILD),
+        React.createElement(TrackingConsentGate, { onConsentDone: undefined, children: CHILD }),
       );
     });
 
