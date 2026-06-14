@@ -63,6 +63,10 @@ args = "board-fit-tests"
 task = "workflow.run"
 args = "cashclip-test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "cashclip-typecheck"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -148,6 +152,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/cashclip run test components/TrackingConsentGate.test.tsx"
+
+[[workflows.workflow]]
+name = "cashclip-typecheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/cashclip run typecheck"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 3001
