@@ -92,6 +92,46 @@ const DAILY_GOAL = 20;
 let _lastWatchedAdId: string | null = null;
 let _lastWatchedAdPts: number = 0;
 
+// Session ID generated once per JS-engine lifetime (= once per cold launch).
+// On a warm resume the same process is reused, so _sessionId is unchanged;
+// on a cold restart the module is re-evaluated and a new ID is minted.
+// Persisting the badge to AsyncStorage alongside this ID lets us detect
+// cold launches and silently discard stale badge values.
+const _sessionId: string =
+  Date.now().toString(36) + Math.random().toString(36).slice(2);
+const _AD_BADGE_KEY = "cashclip_earn_badge_session";
+
+async function _persistBadge(adId: string | null, pts: number): Promise<void> {
+  try {
+    const payload = JSON.stringify({ sid: _sessionId, adId, pts });
+    const { default: AS } = await import(
+      "@react-native-async-storage/async-storage"
+    );
+    await AS.setItem(_AD_BADGE_KEY, payload);
+  } catch {
+    // Non-critical — badge is still held in the module var for this session
+  }
+}
+
+async function _loadBadge(): Promise<{ adId: string | null; pts: number }> {
+  try {
+    const { default: AS } = await import(
+      "@react-native-async-storage/async-storage"
+    );
+    const raw = await AS.getItem(_AD_BADGE_KEY);
+    if (!raw) return { adId: null, pts: 0 };
+    const { sid, adId, pts } = JSON.parse(raw) as {
+      sid: string;
+      adId: string | null;
+      pts: number;
+    };
+    if (sid !== _sessionId) return { adId: null, pts: 0 };
+    return { adId, pts };
+  } catch {
+    return { adId: null, pts: 0 };
+  }
+}
+
 // Explain to the user why a server-rejected mission claim didn't credit, so a
 // failed claim is visible rather than silently swallowed.
 function notifyMissionClaimFailed(result: ClaimMissionResult): void {
@@ -762,6 +802,18 @@ export default function EarnScreen() {
 
   useEffect(() => {
     loadAll();
+    // Validate the persisted badge against the current session ID.  On a cold
+    // launch the stored session ID won't match _sessionId (new ID was minted),
+    // so the badge is treated as absent.  On a warm resume the IDs match and
+    // the badge is left as-is (module vars already restored it via useState).
+    _loadBadge().then(({ adId, pts }) => {
+      if (adId !== _lastWatchedAdId || pts !== _lastWatchedAdPts) {
+        _lastWatchedAdId = adId;
+        _lastWatchedAdPts = pts;
+        setLastWatchedAdId(adId);
+        setLastWatchedAdPts(pts);
+      }
+    });
   }, []);
 
   // Warm a rewarded ad once we know who the user is. The SSV identity itself is
@@ -932,6 +984,7 @@ export default function EarnScreen() {
     setLastWatchedAdId(null);
     setLastWatchedAdPts(0);
     setLastCheckinEarnedPts(null);
+    _persistBadge(null, 0);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -955,6 +1008,7 @@ export default function EarnScreen() {
           _lastWatchedAdPts = Math.round(ad.reward * 1000);
           setLastWatchedAdId(ad.id);
           setLastWatchedAdPts(Math.round(ad.reward * 1000));
+          _persistBadge(ad.id, Math.round(ad.reward * 1000));
           await loadAll();
           balancePulse.value = withSequence(
             withSpring(1.1, { damping: 4 }),
@@ -1001,6 +1055,7 @@ export default function EarnScreen() {
       _lastWatchedAdPts = Math.round(watchingAd.reward * 1000);
       setLastWatchedAdId(watchingAd.id);
       setLastWatchedAdPts(Math.round(watchingAd.reward * 1000));
+      _persistBadge(watchingAd.id, Math.round(watchingAd.reward * 1000));
     }
     setShowModal(false);
     setWatchingAd(null);
