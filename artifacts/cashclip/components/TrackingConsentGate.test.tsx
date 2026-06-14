@@ -192,6 +192,102 @@ describe('TrackingConsentGate — ATT status "restricted" on startup', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Fast-path: DONE_KEY already present (returning user)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — DONE_KEY already set (returning user)", () => {
+  it("renders children immediately without showing any consent UI", async () => {
+    store.set(DONE_KEY, "1");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call requestATT() — no ATT dialog for returning users", async () => {
+    store.set(DONE_KEY, "1");
+
+    await renderGate();
+
+    expect(requestATTCalled).toBe(false);
+  });
+
+  it("leaves DONE_KEY intact in AsyncStorage", async () => {
+    store.set(DONE_KEY, "1");
+
+    await renderGate();
+
+    expect(store.get(DONE_KEY)).toBe("1");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fast-path: legacy key consent_fully_done_v2 present → migrate + skip
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — legacy key consent_fully_done_v2 present", () => {
+  it("renders children immediately without showing any consent UI", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("migrates by writing DONE_KEY so future launches skip the gate too", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    await renderGate();
+
+    expect(store.get(DONE_KEY)).toBe("1");
+  });
+
+  it("does not call requestATT() — no ATT dialog needed", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    await renderGate();
+
+    expect(requestATTCalled).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fast-path: legacy key tracking_consent_dismissed_v1 present → migrate + skip
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — legacy key tracking_consent_dismissed_v1 present", () => {
+  it("renders children immediately without showing any consent UI", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("migrates by writing DONE_KEY so future launches skip the gate too", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(store.get(DONE_KEY)).toBe("1");
+  });
+
+  it("does not call requestATT() — no ATT dialog needed", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(requestATTCalled).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ATT status = "undetermined" → "denied" after requestATT()
 // ─────────────────────────────────────────────────────────────────────────────
 describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestATT()', () => {
