@@ -236,6 +236,16 @@ vi.mock("@/lib/query-client", () => ({
 // storage.ts lazy-imports admob inside recordGamePlay; stub so the module graph
 // resolves cleanly even though no ad functions are exercised here.
 vi.mock("@/lib/admob", () => ({ maybeShowInterstitial: vi.fn(async () => {}) }));
+// secure-store proxies to expo-secure-store on native, which needs TurboModuleRegistry.
+// Stub it to use the same in-memory AsyncStorage map so storage round-trips still work.
+vi.mock("@/lib/secure-store", () => ({
+  secureGet: async (k: string) => (store.has(k) ? store.get(k)! : null),
+  secureSet: async (k: string, v: string) => { store.set(k, v); },
+  secureDelete: async (k: string) => { store.delete(k); },
+  secureMultiDelete: async (keys: string[]) => {
+    keys.forEach((k) => store.delete(k));
+  },
+}));
 
 // ── earn-client: fetchReferralStats / fetchServerBalance are test levers ───────
 // All other functions return safe empty defaults so loadData's server step
@@ -603,5 +613,104 @@ describe("Wallet withdrawal modal — suspicious-email warning banner", () => {
     expect(
       texts.some((t) => t.includes("may not be accepted")),
     ).toBe(false);
+  });
+});
+
+// ── Inline PayPal email validation — typing into the withdrawal modal ─────────
+//
+// handlePaypalEmailChange fires isPlausiblePayPalDomain on every keystroke.
+// When a disposable-domain email is typed the inline paypalEmailError text
+// appears and the withdraw-confirm button becomes disabled, independently of
+// the saved-email warning that fires on modal open.
+describe("Wallet withdrawal modal — inline PayPal email validation on typing", () => {
+  // Balance ≥ $5 makes getWithdrawalTiers return [$3, $5] tiers.
+  // lastPaypalEmail: null ensures no savedEmailWarning so we test the
+  // inline validation path in isolation.
+  const BALANCE_RESP = { balance: 5, totalEarned: 5, lastPaypalEmail: null };
+
+  async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
+    fetchServerBalanceMock.mockResolvedValue(BALANCE_RESP);
+    fetchReferralStatsMock.mockResolvedValue(null);
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(WalletScreen));
+    });
+    await flush();
+    return tr;
+  }
+
+  async function openWithdrawModal(
+    tr: TestRenderer.ReactTestRenderer,
+  ): Promise<void> {
+    const btn = tr.root.find((n) => n.props.testID === "open-withdraw-modal");
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+  }
+
+  // TierCard Pressables contain a bare "$" text node (JSX splits `${"3.00"}`
+  // into two children: `"$"` and `"3.00"`). The close button has hitSlop and
+  // the confirm button has a testID, so neither matches. The convert-now button
+  // shows no "$" while claimablePoints=0 (returns the translation key only).
+  async function selectFirstTier(
+    tr: TestRenderer.ReactTestRenderer,
+  ): Promise<void> {
+    const tierCards = tr.root.findAll((n) => {
+      if ((n.type as unknown) !== "Pressable") return false;
+      if (n.props.testID != null) return false;
+      if (n.props.hitSlop != null) return false;
+      return allText(n).some((t) => t.includes("$"));
+    });
+    if (tierCards.length === 0) throw new Error("No TierCard Pressable found");
+    await act(async () => {
+      tierCards[0]!.props.onPress();
+    });
+    await flush();
+  }
+
+  async function typeEmail(
+    tr: TestRenderer.ReactTestRenderer,
+    email: string,
+  ): Promise<void> {
+    const input = tr.root.find(
+      (n) => n.props.testID === "withdraw-paypal-email",
+    );
+    await act(async () => {
+      input.props.onChangeText(email);
+    });
+    await flush();
+  }
+
+  it("shows the inline error when a disposable-domain email is typed", async () => {
+    const tr = await renderScreen();
+    await openWithdrawModal(tr);
+    await selectFirstTier(tr);
+    await typeEmail(tr, "user@mailinator.com");
+
+    const texts = allText(tr.root);
+    expect(texts.some((t) => t.includes("isn't accepted"))).toBe(true);
+  });
+
+  it("does NOT show the inline error when a plausible email is typed", async () => {
+    const tr = await renderScreen();
+    await openWithdrawModal(tr);
+    await selectFirstTier(tr);
+    await typeEmail(tr, "user@gmail.com");
+
+    const texts = allText(tr.root);
+    expect(texts.some((t) => t.includes("isn't accepted"))).toBe(false);
+  });
+
+  it("disables the withdraw-confirm button while the inline email error is present", async () => {
+    const tr = await renderScreen();
+    await openWithdrawModal(tr);
+    await selectFirstTier(tr);
+    await typeEmail(tr, "user@yopmail.com");
+
+    const confirmBtn = tr.root.find(
+      (n) => n.props.testID === "withdraw-confirm",
+    );
+    expect(confirmBtn.props.disabled).toBe(true);
   });
 });
