@@ -713,4 +713,24 @@ describe("Wallet withdrawal modal — inline PayPal email validation on typing",
     );
     expect(confirmBtn.props.disabled).toBe(true);
   });
+
+  it("clears the inline error and re-enables the confirm button when the user fixes a bad email", async () => {
+    const tr = await renderScreen();
+    await openWithdrawModal(tr);
+    await selectFirstTier(tr);
+
+    // Step 1: type a disposable-domain email → error appears, button disabled.
+    await typeEmail(tr, "user@mailinator.com");
+    expect(allText(tr.root).some((t) => t.includes("isn't accepted"))).toBe(true);
+    expect(
+      tr.root.find((n) => n.props.testID === "withdraw-confirm").props.disabled,
+    ).toBe(true);
+
+    // Step 2: retype with a plausible email → error must be gone, button re-enabled.
+    await typeEmail(tr, "user@gmail.com");
+    expect(allText(tr.root).some((t) => t.includes("isn't accepted"))).toBe(false);
+    expect(
+      tr.root.find((n) => n.props.testID === "withdraw-confirm").props.disabled,
+    ).toBe(false);
+  });
 });
