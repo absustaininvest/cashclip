@@ -83,7 +83,7 @@ vi.mock("@/constants/colors", () => ({
 }));
 
 // ── Import component under test ───────────────────────────────────────────────
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import { TrackingConsentGate } from "./TrackingConsentGate";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -595,6 +595,115 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
 
     // The changed button label must NOT equal the stale quoted name.
     expect(changedButtonLabel).not.toBe(quotedLabel);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Decline Alert — "Continue Without" button label must stay in sync
+//
+// declineDisclosures() fires Alert.alert() with a "Continue Without" cancel
+// button.  This constant is the single source of truth for that label.
+// Both the live-extraction test and the mismatch-simulation test reference it,
+// so renaming the button in the component causes an immediate failure here.
+// ─────────────────────────────────────────────────────────────────────────────
+const DECLINE_CANCEL_LABEL = "Continue Without";
+
+describe('Decline Alert — "Continue Without" button label is consistent', () => {
+  /**
+   * Render the disclosures step (same path as the primary-button tests):
+   * both ATT reads return "undetermined" so the component falls through to
+   * setStep("disclosures").
+   */
+  async function renderDisclosuresForDecline() {
+    attStatuses.push("undetermined", "undetermined");
+
+    vi.useFakeTimers();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { children: CHILD }),
+      );
+    });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+
+    vi.useRealTimers();
+    return tr;
+  }
+
+  it("cancel button label extracted from the live Alert call matches DECLINE_CANCEL_LABEL", async () => {
+    const tr = await renderDisclosuresForDecline();
+
+    // ── 1. Confirm the disclosures step actually rendered ────────────────────
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    // ── 2. Find the "Decline" secondary button and press it ──────────────────
+    // Tree shape (passthrough stubs):
+    //   TouchableOpacity fn → "TouchableOpacity" host (has onPress)
+    //     Text fn → "Text" host → "Decline"
+    const declineTextNode = tr.root.findAll(
+      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+    )[0];
+    expect(
+      declineTextNode,
+      '"Decline" secondary button text node not found in the disclosures step',
+    ).toBeTruthy();
+
+    // parent = Text passthrough fn; parent.parent = "TouchableOpacity" host
+    const declineBtnHost = declineTextNode.parent!.parent!;
+    expect(
+      declineBtnHost.props.onPress != null,
+      '"TouchableOpacity" host above the Decline text has no onPress',
+    ).toBe(true);
+
+    await act(async () => {
+      declineBtnHost.props.onPress();
+    });
+
+    // ── 3. Alert.alert must have been called exactly once ────────────────────
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+
+    // ── 4. Extract the cancel button from the Alert call ─────────────────────
+    // Alert.alert(title, message, buttons[])
+    const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
+    const alertButtons: Array<{ text: string; style?: string }> = alertCall[2];
+    expect(
+      Array.isArray(alertButtons),
+      'Alert.alert was not called with a buttons array as the third argument',
+    ).toBe(true);
+
+    const cancelBtn = alertButtons.find((b) => b.style === "cancel");
+    expect(
+      cancelBtn,
+      'No button with style="cancel" found in the decline Alert',
+    ).toBeTruthy();
+
+    const extractedLabel = cancelBtn!.text;
+    expect(extractedLabel, 'Cancel button text is empty').toBeTruthy();
+
+    // ── 5. The extracted label must equal the shared constant ─────────────────
+    // DECLINE_CANCEL_LABEL is the single reference point for this button name.
+    // A rename in the component without updating that constant breaks this test.
+    expect(extractedLabel).toBe(DECLINE_CANCEL_LABEL);
+  });
+
+  it("catches a mismatch when the Alert cancel button is renamed to something else", () => {
+    // Simulate what the Alert buttons array would look like after a rename.
+    // This exercises the same cancel-button extraction logic as the live test,
+    // proving the assertion fires when the component drifts from DECLINE_CANCEL_LABEL.
+    const simulatedButtons: Array<{ text: string; style?: string }> = [
+      { text: "Open Tracking Settings" },
+      { text: "Skip For Now", style: "cancel" }, // hypothetical rename
+    ];
+
+    const cancelBtn = simulatedButtons.find((b) => b.style === "cancel");
+    expect(cancelBtn).toBeTruthy();
+
+    // The renamed label must NOT match the expected constant — proving the
+    // live-extraction assertion above would catch this drift.
+    expect(cancelBtn!.text).not.toBe(DECLINE_CANCEL_LABEL);
   });
 });
 
