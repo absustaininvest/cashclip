@@ -210,7 +210,7 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
         <View style={styles.footer}>
           <TouchableOpacity style={styles.primaryBtn} onPress={acceptDisclosures} activeOpacity={0.85}>
             <Ionicons name="checkmark-circle-outline" size={20} color="#000" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryBtnText}>Accept & Earn More</Text>
+            <Text style={styles.primaryBtnText}>Continue</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={declineDisclosures} activeOpacity={0.7}>
             <Text style={styles.secondaryBtnText}>Decline</Text>
