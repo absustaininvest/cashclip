@@ -6787,33 +6787,36 @@ function RevenuePanel({
 }
 
 // ─── App Config Panel ────────────────────────────────────────────────────────
-// Static build-configuration snapshot for version reconciliation.
-// No user or admin-sensitive data — only public app.json fields.
+// Version reconciliation reference. No user or admin-sensitive data.
 
-const APP_CONFIG = {
-  identity: {
-    name: "CashClip",
-    slug: "cashclip",
-    owner: "absustainabilityinvestments-owner",
-    easProjectId: "aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
-    bundleId: "app.replit.cashclip",
-    scheme: "cashclip",
-    updatesUrl: "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
-  },
-  versions: {
-    appVersion: "1.1.0",
-    runtimeVersion: "1.0.0",
-    iosBuildNumber: "41",
-    androidVersionCode: 42,
-    expoSdkVersion: "54",
-    newArchEnabled: true,
-  },
+// What is actually live on user devices right now.
+const LIVE_BUILD = {
+  iosBuildNumber: "29",
+  appVersion: "1.0.0",
+  runtimeVersion: "1.0.0",
+  androidBuildNumber: "38",
+  androidStatus: "Internal testing (not yet public)",
+  appStoreStatus: "Approved — live on App Store",
+  bundleId: "app.replit.cashclip",
+  easProjectId: "aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
+  otaUpdatesUrl: "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
+  otaChannel: "production",
+} as const;
+
+// What app.json currently contains — numbers for the NEXT native build,
+// not yet submitted or live anywhere.
+const NEXT_BUILD = {
+  appVersion: "1.1.0",
+  runtimeVersion: "1.0.0",
+  iosBuildNumber: "41",
+  androidVersionCode: 42,
+  expoSdkVersion: "54",
+  newArchEnabled: true,
   ios: {
     deploymentTarget: "15.1",
     supportsTablet: false,
     encryptionExempt: true,
     pushEnvironment: "production",
-    userInterfaceStyle: "automatic",
     admobAppId: "ca-app-pub-8679658921848348~6212139107",
     skAdNetworkCount: 76,
   },
@@ -6824,6 +6827,11 @@ const APP_CONFIG = {
     buildToolsVersion: "36.0.0",
     kotlinVersion: "2.1.20",
     admobAppId: "ca-app-pub-8679658921848348~6212139107",
+  },
+  adNetworks: {
+    platform: "LevelPlay (ironSource mediation)",
+    ironsourceAppKey: "2690d87e5",
+    demandSources: ["Unity Ads", "Pangle"],
   },
   plugins: [
     "@logrocket/react-native",
@@ -6836,21 +6844,9 @@ const APP_CONFIG = {
     "expo-build-properties",
     "withAndroidManifestFix",
   ],
-  adNetworks: {
-    ironsourceAppKey: "2690d87e5",
-    platform: "LevelPlay (ironSource mediation)",
-    demandSources: ["Unity Ads", "Pangle"],
-    admobSdkPresent: true,
-  },
   sentry: {
     organization: "ab-sustainability-investments",
     project: "cash-clip",
-  },
-  features: {
-    typedRoutes: true,
-    reactCompiler: false,
-    orientation: "portrait",
-    privacyTracking: true,
   },
 } as const;
 
@@ -6916,7 +6912,8 @@ function ConfigSection({
 }
 
 function AppConfigPanel() {
-  const cfg = APP_CONFIG;
+  const live = LIVE_BUILD;
+  const next = NEXT_BUILD;
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -6928,76 +6925,92 @@ function AppConfigPanel() {
             App Configuration
           </h2>
           <p className="text-gray-400 text-sm">
-            Current build snapshot — for version reconciliation only. No user
-            data.
+            Version reconciliation reference — no user data.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {/* Identity */}
-        <ConfigSection title="Identity" icon={Smartphone}>
-          <ConfigRow label="App Name" value={cfg.identity.name} />
-          <ConfigRow label="Slug" value={cfg.identity.slug} mono />
-          <ConfigRow label="Bundle ID" value={cfg.identity.bundleId} mono />
-          <ConfigRow label="Scheme" value={cfg.identity.scheme} mono />
-          <ConfigRow label="EAS Project ID" value={cfg.identity.easProjectId} mono />
-          <ConfigRow label="Owner" value={cfg.identity.owner} mono />
-        </ConfigSection>
+      {/* ── LIVE BUILD (reconciliation anchor) ─────────────────────────── */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+        <span className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm uppercase tracking-wider">
+          Live on App Store — reconciliation anchor
+        </span>
+      </div>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8">
+          <ConfigRow label="App Version" value={live.appVersion} badge="green" />
+          <ConfigRow label="iOS Build #" value={live.iosBuildNumber} badge="green" />
+          <ConfigRow label="Runtime Version" value={live.runtimeVersion} badge="blue" />
+          <ConfigRow label="App Store Status" value={live.appStoreStatus} badge="green" />
+          <ConfigRow label="Android Build #" value={live.androidBuildNumber} />
+          <ConfigRow label="Android Status" value={live.androidStatus} badge="gray" />
+          <ConfigRow label="OTA Channel" value={live.otaChannel} badge="blue" />
+          <ConfigRow label="Bundle ID" value={live.bundleId} mono />
+          <ConfigRow label="EAS Project ID" value={live.easProjectId} mono />
+        </div>
+        <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center gap-2">
+          <Wifi className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span className="text-gray-500 text-xs">OTA URL: </span>
+          <span className="text-gray-900 text-xs font-mono">{live.otaUpdatesUrl}</span>
+        </div>
+      </div>
 
+      {/* ── NEXT BUILD (app.json — not yet live) ───────────────────────── */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
+        <span className="font-['Space_Grotesk'] font-bold text-gray-500 text-sm uppercase tracking-wider">
+          Next native build — app.json (not yet submitted or live)
+        </span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* Versions */}
         <ConfigSection title="Versions" icon={Rocket}>
-          <ConfigRow label="App Version" value={cfg.versions.appVersion} badge="green" />
-          <ConfigRow label="Runtime Version" value={cfg.versions.runtimeVersion} badge="blue" />
-          <ConfigRow label="iOS Build #" value={cfg.versions.iosBuildNumber} badge="blue" />
-          <ConfigRow label="Android versionCode" value={cfg.versions.androidVersionCode} badge="blue" />
-          <ConfigRow label="Expo SDK" value={cfg.versions.expoSdkVersion} />
-          <ConfigRow label="New Architecture" value={cfg.versions.newArchEnabled} badge="green" />
+          <ConfigRow label="App Version" value={next.appVersion} />
+          <ConfigRow label="Runtime Version" value={next.runtimeVersion} badge="blue" />
+          <ConfigRow label="iOS Build #" value={next.iosBuildNumber} />
+          <ConfigRow label="Android versionCode" value={next.androidVersionCode} />
+          <ConfigRow label="Expo SDK" value={next.expoSdkVersion} />
+          <ConfigRow label="New Architecture" value={next.newArchEnabled} badge="green" />
         </ConfigSection>
 
         {/* iOS */}
-        <ConfigSection title="iOS" icon={Smartphone}>
-          <ConfigRow label="Deployment Target" value={cfg.ios.deploymentTarget} />
-          <ConfigRow label="Supports Tablet" value={cfg.ios.supportsTablet} badge="gray" />
-          <ConfigRow label="Encryption Exempt" value={cfg.ios.encryptionExempt} badge="green" />
-          <ConfigRow label="Push Environment" value={cfg.ios.pushEnvironment} badge="blue" />
-          <ConfigRow label="UI Style" value={cfg.ios.userInterfaceStyle} />
-          <ConfigRow label="AdMob App ID" value={cfg.ios.admobAppId} mono />
-          <ConfigRow label="SKAdNetwork IDs" value={`${cfg.ios.skAdNetworkCount} entries`} />
+        <ConfigSection title="iOS Config" icon={Smartphone}>
+          <ConfigRow label="Deployment Target" value={next.ios.deploymentTarget} />
+          <ConfigRow label="Supports Tablet" value={next.ios.supportsTablet} badge="gray" />
+          <ConfigRow label="Encryption Exempt" value={next.ios.encryptionExempt} badge="green" />
+          <ConfigRow label="Push Environment" value={next.ios.pushEnvironment} badge="blue" />
+          <ConfigRow label="AdMob App ID" value={next.ios.admobAppId} mono />
+          <ConfigRow label="SKAdNetwork IDs" value={`${next.ios.skAdNetworkCount} entries`} />
         </ConfigSection>
 
         {/* Android */}
-        <ConfigSection title="Android" icon={Smartphone}>
-          <ConfigRow label="Min SDK" value={cfg.android.minSdkVersion} />
-          <ConfigRow label="Compile SDK" value={cfg.android.compileSdkVersion} />
-          <ConfigRow label="Target SDK" value={cfg.android.targetSdkVersion} />
-          <ConfigRow label="Build Tools" value={cfg.android.buildToolsVersion} mono />
-          <ConfigRow label="Kotlin" value={cfg.android.kotlinVersion} mono />
-          <ConfigRow label="AdMob App ID" value={cfg.android.admobAppId} mono />
+        <ConfigSection title="Android Config" icon={Smartphone}>
+          <ConfigRow label="Min SDK" value={next.android.minSdkVersion} />
+          <ConfigRow label="Compile SDK" value={next.android.compileSdkVersion} />
+          <ConfigRow label="Target SDK" value={next.android.targetSdkVersion} />
+          <ConfigRow label="Build Tools" value={next.android.buildToolsVersion} mono />
+          <ConfigRow label="Kotlin" value={next.android.kotlinVersion} mono />
+          <ConfigRow label="AdMob App ID" value={next.android.admobAppId} mono />
         </ConfigSection>
 
         {/* Ad Networks */}
         <ConfigSection title="Ad Networks" icon={DollarSign}>
-          <ConfigRow label="Platform" value={cfg.adNetworks.platform} />
-          <ConfigRow label="App Key" value={cfg.adNetworks.ironsourceAppKey} mono />
-          <ConfigRow label="Demand Sources" value={cfg.adNetworks.demandSources.join(", ")} />
-          <ConfigRow label="AdMob SDK" value={cfg.adNetworks.admobSdkPresent} badge="green" />
+          <ConfigRow label="Platform" value={next.adNetworks.platform} />
+          <ConfigRow label="App Key" value={next.adNetworks.ironsourceAppKey} mono />
+          <ConfigRow label="Demand Sources" value={next.adNetworks.demandSources.join(", ")} />
         </ConfigSection>
 
-        {/* Plugins & Features */}
-        <ConfigSection title="Plugins & Features" icon={Layers}>
-          <ConfigRow label="Typed Routes" value={cfg.features.typedRoutes} badge="green" />
-          <ConfigRow label="React Compiler" value={cfg.features.reactCompiler} badge="gray" />
-          <ConfigRow label="Privacy Tracking" value={cfg.features.privacyTracking} badge="green" />
-          <ConfigRow label="Orientation" value={cfg.features.orientation} />
-          <ConfigRow label="Sentry Org" value={cfg.sentry.organization} mono />
-          <ConfigRow label="Sentry Project" value={cfg.sentry.project} mono />
+        {/* Sentry + Plugins */}
+        <ConfigSection title="Monitoring & Plugins" icon={Layers}>
+          <ConfigRow label="Sentry Org" value={next.sentry.organization} mono />
+          <ConfigRow label="Sentry Project" value={next.sentry.project} mono />
           <div className="pt-2">
             <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              Plugins ({cfg.plugins.length})
+              Plugins ({next.plugins.length})
             </p>
             <div className="flex flex-wrap gap-1">
-              {cfg.plugins.map((p) => (
+              {next.plugins.map((p) => (
                 <span
                   key={p}
                   className="text-xs bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded font-mono"
@@ -7009,25 +7022,6 @@ function AppConfigPanel() {
           </div>
         </ConfigSection>
       </div>
-
-      {/* Updates URL */}
-      <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-3">
-        <Wifi className="w-4 h-4 text-emerald-500 shrink-0" />
-        <div>
-          <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
-            OTA Updates URL
-          </p>
-          <p className="text-gray-900 text-sm font-mono mt-0.5">
-            {cfg.identity.updatesUrl}
-          </p>
-        </div>
-      </div>
-
-      <p className="text-gray-400 text-xs mt-4 text-center">
-        This data is extracted from{" "}
-        <span className="font-mono">artifacts/cashclip/app.json</span> at build
-        time. Update this panel whenever app.json changes.
-      </p>
     </div>
   );
 }
