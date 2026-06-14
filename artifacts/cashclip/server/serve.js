@@ -289,6 +289,7 @@ const server = http.createServer((req, res) => {
       "blueseasx.com, 203625, RESELLER",
       "bold-win.com, 165, RESELLER, 71746737d0bab951",
       "brightcom.com, 23120, RESELLER",
+      "chartboost.com, 6a2e560f4ea6b51458f109a2, DIRECT",
       "contextweb.com, 558622, RESELLER, 89ff185a4c4e857c",
       "conversantmedia.com, 41024, RESELLER, 03113cd04947736d",
       "criteo.com, b-062019, RESELLER, 9fac4a4a87c2a44f",
