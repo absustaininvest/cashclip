@@ -13,6 +13,7 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 import { initializeAdMob, preloadRewardedAd, setFillChangeCallback } from "@/lib/admob";
 import { apiRequestSafe } from "@/lib/query-client";
+import { secureGet } from "@/lib/secure-store";
 import { startAdAnalyticsFlush, stopAdAnalyticsFlush } from "@/lib/ad-analytics";
 import { TrackingConsentGate } from "@/components/TrackingConsentGate";
 import { ForceUpdateGate } from "@/components/ForceUpdateGate";
@@ -241,8 +242,11 @@ function RootLayout() {
                   and login redirects only start after consent is done. */}
               <TrackingConsentGate onConsentDone={() => {
                 setFillChangeCallback((fillAvailable) => {
-                  apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
-                    .catch(() => {});
+                  secureGet("cashclip_auth_token").then((token) => {
+                    if (!token) return;
+                    apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
+                      .catch(() => {});
+                  }).catch(() => {});
                 });
                 initializeAdMob().then((initialized) => {
                   if (initialized) preloadRewardedAd();
