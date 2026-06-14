@@ -47,10 +47,11 @@ TrackingConsentGate was fully rewritten (v3, DONE_KEY = "consent_done_v3"):
   status; if "authorized"/"granted" → writes done key → skips disclosures/terms entirely
 - Handles the build-29 silent-authorized path (wrote NO key on authorized pass-through)
 
-**Critical architectural fix**: TrackingConsentGate moved to outermost position in
-`_layout.tsx`, wrapping OtaUpdateGate (previously OtaUpdateGate was outside it).
-This prevents OtaUpdateGate from reloading the bundle mid-consent before the key
-is written. Gate order: TrackingConsentGate → OtaUpdateGate → ForceUpdateGate → App.
+**Critical architectural fix**: TrackingConsentGate is outermost AND AuthProvider
+is inside it. Gate order: TrackingConsentGate → AuthProvider → OtaUpdateGate →
+ForceUpdateGate → App. This means: (1) OtaUpdateGate can never reload mid-consent,
+(2) zero auth activity (token reads, API calls, login redirects) fires before consent
+resolves — eliminating background fluctuation on fresh installs before the user taps.
 
 ## How to apply
 If owner reports consent re-asking: confirm gate order in _layout.tsx (TrackingConsentGate

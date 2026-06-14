@@ -233,44 +233,35 @@ function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
-          <AuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
               <StatusBar style="light" />
               <View style={{ flex: 1, backgroundColor: Colors.background }}>
-                {/* TrackingConsentGate is the outermost gate intentionally.
-                    It must resolve (and write its done key) BEFORE OtaUpdateGate
-                    can reload the bundle mid-session, otherwise a rapid OTA push
-                    would interrupt consent before the key is saved and Apple's
-                    reviewer would see the ATT prompt again on the next launch.
-                    Consent first → key written → OTA can reload freely. */}
+                {/* TrackingConsentGate is outermost and AuthProvider is inside it.
+                    This means ZERO auth activity (no token reads, no API calls,
+                    no login redirect) happens before consent resolves. On a fresh
+                    install the user sees consent first, then a stable login page —
+                    no background fluctuation before they tap anything. */}
                 <TrackingConsentGate onConsentDone={() => {
-                  // Register the fill-state reporter BEFORE init so the first
-                  // onAdAvailable event is captured.  The callback is fire-and-forget:
-                  // it POSTs to /api/earn/ad-fill with the current fill state so the
-                  // admin Integration Hub can show a colour-coded badge without
-                  // requiring log access.  Failures are silently swallowed.
                   setFillChangeCallback((fillAvailable) => {
                     apiRequestSafe("POST", "/api/earn/ad-fill", { rewardedFillAvailable: fillAvailable })
                       .catch(() => {});
                   });
-                  // LevelPlay (ironSource) replaces AdMob as the ad platform.
-                  // initializeAdMob() is the stable entry-point — internally it
-                  // now initialises the LevelPlay SDK instead.
                   initializeAdMob().then((initialized) => {
                     if (initialized) preloadRewardedAd();
                   });
                 }}>
-                  <OtaUpdateGate>
-                    <ForceUpdateGate>
-                      <CelebrationProvider>
-                        <RootLayoutNav />
-                      </CelebrationProvider>
-                    </ForceUpdateGate>
-                  </OtaUpdateGate>
+                  <AuthProvider>
+                    <OtaUpdateGate>
+                      <ForceUpdateGate>
+                        <CelebrationProvider>
+                          <RootLayoutNav />
+                        </CelebrationProvider>
+                      </ForceUpdateGate>
+                    </OtaUpdateGate>
+                  </AuthProvider>
                 </TrackingConsentGate>
               </View>
             </GestureHandlerRootView>
-          </AuthProvider>
         </LanguageProvider>
       </QueryClientProvider>
     </ErrorBoundary>
