@@ -270,6 +270,16 @@ export function TrackingConsentGate({ children, onConsentDone }: Props) {
         return;
       }
 
+      // Migration: users who completed the OLD consent flow have
+      // "tracking_consent_dismissed_v1" set. Honour it so they are never
+      // re-prompted by the new gate.
+      const oldDone = await AsyncStorage.getItem("tracking_consent_dismissed_v1").catch(() => null);
+      if (oldDone) {
+        AsyncStorage.setItem(CONSENT_DONE_KEY, "1").catch(() => {});
+        markDone();
+        return;
+      }
+
       // ② Fire ATT native dialog NOW (while spinner is visible) if undetermined.
       //    If ATT was previously denied/authorized iOS just returns immediately —
       //    no dialog, no delay.
