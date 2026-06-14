@@ -743,6 +743,77 @@ describe("POST /api/withdrawals — paypalEmail input validation", () => {
   });
 });
 
+// ── Fake / implausible PayPal email domain — user-facing withdrawal ───────────
+//
+// POST /api/withdrawals must also reject syntactically valid but clearly fake
+// domains: single-character labels, single-character TLDs, and known disposable
+// providers. These pass the bare format regex but would produce PayPal failures
+// or fund fake accounts. Rejection must be pre-emptive — createWithdrawalAtomic
+// must NOT be called for any of these inputs.
+
+describe("POST /api/withdrawals — fake/implausible PayPal domain rejection", () => {
+  const FAKE_DOMAIN_EMAILS: Array<{ label: string; value: string }> = [
+    { label: "single-char SLD (a.co)",                value: "user@a.co" },
+    { label: "single-char TLD (domain.x)",            value: "user@domain.x" },
+    { label: "both labels single-char (x.y)",         value: "user@x.y" },
+    { label: "three-part, one label 1-char",          value: "user@ab.c.com" },
+    { label: "short SLD + non-trusted TLD (aaa.co)",  value: "user@aaa.co" },
+    { label: "short SLD + non-trusted TLD (ab.cc)",   value: "user@ab.cc" },
+    { label: "short SLD + non-trusted TLD (xyz.biz)", value: "user@xyz.biz" },
+    { label: "known disposable: mailinator.com",      value: "user@mailinator.com" },
+    { label: "known disposable: yopmail.com",         value: "user@yopmail.com" },
+    { label: "known disposable: trashmail.net",       value: "user@trashmail.net" },
+    { label: "known disposable: guerrillamail.com",   value: "user@guerrillamail.com" },
+  ];
+
+  for (const { label, value } of FAKE_DOMAIN_EMAILS) {
+    it(`rejects "${label}" with 400 and does not call createWithdrawalAtomic`, async () => {
+      const res = await withAuth(
+        request(app)
+          .post("/api/withdrawals")
+          .send({ amount: 3, paypalEmail: value }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeDefined();
+      expect(mockCreateWithdrawalAtomic).not.toHaveBeenCalled();
+    });
+  }
+
+  it("accepts a plausible domain with short but valid multi-label structure (ox.ac.uk)", async () => {
+    const res = await withAuth(
+      request(app)
+        .post("/api/withdrawals")
+        .send({ amount: 3, paypalEmail: "user@ox.ac.uk" }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockCreateWithdrawalAtomic).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a short SLD on a trusted TLD (aol.com) — real email provider", async () => {
+    const res = await withAuth(
+      request(app)
+        .post("/api/withdrawals")
+        .send({ amount: 3, paypalEmail: "user@aol.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockCreateWithdrawalAtomic).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a short SLD on a trusted TLD (qq.com) — real email provider", async () => {
+    const res = await withAuth(
+      request(app)
+        .post("/api/withdrawals")
+        .send({ amount: 3, paypalEmail: "user@qq.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockCreateWithdrawalAtomic).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ── Admin payout — stored email re-validation ─────────────────────────────────
 //
 // POST /api/admin/withdrawals/:id/payout must re-validate the stored paypalEmail
@@ -782,6 +853,31 @@ describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation"
 
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/invalid/i);
+      expect(mockSendPayPalPayout).not.toHaveBeenCalled();
+      expect(mockUpdateWithdrawalStatusIfStatus).not.toHaveBeenCalled();
+    });
+  }
+
+  const FAKE_STORED_EMAILS: Array<{ label: string; paypalEmail: string }> = [
+    { label: "single-char SLD (user@a.co)",              paypalEmail: "user@a.co" },
+    { label: "single-char TLD (user@domain.x)",          paypalEmail: "user@domain.x" },
+    { label: "both labels 1-char (user@x.y)",            paypalEmail: "user@x.y" },
+    { label: "short SLD + non-trusted TLD (aaa.co)",     paypalEmail: "user@aaa.co" },
+    { label: "short SLD + non-trusted TLD (ab.cc)",      paypalEmail: "user@ab.cc" },
+    { label: "known disposable: mailinator.com",         paypalEmail: "user@mailinator.com" },
+    { label: "known disposable: guerrillamail.com",      paypalEmail: "user@guerrillamail.com" },
+  ];
+
+  for (const { label, paypalEmail } of FAKE_STORED_EMAILS) {
+    it(`returns 400 and does NOT call sendPayPalPayout when stored email has fake domain "${label}"`, async () => {
+      mockGetWithdrawalById.mockResolvedValue({ ...VALID_WITHDRAWAL, paypalEmail });
+
+      const res = await request(app)
+        .post("/api/admin/withdrawals/wd-email-guard/payout")
+        .set("x-console-token", TEST_ADMIN_TOKEN);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeDefined();
       expect(mockSendPayPalPayout).not.toHaveBeenCalled();
       expect(mockUpdateWithdrawalStatusIfStatus).not.toHaveBeenCalled();
     });

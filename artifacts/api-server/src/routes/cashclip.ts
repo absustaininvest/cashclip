@@ -26,7 +26,7 @@ import { snapshotRateString } from "../lib/pointsEconomy";
 import { buildDemographicEntryUrl } from "../lib/demographicUrl";
 import venturesRouter from "./ventures";
 import { sendPayPalPayout, isPayPalConfigured, isPayPalWebhookConfigured, verifyPayPalWebhook } from "../paypal";
-import { isRelayEmail } from "../lib/emailValidation";
+import { isRelayEmail, isPlausiblePayPalDomain } from "../lib/emailValidation";
 import { logWebhookVerificationFailure } from "../lib/webhookAuth";
 import { recordLoginAttempt } from "../lib/dbRateLimit";
 import { reserveDedupeSlot, releaseDedupeSlot } from "../lib/dedupe";
@@ -1429,6 +1429,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!emailRegex.test(paypalEmail)) {
         res.status(400).json({ error: "Invalid PayPal email" }); return;
       }
+      if (!isPlausiblePayPalDomain(paypalEmail)) {
+        res.status(400).json({ error: "PayPal email domain is not accepted. Please use a real PayPal email address." }); return;
+      }
 
       const tier = resolveTierForAmount(numericAmount);
       if (!tier) {
@@ -1784,6 +1787,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paypalEmailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!withdrawal.paypalEmail || typeof withdrawal.paypalEmail !== "string" || !paypalEmailRe.test(withdrawal.paypalEmail.trim())) {
         res.status(400).json({ error: "Stored PayPal email is invalid. Update the withdrawal record before retrying." }); return;
+      }
+      if (!isPlausiblePayPalDomain(withdrawal.paypalEmail.trim())) {
+        res.status(400).json({ error: "Stored PayPal email domain is not accepted. Update the withdrawal record before retrying." }); return;
       }
 
       const stableBatchId = withdrawal.paypalBatchId ?? `cashclip_${withdrawal.id}`;
