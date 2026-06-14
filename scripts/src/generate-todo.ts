@@ -264,7 +264,7 @@ for (const section of sections) {
   const badgeW = 18;
   doc.save().circle(ML + 14, y + headerH / 2, 7).fill(section.color).restore();
   doc.save().fillColor("#FFFFFF").fontSize(8).font("Helvetica-Bold")
-    .text(section.emoji, ML + 14 - doc.widthOfString(section.emoji, { fontSize: 8 }) / 2, y + headerH / 2 - 4, { lineBreak: false })
+    .text(section.emoji, ML + 14 - doc.widthOfString(section.emoji, { fontSize: 8 } as any) / 2, y + headerH / 2 - 4, { lineBreak: false })
     .restore();
 
   doc.save().fillColor(section.color).fontSize(9).font("Helvetica-Bold")
@@ -275,8 +275,8 @@ for (const section of sections) {
 
   for (const item of section.items) {
     const BOX = 14;
-    const textH0 = doc.heightOfString(item.text, { width: CW - BOX - 12, fontSize: 11 });
-    const subH0 = item.sub ? doc.heightOfString(item.sub, { width: CW - BOX - 12, fontSize: 9 }) : 0;
+    const textH0 = doc.heightOfString(item.text, { width: CW - BOX - 12, fontSize: 11 } as any);
+    const subH0 = item.sub ? doc.heightOfString(item.sub, { width: CW - BOX - 12, fontSize: 9 } as any) : 0;
     ensure(textH0 + subH0 + 20);
     const itemY = y;
 
@@ -289,13 +289,13 @@ for (const section of sections) {
       .text(item.text, ML + BOX + 10, itemY, { width: CW - BOX - 12, lineGap: 2 })
       .restore();
 
-    const textH = doc.heightOfString(item.text, { width: CW - BOX - 12, fontSize: 11 });
+    const textH = doc.heightOfString(item.text, { width: CW - BOX - 12, fontSize: 11 } as any);
 
     if (item.sub) {
       doc.save().fillColor(GRAY).fontSize(9).font("Helvetica")
         .text(item.sub, ML + BOX + 10, itemY + textH + 2, { width: CW - BOX - 12, lineGap: 2 })
         .restore();
-      const subH = doc.heightOfString(item.sub, { width: CW - BOX - 12, fontSize: 9 });
+      const subH = doc.heightOfString(item.sub, { width: CW - BOX - 12, fontSize: 9 } as any);
       y += textH + subH + 18;
     } else {
       y += textH + 16;

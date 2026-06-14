@@ -11,7 +11,7 @@ const BLOCKED = /\.(zip|tar|gz|tgz|7z|rar|bz2|sql|bak|env)$/i;
 function scanDir(dir: string): string[] {
   const found: string[] = [];
   if (!existsSync(dir)) return found;
-  const entries = readdirSync(dir, { recursive: true } as Parameters<typeof readdirSync>[1]) as string[];
+  const entries = readdirSync(dir, { recursive: true, encoding: "utf8" });
   for (const entry of entries) {
     if (typeof entry === "string" && BLOCKED.test(entry)) {
       found.push(join(dir, entry));
