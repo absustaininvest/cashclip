@@ -552,12 +552,16 @@ export async function hydrateDisplayRate(): Promise<void> {
 // `users.balance` column, exposed at GET /api/balance). Every surface that shows
 // the wallet balance must read it from here so Home and Wallet can never diverge.
 // Uses apiRequest so the auth token (and 401 refresh) is handled consistently.
-export async function fetchServerBalance(): Promise<{ balance: number; totalEarned: number } | null> {
+export async function fetchServerBalance(): Promise<{ balance: number; totalEarned: number; lastPaypalEmail: string | null } | null> {
   try {
     const res = await apiRequest("GET", "/api/balance");
     if (!res.ok) return null;
     const data = await res.json();
-    return { balance: Number(data.balance) || 0, totalEarned: Number(data.totalEarned) || 0 };
+    return {
+      balance: Number(data.balance) || 0,
+      totalEarned: Number(data.totalEarned) || 0,
+      lastPaypalEmail: typeof data.lastPaypalEmail === "string" ? data.lastPaypalEmail : null,
+    };
   } catch {
     return null;
   }

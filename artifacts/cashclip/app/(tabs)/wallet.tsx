@@ -246,6 +246,7 @@ export default function WalletScreen() {
   const [referralBonusAmount, setReferralBonusAmount] = useState(0);
   const [referralBonusCount, setReferralBonusCount] = useState(0);
   const [serverError, setServerError] = useState(false);
+  const [savedEmailWarning, setSavedEmailWarning] = useState(false);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -423,6 +424,10 @@ export default function WalletScreen() {
     setPaypalEmailError(null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
+    const storedEmail = srv?.lastPaypalEmail ?? null;
+    setSavedEmailWarning(
+      !!storedEmail && !isPlausiblePayPalDomain(storedEmail)
+    );
     setShowWithdrawModal(true);
   }, [t]);
 
@@ -773,6 +778,14 @@ export default function WalletScreen() {
               </View>
             ) : (
             <>
+            {savedEmailWarning && (
+              <View style={styles.savedEmailWarningBanner}>
+                <Feather name="alert-triangle" size={15} color="#F59E0B" />
+                <Text style={styles.savedEmailWarningText}>
+                  Your saved PayPal email may not be accepted — please update it before submitting.
+                </Text>
+              </View>
+            )}
             <Text style={styles.modalBalance}>
               {t.wallet.available}: ${serverBalance.toFixed(2)}
             </Text>
@@ -1108,5 +1121,16 @@ const styles = StyleSheet.create({
   serverWarningText: {
     fontFamily: "Outfit_400Regular", fontSize: 12,
     color: "#F5A623", flex: 1,
+  },
+  savedEmailWarningBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderWidth: 1, borderColor: "rgba(245, 158, 11, 0.35)",
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 12,
+  },
+  savedEmailWarningText: {
+    fontFamily: "Outfit_400Regular", fontSize: 12,
+    color: "#F59E0B", flex: 1, lineHeight: 18,
   },
 });

@@ -1399,7 +1399,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { balance, totalEarned } = await storage.getUserBalance(req.userId!);
       const tiers = getAvailableTiers(balance);
-      res.json({ balance, totalEarned, tiers, allTiers: WITHDRAWAL_TIERS });
+      const userWithdrawals = await storage.getUserWithdrawals(req.userId!);
+      const lastPaypalEmail = userWithdrawals.length > 0 ? (userWithdrawals[0]!.paypalEmail ?? null) : null;
+      res.json({ balance, totalEarned, tiers, allTiers: WITHDRAWAL_TIERS, lastPaypalEmail });
     } catch (err) {
       res.status(500).json({ error: "Failed to load balance" });
     }
