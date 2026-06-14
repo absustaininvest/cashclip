@@ -918,6 +918,7 @@ export default function EarnScreen() {
     if (adLoading) return;
 
     setLastWatchedAdId(null);
+    setLastCheckinEarnedPts(null);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -1436,6 +1437,7 @@ export default function EarnScreen() {
             pendingPtsBeforeGamesRef.current = (pendingState?.pendingPoints ?? 0) + (pendingState?.claimablePoints ?? 0);
             checkGameEarnedRef.current = true;
             setLastGameEarnedPts(null);
+            setLastCheckinEarnedPts(null);
             router.push("/games");
           }}
           style={({ pressed }) => [styles.sectionCard, { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
