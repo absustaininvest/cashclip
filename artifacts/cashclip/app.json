@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
-      "buildNumber": "41",
+      "buildNumber": "42",
       "entitlements": {
         "aps-environment": "production"
       },
@@ -381,7 +381,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 42,
+      "versionCode": 43,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
       },
@@ -458,7 +458,7 @@
         "projectId": "aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
     }
