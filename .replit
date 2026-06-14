@@ -55,6 +55,10 @@ args = "absustain-seo-noindex"
 task = "workflow.run"
 args = "EAS OTA Publish"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "board-fit-tests"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -118,6 +122,17 @@ case $cmd in
   add|commit|merge|push|pull|fetch|checkout|reset|rebase|tag|stash|rm|mv) exit 0 ;;
   *) exec /usr/bin/git \"$@\" ;;
 esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'OTA update' --non-interactive"""
+
+[[workflows.workflow]]
+name = "board-fit-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter cashclip exec vitest run app/game/board-fit.test.tsx"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 3001
