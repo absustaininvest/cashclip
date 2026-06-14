@@ -274,6 +274,38 @@ describe("CashClipUsersPanel — Manual Credit write path", () => {
     expect(creditCall).toBeUndefined();
   });
 
+  it("shows an error toast and does not fire a POST when the amount exceeds ±1000", async () => {
+    const fetchMock = installCreditFetchMock({});
+    const user = userEvent.setup();
+    render(<CashClipUsersPanel token="admin-token" />);
+
+    await expandJaneRow(user);
+
+    await user.type(
+      screen.getByPlaceholderText("$ (e.g. 5 or -2.50)"),
+      "1001",
+    );
+    await user.type(
+      screen.getByPlaceholderText("Reason (required for audit log)"),
+      "Goodwill credit",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Apply Credit / Correction" }),
+    );
+
+    await screen.findByText("Amount must be between -1000 and 1000");
+
+    const creditCall = fetchMock.mock.calls.find(([input, init]) => {
+      const url = new URL(String(input), "http://localhost");
+      return (
+        url.pathname === "/api/admin/credit" &&
+        ((init as RequestInit | undefined)?.method ?? "GET").toUpperCase() ===
+          "POST"
+      );
+    });
+    expect(creditCall).toBeUndefined();
+  });
+
   it("shows an error toast and does not falsely report success when the credit request fails", async () => {
     installCreditFetchMock({
       creditResponse: {

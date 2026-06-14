@@ -3644,19 +3644,24 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
                             className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-[320px]"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={creditAmountMap[u.id] ?? ""}
-                              onChange={(e) =>
-                                setCreditAmountMap((p) => ({
-                                  ...p,
-                                  [u.id]: e.target.value,
-                                }))
-                              }
-                              placeholder="$ (e.g. 5 or -2.50)"
-                              className="w-28 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
-                            />
+                            <div className="flex flex-col gap-0.5">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="-1000"
+                                max="1000"
+                                value={creditAmountMap[u.id] ?? ""}
+                                onChange={(e) =>
+                                  setCreditAmountMap((p) => ({
+                                    ...p,
+                                    [u.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="$ (e.g. 5 or -2.50)"
+                                className="w-28 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs placeholder-white/25 focus:outline-none focus:border-emerald-300 transition-colors"
+                              />
+                              <span className="text-[10px] text-gray-400 pl-1">Max ±$1,000</span>
+                            </div>
                             <input
                               type="text"
                               value={creditNoteMap[u.id] ?? ""}
