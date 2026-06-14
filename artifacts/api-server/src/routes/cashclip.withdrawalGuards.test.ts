@@ -11,6 +11,11 @@
  * These tests pin both gates so a future refactor cannot silently remove
  * server-side enforcement and regress to client-only AsyncStorage checks
  * (which are bypassable by reinstalling the app or calling the API directly).
+ *
+ * Also covers withdrawal email delivery guarantees:
+ *   • sendWithdrawalRequestedUser fires for every payout tier ($3/$5/$7).
+ *   • sendWithdrawalRequestedAdmin fires only for the $7 max tier.
+ *   • sendPayPalAmbiguousAlert fires when the admin payout result is ambiguous.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
@@ -20,17 +25,30 @@ import jwt from "jsonwebtoken";
 
 const USER_ID = "user-withdrawal-guard-test";
 const JWT_SECRET = "test-jwt-secret-for-withdrawal-guard-tests-padded-to-64xxxxxx";
+const TEST_ADMIN_TOKEN = "test-admin-console-token-for-withdrawal-email-tests";
 
 const mockGetUser = vi.fn();
 const mockGetUserWithdrawals = vi.fn();
 const mockCreateWithdrawalAtomic = vi.fn();
+const mockGetWithdrawalById = vi.fn();
+const mockUpdateWithdrawalStatusIfStatus = vi.fn();
+const mockSendPayPalPayout = vi.fn();
 
 vi.mock("../storage", () => ({
   storage: {
     getUser: (...args: unknown[]) => mockGetUser(...args),
     getUserWithdrawals: (...args: unknown[]) => mockGetUserWithdrawals(...args),
     createWithdrawalAtomic: (...args: unknown[]) => mockCreateWithdrawalAtomic(...args),
+    getWithdrawalById: (...args: unknown[]) => mockGetWithdrawalById(...args),
+    updateWithdrawalStatusIfStatus: (...args: unknown[]) => mockUpdateWithdrawalStatusIfStatus(...args),
   },
+}));
+
+vi.mock("../paypal", () => ({
+  sendPayPalPayout: (...args: unknown[]) => mockSendPayPalPayout(...args),
+  isPayPalConfigured: () => true,
+  isPayPalWebhookConfigured: () => true,
+  verifyPayPalWebhook: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../lib/dbRateLimit", () => ({
@@ -58,14 +76,16 @@ vi.mock("./earnings", () => ({ registerEarningsRoutes: vi.fn() }));
 vi.mock("./ventures", () => ({ default: express.Router() }));
 
 vi.mock("../lib/email", () => ({
-  sendWithdrawalRequestedAdmin: vi.fn(),
-  sendWithdrawalRequestedUser: vi.fn(),
-  sendWithdrawalVelocityAdmin: vi.fn(),
-  sendWithdrawalStatusUpdate: vi.fn(),
-  sendSupportTicket: vi.fn(),
-  sendPasswordChangedNotice: vi.fn(),
-  sendAdminCreditReceipt: vi.fn(),
-  sendSupportReply: vi.fn(),
+  sendWithdrawalRequestedAdmin: vi.fn().mockResolvedValue(undefined),
+  sendWithdrawalRequestedUser: vi.fn().mockResolvedValue(undefined),
+  sendWithdrawalVelocityAdmin: vi.fn().mockResolvedValue(undefined),
+  sendWithdrawalStatusUpdate: vi.fn().mockResolvedValue(undefined),
+  sendSupportTicket: vi.fn().mockResolvedValue(undefined),
+  sendPasswordChangedNotice: vi.fn().mockResolvedValue(undefined),
+  sendAdminCreditReceipt: vi.fn().mockResolvedValue(undefined),
+  sendSupportReply: vi.fn().mockResolvedValue(undefined),
+  sendReferralBonusEarned: vi.fn().mockResolvedValue(undefined),
+  sendPayPalAmbiguousAlert: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../lib/logger", () => ({
@@ -74,6 +94,12 @@ vi.mock("../lib/logger", () => ({
 
 let app: Express;
 let userToken: string;
+
+// References to the mocked email functions — captured after vi.resetModules() + dynamic import
+// so they point to the same instances that cashclip.ts received.
+let mockSendWithdrawalRequestedUser: ReturnType<typeof vi.fn>;
+let mockSendWithdrawalRequestedAdmin: ReturnType<typeof vi.fn>;
+let mockSendPayPalAmbiguousAlert: ReturnType<typeof vi.fn>;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -108,7 +134,7 @@ const VALID_BODY = { amount: 3, paypalEmail: "user@paypal.com" };
 beforeAll(async () => {
   process.env["DATABASE_URL"] ??= "postgres://test:test@127.0.0.1:5432/test";
   process.env["JWT_ACCESS_SECRET"] = JWT_SECRET;
-  delete process.env["ADMIN_TOKEN"];
+  process.env["ADMIN_TOKEN"] = TEST_ADMIN_TOKEN;
   delete process.env["NEW_ACCOUNT_HOLD_HOURS"];
   delete process.env["MAX_WITHDRAWALS_PER_DAY"];
 
@@ -121,6 +147,13 @@ beforeAll(async () => {
   app = express();
   app.use(express.json());
   await registerRoutes(app);
+
+  // Capture the mocked email functions that cashclip.ts received after reset.
+  // These are the exact vi.fn() instances called by the route handlers.
+  const emailMod = await import("../lib/email");
+  mockSendWithdrawalRequestedUser = emailMod.sendWithdrawalRequestedUser as ReturnType<typeof vi.fn>;
+  mockSendWithdrawalRequestedAdmin = emailMod.sendWithdrawalRequestedAdmin as ReturnType<typeof vi.fn>;
+  mockSendPayPalAmbiguousAlert = emailMod.sendPayPalAmbiguousAlert as ReturnType<typeof vi.fn>;
 
   // Warm-up: send one request so any lazy module initialization (rate limiters,
   // module-level singletons, etc.) completes before the first timed test runs.
@@ -334,5 +367,251 @@ describe("POST /api/withdrawals — daily count cap (server-side enforcement)", 
 
     expect(res.status).toBe(201);
     expect(res.body.withdrawal).toBeDefined();
+  });
+});
+
+// ── Withdrawal email delivery — user confirmation ─────────────────────────────
+//
+// sendWithdrawalRequestedUser must fire for every accepted tier so the user
+// always receives a "we got your request" email regardless of the amount.
+// sendWithdrawalRequestedAdmin must fire ONLY on the $7 (max) tier to avoid
+// operator inbox noise for routine $3/$5 cashouts.
+
+describe("POST /api/withdrawals — sendWithdrawalRequestedUser called for every tier", () => {
+  function successResultFor(amountStr: string) {
+    return {
+      ok: true,
+      withdrawal: { id: "w-email", status: "pending", amount: amountStr, totalPayout: amountStr },
+      balance: 0,
+      withdrawalsTodayCount: 1,
+    };
+  }
+
+  it("sends user confirmation email for a $3 withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("3.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    // Fire-and-forget — give the microtask queue a tick to flush.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["paypalEmail"]).toBe("user@paypal.com");
+    expect(args["totalPayout"]).toBe("3.00");
+  });
+
+  it("sends user confirmation email for a $5 withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("5.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 5, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["totalPayout"]).toBe("5.00");
+  });
+
+  it("sends user confirmation email for a $7 withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("7.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 7, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedUser.mock.calls[0][0] as Record<string, string>;
+    expect(args["totalPayout"]).toBe("7.00");
+  });
+
+  it("does NOT send user email when the withdrawal is rejected (insufficient balance)", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue({
+      ok: false,
+      reason: "INSUFFICIENT_BALANCE",
+      balance: 1,
+    });
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(400);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).not.toHaveBeenCalled();
+  });
+});
+
+// ── Withdrawal email delivery — admin notification ────────────────────────────
+//
+// sendWithdrawalRequestedAdmin is intentionally gated to max-tier ($7) only.
+// Removing this gate would flood the operator inbox on every $3/$5 cashout.
+
+describe("POST /api/withdrawals — sendWithdrawalRequestedAdmin only for $7 (max tier)", () => {
+  function successResultFor(amountStr: string) {
+    return {
+      ok: true,
+      withdrawal: { id: "w-admin", status: "pending", amount: amountStr, totalPayout: amountStr },
+      balance: 0,
+      withdrawalsTodayCount: 1,
+    };
+  }
+
+  it("does NOT send admin email for a $3 withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("3.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 3, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedAdmin).not.toHaveBeenCalled();
+  });
+
+  it("does NOT send admin email for a $5 withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("5.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 5, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedAdmin).not.toHaveBeenCalled();
+  });
+
+  it("sends admin email for the $7 max-tier withdrawal", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("7.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 7, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedAdmin).toHaveBeenCalledTimes(1);
+    const args = mockSendWithdrawalRequestedAdmin.mock.calls[0][0] as Record<string, string>;
+    expect(args["amount"]).toBe("7.00");
+  });
+
+  it("sends BOTH user and admin emails for the $7 tier in the same request", async () => {
+    mockCreateWithdrawalAtomic.mockResolvedValue(successResultFor("7.00"));
+
+    const res = await withAuth(
+      request(app).post("/api/withdrawals").send({ amount: 7, paypalEmail: "user@paypal.com" }),
+    );
+
+    expect(res.status).toBe(201);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendWithdrawalRequestedUser).toHaveBeenCalledTimes(1);
+    expect(mockSendWithdrawalRequestedAdmin).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Admin payout — sendPayPalAmbiguousAlert on uncertain outcome ───────────────
+//
+// When PayPal accepts the request but the response is ambiguous (timeout,
+// network drop, duplicate batch), the route must alert the operator so they
+// can resolve the withdrawal manually rather than silently leaving it stuck.
+
+describe("POST /api/admin/withdrawals/:id/payout — sendPayPalAmbiguousAlert on ambiguous result", () => {
+  const WITHDRAWAL_ID = "w-ambiguous-test";
+  const BATCH_ID = "cashclip_w-ambiguous-test";
+
+  function adminRequest() {
+    return request(app)
+      .post(`/api/admin/withdrawals/${WITHDRAWAL_ID}/payout`)
+      .set("x-console-token", TEST_ADMIN_TOKEN);
+  }
+
+  function pendingWithdrawal(overrides: Record<string, unknown> = {}) {
+    return {
+      id: WITHDRAWAL_ID,
+      status: "pending",
+      amount: "3.00",
+      totalPayout: "3.00",
+      paypalEmail: "user@paypal.com",
+      username: "testuser",
+      paypalBatchId: null,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    mockGetWithdrawalById.mockResolvedValue(pendingWithdrawal());
+    mockUpdateWithdrawalStatusIfStatus.mockResolvedValue(pendingWithdrawal({ status: "paying" }));
+    mockSendPayPalPayout.mockResolvedValue({ success: true, batchId: BATCH_ID });
+  });
+
+  it("fires sendPayPalAmbiguousAlert and returns 503 when result.ambiguous is true", async () => {
+    mockSendPayPalPayout.mockResolvedValue({
+      success: false,
+      ambiguous: true,
+      error: "Network timeout after dispatch",
+    });
+
+    const res = await adminRequest().send();
+
+    expect(res.status).toBe(503);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendPayPalAmbiguousAlert).toHaveBeenCalledTimes(1);
+    const args = mockSendPayPalAmbiguousAlert.mock.calls[0][0] as Record<string, string>;
+    expect(args["withdrawalId"]).toBe(WITHDRAWAL_ID);
+  });
+
+  it("includes the withdrawal ID and batch ID in the ambiguous alert payload", async () => {
+    mockSendPayPalPayout.mockResolvedValue({
+      success: false,
+      ambiguous: true,
+      error: "Connection dropped",
+    });
+    // Simulate a pre-assigned batchId on the withdrawal so the stable ID path is exercised.
+    mockGetWithdrawalById.mockResolvedValue(pendingWithdrawal({ paypalBatchId: BATCH_ID }));
+    mockUpdateWithdrawalStatusIfStatus.mockResolvedValue(
+      pendingWithdrawal({ status: "paying", paypalBatchId: BATCH_ID }),
+    );
+
+    await adminRequest().send();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockSendPayPalAmbiguousAlert).toHaveBeenCalledTimes(1);
+    const args = mockSendPayPalAmbiguousAlert.mock.calls[0][0] as Record<string, string>;
+    expect(args["withdrawalId"]).toBe(WITHDRAWAL_ID);
+    expect(args["paypalBatchId"]).toBe(BATCH_ID);
+  });
+
+  it("does NOT fire sendPayPalAmbiguousAlert on a clean success", async () => {
+    mockSendPayPalPayout.mockResolvedValue({ success: true, batchId: BATCH_ID });
+    // After success, getWithdrawalById is called again to return the fresh record.
+    mockGetWithdrawalById
+      .mockResolvedValueOnce(pendingWithdrawal())
+      .mockResolvedValueOnce(pendingWithdrawal({ status: "paying" }));
+
+    const res = await adminRequest().send();
+
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendPayPalAmbiguousAlert).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire sendPayPalAmbiguousAlert on a clean failure (non-ambiguous)", async () => {
+    mockSendPayPalPayout.mockResolvedValue({
+      success: false,
+      ambiguous: false,
+      error: "Recipient not found",
+    });
+
+    const res = await adminRequest().send();
+
+    expect(res.status).toBe(500);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockSendPayPalAmbiguousAlert).not.toHaveBeenCalled();
   });
 });
