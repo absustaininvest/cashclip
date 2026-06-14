@@ -2434,23 +2434,6 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
     fetchPayouts(payoutRange);
   }, [payoutRange, fetchPayouts]);
 
-  const fetchAdjustmentActors = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/adjustments/actors", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const actors: Array<{ actorUserId: string; actorUsername: string | null }> = data.actors ?? [];
-      const names = actors
-        .map((a) => a.actorUsername ?? a.actorUserId)
-        .filter((n): n is string => !!n)
-        .sort((a, b) => a.localeCompare(b));
-      setAuditActors(names);
-    } catch {
-    }
-  }, [token]);
-
   const fetchAdjustments = useCallback(async () => {
     setAuditLoading(true);
     try {
@@ -2461,18 +2444,24 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      const rows = data.adjustments ?? [];
+      const rows: { id: string; userId: string; username: string; email: string | null; amount: string; description: string | null; actorUserId: string | null; actorUsername: string | null; createdAt: string }[] = data.adjustments ?? [];
       setAuditRows(rows);
+      if (!auditActorFilter) {
+        const names = Array.from(
+          new Set(
+            rows
+              .map((r) => r.actorUsername ?? r.actorUserId ?? "")
+              .filter(Boolean),
+          ),
+        ).sort((a, b) => a.localeCompare(b));
+        setAuditActors(names);
+      }
     } catch {
       setAuditRows([]);
     } finally {
       setAuditLoading(false);
     }
   }, [token, auditActorFilter]);
-
-  useEffect(() => {
-    fetchAdjustmentActors();
-  }, [fetchAdjustmentActors]);
 
   useEffect(() => {
     fetchAdjustments();
