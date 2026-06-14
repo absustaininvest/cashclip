@@ -223,7 +223,7 @@ function findDayRungs(
   // HOST "Text" instances whose content is a bare "{reward} pts" label.
   const rewardTexts = root.findAll(
     (n: any) =>
-      n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
+      (n.type as string) === "Text" && /^\d+\s*pts$/.test(collectText(n)),
   );
 
   const seen = new Set<TestRenderer.ReactTestInstance>();
@@ -239,11 +239,11 @@ function findDayRungs(
     // WheelSegment Views contain only a dot View and the label Text — neither.
     const hasCheckmark =
       rung.findAll(
-        (n: any) => n.type === "Icon" && n.props?.name === "checkmark",
+        (n: any) => (n.type as string) === "Icon" && n.props?.name === "checkmark",
       ).length > 0;
     const hasDayNumber =
       rung.findAll(
-        (n: any) => n.type === "Text" && /^\d+$/.test(collectText(n)),
+        (n: any) => (n.type as string) === "Text" && /^\d+$/.test(collectText(n)),
       ).length > 0;
 
     if (hasCheckmark || hasDayNumber) {
@@ -259,7 +259,7 @@ function findDayRungs(
 function rungHasCheckmark(rung: TestRenderer.ReactTestInstance): boolean {
   return (
     rung.findAll(
-      (n: any) => n.type === "Icon" && n.props.name === "checkmark",
+      (n: any) => (n.type as string) === "Icon" && n.props.name === "checkmark",
     ).length > 0
   );
 }
@@ -293,7 +293,7 @@ function milestoneDayNumbers(root: TestRenderer.ReactTestInstance): number[] {
     .map((rung, i) => {
       const hasStar =
         rung.findAll(
-          (n: any) => n.type === "Icon" && n.props.name === "star",
+          (n: any) => (n.type as string) === "Icon" && n.props.name === "star",
         ).length > 0;
       return hasStar ? i + 1 : null;
     })
@@ -403,7 +403,7 @@ describe("Earn screen check-in streak ladder – reward amounts", () => {
     rungs.forEach((rung, i) => {
       const rewardText = rung.findAll(
         (n: any) =>
-          n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
+          (n.type as string) === "Text" && /^\d+\s*pts$/.test(collectText(n)),
       );
       expect(rewardText).toHaveLength(1);
       expect(collectText(rewardText[0])).toBe(`${ladder[i]} pts`);
@@ -429,7 +429,7 @@ describe("Earn screen check-in streak ladder – reward amounts", () => {
     rungs.forEach((rung, i) => {
       const rewardText = rung.findAll(
         (n: any) =>
-          n.type === "Text" && /^\d+\s*pts$/.test(collectText(n)),
+          (n.type as string) === "Text" && /^\d+\s*pts$/.test(collectText(n)),
       );
       expect(collectText(rewardText[0])).toBe(`${ladder[i]} pts`);
     });

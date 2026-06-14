@@ -123,7 +123,7 @@ function allText(node: TestRenderer.ReactTestInstance): string[] {
 }
 
 function findChipley(root: TestRenderer.ReactTestInstance, pose: string) {
-  return root.findAll((n: any) => n.type === "Chipley" && n.props.pose === pose);
+  return root.findAll((n: any) => (n.type as string) === "Chipley" && n.props.pose === pose);
 }
 
 function findPressableByLabel(root: TestRenderer.ReactTestInstance, label: string) {

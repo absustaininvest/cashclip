@@ -699,7 +699,7 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
     expect(disclosuresVisible(tr.root)).toBe(true);
 
     const declineTextNode = tr.root.findAll(
-      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
     )[0];
     expect(declineTextNode, '"Decline" button not found').toBeTruthy();
     const declineBtnHost = declineTextNode.parent!.parent!;
@@ -722,7 +722,7 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
     expect(disclosuresVisible(tr.root)).toBe(true);
 
     const declineTextNode = tr.root.findAll(
-      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
     )[0];
     expect(declineTextNode, '"Decline" button not found').toBeTruthy();
     const declineBtnHost = declineTextNode.parent!.parent!;
@@ -777,7 +777,7 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
 
     // ── 2. Find the "Decline" button and press it ────────────────────────────
     const declineTextNode = tr.root.findAll(
-      (n) => n.type === "Text" && allText(n).join("") === "Decline",
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
     )[0];
     expect(
       declineTextNode,
