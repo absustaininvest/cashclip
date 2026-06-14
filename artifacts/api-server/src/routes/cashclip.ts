@@ -14,6 +14,7 @@ import { verifyIntegrationKey } from "../lib/integrationVerify";
 import { getAdMobConfigState, syncAdMobSnapshots } from "../lib/admobReporting";
 import { secretsPassphraseMiddleware } from "../lib/secretsPassphrase";
 import { sponsoredBeginRateLimiter } from "../lib/sponsoredVisitRateLimit";
+import { adFillRateLimiter } from "../lib/adFillRateLimit";
 import {
   setVerificationState,
   clearVerificationState,
@@ -851,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * changes (onAdAvailable / onAdUnavailable).  Requires a valid user JWT.
    * Body: { rewardedFillAvailable: boolean }
    */
-  app.post("/api/earn/ad-fill", authMiddleware, (req: AuthRequest, res) => {
+  app.post("/api/earn/ad-fill", authMiddleware, adFillRateLimiter, (req: AuthRequest, res) => {
     const { rewardedFillAvailable } = req.body as { rewardedFillAvailable?: unknown };
     if (typeof rewardedFillAvailable !== "boolean") {
       res.status(400).json({ error: "rewardedFillAvailable must be a boolean" });

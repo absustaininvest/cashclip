@@ -16,7 +16,7 @@
  * reaching into module internals.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi, type MockInstance } from "vitest";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
@@ -70,8 +70,10 @@ vi.mock("../lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+const mockRecordLoginAttempt = vi.fn().mockResolvedValue({ count: 1, allowed: true });
+
 vi.mock("../lib/dbRateLimit", () => ({
-  recordLoginAttempt: vi.fn().mockResolvedValue({ count: 1, allowed: true }),
+  recordLoginAttempt: (...args: unknown[]) => mockRecordLoginAttempt(...args),
   checkLoginAttempts: vi.fn().mockResolvedValue({ count: 0, allowed: true }),
   clearLoginAttempts: vi.fn().mockResolvedValue(undefined),
   pruneExpiredLoginAttempts: vi.fn().mockResolvedValue(undefined),
@@ -184,6 +186,17 @@ describe("POST /api/earn/ad-fill — fill state reporting", () => {
       request(app).post("/api/earn/ad-fill").send({}),
     );
     expect(missingVal.status).toBe(400);
+  });
+
+  it("returns 429 when the per-user rate limit is exceeded", async () => {
+    mockRecordLoginAttempt.mockResolvedValueOnce({ count: 11, allowed: false });
+
+    const res = await asUser(
+      request(app).post("/api/earn/ad-fill").send({ rewardedFillAvailable: true }),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.body).toMatchObject({ error: expect.stringContaining("fill reports") });
   });
 
   it("stores only the latest value when two POSTs arrive in sequence", async () => {
