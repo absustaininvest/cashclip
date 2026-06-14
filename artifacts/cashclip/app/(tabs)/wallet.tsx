@@ -420,11 +420,25 @@ export default function WalletScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTiers(getWithdrawalTiers(effective));
     setSelectedTier(null);
-    setPaypalEmail("");
-    setPaypalEmailError(null);
+    const storedEmail = srv?.lastPaypalEmail ?? null;
+    setPaypalEmail(storedEmail ?? "");
+    // Run inline domain validation immediately on the pre-filled value so a
+    // suspicious stored email shows the field-level error alongside the banner.
+    const prefilledTrimmed = storedEmail?.trim() ?? "";
+    const prefilledEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (
+      prefilledTrimmed &&
+      prefilledEmailRegex.test(prefilledTrimmed) &&
+      !isPlausiblePayPalDomain(prefilledTrimmed)
+    ) {
+      setPaypalEmailError(
+        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+      );
+    } else {
+      setPaypalEmailError(null);
+    }
     setWithdrawError(null);
     setWithdrawErrorCode(null);
-    const storedEmail = srv?.lastPaypalEmail ?? null;
     setSavedEmailWarning(
       !!storedEmail && !isPlausiblePayPalDomain(storedEmail)
     );
