@@ -1,0 +1,47 @@
+CashClip — Session Recap & Status Script
+Last updated: June 06, 2026
+This is the running record Jorge asked for before purging the screenshot backlog: key checkpoints, what has actually gone out over OTA, and tasks completed with checkmarks.
+
+🔖 Key checkpoints / known-good restore points
+* "Original (29)" restore point — saved at snapshots/original-29/ (with RESTORE.md). Pins the stable build-29 live bundle so we can always roll back.
+* Live good OTA group — source 26fa0d4c-… (commit 9c71ec40), republished live as 991eb089-… on branch production, runtime 1.0.0. This is what real users on App Store build 29 are running today.
+* Replit auto-checkpoints continue to snapshot the codebase + database on every change.
+
+📡 What has actually shipped over OTA to LIVE build 29 (✅ live now)
+These rode OTA onto the live App Store build 29 (channel production, runtime 1.0.0):
+* ✅ Chipley mascot celebration — Home greeting wave, reward celebrate, empty states (wallet / referral / surveys / offerwalls)
+* ✅ Spin fix — celebrate ONLY on confirmed wins (convert / withdraw / claim); removed the spin celebration
+* ✅ Home taps — balance chip → Wallet, "Today's Earn" strip → Earn
+* ✅ Consent fix — consent prompt gates correctly (no more re-asking)
+
+🧪 Staged & tested, but NOT yet live (awaiting your go)
+* ⏸️ Home-balance fix OTA — makes the Home balance show the real server balance (same as Wallet) instead of the local optimistic number.
+    * Test-published to Project A (TestFlight) → group 2f8f9f39, build exit code 0, clean bundle on both platforms.
+    * Isolation verified (money safety): points / storage / earn-client / plugins are byte-identical to the live base; no voice; no test files; only the approved changes.
+    * 🔒 HELD at the gate (T005): will NOT publish to LIVE build 29 until you explicitly say "ship to build 29."
+
+✅ Task checklist (Home-balance OTA plan)
+* ✅ T001 — Scratch build from live base + reconstruct celebration / spin / home-taps
+* ✅ T002 — Add Home-balance fix (Home shows server balance; chip still taps to Wallet)
+* ✅ T003 — Verify isolation (CRITICAL money-safety check — passed)
+* ✅ T004 — Test publish to Project A (TestFlight) — clean
+* 🔒 T005 — GATE: publish to LIVE build 29 — HELD, needs your explicit OK
+
+🧰 Other work covered this session
+* ✅ Verified AdMob ↔ Unity ad placement casing is all-green (the feared typo did NOT happen)
+* ✅ Confirmed Unity ad revenue is paid through AdMob (Unity is a bidding source) — the Unity "Add payout profile" prompt is unrelated
+* ✅ Added the Insticator authorized-seller line to app-ads.txt (in serve.js)
+    * ⏳ Pending: tap Republish on the production deployment (2 artifacts: web + phone) to make it live. Checked live — it is not live yet.
+* ✅ Confirmed deploy gates pass (check-public-archives, typecheck:deploy)
+* ✅ Investigated production deployment logs:
+    * App is up and healthy (cash-clip.app, api.cash-clip.app all return 200)
+    * "healthcheck failed" / "signal: terminated" = normal autoscale sleep/wake — not a crash
+    * pg "SSL WARNING" = harmless library deprecation notice
+    * One ghost account (deleted user with leftover tokens) makes a background job log a safe, skipped error each cycle — worth a one-time cleanup (offered, awaiting your OK)
+* ✅ Purged 9 sensitive dashboard screenshots (one exposed the Unity API key, one had your IP / security log)
+* ✅ Purged the full screenshot backlog from the project (originals remain in your iPad Photos; the Unity key stays safe in Replit Secrets; processed logo/icon exports kept)
+
+📋 Open items awaiting your decision
+1. Republish the production deployment to make the Insticator app-ads.txt line live.
+2. Explicit OK to ship the Home-balance fix OTA to LIVE build 29 (unlocks T005).
+3. Ghost-account cleanup — say the word and I'll run a safe read-only check first.
