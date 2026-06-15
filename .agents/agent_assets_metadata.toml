@@ -299,3 +299,9 @@ id = "l7MCjzBDdwG4hmL4nYQa-"
 uri = "file://artifacts/absustain/public/logos/partner-googleplay.png"
 type = "image"
 title = "Google Play — background removed"
+
+[[outputs]]
+id = "F4Nkd4bR_Vw_JLM2GOHEv"
+uri = "file://exports/cashclip-build40-runtime1.0.0-unsigned.zip"
+type = "unspecified"
+title = "CashClip build40 — runtimeVersion 1.0.0 (re-sign on Mac before submitting)"
