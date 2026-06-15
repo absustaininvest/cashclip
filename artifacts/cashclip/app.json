@@ -428,7 +428,13 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "extraPods": [
+              {
+                "name": "EXUpdatesInterface",
+                "path": "../../../node_modules/.pnpm/expo-updates-interface@2.0.0_expo@54.0.34/node_modules/expo-updates-interface/ios"
+              }
+            ]
           },
           "android": {
             "minSdkVersion": 25,

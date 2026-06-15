@@ -102,6 +102,9 @@
     "expo-updates": "~29.0.17",
     "ironsource-mediation": "^3.2.0",
     "react-native-google-mobile-ads": "^14.11.0",
-    "vexo-analytics": "^1.5.7"
+    "vexo-analytics": "^1.5.7",
+    "expo": "~54.0.34",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   }
 }
