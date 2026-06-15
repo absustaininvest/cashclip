@@ -1,0 +1,95 @@
+Get started with EAS Workflows
+
+
+Copy page
+
+Learn how to use EAS Workflows to automate your React Native CI/CD development and release processes.
+For the complete documentation index, see llms.txt. Use this file to discover all available pages.
+This page walks you through the process of creating your first EAS Workflows for building and submitting your app to the app stores.
+
+Get started
+
+
+
+Prerequisites
+4 requirements
+1.
+
+Sign up for an Expo account
+You'll need to sign up for an Expo account.
+2.
+
+Create a project
+You'll need to create a project with the following command:
+
+
+Terminal
+npm
+yarn
+pnpm
+bun
+
+Copy
+npx create-expo-app@latest --template default@sdk-56
+3.
+
+Sync the project with EAS
+You'll need to sync the project with EAS with the following command. This will create an EAS project and link it to your local project:
+
+
+Terminal
+
+Copy
+npx eas-cli@latest init
+4.
+
+Add eas.json
+You'll need to add an eas.json file to the root of your project if it doesn't already exist:
+
+
+Terminal
+
+Copy
+touch eas.json && echo "{}" > eas.json
+1
+Create a directory named .eas/workflows at the root of your project with a YAML file inside of it. For example: .eas/workflows/create-production-builds.yml.
+
+
+my-app
+ 
+.eas
+  
+workflows
+   
+create-production-builds.yml
+ 
+eas.json
+2
+Add the following YAML to the create-production-builds.yml file:
+
+
+.eas/workflows/create-production-builds.yml
+
+Copy
+
+name: Create Production Builds
+
+jobs:
+  build_android:
+    type: build # This job type creates a production build for Android
+    params:
+      platform: android
+  build_ios:
+    type: build # This job type creates a production build for iOS
+    params:
+      platform: ios
+The workflow above will create a production build for Android and iOS in parallel. To run this workflow successfully, you'll need to set up and build your project using EAS CLI first.
+3
+Finally, run the workflow with the following command:
+
+
+Terminal
+
+Copy
+npx eas-cli@latest workflow:run create-production-builds.yml
+Once you do, you can see your workflow running on your project's workflows page.
