@@ -94,6 +94,7 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 - During integration/ad-network setup, give ONE step at a time and wait for confirmation — never a multi-step list at once. This is the highest-stakes part of the project (ad-revenue wiring); rushing it means money never flows.
 - When entering credentials/secrets/tokens, capture and SAVE each one individually as its step completes — never open several secret boxes at once. Batching all boxes together caused values to get pasted into the wrong fields. One value → save → confirm → next.
 - Deliver app changes as small, frequent, self-contained over-the-air (OTA) update groups that actually land on the live in-distribution build (29) — never big bundled update packs. Native-level changes can't ride OTA and need a new App Store build.
+- **This is a live product handling real money.** Always query the production database first when looking up users, withdrawals, balances, or any operational data. Never present dev database results as if they are relevant to what the owner sees in the admin panel or the app. Dev data must be clearly labeled as dev-only and is almost never the answer the owner needs.
 
 ## Footnote (agent memory — context only)
 
