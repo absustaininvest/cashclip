@@ -48,6 +48,31 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     setStep("done");
   }
 
+  // Called when a returning user's ATT is found to be denied/restricted on cold
+  // start (they revoked tracking via iOS Settings after previously consenting).
+  // Renders children normally but fires onConsentRevoked so callers never
+  // register the fill-change callback for a non-consented session.
+  function revoke() {
+    onConsentRevoked?.();
+    setStep("done");
+  }
+
+  // Checks the current ATT status and resolves the gate for a returning user
+  // (DONE_KEY was present in storage). If ATT was revoked since the user last
+  // opened the app, call revoke(); otherwise call finish() as normal.
+  async function resolveReturningUser() {
+    try {
+      const status = await getATTStatus();
+      if (status === "denied" || status === "restricted") {
+        revoke();
+        return;
+      }
+    } catch {
+      // getATTStatus failure → treat as consented (fail-open)
+    }
+    finish();
+  }
+
   // Detect iOS ATT revocation via iOS Settings → Privacy → Tracking.
   // When the user returns the app to the foreground after revoking tracking,
   // AppState fires "active". If ATT is now denied/restricted and we had
@@ -85,15 +110,18 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     (async () => {
       // ── Fast-path 1: key in SecureStore (Keychain) — survives reinstalls ───
       // Written by any build that ships this version of the gate.
+      // Re-check ATT status: the user may have revoked tracking via iOS Settings
+      // since they last consented. If so, fire onConsentRevoked instead of
+      // onConsentDone so the fill callback is never registered.
       const doneSecure = await secureGet(DONE_KEY);
-      if (doneSecure) { finish(); return; }
+      if (doneSecure) { await resolveReturningUser(); return; }
 
       // ── Fast-path 2: key in AsyncStorage — written by old builds (≤v39) ───
       // Migrate it to SecureStore so future reinstalls also pass through.
       const doneLegacyStorage = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
       if (doneLegacyStorage) {
         await secureSet(DONE_KEY, "1").catch(() => {});
-        finish();
+        await resolveReturningUser();
         return;
       }
 
@@ -102,7 +130,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
       const prev2 = await AsyncStorage.getItem("tracking_consent_dismissed_v1").catch(() => null);
       if (prev1 || prev2) {
         await secureSet(DONE_KEY, "1").catch(() => {});
-        finish();
+        await resolveReturningUser();
         return;
       }
 

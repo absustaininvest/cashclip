@@ -27,6 +27,10 @@ const mockApiRequestSafe = vi.fn<(...args: any[]) => Promise<any>>();
 let capturedFillCb: ((fillAvailable: boolean) => void) | null = null;
 let capturedRevokeCb: (() => void) | null = null;
 
+// When true, the TrackingConsentGate mock fires onConsentRevoked on mount
+// instead of onConsentDone — simulates a cold-start-after-revocation scenario.
+let mockFireRevoke = false;
+
 // ── @/lib/secure-store ────────────────────────────────────────────────────────
 vi.mock("@/lib/secure-store", () => ({
   secureGet: (key: string) => mockSecureGet(key),
@@ -58,11 +62,17 @@ vi.mock("@/lib/admob", () => ({
 }));
 
 // ── TrackingConsentGate — fires onConsentDone immediately; captures revoke cb ─
+// When mockFireRevoke is true, fires onConsentRevoked instead (cold-start after
+// the user revoked tracking in iOS Settings).
 vi.mock("@/components/TrackingConsentGate", () => ({
   TrackingConsentGate: ({ onConsentDone, onConsentRevoked, children }: any) => {
     capturedRevokeCb = onConsentRevoked ?? null;
     React.useEffect(() => {
-      onConsentDone?.();
+      if (mockFireRevoke) {
+        onConsentRevoked?.();
+      } else {
+        onConsentDone?.();
+      }
     }, []);
     return React.createElement(React.Fragment, null, children);
   },
@@ -236,6 +246,7 @@ describe("fill callback pre-auth guard (_layout.tsx)", () => {
   beforeEach(() => {
     capturedFillCb = null;
     capturedRevokeCb = null;
+    mockFireRevoke = false;
     mockSecureGet.mockReset();
     mockApiRequestSafe.mockReset();
     mockApiRequestSafe.mockResolvedValue({ ok: true });
@@ -245,6 +256,7 @@ describe("fill callback pre-auth guard (_layout.tsx)", () => {
   afterEach(() => {
     capturedFillCb = null;
     capturedRevokeCb = null;
+    mockFireRevoke = false;
   });
 
   it("does NOT call apiRequestSafe when secureGet returns null (no token)", async () => {
@@ -303,6 +315,31 @@ describe("fill callback pre-auth guard (_layout.tsx)", () => {
       "/api/earn/ad-fill",
       { rewardedFillAvailable: false },
     );
+  });
+
+  it("does NOT register the fill callback when gate fires onConsentRevoked on mount (cold start after revocation)", async () => {
+    // Simulate a cold start where ATT was revoked via iOS Settings: the gate
+    // detects the denial and fires onConsentRevoked instead of onConsentDone.
+    mockFireRevoke = true;
+    mockSecureGet.mockResolvedValue(null);
+
+    capturedFillCb = null;
+    await act(async () => {
+      TestRenderer.create(React.createElement(RootLayout));
+    });
+    await flush();
+
+    // No real fill callback must have been registered.
+    expect(capturedFillCb).toBeNull();
+    // setFillChangeCallback must never have been called with an actual function
+    // (only null is acceptable — the revoke handler tears down any prior cb).
+    const realCbCalls = vi.mocked(setFillChangeCallback).mock.calls.filter(
+      ([cb]) => typeof cb === "function",
+    );
+    expect(realCbCalls).toHaveLength(0);
+
+    // No fill POST should have been sent
+    expect(mockApiRequestSafe).not.toHaveBeenCalled();
   });
 
   it("calls setFillChangeCallback(null) when consent is revoked after onConsentDone", async () => {
