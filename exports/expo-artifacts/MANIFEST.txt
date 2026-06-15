@@ -87,3 +87,4 @@ LAYOUT  build-29-safe OTA layout override  -> V39-prep/_layout.build29.tsx
 CREDS   Apple iOS Distribution Certificate  -> V39-prep/credentials/DistCert_CGHKZMC5AY.zip  (LOCAL-ONLY, SENSITIVE)
 CREDS   Apple/Expo signing reference notes  -> V39-prep/credentials/CREDENTIALS-NOTES.txt    (LOCAL-ONLY)
 APPLE   ASC API key in Replit secrets: APPLE_ASC_PRIVATE_KEY / APPLE_ASC_ISSUER_ID / APPLE_ASC_KEY_ID (+ in Expo)
+i got 
