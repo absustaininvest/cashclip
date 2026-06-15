@@ -428,8 +428,7 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1",
-            "extraPods": []
+            "deploymentTarget": "15.1"
           },
           "android": {
             "minSdkVersion": 25,
@@ -439,8 +438,7 @@
             "kotlinVersion": "2.1.20",
             "extraMavenRepos": [
               "https://android-sdk.is.com/",
-              "https://artifact.bytedance.com/repository/pangle",
-              "https://cboost.jfrog.io/artifactory/chartboost-ads/"
+              "https://artifact.bytedance.com/repository/pangle"
             ]
           }
         }
