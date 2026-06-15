@@ -447,7 +447,8 @@
           }
         }
       ],
-      "./plugins/withAndroidManifestFix"
+      "./plugins/withAndroidManifestFix",
+      "./plugins/withChartboostPodSource"
     ],
     "experiments": {
       "typedRoutes": true,
