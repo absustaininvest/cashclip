@@ -8,7 +8,7 @@ export type IssueType =
   | "login"
   | "general";
 
-export type Lang = "en" | "es";
+export type Lang = "en" | "es" | "fr";
 
 export interface UserContext {
   username: string;
@@ -37,27 +37,36 @@ const ES_KEYWORDS = [
   "ganar","ganancias","aplicación","no puedo","tengo","quiero",
 ];
 
+const FR_KEYWORDS = [
+  "bonjour","bonsoir","merci","salut","paiement","retrait","solde","jeu","jouant",
+  "sondage","je n'ai pas","pas reçu","reçu","problème","compte","argent","gagné",
+  "gains","application","je ne peux pas","j'ai","je veux","cordialement","bien à vous",
+  "svp","s'il vous plaît","n'arrive pas","monsieur","madame",
+];
+
 export function detectLang(text: string): Lang {
   const lower = text.toLowerCase();
-  const hits = ES_KEYWORDS.filter((k) => lower.includes(k)).length;
-  return hits >= 2 ? "es" : "en";
+  const frHits = FR_KEYWORDS.filter((k) => lower.includes(k)).length;
+  if (frHits >= 2) return "fr";
+  const esHits = ES_KEYWORDS.filter((k) => lower.includes(k)).length;
+  return esHits >= 2 ? "es" : "en";
 }
 
 export function detectIssue(text: string): IssueType {
   const lower = text.toLowerCase();
-  if (/game|gaming|playing|jugando|juego|played|play game/.test(lower))
+  if (/game|gaming|playing|jugando|juego|played|play game|jeu|jouant|jouer/.test(lower))
     return "game_credits";
-  if (/survey|encuesta|offer|oferta|task|tarea/.test(lower))
+  if (/survey|encuesta|offer|oferta|task|tarea|sondage|questionnaire/.test(lower))
     return "survey_credits";
   if (
-    /withdraw|withdrawal|paypal|retiro|cobrar|cobro|pago|cash.?out|payment|money|dinero/.test(
+    /withdraw|withdrawal|paypal|retiro|cobrar|cobro|pago|cash.?out|payment|money|dinero|paiement|retrait|virement|argent|demande de/.test(
       lower,
     )
   )
     return "withdrawal";
-  if (/balance|points|puntos|saldo|earning|ganancia|wallet|cartera/.test(lower))
+  if (/balance|points|puntos|saldo|earning|ganancia|wallet|cartera|solde|gains|gagné/.test(lower))
     return "balance";
-  if (/login|password|contraseña|forgot|sign.?in|cant.*log|access|acceso/.test(lower))
+  if (/login|password|contraseña|forgot|sign.?in|cant.*log|access|acceso|mot de passe|connexion|connecter/.test(lower))
     return "login";
   return "general";
 }
@@ -80,6 +89,105 @@ function fmtDaysAgoEs(n: number): string {
   if (n === 0) return "hoy";
   if (n === 1) return "ayer";
   return `hace ${n} días`;
+}
+
+function fmtDaysAgoFr(n: number): string {
+  if (n === 0) return "aujourd'hui";
+  if (n === 1) return "hier";
+  return `il y a ${n} jours`;
+}
+
+function buildDraftFr(issue: IssueType, ctx: UserContext | null): string {
+  const greeting = ctx ? `Bonjour ${ctx.username},` : "Bonjour,";
+
+  const accountLine = ctx
+    ? `Nous avons trouvé votre compte (solde : ${ctx.balanceUsd}, total gagné : ${ctx.totalEarnedUsd}, membre depuis ${ctx.accountAgeDays} jour${ctx.accountAgeDays === 1 ? "" : "s"}).`
+    : "";
+
+  let body = "";
+
+  switch (issue) {
+    case "game_credits":
+      body = [
+        `Merci de contacter le support CashClip.`,
+        accountLine,
+        `Les points obtenus dans les jeux sont crédités côté serveur une fois la session entièrement vérifiée par notre système — cela prend généralement quelques minutes, mais peut parfois nécessiter jusqu'à 24 heures selon le jeu et votre connexion à ce moment-là.`,
+        ctx?.recentEarningDaysAgo != null
+          ? `Nous constatons que votre dernière activité de gains remonte à ${fmtDaysAgoFr(ctx.recentEarningDaysAgo)}. Si vous avez terminé une session de jeu et que les points n'apparaissent toujours pas après 24 heures, veuillez nous répondre en indiquant le nom du jeu et l'heure approximative à laquelle vous avez joué afin que nous puissions vérifier.`
+          : `Si vous avez terminé une session de jeu et que les points n'apparaissent pas après 24 heures, veuillez nous répondre avec le nom du jeu et l'heure approximative pour que nous puissions enquêter.`,
+        `Nous vous remercions de votre patience et souhaitons nous assurer que chaque session complétée soit correctement récompensée.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      break;
+
+    case "survey_credits":
+      body = [
+        `Merci de contacter CashClip.`,
+        accountLine,
+        `Les récompenses des sondages et offres sont émises par des prestataires tiers (CPX Research, BitLabs, etc.) et vérifiées par notre serveur avant d'être ajoutées à votre solde. Il arrive qu'une session soit soumise à un examen qualité du côté du prestataire, ce qui peut retarder ou bloquer le crédit.`,
+        `Veuillez nous répondre en indiquant le nom du sondage ou de l'offre ainsi que la date et l'heure approximatives de complétion, et nous consulterons les enregistrements du prestataire de notre côté.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      break;
+
+    case "withdrawal":
+      body = [
+        `Merci de nous avoir contactés.`,
+        accountLine,
+        `Les retraits vers PayPal sont traités manuellement et prennent généralement 1 à 3 jours ouvrés après approbation. Les nouveaux comptes bénéficient également d'une courte période de rétention avant que le premier retrait ne soit disponible.`,
+        ctx && ctx.withdrawalCount > 0
+          ? `Nos enregistrements indiquent ${ctx.withdrawalCount} demande${ctx.withdrawalCount === 1 ? "" : "s"} de retrait sur votre compte. Si vous pensez qu'un retrait est bloqué ou manquant, veuillez nous répondre avec le montant et la date approximative de la demande et nous vérifierons son statut.`
+          : `Si vous rencontrez des difficultés pour effectuer un retrait, veuillez nous répondre avec les détails et nous vous aiderons directement.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      break;
+
+    case "balance":
+      body = [
+        `Merci de nous avoir contactés.`,
+        accountLine,
+        ctx
+          ? `Votre solde actuel est de ${ctx.balanceUsd} pour un total cumulé de ${ctx.totalEarnedUsd} gagné. Les points sont convertis en espèces une fois la session de gains entièrement vérifiée, ce qui prend généralement quelques minutes.`
+          : `Votre solde reflète l'ensemble des gains vérifiés et convertis. Les points des sessions actives apparaissent une fois que la session est confirmée par notre système, ce qui prend généralement quelques minutes.`,
+        `Si vous pensez qu'un gain spécifique est manquant, veuillez nous répondre en indiquant le type d'activité et l'heure approximative, et nous enquêterons.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      break;
+
+    case "login":
+      body = [
+        `Merci de nous avoir contactés.`,
+        accountLine,
+        `Si vous ne pouvez pas vous connecter, veuillez utiliser l'option « Mot de passe oublié » sur l'écran de connexion — entrez votre nom d'utilisateur et nous vous enverrons un code à usage unique à votre adresse e-mail enregistrée pour réinitialiser votre mot de passe.`,
+        `Si vous n'avez plus accès à votre adresse e-mail enregistrée, veuillez nous répondre avec votre nom d'utilisateur et nous vous assisterons manuellement.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      break;
+
+    default:
+      body = [
+        `Merci de contacter le support CashClip.`,
+        accountLine,
+        `Nous avons bien reçu votre message et allons l'examiner. Pourriez-vous nous donner un peu plus de détails sur le problème que vous rencontrez ? Cela nous permettra de le résoudre le plus rapidement possible.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+  }
+
+  return [
+    greeting,
+    "",
+    body,
+    "",
+    "Cordialement,",
+    "Équipe Support CashClip",
+    "support@cash-clip.app",
+  ].join("\n");
 }
 
 function buildDraftEn(issue: IssueType, ctx: UserContext | null): string {
@@ -312,9 +420,11 @@ export async function generateInboxDraft(
   }
 
   const draft =
-    lang === "es"
-      ? buildDraftEs(issue, userCtx)
-      : buildDraftEn(issue, userCtx);
+    lang === "fr"
+      ? buildDraftFr(issue, userCtx)
+      : lang === "es"
+        ? buildDraftEs(issue, userCtx)
+        : buildDraftEn(issue, userCtx);
 
   return {
     draft,
