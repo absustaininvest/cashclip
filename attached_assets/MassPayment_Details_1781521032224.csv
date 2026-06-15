@@ -1,0 +1,21 @@
+﻿Transaction Type: Mass Payment
+"Date and time of submission: June 15, 2026 at 5:56:28 AM EDT"
+"Date and time of processing: June 15, 2026 at 5:57:37 AM EDT"
+"Date and time of completed: June 15, 2026 at 5:57:37 AM EDT"
+
+Subject: You have a CashClip payout!
+Note: You received a payout from CashClip. Thanks for being part of our community!
+
+Payment Amount: $3.00 USD in 1 payment
+Fee Amount: $0.00 USD
+Total Amount: $3.00 USD
+
+Completed Amount: $0.00 USD in 0 payments
+Unclaimed Amount: $0.00 USD in 0 payments
+Returned Amount: $0.00 USD in 0 payments
+Denied Amount: $3.00 USD in 1 payment
+Pending Amount: $0.00 USD in 0 payments
+Blocked Amount: $0.00 USD in 0 payments
+
+Transaction ID,Recipient,Recipient Name,Unique Identifier,Amount,Fee,Total,Status,Reason Code,Custom Note,Message
+,www.adilnassir1@gmail.com,,6b4801a6-b8c5-4d4c-8f93-83df17af64e6,$3.00 USD,$0.00 USD,$3.00 USD,Denied,9302,CashClip payout for adel,
