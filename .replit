@@ -118,6 +118,9 @@ args = "pnpm --filter @workspace/cashclip run test components/TrackingConsentGat
 name = "EAS iOS Build 44"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = """
@@ -125,10 +128,7 @@ mkdir -p /tmp/fake-bin && printf '#!/bin/bash
 case \"$1\" in
   add|commit|stash|checkout|reset|clean|push|pull|fetch|rm) exit 0 ;;
   *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cat attached_assets/AuthKey_DGVBV8VV95_1781550317339.p8 > /tmp/AuthKey_DGVBV8VV95.p8 && cd artifacts/cashclip && PATH=\"/tmp/fake-bin:$PATH\" EXPO_TOKEN=\"$EXPO_TOKLAST\" EXPO_ASC_API_KEY_PATH=\"/tmp/AuthKey_DGVBV8VV95.p8\" EXPO_ASC_KEY_ID=\"DGVBV8VV95\" EXPO_ASC_ISSUER_ID=\"45944549-8278-4477-a1c6-3348ec45c3f0\" EXPO_APPLE_TEAM_ID=\"FAX932PG78\" EXPO_APPLE_TEAM_TYPE=\"COMPANY_OR_ORGANIZATION\" pnpm exec eas build --platform ios --profile production --non-interactive --no-wait"""
-
-[workflows.workflow.metadata]
-outputType = "console"
+esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cat attached_assets/AuthKey_DGVBV8VV95_1781550317339.p8 > /tmp/AuthKey_DGVBV8VV95.p8 && cd artifacts/cashclip && PATH=\"/tmp/fake-bin:$PATH\" EXPO_TOKEN=\"$EXPO_TOKLAST\" pnpm exec eas workflow:run build-and-submit-ios.yml --non-interactive"""
 
 [[ports]]
 localPort = 3001
