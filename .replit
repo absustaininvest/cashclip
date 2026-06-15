@@ -43,15 +43,7 @@ args = "Start Backend"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Project Video"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "absustain-seo-noindex"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS OTA Publish"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -60,10 +52,6 @@ args = "board-fit-tests"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "cashclip-test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "cashclip-typecheck"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -90,18 +78,6 @@ args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
 
 [[workflows.workflow]]
-name = "Project Video"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=5173 pnpm --filter @workspace/intro-video run dev"
-waitForPort = 5173
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "absustain-seo-noindex"
 author = "agent"
 
@@ -111,23 +87,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter absustain exec vitest run src/components/Seo.test.tsx"
-
-[[workflows.workflow]]
-name = "EAS OTA Publish"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = """
-mkdir -p /tmp/fake-bin && printf '#!/bin/bash
-cmd=${1:-}
-case $cmd in
-  add|commit|merge|push|pull|fetch|checkout|reset|rebase|tag|stash|rm|mv) exit 0 ;;
-  *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cd artifacts/cashclip && PATH=/tmp/fake-bin:$PATH EXPO_TOKEN=$EXPO_TOKLAST pnpm exec eas update --channel production --message 'OTA update' --non-interactive"""
 
 [[workflows.workflow]]
 name = "board-fit-tests"
@@ -150,17 +109,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/cashclip run test components/TrackingConsentGate.test.tsx"
-
-[[workflows.workflow]]
-name = "cashclip-typecheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/cashclip run typecheck"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [[ports]]
 localPort = 3001
