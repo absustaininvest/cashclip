@@ -1,4 +1,4 @@
-CashClip Expo build-artifact backup — generated 2026-06-05T11:06:12Z
+Thats CashClip Expo build-artifact backup — generated 2026-06-05T11:06:12Z
   *** REFRESHED 2026-06-10: added iOS build 40 (.ipa) + Android build 39 (.aab). ***
   Latest full workspace source = git HEAD d7f2aee (Firebase removed); regenerate: git archive -o out.tar.gz d7f2aee
   Live build-29 OTA source still at commit 9c71ec4 (good group 26fa0d4c-...). Signing creds in V39-prep/credentials/ (local-only).
