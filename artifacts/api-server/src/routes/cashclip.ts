@@ -59,7 +59,7 @@ import {
   isSnoozed,
 } from "../lib/sponsoredVisitMonitor";
 import { fetchInbox } from "../lib/inbox";
-import { generateInboxDraft } from "../lib/inboxDraft.js";
+import { generateInboxDraft, detectLang, detectIssue } from "../lib/inboxDraft.js";
 import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe, sql as drizzleSql, gte as drizzleGte } from "drizzle-orm";
 
 interface RevenueSource {
@@ -2745,6 +2745,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // that survives restarts (the log line below is ephemeral). A failed
       // persist must not make the admin think the email didn't send, so we
       // log the error but still return success.
+      const replyLang = detectLang(`${subject} ${body}`);
+      const replyIssue = detectIssue(`${subject} ${body}`);
+
       let savedReply: Awaited<ReturnType<typeof storage.createSupportReply>> | null = null;
       try {
         savedReply = await storage.createSupportReply({
@@ -2753,6 +2756,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subject,
           body,
           inReplyTo: inReplyTo || null,
+          issueType: replyIssue,
+          lang: replyLang,
         });
       } catch (persistErr) {
         req.log?.error(

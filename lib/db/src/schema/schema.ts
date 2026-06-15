@@ -491,12 +491,15 @@ export const supportReplies = pgTable(
     // Used to look up prior replies for a selected thread. Null when the
     // original message had no Message-ID.
     inReplyTo: text("in_reply_to"),
+    issueType: text("issue_type"),
+    lang: text("lang"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     inReplyToIdx: index("support_replies_in_reply_to_idx").on(t.inReplyTo),
     adminIdx: index("support_replies_admin_idx").on(t.adminUserId, t.createdAt),
     createdAtIdx: index("support_replies_created_at_idx").on(t.createdAt),
+    issueIdx: index("support_replies_issue_lang_idx").on(t.issueType, t.lang, t.createdAt),
   })
 );
 

@@ -137,6 +137,7 @@ export interface IStorage {
   }): Promise<{ entries: SecurityAuditEntryView[]; total: number }>;
   createSupportReply(entry: InsertSupportReply): Promise<SupportReply>;
   getSupportRepliesByThread(inReplyTo: string): Promise<SupportReplyView[]>;
+  getSupportRepliesByIssue(issueType: string, lang: string, limit: number): Promise<SupportReply[]>;
   listSupportReplies(opts?: {
     recipient?: string;
     adminUserId?: string;
@@ -542,6 +543,25 @@ export class DatabaseStorage implements IStorage {
   // Prior replies for a selected thread, looked up by the original message's
   // Message-ID. Oldest first so the conversation reads top-to-bottom. Joins the
   // sending admin so the UI can attribute each reply.
+  async getSupportRepliesByIssue(
+    issueType: string,
+    lang: string,
+    limit: number,
+  ): Promise<SupportReply[]> {
+    const rows = await db
+      .select()
+      .from(supportReplies)
+      .where(
+        and(
+          eq(supportReplies.issueType, issueType),
+          eq(supportReplies.lang, lang),
+        ),
+      )
+      .orderBy(desc(supportReplies.createdAt))
+      .limit(limit);
+    return rows;
+  }
+
   async getSupportRepliesByThread(
     inReplyTo: string,
   ): Promise<SupportReplyView[]> {

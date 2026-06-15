@@ -378,6 +378,64 @@ function buildDraftEs(issue: IssueType, ctx: UserContext | null): string {
   ].join("\n");
 }
 
+function buildTemplateDraft(lang: Lang, issue: IssueType, ctx: UserContext | null): string {
+  return lang === "fr"
+    ? buildDraftFr(issue, ctx)
+    : lang === "es"
+      ? buildDraftEs(issue, ctx)
+      : buildDraftEn(issue, ctx);
+}
+
+const GREETING_RE = /^(hi |hello |bonjour|bonsoir|hola,|hola |salut)/i;
+const ACCOUNT_RE = /(we located your account|encontramos tu cuenta|nous avons trouvé votre compte|balance:|solde\s*:|saldo:)/i;
+const CLOSING_RE = /^(best regards|saludos|cordialement|cashclip support team|équipe support|equipo de soporte|support@cash-clip\.app)/i;
+
+function extractLearnedBody(body: string): string | null {
+  const paragraphs = body.split("\n\n");
+  const policy = paragraphs.filter((p) => {
+    const first = p.split("\n")[0].trim();
+    if (GREETING_RE.test(first)) return false;
+    if (ACCOUNT_RE.test(p)) return false;
+    if (CLOSING_RE.test(first)) return false;
+    return p.trim().length > 0;
+  });
+  return policy.length > 0 ? policy.join("\n\n") : null;
+}
+
+function buildDraftFromLearned(
+  lang: Lang,
+  _issue: IssueType,
+  ctx: UserContext | null,
+  learnedBody: string,
+): string {
+  const greeting =
+    lang === "fr" ? (ctx ? `Bonjour ${ctx.username},` : "Bonjour,")
+    : lang === "es" ? (ctx ? `Hola ${ctx.username},` : "Hola,")
+    : (ctx ? `Hi ${ctx.username},` : "Hi there,");
+
+  const accountLine = ctx
+    ? lang === "fr"
+      ? `Nous avons trouvé votre compte (solde : ${ctx.balanceUsd}, total gagné : ${ctx.totalEarnedUsd}, membre depuis ${ctx.accountAgeDays} jour${ctx.accountAgeDays === 1 ? "" : "s"}).`
+      : lang === "es"
+        ? `Encontramos tu cuenta (saldo: ${ctx.balanceUsd}, total ganado: ${ctx.totalEarnedUsd}, miembro desde hace ${ctx.accountAgeDays} día${ctx.accountAgeDays === 1 ? "" : "s"}).`
+        : `We located your account (balance: ${ctx.balanceUsd}, total earned: ${ctx.totalEarnedUsd}, member for ${ctx.accountAgeDays} day${ctx.accountAgeDays === 1 ? "" : "s"}).`
+    : "";
+
+  const closing =
+    lang === "fr" ? ["Cordialement,", "Équipe Support CashClip", "support@cash-clip.app"]
+    : lang === "es" ? ["Saludos,", "Equipo de Soporte CashClip", "support@cash-clip.app"]
+    : ["Best regards,", "CashClip Support Team", "support@cash-clip.app"];
+
+  return [
+    greeting,
+    "",
+    ...(accountLine ? [accountLine, ""] : []),
+    learnedBody,
+    "",
+    ...closing,
+  ].join("\n");
+}
+
 export async function generateInboxDraft(
   fromEmail: string,
   subject: string,
@@ -419,12 +477,21 @@ export async function generateInboxDraft(
     // DB unavailable — generate draft without user context
   }
 
-  const draft =
-    lang === "fr"
-      ? buildDraftFr(issue, userCtx)
-      : lang === "es"
-        ? buildDraftEs(issue, userCtx)
-        : buildDraftEn(issue, userCtx);
+  let draft: string;
+  try {
+    const examples = await storage.getSupportRepliesByIssue(issue, lang, 3);
+    const best = examples[0] ?? null;
+    if (best) {
+      const learned = extractLearnedBody(best.body);
+      draft = learned
+        ? buildDraftFromLearned(lang, issue, userCtx, learned)
+        : buildTemplateDraft(lang, issue, userCtx);
+    } else {
+      draft = buildTemplateDraft(lang, issue, userCtx);
+    }
+  } catch {
+    draft = buildTemplateDraft(lang, issue, userCtx);
+  }
 
   return {
     draft,
