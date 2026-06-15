@@ -98,9 +98,10 @@ env vars that work for `eas build`. It reads credentials from the EAS-stored key
   Owner can confirm it's still Active in App Store Connect → Integrations → App Store
   Connect API → Team Keys (look for `87Z27CQ96U` status).
 
-**Current workspace key: `3685WS5P35` (Admin, created Jun 12 2026).** Saved in
-`APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY`. `.p8` purged after saving. Old revoked
-key `36377NCG8Z` should be revoked in ASC when convenient.
+**Current workspace key: `DGVBV8VV95` (Admin, created Jun 15 2026).** Saved in
+`APPLE_ASC_KEY_ID` + `APPLE_ASC_PRIVATE_KEY`. `.p8` purged after saving. Successfully
+fixed malformed provisioning profile (2J8C54TPQA) and queued EAS build 43 (runtime 1.0.0).
+Old key `3685WS5P35` should be revoked in ASC when convenient.
 
 **Replacement process (for future rotations):**
 1. Owner creates a new Admin Team Key in ASC → Integrations → App Store Connect API → Team Keys → (+).
