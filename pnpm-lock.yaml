@@ -307,7 +307,7 @@ importers:
         version: 7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.5(@types/node@25.3.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4))
       wouter:
         specifier: ^3.3.5
         version: 3.9.0(react@19.1.0)
@@ -413,7 +413,7 @@ importers:
         version: 3.1.0
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.5(@types/node@25.3.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4))
 
   artifacts/cashclip:
     dependencies:
@@ -432,6 +432,9 @@ importers:
       babel-preset-expo:
         specifier: ~54.0.10
         version: 54.0.10(@babel/core@7.29.0)(@babel/runtime@7.28.6)(expo@54.0.34)(react-refresh@0.18.0)
+      expo:
+        specifier: ~54.0.34
+        version: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(graphql@16.8.1)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
       expo-audio:
         specifier: ~1.1.1
         version: 1.1.1(expo-asset@12.0.13(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -456,6 +459,12 @@ importers:
       ironsource-mediation:
         specifier: ^3.2.0
         version: 3.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      react:
+        specifier: 19.1.0
+        version: 19.1.0
+      react-native:
+        specifier: 0.81.5
+        version: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
       react-native-google-mobile-ads:
         specifier: ^14.11.0
         version: 14.11.0(expo@54.0.34)(react@19.1.0)
@@ -514,9 +523,6 @@ importers:
       eas-cli:
         specifier: ^20.1.0
         version: 20.1.0(@types/node@25.3.5)(typescript@5.9.3)
-      expo:
-        specifier: ~54.0.27
-        version: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(graphql@16.8.1)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
       expo-asset:
         specifier: ^12.0.13
         version: 12.0.13(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
@@ -574,15 +580,9 @@ importers:
       patch-package:
         specifier: ^8.0.1
         version: 8.0.1
-      react:
-        specifier: 'catalog:'
-        version: 19.1.0
       react-dom:
         specifier: 'catalog:'
         version: 19.1.0(react@19.1.0)
-      react-native:
-        specifier: 0.81.5
-        version: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
       react-native-gesture-handler:
         specifier: ~2.28.0
         version: 2.28.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -615,7 +615,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)
+        version: 4.1.5(@types/node@25.3.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4))
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -7992,6 +7992,7 @@ packages:
       '@vitest/ui': 4.1.5
       happy-dom: '*'
       jsdom: '*'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -9172,7 +9173,7 @@ snapshots:
       '@expo/plist': 0.4.8
       '@expo/prebuild-config': 54.0.8(expo@54.0.34)(typescript@5.9.3)
       '@expo/schema-utils': 0.1.8
-      '@expo/spawn-async': 1.7.2
+      '@expo/spawn-async': 1.8.0
       '@expo/ws-tunnel': 1.0.6
       '@expo/xcpretty': 4.4.3
       '@react-native/dev-middleware': 0.81.5
@@ -9422,7 +9423,7 @@ snapshots:
 
   '@expo/fingerprint@0.15.5':
     dependencies:
-      '@expo/spawn-async': 1.7.2
+      '@expo/spawn-async': 1.8.0
       arg: 5.0.2
       chalk: 4.1.2
       debug: 4.4.3(supports-color@8.1.1)
@@ -13431,7 +13432,7 @@ snapshots:
 
   expo-modules-autolinking@3.0.25:
     dependencies:
-      '@expo/spawn-async': 1.7.2
+      '@expo/spawn-async': 1.8.0
       chalk: 4.1.2
       commander: 7.2.0
       require-from-string: 2.0.2
@@ -14881,7 +14882,7 @@ snapshots:
   metro-transform-plugins@0.83.3:
     dependencies:
       '@babel/core': 7.29.0
-      '@babel/generator': 7.29.1
+      '@babel/generator': 7.29.7
       '@babel/template': 7.29.7
       '@babel/traverse': 7.29.7
       flow-enums-runtime: 0.0.6
@@ -14903,8 +14904,8 @@ snapshots:
   metro-transform-worker@0.83.3:
     dependencies:
       '@babel/core': 7.29.0
-      '@babel/generator': 7.29.1
-      '@babel/parser': 7.29.0
+      '@babel/generator': 7.29.7
+      '@babel/parser': 7.29.7
       '@babel/types': 7.29.7
       flow-enums-runtime: 0.0.6
       metro: 0.83.3
@@ -14944,8 +14945,8 @@ snapshots:
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.0
-      '@babel/generator': 7.29.1
-      '@babel/parser': 7.29.0
+      '@babel/generator': 7.29.7
+      '@babel/parser': 7.29.7
       '@babel/template': 7.29.7
       '@babel/traverse': 7.29.7
       '@babel/types': 7.29.7
@@ -16871,7 +16872,7 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.8.4
 
-  vitest@4.1.5(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4):
+  vitest@4.1.5(@types/node@25.3.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)):
     dependencies:
       '@vitest/expect': 4.1.5
       '@vitest/mocker': 4.1.5(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4))
@@ -16897,17 +16898,7 @@ snapshots:
       '@types/node': 25.3.5
       jsdom: 29.1.1(@noble/hashes@1.8.0)
     transitivePeerDependencies:
-      - jiti
-      - less
-      - lightningcss
       - msw
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - terser
-      - tsx
-      - yaml
 
   vlq@1.0.1: {}
 
