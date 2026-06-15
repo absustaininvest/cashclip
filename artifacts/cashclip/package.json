@@ -94,6 +94,7 @@
     "@sentry/react-native": "~7.2.0",
     "babel-preset-expo": "~54.0.10",
     "expo-audio": "~1.1.1",
+    "expo-dev-client": "^56.0.20",
     "expo-device": "~7.0.3",
     "expo-notifications": "^56.0.17",
     "expo-secure-store": "^15.0.8",
