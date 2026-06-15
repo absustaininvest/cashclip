@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -220,7 +220,8 @@ function TierCard({
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const router = useRouter();
   const { celebrate } = useCelebration();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [serverBalance, setServerBalance] = useState<number>(0);
@@ -376,6 +377,18 @@ export default function WalletScreen() {
   }, []);
 
   const openWithdrawModal = useCallback(async () => {
+    if (!user?.paypalEmail) {
+      Alert.alert(
+        "PayPal Email Required",
+        "Set your PayPal payout email in your Profile before making a withdrawal.",
+        [
+          { text: "Later", style: "cancel" },
+          { text: "Go to Profile", onPress: () => router.push("/(tabs)/profile" as any) },
+        ]
+      );
+      return;
+    }
+
     const [integrity, srv, eligibility] = await Promise.all([
       checkDeviceIntegrity(),
       fetchServerBalance(),
@@ -420,30 +433,17 @@ export default function WalletScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTiers(getWithdrawalTiers(effective));
     setSelectedTier(null);
-    const storedEmail = srv?.lastPaypalEmail ?? null;
-    setPaypalEmail(storedEmail ?? "");
-    // Run inline domain validation immediately on the pre-filled value so a
-    // suspicious stored email shows the field-level error alongside the banner.
-    const prefilledTrimmed = storedEmail?.trim() ?? "";
-    const prefilledEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (
-      prefilledTrimmed &&
-      prefilledEmailRegex.test(prefilledTrimmed) &&
-      !isPlausiblePayPalDomain(prefilledTrimmed)
-    ) {
-      setPaypalEmailError(
-        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-      );
-    } else {
-      setPaypalEmailError(null);
-    }
+    // Use the profile-locked PayPal email (write-once). Fall back to last-used
+    // email from the server only if the profile email isn't set yet (shouldn't
+    // normally happen since openWithdrawModal guards on user.paypalEmail above).
+    const lockedEmail = user?.paypalEmail ?? srv?.lastPaypalEmail ?? null;
+    setPaypalEmail(lockedEmail ?? "");
+    setPaypalEmailError(null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
-    setSavedEmailWarning(
-      !!storedEmail && !isPlausiblePayPalDomain(storedEmail)
-    );
+    setSavedEmailWarning(false);
     setShowWithdrawModal(true);
-  }, [t]);
+  }, [user, t]);
 
   const handlePaypalEmailChange = useCallback((value: string) => {
     setPaypalEmail(value);
@@ -793,14 +793,6 @@ export default function WalletScreen() {
               </View>
             ) : (
             <>
-            {savedEmailWarning && (
-              <View style={styles.savedEmailWarningBanner}>
-                <Feather name="alert-triangle" size={15} color="#F59E0B" />
-                <Text style={styles.savedEmailWarningText}>
-                  Your saved PayPal email may not be accepted — please update it before submitting.
-                </Text>
-              </View>
-            )}
             <Text style={styles.modalBalance}>
               {t.wallet.available}: ${serverBalance.toFixed(2)}
             </Text>
@@ -828,25 +820,14 @@ export default function WalletScreen() {
                     <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
                     <Text style={styles.paypalLabel}>PayPal Email</Text>
                   </View>
-                  <View style={[styles.paypalInputWrapper, !!paypalEmailError && styles.paypalInputWrapperError]}>
-                    <TextInput
-                      style={styles.paypalInput}
-                      placeholder="your@email.com"
-                      placeholderTextColor={Colors.textMuted}
-                      value={paypalEmail}
-                      onChangeText={handlePaypalEmailChange}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      testID="withdraw-paypal-email"
-                    />
-                  </View>
-                  {!!paypalEmailError && (
-                    <View style={styles.paypalEmailErrorRow}>
-                      <Feather name="alert-circle" size={13} color={Colors.error} />
-                      <Text style={styles.paypalEmailErrorText}>{paypalEmailError}</Text>
+                  {/* Locked display — email was set once on the profile and cannot be changed here */}
+                  <View style={styles.paypalLockedRow}>
+                    <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                    <Text style={styles.paypalLockedText} numberOfLines={1}>{paypalEmail}</Text>
+                    <View style={styles.paypalLockedBadge}>
+                      <Text style={styles.paypalLockedBadgeText}>Verified</Text>
                     </View>
-                  )}
+                  </View>
                 </View>
 
                 <View style={styles.summaryCard}>
@@ -1147,5 +1128,19 @@ const styles = StyleSheet.create({
   savedEmailWarningText: {
     fontFamily: "Outfit_400Regular", fontSize: 12,
     color: "#F59E0B", flex: 1, lineHeight: 18,
+  },
+  paypalLockedRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(0,230,118,0.07)", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+  },
+  paypalLockedText: {
+    fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.text, flex: 1,
+  },
+  paypalLockedBadge: {
+    backgroundColor: "rgba(0,230,118,0.15)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
+  },
+  paypalLockedBadgeText: {
+    fontFamily: "Outfit_700Bold", fontSize: 11, color: Colors.primary,
   },
 });

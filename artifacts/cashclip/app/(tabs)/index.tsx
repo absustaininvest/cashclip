@@ -20,6 +20,7 @@ import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from 
 import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useAuth } from "@/lib/AuthContext";
 import { getUnreadNotificationCount, recordAdWatch } from "@/lib/storage";
 import { fetchServerBalance, fetchProfileComplete, beginAdView, completeAdView, recordEarnAction } from "@/lib/earn-client";
 import { showRewardedAd, isAdMobReady, preloadRewardedAd } from "@/lib/admob";
@@ -53,6 +54,34 @@ const EARN_HIGHLIGHTS = [
   { icon: "check-circle", label: "Check-in", value: "100 pts/day", color: "#43A047", route: "/earn" },
   { icon: "users", label: "Refer", value: "After $3 cashout", color: "#E53935", route: "/referral" },
 ];
+
+function PayPalEmailBanner() {
+  const { user } = useAuth();
+  const router = useRouter();
+  if (user?.paypalEmail) return null;
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: 10,
+      backgroundColor: "rgba(245,158,11,0.10)",
+      borderColor: "rgba(245,158,11,0.30)", borderWidth: 1,
+      borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+      marginBottom: 12,
+    }}>
+      <MaterialCommunityIcons name="email-alert-outline" size={20} color="#F59E0B" />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: "Outfit_700Bold", fontSize: 13, color: Colors.text }}>
+          Set your PayPal email
+        </Text>
+        <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 }}>
+          Required for cash withdrawals — set it once in your Profile.
+        </Text>
+      </View>
+      <Pressable onPress={() => router.push("/(tabs)/profile" as any)} hitSlop={10}>
+        <Feather name="chevron-right" size={18} color="#F59E0B" />
+      </Pressable>
+    </View>
+  );
+}
 
 function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -350,6 +379,9 @@ export default function HomeScreen() {
                 </Pressable>
               ))}
             </View>
+
+            {/* PayPal email reminder — shows until the user sets it */}
+            <PayPalEmailBanner />
 
             {/* Announcement: upcoming release */}
             <AnnouncementBanner />

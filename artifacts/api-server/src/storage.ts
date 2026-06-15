@@ -127,6 +127,7 @@ export interface IStorage {
     pendingPayouts: { count: number; amount: number };
   }>;
   setTotpBackupCodes(userId: string, hashes: string[]): Promise<void>;
+  setPaypalEmail(userId: string, email: string): Promise<{ ok: boolean; conflict: boolean }>;
   recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }): Promise<void>;
   getSecurityAuditEntries(opts?: {
     actorUserId?: string;
@@ -453,6 +454,23 @@ export class DatabaseStorage implements IStorage {
 
   async setTotpBackupCodes(userId: string, hashes: string[], executor: Executor = db): Promise<void> {
     await executor.update(users).set({ totpBackupCodes: hashes }).where(eq(users.id, userId));
+  }
+
+  async setPaypalEmail(userId: string, email: string): Promise<{ ok: boolean; conflict: boolean }> {
+    const { isNull, and } = await import("drizzle-orm");
+    try {
+      const result = await db
+        .update(users)
+        .set({ paypalEmail: email, paypalEmailSetAt: new Date() })
+        .where(and(eq(users.id, userId), isNull(users.paypalEmail)));
+      const affected = (result as any).rowCount ?? (result as any).rowsAffected ?? 0;
+      return { ok: affected > 0, conflict: false };
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        return { ok: false, conflict: true };
+      }
+      throw err;
+    }
   }
 
   async recordSecurityAudit(args: { actorUserId: string; event: SecurityAuditEvent; targetUserId?: string | null; ip?: string | null }, executor: Executor = db): Promise<void> {

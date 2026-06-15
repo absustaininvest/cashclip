@@ -49,6 +49,8 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
   totpBackupCodes: text("totp_backup_codes").array(),
+  paypalEmail: text("paypal_email").unique(),
+  paypalEmailSetAt: timestamp("paypal_email_set_at"),
 },
 (t) => ({
   balanceNonNegative: check("users_balance_non_negative", sql`${t.balance} >= 0`),

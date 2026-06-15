@@ -10,6 +10,7 @@ interface AuthUser {
   id: string;
   username: string;
   role: string;
+  paypalEmail: string | null;
 }
 
 interface AuthContextValue {
@@ -21,6 +22,7 @@ interface AuthContextValue {
   register: (username: string, password: string, email: string, referralCode?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthContextValue>({
   register: async () => ({ success: false }),
   logout: async () => {},
   refreshSession: async () => false,
+  refreshUser: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -158,6 +161,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const savedToken = await secureGet(AUTH_TOKEN_KEY);
+      if (!savedToken) return;
+      const baseUrl = getApiUrl();
+      const res = await fetch(new URL("/api/auth/me", baseUrl).toString(), {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      }
+    } catch {
+      // fail silently — stale user state is acceptable here
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       const storedToken = await secureGet(AUTH_TOKEN_KEY);
@@ -180,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, isAdmin, login, register, logout, refreshSession }}>
+    <AuthContext.Provider value={{ user, token, isLoading, isAdmin, login, register, logout, refreshSession, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1395,6 +1395,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/profile/paypal-email", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const { email } = req.body;
+      if (typeof email !== "string" || !email.trim()) {
+        res.status(400).json({ error: "Email is required" }); return;
+      }
+      const trimmed = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmed)) {
+        res.status(400).json({ error: "Invalid email format" }); return;
+      }
+      if (!isPlausiblePayPalDomain(trimmed)) {
+        res.status(400).json({ error: "This email domain is not accepted for PayPal payouts." }); return;
+      }
+      const user = await storage.getUser(req.userId!);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+      if (user.paypalEmail) {
+        res.status(409).json({ error: "PayPal email has already been set and cannot be changed.", code: "ALREADY_SET" }); return;
+      }
+      const result = await storage.setPaypalEmail(req.userId!, trimmed);
+      if (result.conflict) {
+        res.status(409).json({ error: "This PayPal email is already linked to another account.", code: "CONFLICT" }); return;
+      }
+      if (!result.ok) {
+        res.status(409).json({ error: "PayPal email has already been set and cannot be changed.", code: "ALREADY_SET" }); return;
+      }
+      await storage.insertUserNotification({
+        userId: req.userId!,
+        title: "PayPal email saved ✓",
+        message: `Your payout email (${trimmed}) has been saved. This cannot be changed later — contact support if needed.`,
+        type: "account",
+      });
+      res.json({ ok: true, paypalEmail: trimmed });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to save PayPal email" });
+    }
+  });
+
   app.get("/api/balance", authMiddleware, async (req: AuthRequest, res) => {
     try {
       const { balance, totalEarned } = await storage.getUserBalance(req.userId!);

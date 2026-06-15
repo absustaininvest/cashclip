@@ -959,7 +959,7 @@ export function registerAuthRoutes(app: Express) {
       return;
     }
     res.json({
-      user: { id: user.id, username: user.username, role: user.role },
+      user: { id: user.id, username: user.username, role: user.role, paypalEmail: user.paypalEmail ?? null },
     });
   });
 

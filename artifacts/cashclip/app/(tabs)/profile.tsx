@@ -8,6 +8,8 @@ import {
   Platform,
   RefreshControl,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +20,7 @@ import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
 import { getUserStats, getReferralEarnings, getTotalReferrals, getUnreadNotificationCount, type UserStats } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
 import { getDisplayPointsPerDollar } from "@/lib/points";
 import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -87,9 +90,12 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { lang, t, setLang } = useLanguage();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, token, refreshUser } = useAuth();
   const [stats, setStats] = useState<(UserStats & { totalReferrals: number; referralEarnings: number; unreadNotifs: number; lifetimePoints: number }) | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [paypalInput, setPaypalInput] = useState("");
+  const [paypalSaving, setPaypalSaving] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
 
   const [fontsLoaded] = useFonts({ Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold });
 
@@ -115,9 +121,36 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadStats();
+    await Promise.all([loadStats(), refreshUser()]);
     setRefreshing(false);
-  }, []);
+  }, [refreshUser]);
+
+  const handleSavePaypal = useCallback(async () => {
+    const trimmed = paypalInput.trim().toLowerCase();
+    if (!trimmed) { setPaypalError("Please enter your PayPal email."); return; }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) { setPaypalError("Enter a valid email address."); return; }
+    setPaypalSaving(true);
+    setPaypalError(null);
+    try {
+      await apiRequest("POST", "/api/profile/paypal-email", { email: trimmed });
+      await refreshUser();
+      setPaypalInput("");
+      Alert.alert("PayPal email saved", `${trimmed} has been linked to your account. This cannot be changed later.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save.";
+      if (msg.includes("CONFLICT")) {
+        setPaypalError("This PayPal email is already linked to another account.");
+      } else if (msg.includes("ALREADY_SET")) {
+        setPaypalError("PayPal email has already been set.");
+        await refreshUser();
+      } else {
+        setPaypalError(msg || "Failed to save.");
+      }
+    } finally {
+      setPaypalSaving(false);
+    }
+  }, [paypalInput, refreshUser]);
 
   if (!fontsLoaded || !stats) return null;
 
@@ -192,6 +225,62 @@ export default function ProfileScreen() {
             <Text style={styles.gridValue}>{stats.streak}</Text>
             <Text style={styles.gridLabel}>{t.profile.bestStreak}</Text>
           </View>
+        </View>
+
+        {/* PayPal Payout Email Section */}
+        <View style={styles.paypalSection}>
+          <View style={styles.paypalHeader}>
+            <MaterialCommunityIcons name="email-outline" size={18} color={Colors.primary} />
+            <Text style={styles.paypalSectionTitle}>PayPal Payout Email</Text>
+          </View>
+          {user?.paypalEmail ? (
+            <View style={styles.paypalLocked}>
+              <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />
+              <Text style={styles.paypalLockedEmail}>{user.paypalEmail}</Text>
+              <View style={styles.paypalLockedBadge}>
+                <Text style={styles.paypalLockedBadgeText}>Verified</Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.paypalHint}>
+                Set your PayPal email to enable withdrawals. This can only be set once.
+              </Text>
+              <View style={[styles.paypalInputRow, !!paypalError && styles.paypalInputRowError]}>
+                <TextInput
+                  style={styles.paypalInput}
+                  placeholder="your@paypal.com"
+                  placeholderTextColor={Colors.textMuted}
+                  value={paypalInput}
+                  onChangeText={(v) => { setPaypalInput(v); setPaypalError(null); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!paypalSaving}
+                />
+                <Pressable
+                  onPress={handleSavePaypal}
+                  disabled={paypalSaving || !paypalInput.trim()}
+                  style={({ pressed }) => [
+                    styles.paypalSaveBtn,
+                    (paypalSaving || !paypalInput.trim()) && { opacity: 0.4 },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  {paypalSaving
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.paypalSaveBtnText}>Save</Text>
+                  }
+                </Pressable>
+              </View>
+              {!!paypalError && (
+                <View style={styles.paypalErrorRow}>
+                  <Feather name="alert-circle" size={13} color={Colors.error} />
+                  <Text style={styles.paypalErrorText}>{paypalError}</Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         <Pressable
@@ -308,4 +397,19 @@ const styles = StyleSheet.create({
   langBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 12, color: Colors.primary },
   buildInfo: { alignItems: "center", marginBottom: 16 },
   buildInfoText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted },
+  paypalSection: { backgroundColor: Colors.surface, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 16 },
+  paypalHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  paypalSectionTitle: { fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text },
+  paypalLocked: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,230,118,0.07)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  paypalLockedEmail: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: Colors.text, flex: 1 },
+  paypalLockedBadge: { backgroundColor: "rgba(0,230,118,0.15)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  paypalLockedBadgeText: { fontFamily: "Outfit_700Bold", fontSize: 11, color: Colors.primary },
+  paypalHint: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary, marginBottom: 10, lineHeight: 17 },
+  paypalInputRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: Colors.background },
+  paypalInputRowError: { borderColor: Colors.error },
+  paypalInput: { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 14, color: Colors.text, paddingVertical: 8 },
+  paypalSaveBtn: { backgroundColor: Colors.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  paypalSaveBtnText: { fontFamily: "Outfit_700Bold", fontSize: 13, color: "#000" },
+  paypalErrorRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
+  paypalErrorText: { fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.error, flex: 1 },
 });
