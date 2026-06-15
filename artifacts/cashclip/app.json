@@ -429,9 +429,7 @@
         {
           "ios": {
             "deploymentTarget": "15.1",
-            "extraPods": [
-              { "name": "ISChartboostAdapter" }
-            ]
+            "extraPods": []
           },
           "android": {
             "minSdkVersion": 25,
@@ -447,8 +445,7 @@
           }
         }
       ],
-      "./plugins/withAndroidManifestFix",
-      "./plugins/withChartboostPodSource"
+      "./plugins/withAndroidManifestFix"
     ],
     "experiments": {
       "typedRoutes": true,
