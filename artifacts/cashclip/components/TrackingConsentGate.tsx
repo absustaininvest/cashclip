@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +26,7 @@ type Step = "checking" | "disclosures" | "terms" | "done";
 interface Props {
   children: React.ReactNode;
   onConsentDone?: () => void;
+  onConsentRevoked?: () => void;
 }
 
 function openTrackingSettings() {
@@ -32,14 +35,43 @@ function openTrackingSettings() {
   );
 }
 
-export function TrackingConsentGate({ children, onConsentDone }: Props) {
+export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked }: Props) {
   const [step, setStep] = useState<Step>("checking");
+  // Track whether consent was ever granted in this session so the AppState
+  // listener only fires onConsentRevoked when there was something to revoke.
+  const consentGrantedRef = useRef(false);
 
   function finish() {
     requestAdsConsent().catch(() => {});
+    consentGrantedRef.current = true;
     onConsentDone?.();
     setStep("done");
   }
+
+  // Detect iOS ATT revocation via iOS Settings → Privacy → Tracking.
+  // When the user returns the app to the foreground after revoking tracking,
+  // AppState fires "active". If ATT is now denied/restricted and we had
+  // previously granted consent, call onConsentRevoked so callers can tear
+  // down any tracking-dependent callbacks (e.g. ad-fill change handler).
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState !== "active") return;
+        if (!consentGrantedRef.current) return;
+        getATTStatus().then((status) => {
+          if (status === "denied" || status === "restricted") {
+            consentGrantedRef.current = false;
+            onConsentRevoked?.();
+          }
+        }).catch(() => {});
+      },
+    );
+
+    return () => subscription.remove();
+  }, [onConsentRevoked]);
 
   useEffect(() => {
     if (Platform.OS !== "ios") {

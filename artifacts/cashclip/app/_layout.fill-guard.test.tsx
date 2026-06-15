@@ -25,6 +25,7 @@ import TestRenderer, { act } from "react-test-renderer";
 const mockSecureGet = vi.fn<(key: string) => Promise<string | null>>();
 const mockApiRequestSafe = vi.fn<(...args: any[]) => Promise<any>>();
 let capturedFillCb: ((fillAvailable: boolean) => void) | null = null;
+let capturedRevokeCb: (() => void) | null = null;
 
 // ── @/lib/secure-store ────────────────────────────────────────────────────────
 vi.mock("@/lib/secure-store", () => ({
@@ -56,9 +57,10 @@ vi.mock("@/lib/admob", () => ({
   isRewardedAdPreloaded: vi.fn(() => false),
 }));
 
-// ── TrackingConsentGate — fires onConsentDone immediately on mount ────────────
+// ── TrackingConsentGate — fires onConsentDone immediately; captures revoke cb ─
 vi.mock("@/components/TrackingConsentGate", () => ({
-  TrackingConsentGate: ({ onConsentDone, children }: any) => {
+  TrackingConsentGate: ({ onConsentDone, onConsentRevoked, children }: any) => {
+    capturedRevokeCb = onConsentRevoked ?? null;
     React.useEffect(() => {
       onConsentDone?.();
     }, []);
@@ -206,6 +208,9 @@ vi.mock("@/constants/colors", () => ({
 
 // ── Import the layout AFTER all mocks are registered ─────────────────────────
 import RootLayout from "./_layout";
+// setFillChangeCallback is already mocked above; this import gives access to
+// its spy so we can assert call arguments (e.g. called with null on revocation).
+import { setFillChangeCallback } from "@/lib/admob";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -230,13 +235,16 @@ async function renderAndCaptureFillCb(): Promise<void> {
 describe("fill callback pre-auth guard (_layout.tsx)", () => {
   beforeEach(() => {
     capturedFillCb = null;
+    capturedRevokeCb = null;
     mockSecureGet.mockReset();
     mockApiRequestSafe.mockReset();
     mockApiRequestSafe.mockResolvedValue({ ok: true });
+    vi.mocked(setFillChangeCallback).mockClear();
   });
 
   afterEach(() => {
     capturedFillCb = null;
+    capturedRevokeCb = null;
   });
 
   it("does NOT call apiRequestSafe when secureGet returns null (no token)", async () => {
@@ -295,5 +303,32 @@ describe("fill callback pre-auth guard (_layout.tsx)", () => {
       "/api/earn/ad-fill",
       { rewardedFillAvailable: false },
     );
+  });
+
+  it("calls setFillChangeCallback(null) when consent is revoked after onConsentDone", async () => {
+    mockSecureGet.mockResolvedValue(null);
+
+    await renderAndCaptureFillCb();
+
+    // onConsentDone fires on mount and registers a real fill callback
+    expect(capturedFillCb).toBeTruthy();
+    // onConsentRevoked must have been passed to the gate
+    expect(capturedRevokeCb).toBeTruthy();
+
+    // Clear prior calls so we can assert the revocation call in isolation
+    vi.mocked(setFillChangeCallback).mockClear();
+
+    // Simulate the user revoking tracking consent (e.g. via iOS Settings → Tracking)
+    await act(async () => {
+      capturedRevokeCb!();
+      await Promise.resolve();
+    });
+
+    // The fill callback must be torn down — setFillChangeCallback(null) unregisters it
+    expect(vi.mocked(setFillChangeCallback)).toHaveBeenCalledOnce();
+    expect(vi.mocked(setFillChangeCallback)).toHaveBeenCalledWith(null);
+
+    // No fill POST should have been sent during or after revocation
+    expect(mockApiRequestSafe).not.toHaveBeenCalled();
   });
 });

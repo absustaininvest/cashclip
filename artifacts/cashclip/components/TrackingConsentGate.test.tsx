@@ -68,6 +68,9 @@ vi.mock("react-native", () => {
     StyleSheet: { create: (s: any) => s, flatten: (s: any) => s, hairlineWidth: 1 },
     Linking: { openURL: vi.fn(async () => {}) },
     Alert: { alert: vi.fn() },
+    AppState: {
+      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    },
   };
 });
 

@@ -260,7 +260,14 @@ function RootLayout() {
               {/* TrackingConsentGate is outermost so zero auth activity fires
                   before consent resolves. AuthProvider is inside so token reads
                   and login redirects only start after consent is done. */}
-              <TrackingConsentGate onConsentDone={() => {
+              <TrackingConsentGate
+                onConsentRevoked={() => {
+                  // User revoked tracking consent — unregister the fill
+                  // callback immediately so it can never fire a fill POST
+                  // from a non-consented session.
+                  setFillChangeCallback(null);
+                }}
+                onConsentDone={() => {
                 setFillChangeCallback((fillAvailable) => {
                   secureGet("cashclip_auth_token").then((token) => {
                     if (!token) {
