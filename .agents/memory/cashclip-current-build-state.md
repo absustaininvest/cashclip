@@ -3,7 +3,11 @@ name: CashClip current build state
 description: Which build is live, what's in progress, and the runtime version picture.
 ---
 
-**App Store live build:** build 40 (runtime 1.1.0) — submitted by owner; this is what users currently install from the App Store.
+**App Store LIVE (public) build:** build **29, runtime 1.0.0, channel `production`** — this is what real users actually install/run. Confirmed Jun 16 2026 by owner with a Transporter screenshot + his own session recap. The "Original (29)" restore point pins this bundle; live OTA group `991eb089…` rides on it.
+
+**CORRECTION (do not repeat the old claim):** builds **40, 42, 46 are NOT public.** Transporter shows 40 (Jun 10) and 46 (Jun 15) only "Delivered … ready for internal testing" (TestFlight/internal); build 42 is the runtime-1.1.0 TestFlight backup. **No 1.1.0 build is live** — runtime 1.1.0 only ever existed in TestFlight. Earlier memory/replit.md footnote saying "build 40 runtime 1.1.0 live on the App Store" was wrong on every count.
+
+**OTA reach:** an `eas update` at runtime 1.0.0 on the `production` channel DOES reach the live build-29 users (that's how the Chipley celebration, spin fix, home-taps, consent fixes already shipped). BUT never `eas update` from current repo HEAD — HEAD carries the AdMob mediation NATIVE swap (buildNumber 47) that build 29 lacks; OTA must be built from the live build-29 base with only safe JS changes, isolation-verified.
 
 **Latest successful EAS build:** build 46 (runtime 1.0.0) — completed Jun 15 2026. IPA produced at:
 `https://expo.dev/artifacts/eas/n2o4hfj-EIhs99h29_NNWAwyuqex4jXnnet7zRXv1NI.ipa`
