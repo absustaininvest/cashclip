@@ -30,13 +30,14 @@
     "eas-build-pre-install": "node -e \"const p=process.env.EAS_BUILD_PROFILE; if(p==='production'){ if(!process.env.SENTRY_AUTH_TOKEN){ console.error('ERROR: SENTRY_AUTH_TOKEN is not set in the EAS production environment. Source map uploads will fail. Register it via: eas env:create --environment production --name SENTRY_AUTH_TOKEN --type secret'); process.exit(1); } console.log('SENTRY_AUTH_TOKEN is present (production build) — source map upload enabled.'); } else { console.log('Non-production profile ('+p+') — skipping SENTRY_AUTH_TOKEN check.'); }\"",
     "postinstall": "patch-package",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "check:versions": "node scripts/check-expo-versions.js"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@expo-google-fonts/inter": "^0.4.0",
     "@expo-google-fonts/outfit": "^0.4.3",
-    "@expo/cli": "54.0.23",
+    "@expo/cli": "54.0.24",
     "@expo/config-plugins": "~54.0.4",
     "@expo/ngrok": "^4.1.0",
     "@expo/vector-icons": "^15.0.3",
@@ -50,7 +51,7 @@
     "@workspace/api-client-react": "workspace:*",
     "babel-plugin-react-compiler": "^19.0.0-beta-e993439-20250117",
     "eas-cli": "^20.1.0",
-    "expo": "~54.0.27",
+    "expo": "~54.0.35",
     "expo-asset": "^12.0.13",
     "expo-blur": "~15.0.8",
     "expo-build-properties": "~1.0.10",
@@ -93,6 +94,7 @@
     "@sentry/cli": "2.37.0",
     "@sentry/react-native": "~7.2.0",
     "babel-preset-expo": "~54.0.10",
+    "expo": "~54.0.35",
     "expo-audio": "~1.1.1",
     "expo-device": "~8.0.10",
     "expo-notifications": "~0.32.17",
@@ -100,10 +102,9 @@
     "expo-tracking-transparency": "^6.0.8",
     "expo-updates": "~29.0.18",
     "ironsource-mediation": "^3.2.0",
-    "react-native-google-mobile-ads": "^14.11.0",
-    "vexo-analytics": "^1.5.7",
-    "expo": "~54.0.34",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-google-mobile-ads": "^14.11.0",
+    "vexo-analytics": "^1.5.7"
   }
 }

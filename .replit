@@ -61,6 +61,10 @@ args = "EAS iOS Build 44"
 task = "workflow.run"
 args = "EAS iOS Build 46"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "cashclip-expo-versions"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -144,6 +148,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash artifacts/cashclip/scripts/eas-build-ios-46.sh"
+
+[[workflows.workflow]]
+name = "cashclip-expo-versions"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/cashclip run check:versions"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 3001
