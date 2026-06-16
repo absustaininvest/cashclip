@@ -83,18 +83,37 @@ export async function secretsPassphraseMiddleware(
     return;
   }
 
+  // Require a real authenticated admin identity before evaluating the passphrase.
+  // The console-token path (X-Console-Token / ADMIN_TOKEN) does not attach a
+  // req.userId, so it must not be able to reach routes gated by this middleware.
+  // Without this check, an attacker who knows both shared secrets (ADMIN_TOKEN +
+  // SECRETS_PASSPHRASE) could invoke high-privilege operator actions — such as
+  // factory-reset — while bypassing account-level auth, TOTP, and the durable
+  // actor-attributed audit trail. A real admin JWT is required.
+  if (!req.userId) {
+    req.log?.warn(
+      { route: req.originalUrl },
+      "secretsPassphraseMiddleware: rejected — no authenticated admin identity (console-token path not permitted here)",
+    );
+    res.status(403).json({
+      error: "A real admin account JWT is required to use this route. Console-token access is not permitted.",
+      code: "ADMIN_IDENTITY_REQUIRED",
+    });
+    return;
+  }
+
   const ip = getClientIp(req);
   const userId = req.userId;
   const ipKey = `secpass:ip:${ip}`;
-  const userKey = userId ? `secpass:user:${userId}` : null;
+  const userKey = `secpass:user:${userId}`;
 
   // Gate before evaluating the passphrase. Use the read-only check so simply
   // being at the limit does not itself burn a slot; slots are only consumed
   // by an incorrect attempt below.
   const gateChecks: Array<{ key: string; max: number; label: string }> = [
     { key: ipKey, max: getIpLimit(), label: "per-ip" },
+    { key: userKey, max: getUserLimit(), label: "per-admin" },
   ];
-  if (userKey) gateChecks.push({ key: userKey, max: getUserLimit(), label: "per-admin" });
 
   for (const c of gateChecks) {
     try {
@@ -141,7 +160,7 @@ export async function secretsPassphraseMiddleware(
     // an unthrottled 401, but it also must not crash the request.
     try {
       await recordLoginAttempt(ipKey, getIpLimit(), WINDOW_MS);
-      if (userKey) await recordLoginAttempt(userKey, getUserLimit(), WINDOW_MS);
+      await recordLoginAttempt(userKey, getUserLimit(), WINDOW_MS);
     } catch (err) {
       logger.error({ err, ip, userId }, "secretsPassphraseMiddleware failed to record attempt");
     }
@@ -160,7 +179,7 @@ export async function secretsPassphraseMiddleware(
   // penalized by earlier failed guesses.
   try {
     await clearLoginAttempts(ipKey);
-    if (userKey) await clearLoginAttempts(userKey);
+    await clearLoginAttempts(userKey);
   } catch (err) {
     logger.warn({ err, ip, userId }, "secretsPassphraseMiddleware failed to clear attempts");
   }

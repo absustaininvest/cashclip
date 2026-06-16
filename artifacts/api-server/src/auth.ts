@@ -26,40 +26,6 @@ function getTotpTokenKey(totpSessionToken: string): string {
   return "totp:token:" + crypto.createHash("sha256").update(totpSessionToken).digest("hex");
 }
 
-// ── ADMIN_TOKEN console-token gate brute-force throttle ───────────────────────
-// The ADMIN_TOKEN console-token path is a high-privilege operator entry point.
-// Failed attempts are counted (per IP) in the shared `login_attempts` table so
-// the limit holds across all autoscaled replicas and restarts — a memory-only
-// counter would be replica-local and bypassable in production (per the threat
-// model). Only *incorrect* tokens consume a slot; a correct token clears it.
-// Failure policy: if the DB check throws we fail closed (503) so this control
-// never degrades to "unlimited".
-const ADMIN_TOKEN_WINDOW_MS = 15 * 60 * 1000;
-
-function getAdminTokenIpLimit(): number {
-  const raw = process.env["ADMIN_TOKEN_IP_LIMIT"];
-  if (!raw) return 15;
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 1) {
-    logger.warn({ value: raw }, "Invalid ADMIN_TOKEN_IP_LIMIT, using default 15");
-    return 15;
-  }
-  return n;
-}
-
-// Constant-time compare that tolerates length mismatches without throwing
-// (crypto.timingSafeEqual rejects differing-length buffers), so a wrong-length
-// token is rejected and throttled like any other incorrect guess.
-function adminTokenSafeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a, "utf8");
-  const bb = Buffer.from(b, "utf8");
-  if (ab.length !== bb.length) {
-    const pad = Buffer.alloc(Math.max(ab.length, bb.length, 1));
-    crypto.timingSafeEqual(pad, pad);
-    return false;
-  }
-  return crypto.timingSafeEqual(ab, bb);
-}
 
 // Resolved lazily so the server can start and pass the health check even when
 // JWT_ACCESS_SECRET hasn't been linked to the production environment yet.
@@ -301,96 +267,16 @@ function touchLastSeen(userId: string): void {
 }
 
 export async function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  // A valid admin Bearer JWT is always sufficient — this covers the web portal.
-  // The ADMIN_TOKEN console-token path is for internal/programmatic access only.
+  // All admin API access requires a real admin Bearer JWT — a verified identity
+  // with a bound userId and tokenVersion that can be attributed in audit logs.
+  //
+  // The ADMIN_TOKEN env var continues to sign the sid session cookie (see
+  // setSessionCookie / app.ts cookieParser) but is no longer accepted as a
+  // standalone API credential via X-Console-Token. That design was a broken
+  // admin-boundary: a single shared secret could bypass account auth, TOTP, and
+  // the durable actor-attributed security_audit_log on the most sensitive routes.
   const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    const payload = verifyToken(token);
-    if (payload) {
-      const user = await storage.getUser(payload.userId);
-      if (user && user.tokenVersion === payload.tokenVersion && user.role === "admin") {
-        req.userId = user.id;
-        req.userRole = user.role;
-        next();
-        return;
-      }
-    }
-  }
-
-  // Fallback: console-token path (internal tooling / ADMIN_TOKEN secret).
-  const consoleToken = process.env.ADMIN_TOKEN;
-  if (consoleToken) {
-    const ip = getClientIp(req);
-    const ipKey = `admintoken:ip:${ip}`;
-
-    // Gate before evaluating the token. Read-only check so simply being at the
-    // limit does not itself burn a slot; slots are consumed only by an
-    // incorrect attempt below. Fail closed (503) if the DB check throws.
-    try {
-      const { allowed } = await checkLoginAttempts(ipKey, getAdminTokenIpLimit());
-      if (!allowed) {
-        req.log?.warn({ route: req.originalUrl, ip }, "Admin console-token attempts rate-limited");
-        res.status(429).json({
-          error: "Too many incorrect admin token attempts. Please try again later.",
-          code: "ADMIN_TOKEN_RATE_LIMITED",
-          retryAfterMs: ADMIN_TOKEN_WINDOW_MS,
-        });
-        return;
-      }
-    } catch (err) {
-      logger.error({ err, ip }, "adminMiddleware console-token rate-limit check failed — failing closed");
-      res.status(503).json({
-        error: "Admin token rate-limit check failed. Try again shortly.",
-        code: "ADMIN_TOKEN_RATE_LIMIT_UNAVAILABLE",
-      });
-      return;
-    }
-
-    const provided = req.headers["x-console-token"];
-    if (typeof provided !== "string" || !adminTokenSafeEqual(provided, consoleToken)) {
-      // Record the failed guess against the shared key so the throttle holds
-      // across replicas. Best-effort: a DB hiccup must not fail open here.
-      try {
-        await recordLoginAttempt(ipKey, getAdminTokenIpLimit(), ADMIN_TOKEN_WINDOW_MS);
-      } catch (err) {
-        logger.error({ err, ip }, "adminMiddleware failed to record console-token attempt");
-      }
-      req.log?.warn({ route: req.originalUrl, ip }, "Admin console-token rejected");
-      res.status(401).json({ error: "No token provided" });
-      return;
-    }
-
-    // Correct console token: clear the counter so a legitimate operator is not
-    // penalized by earlier failed guesses.
-    try {
-      await clearLoginAttempts(ipKey);
-    } catch (err) {
-      logger.warn({ err, ip }, "adminMiddleware failed to clear console-token attempts");
-    }
-    // Console-token is restricted to safe, read-only HTTP methods. It does NOT
-    // bind a durable admin-account identity (req.userId stays unset), so any
-    // state-mutating operation (POST/PUT/PATCH/DELETE) would run without an
-    // attributable actor and without a durable security-audit trail. Operators
-    // must use an authenticated admin account (Bearer JWT) for all writes.
-    const method = req.method?.toUpperCase();
-    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-      req.log?.warn(
-        { route: req.originalUrl, ip, method },
-        "Admin console-token rejected for state-mutating method — admin account JWT required",
-      );
-      res.status(403).json({
-        error:
-          "Console-token access is restricted to read-only requests. Use an authenticated admin account (Bearer JWT) for state-mutating operations.",
-        code: "ADMIN_IDENTITY_REQUIRED",
-      });
-      return;
-    }
-    // Token verified — allow read-only access.
-    next();
-    return;
-  }
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "No token provided" });
     return;
   }

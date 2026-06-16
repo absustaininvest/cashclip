@@ -2486,6 +2486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Password reset + durable audit entry commit atomically (fail-closed): if
       // the audit write fails the password change is rolled back, so an admin can
       // never alter a user's credentials without a persisted audit trail.
+      // req.userId is guaranteed non-null by the guard above.
       await db.transaction(async (tx) => {
         await storage.updateUserPassword(userId, hashed, tx);
         await storage.recordSecurityAudit({
@@ -2539,6 +2540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Factory reset + durable audit entry commit atomically (fail-closed): if
       // the audit write fails the credential regeneration is rolled back, so an
       // operator can never take over an account without a persisted audit trail.
+      // req.userId is guaranteed non-null by the guard above.
       const { tokenVersion } = await db.transaction(async (tx) => {
         const result = await storage.factoryResetUser(userId, hashed, tx);
         await storage.recordSecurityAudit({
