@@ -65,7 +65,7 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
-  vite: ^7.3.2
+  vite: ^7.3.5
   wouter: ^3.3.5
   zod: ^3.25.76
 
@@ -174,7 +174,7 @@ overrides:
   "@xmldom/xmldom": "~0.8.13"  # GHSA-crh6-fp67-6883 (DoS), GHSA-5fg8-2547-mr8q (tampering)
   node-forge: "~1.4.0"         # GHSA-x4jg-mjrx-434g (crypto bypass), GHSA-2r2c-g63r-vccr (DoS), GHSA-cfm4-qjh2-4765 (injection)
   minimatch: "~5.1.8"          # GHSA-f8q6-p94x-37v3 (ReDoS)
-  tar: "~7.5.11"               # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal)
+  tar: "~7.5.16"               # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal), GHSA-vmf3-w455-68vh (PAX smuggling, fix >=7.5.16)
   ajv: "~8.18.0"               # GHSA-v6b9-6x5j-xhj3 (input DoS)
   ip-address: "~10.1.1"        # GHSA-m6vp-8q9j-whx4 (validation bypass)
   fast-uri: "~3.1.2"           # GHSA-p5x6-c79v-8259 (URI injection)
@@ -183,7 +183,18 @@ overrides:
   # Audited 2026-05-19: no brace-expansion@5.x snapshot present in lockfile (v5 not
   # a live transitive dep); override is a forward safety pin. v1/v2 unaffected.
   "brace-expansion@5": "~5.0.6"
-  # GHSA-58qx-3vcg-4xpx: ws@8.19.x–8.20.0 information disclosure — override forces >=8.20.1.
-  # Audited 2026-05-19: pnpm-lock.yaml resolves ws@8.20.1 only; no 8.19.x snapshot present.
-  ws: "~8.20.1"
-  # (tmp security override is in package.json pnpm.overrides — see GHSA-ph9p-34f9-6g65)
+  # GHSA-96hv-2xvq-fx4p: ws memory exhaustion DoS — affects ws@8<8.21.0, ws@7<7.5.11, ws@6<6.2.4.
+  # Global override forces all ws resolutions to >=8.21.0 which includes the DoS fix.
+  # Previously ~8.20.1 (GHSA-58qx-3vcg-4xpx information disclosure fix); bumped Jun 2026.
+  ws: ">=8.21.0"
+  # GHSA-7c78-jf6q-g5cm: tmp path traversal via type confusion — fix >=0.2.7 (in package.json overrides).
+  # GHSA-hmw2-7cc7-3qxx: form-data CRLF injection in multipart field names/filenames.
+  form-data: ">=4.0.6"
+  # GHSA-6v5v-wf23-fmfq: markdown-it quadratic complexity DoS in smartquotes rule.
+  markdown-it: ">=14.2.0"
+  # GHSA-h67p-54hq-rp68: js-yaml quadratic DoS via merge key repeated aliases — fix >=4.2.0.
+  # Covers both js-yaml@3 and js-yaml@4 transitive deps by forcing all to 4.2.0+.
+  js-yaml: ">=4.2.0"
+  # GHSA-4x5r-pxfx-6jf8: @babel/core arbitrary file read via sourceMappingURL comment.
+  "@babel/core": ">=7.29.6"
+  # (tmp security override is in package.json pnpm.overrides — see GHSA-7c78-jf6q-g5cm)
