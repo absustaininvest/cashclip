@@ -13,7 +13,6 @@ import {
 import { verifyIntegrationKey } from "../lib/integrationVerify";
 import { getAdMobConfigState, syncAdMobSnapshots } from "../lib/admobReporting";
 import { secretsPassphraseMiddleware } from "../lib/secretsPassphrase";
-import { sponsoredBeginRateLimiter } from "../lib/sponsoredVisitRateLimit";
 import { adFillRateLimiter } from "../lib/adFillRateLimit";
 import {
   setVerificationState,
@@ -3402,53 +3401,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /** Earn: list active sponsored campaigns (auth required — prevents bots) */
-  app.get("/api/earn/sponsored", authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const { db: dbClient, campaigns: campaignsTable, campaignClicks: clicksTable, users: usersTable } = await import("@workspace/db");
-      const { eq: drizzleEqLocal, and: drizzleAndLocal, sql: drizzleSql, desc: drizzleDescLocal } = await import("drizzle-orm");
-
-      // Get active campaigns with enough remaining budget
-      const rows = await dbClient
-        .select({
-          id: campaignsTable.id,
-          title: campaignsTable.title,
-          description: campaignsTable.description,
-          targetUrl: campaignsTable.targetUrl,
-          rewardPerVisit: campaignsTable.rewardPerVisit,
-          totalBudget: campaignsTable.totalBudget,
-          spent: campaignsTable.spent,
-          clicks: campaignsTable.clicks,
-          publisherName: usersTable.username,
-        })
-        .from(campaignsTable)
-        .leftJoin(usersTable, drizzleEqLocal(campaignsTable.userId, usersTable.id))
-        .where(drizzleSql`${campaignsTable.status} = 'active' AND ${campaignsTable.spent} < ${campaignsTable.totalBudget}`)
-        .orderBy(drizzleDescLocal(campaignsTable.createdAt));
-
-      // Check which ones this user has already visited
-      const campaignIds = rows.map(r => r.id);
-      let visitedIds: string[] = [];
-      if (campaignIds.length > 0) {
-        const visited = await dbClient
-          .select({ campaignId: clicksTable.campaignId })
-          .from(clicksTable)
-          .where(drizzleEqLocal(clicksTable.visitorUserId, req.userId!));
-        visitedIds = visited.map(v => v.campaignId);
-      }
-
-      const result = rows.map(r => ({
-        ...r,
-        rewardPerVisit: Number(r.rewardPerVisit),
-        totalBudget: Number(r.totalBudget),
-        spent: Number(r.spent),
-        alreadyVisited: visitedIds.includes(r.id),
-      }));
-
-      res.json({ campaigns: result });
-    } catch (err) {
-      req.log?.error({ err }, "Earn sponsored failed");
-      res.status(500).json({ error: "Failed to load sponsored offers" });
-    }
+  // ── GET /api/earn/sponsored — DISABLED (Task #698, Vuln #2) ──────────────────
+  // Sponsored-visit earning is disabled because a real human viewing a third-
+  // party advertiser page cannot be proven from an untrusted client: every value
+  // in the witness chain (the /r redirect, the /ack + /c ack token, the witness
+  // cookie, the /delivery pixel) travels through the client and is replayable by
+  // a script, so visits can be faked to mint balance and drain publisher campaign
+  // budgets. The threat model explicitly rejects such replayable browser
+  // choreography as proof for money-like rewards, and no trusted provider/proof-
+  // of-delivery signal exists for arbitrary advertiser URLs to harden against.
+  //
+  // We return an empty list so the app's "Sponsored" section disappears cleanly
+  // (SponsoredSection renders nothing when there are no campaigns). Publisher
+  // campaign management is unaffected — only visitor self-crediting is disabled,
+  // and it can be re-enabled if a verifiable proof-of-visit signal is added.
+  app.get("/api/earn/sponsored", authMiddleware, (_req: AuthRequest, res) => {
+    res.json({ campaigns: [] });
   });
 
   /**
@@ -3523,31 +3491,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  This prevents direct API calls from claiming rewards without any
    *  actual visit interaction.
    */
-  // ── POST /api/earn/sponsored/:id/begin ──────────────────────────────────────
-  // DISABLED — returns 410 Gone.
-  //
-  // The full sponsored-visit chain (/begin → /r → /ack → /c → /visit) is
-  // reproducible by a scripted HTTP client:
-  //   1. Call /begin to obtain the attempt token and visitSessionToken.
-  //   2. Call /r/:token?vst=... to stamp redirectedAt and witnessNonce.
-  //   3. Wait the minimum interstitial dwell.
-  //   4. Call /ack/:token?vst=... to obtain the ackToken.
-  //   5. Call /c/:token?ack=... with spoofed Sec-Fetch-* headers to set witnessedAt.
-  //   6. Wait MIN_SPONSORED_VISIT_MS, then call /visit to settle money.
-  //
-  // No advertiser-controlled or third-party attested signal is required at any
-  // step. Sec-Fetch-* headers, IP/UA strings, and elapsed-time checks are all
-  // client-spoofable anti-abuse hints, not proof of a real page view.
-  //
-  // The endpoint is disabled until a server-verifiable external attestation
-  // (e.g. a signed partner postback with per-attempt nonce binding and replay
-  // protection from a partner system we control or trust) is added to the
-  // settlement path. The campaign browse and admin endpoints are unaffected.
-  app.post("/api/earn/sponsored/:id/begin", authMiddleware, sponsoredBeginRateLimiter, async (req: AuthRequest, res) => {
-    res.status(410).json({
-      error: "Sponsored-visit rewards are temporarily disabled. Check back soon.",
-      disabled: true,
-    });
+  // ── POST /api/earn/sponsored/:id/begin — DISABLED (Task #698, Vuln #2) ───────
+  // Returns 410 Gone so no new visit attempts can be started. Disabling /begin
+  // means no attemptToken is ever minted, which dead-ends the entire downstream
+  // witness chain (/r, /ack, /c, /delivery) and the /visit settlement. See the
+  // GET /api/earn/sponsored comment above for why this flow cannot be made
+  // tamper-proof from an untrusted client. The client (SponsoredSection) shows a
+  // benign error on non-OK begin and the section is hidden anyway (empty list).
+  app.post("/api/earn/sponsored/:id/begin", authMiddleware, (_req: AuthRequest, res) => {
+    res.status(410).json({ error: "Sponsored visits are no longer available." });
   });
 
   /** Public redirect proxy for sponsored visits.
@@ -4484,13 +4436,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  Requires a visitToken from /begin, and enforces a minimum dwell time
    *  to prove the user actually had the page open.
    */
-  // ── POST /api/earn/sponsored/:id/visit ──────────────────────────────────────
-  // DISABLED — returns 410 Gone. See /api/earn/sponsored/:id/begin for rationale.
+  // ── POST /api/earn/sponsored/:id/visit — DISABLED (Task #698, Vuln #2) ───────
+  // The settlement (money-moving) end of the sponsored-visit flow. Returns 410
+  // Gone so no balance can be credited and no publisher campaign budget can be
+  // spent for a sponsored visit. This is the authoritative closure of the fraud
+  // path: even if any pre-existing/in-flight attemptToken were replayed, no
+  // settlement can occur. See the GET /api/earn/sponsored comment above for the
+  // full rationale (replayable client-observed witness chain is not trusted proof).
   app.post("/api/earn/sponsored/:id/visit", authMiddleware, (_req: AuthRequest, res) => {
-    res.status(410).json({
-      error: "Sponsored-visit rewards are temporarily disabled. Check back soon.",
-      disabled: true,
-    });
+    res.status(410).json({ error: "Sponsored visit rewards are no longer available." });
   });
 
   /**

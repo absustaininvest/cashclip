@@ -701,74 +701,46 @@ export function registerEarningsRoutes(app: Express): void {
     },
   );
 
-  // ── POST /api/earn/game/begin ────────────────────────────────────────────────
-  // DISABLED — returns 410 Gone.
-  //
-  // The begin→complete challenge ceremony proves only elapsed time, not a real
-  // game win. No server-verifiable proof of game completion exists, so there is
-  // no trusted signal to gate the reward on. A scripted client could automate
-  // /begin → sleep → /complete and exhaust the daily cap in seconds.
-  // The endpoint is closed until a server-verifiable completion signal exists
-  // (e.g. a provider callback, signed game result, or third-party attestation).
-  // The mobile app client already expects 410 and shows the win animation without
-  // crediting a server reward.
-  app.post(
-    "/api/earn/game/begin",
-    authMiddleware,
-    (_req: AuthRequest, res: Response): void => {
-      res.status(410).json({
-        error: "Game rewards via the begin/complete flow are currently disabled. No trusted game-completion signal is available.",
-        disabled: true,
-      });
-    },
-  );
+  // ── POST /api/earn/game/{begin,complete} — DISABLED (410 Gone) ───────────────
+  // SECURITY (Task #698, Vuln #1): the begin→complete ceremony only ever proved
+  // that the client waited GAME_CHALLENGE_MIN_MS between two calls while holding
+  // its own challenge token. Elapsed time on a same-user token is NOT proof that
+  // a real game was played or won — a script can call begin, sleep, then complete
+  // to mint balance-bearing earn tokens at will, and a farm of accounts scales it.
+  // The threat model explicitly rejects "replayable browser choreography" /
+  // client-timed begin/complete as proof for money-like rewards, and there is no
+  // server-verifiable gameplay-result signal to bind these calls to. The credit
+  // path is therefore removed rather than re-hardened (no trustworthy signal
+  // exists to harden against). The client (cashclip/lib/earn-client.ts) already
+  // treats 410 as "no server reward" and shows the win animation without crediting.
+  const gameRewardGone = (_req: AuthRequest, res: Response): void => {
+    res.status(410).json({
+      ok: false,
+      error: "Game rewards are no longer available.",
+    });
+  };
+  app.post("/api/earn/game/begin", authMiddleware, gameRewardGone);
+  app.post("/api/earn/game/complete", authMiddleware, gameRewardGone);
 
-  // ── POST /api/earn/game/complete ─────────────────────────────────────────────
-  // DISABLED — returns 410 Gone. See /api/earn/game/begin for rationale.
-  app.post(
-    "/api/earn/game/complete",
-    authMiddleware,
-    (_req: AuthRequest, res: Response): void => {
-      res.status(410).json({
-        error: "Game rewards via the begin/complete flow are currently disabled. No trusted game-completion signal is available.",
-        disabled: true,
-      });
-    },
-  );
-
-  // ── POST /api/earn/ad/begin ──────────────────────────────────────────────────
-  // DISABLED — returns 410 Gone.
-  //
-  // The begin→complete challenge ceremony proves only elapsed time, not a real
-  // ad impression. Real rewarded-ad credits are delivered exclusively via the
-  // Google AdMob SSV callback at GET /api/admob/ssv, which is ECDSA-SHA256
-  // verified using Google's public keys. A scripted client could automate
-  // /begin → sleep → /complete against this fallback path to mint rewards with
-  // no real ad inventory consumed, so the endpoint is closed. The mobile app
-  // already expects 410 and skips the earn-token step gracefully.
-  app.post(
-    "/api/earn/ad/begin",
-    authMiddleware,
-    (_req: AuthRequest, res: Response): void => {
-      res.status(410).json({
-        error: "Ad rewards via the begin/complete fallback are disabled. Real ad rewards are delivered via AdMob SSV.",
-        disabled: true,
-      });
-    },
-  );
-
-  // ── POST /api/earn/ad/complete ───────────────────────────────────────────────
-  // DISABLED — returns 410 Gone. See /api/earn/ad/begin for rationale.
-  app.post(
-    "/api/earn/ad/complete",
-    authMiddleware,
-    (_req: AuthRequest, res: Response): void => {
-      res.status(410).json({
-        error: "Ad rewards via the begin/complete fallback are disabled. Real ad rewards are delivered via AdMob SSV.",
-        disabled: true,
-      });
-    },
-  );
+  // ── POST /api/earn/ad/{begin,complete} — DISABLED (410 Gone) ─────────────────
+  // SECURITY (Task #698, Vuln #1): this in-app "rewarded-ad fallback" used the
+  // same client-timed begin→complete ceremony and credited a balance-bearing
+  // earn token after only AD_CHALLENGE_MIN_MS elapsed — with no attested
+  // ad-impression signal proving an ad was ever shown. It was trivially
+  // scriptable (begin → sleep → complete) and farmable across accounts.
+  // Real rewarded-ad rewards are credited exclusively server-side via Google
+  // AdMob Server-Side Verification (ECDSA-SHA256 verified at GET /api/admob/ssv),
+  // which is a trusted provider callback. This unverifiable fallback is removed.
+  // The client (cashclip/lib/earn-client.ts) already treats 410 as "no server
+  // reward" and skips the earn-token step gracefully.
+  const adRewardGone = (_req: AuthRequest, res: Response): void => {
+    res.status(410).json({
+      ok: false,
+      error: "This reward is no longer available.",
+    });
+  };
+  app.post("/api/earn/ad/begin", authMiddleware, adRewardGone);
+  app.post("/api/earn/ad/complete", authMiddleware, adRewardGone);
 
   // ── POST /api/earnings/claim ────────────────────────────────────────────────
   // Claims all earn tokens past their 3-hour window.
