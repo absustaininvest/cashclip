@@ -12,27 +12,23 @@ esac
 GITEOF
 chmod +x /tmp/fake-bin/git
 
-# ── Locate ASC key — owner drops AuthKey_DGVBV8VV95_*.p8 into attached_assets ──
-# NOTE: The .p8 file must NOT be committed to the repo. Drop it into chat at
-# build time; Replit places it in attached_assets/ with a timestamp suffix.
-# After the build queues, the file can be safely discarded.
-KEY_FILE=$(ls -t attached_assets/AuthKey_DGVBV8VV95_*.p8 2>/dev/null | head -1)
-if [ -z "$KEY_FILE" ]; then
-  echo "ERROR: No AuthKey_DGVBV8VV95_*.p8 found in attached_assets/"
-  echo "Please drop the ASC private key file into the chat before running this build."
-  exit 1
-fi
-echo "Using ASC key: $KEY_FILE"
-cat "$KEY_FILE" > /tmp/AuthKey_DGVBV8VV95.p8
+# ── Materialize ASC key from the verified APPLE_ASC_PRIVATE_KEY secret ────────
+# Key ID 3685WS5P35 (Admin role), verified against the App Store Connect API.
+# The .p8 is NEVER stored in the repo — it lives only in Replit Secrets and is
+# written to /tmp at build time, then discarded with the sandbox.
+KEY_ID="${APPLE_ASC_KEY_ID:-3685WS5P35}"
+KEY_PATH="/tmp/AuthKey_${KEY_ID}.p8"
+KEY_PATH="$KEY_PATH" node -e 'const s=(process.env.APPLE_ASC_PRIVATE_KEY||"").replace(/\\n/g,"\n").trim(); if(!s){console.error("ERROR: APPLE_ASC_PRIVATE_KEY secret is not set.");process.exit(1)} const pem=s.includes("\n")?s:`-----BEGIN PRIVATE KEY-----\n${s.replace(/-----[^-]+-----/g,"").replace(/\s+/g,"").match(/.{1,64}/g).join("\n")}\n-----END PRIVATE KEY-----`; require("fs").writeFileSync(process.env.KEY_PATH, pem.endsWith("\n")?pem:pem+"\n");' || exit 1
+echo "Wrote ASC key $KEY_ID to $KEY_PATH"
 
 # ── Run EAS iOS production build ─────────────────────────────────────────────
 cd artifacts/cashclip
 
 export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="$EXPO_TOKLAST"
-export EXPO_ASC_API_KEY_PATH="/tmp/AuthKey_DGVBV8VV95.p8"
-export EXPO_ASC_KEY_ID="DGVBV8VV95"
-export EXPO_ASC_ISSUER_ID="45944549-8278-4477-a1c6-3348ec45c3f0"
+export EXPO_ASC_API_KEY_PATH="$KEY_PATH"
+export EXPO_ASC_KEY_ID="$KEY_ID"
+export EXPO_ASC_ISSUER_ID="${APPLE_ASC_ISSUER_ID:-45944549-8278-4477-a1c6-3348ec45c3f0}"
 export EXPO_APPLE_TEAM_ID="FAX932PG78"
 export EXPO_APPLE_TEAM_TYPE="COMPANY_OR_ORGANIZATION"
 export EAS_SKIP_AUTO_FINGERPRINT=1

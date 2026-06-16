@@ -67,9 +67,9 @@
         "ascAppId": "6759931285",
         "appleTeamId": "FAX932PG78",
         "bundleIdentifier": "app.replit.cashclip",
-        "ascApiKeyPath": "/tmp/AuthKey_DGVBV8VV95.p8",
+        "ascApiKeyPath": "/tmp/AuthKey_3685WS5P35.p8",
         "ascApiKeyIssuerId": "45944549-8278-4477-a1c6-3348ec45c3f0",
-        "ascApiKeyId": "DGVBV8VV95"
+        "ascApiKeyId": "3685WS5P35"
       },
       "android": {
         "serviceAccountKeyPath": "./credentials/google-service-account.json",
