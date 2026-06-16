@@ -84,6 +84,7 @@ vi.mock("../lib/email", () => ({
   sendPasswordChangedNotice: vi.fn(),
   sendAdminCreditReceipt: vi.fn(),
   sendSupportReply: vi.fn(),
+  sendPayPalWebhookSecretMissingAlert: vi.fn(),
 }));
 
 vi.mock("../lib/logger", () => ({

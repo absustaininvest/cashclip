@@ -36,6 +36,7 @@ import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned, sendPayPalAmbiguousAlert } from "../lib/email";
+import { alertPayPalWebhookSecretMissing } from "../lib/paypalWebhookAlert";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import { supportTicketRateLimiter } from "../lib/supportTicketRateLimit";
 import {
@@ -2002,12 +2003,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // payouts can still go out, but every PayPal status callback is 401'd, so
       // withdrawals never clear. Surface it once per process so it stands out in
       // the deployment logs instead of looking like routine attack noise.
-      if (!isPayPalWebhookConfigured() && !paypalWebhookMissingWarned) {
-        paypalWebhookMissingWarned = true;
-        req.log?.error(
-          { secret: "PAYPAL_WEBHOOK_ID" },
-          "PayPal webhook callback received but PAYPAL_WEBHOOK_ID is NOT set — signature verification is disabled, all callbacks will be rejected (401) and withdrawals will stay stuck in 'paying'/'pending'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
-        );
+      if (!isPayPalWebhookConfigured()) {
+        if (!paypalWebhookMissingWarned) {
+          paypalWebhookMissingWarned = true;
+          req.log?.error(
+            { secret: "PAYPAL_WEBHOOK_ID" },
+            "PayPal webhook callback received but PAYPAL_WEBHOOK_ID is NOT set — signature verification is disabled, all callbacks will be rejected (401) and withdrawals will stay stuck in 'paying'/'pending'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
+          );
+        }
+        // Active push alert (email) so the operator reacts without watching the
+        // hub. Self-throttled once per cooldown so it can't spam the inbox on
+        // every rejected callback (PayPal retries failed deliveries).
+        alertPayPalWebhookSecretMissing("callback");
       }
 
       const verification = await verifyPayPalWebhook(

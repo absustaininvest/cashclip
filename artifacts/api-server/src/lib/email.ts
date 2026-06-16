@@ -829,6 +829,46 @@ export function sendPayPalAmbiguousAlert(alert: {
 }
 
 /**
+ * Alert the operator that PayPal payouts are configured but PAYPAL_WEBHOOK_ID
+ * is missing — so every PayPal status callback fails closed (401) and
+ * withdrawals stay stuck in "paying"/"pending" indefinitely. This is the
+ * silent-failure mode that an admin must fix by setting the secret in the
+ * Production app secrets and re-publishing the API. Fire-and-forget; never
+ * blocks the caller. Throttling/debounce is the caller's responsibility (see
+ * paypalWebhookAlert.ts) so this cannot spam the inbox on every rejected
+ * callback.
+ */
+export function sendPayPalWebhookSecretMissingAlert(alert: {
+  /** Where the condition was detected — "startup" or "callback". */
+  source: "startup" | "callback";
+  mode: string;
+}): void {
+  const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const safeSource =
+    alert.source === "startup"
+      ? "on API startup"
+      : "when a PayPal status callback was received";
+  const safeMode = escapeHtml(alert.mode);
+  sendBestEffort({
+    to,
+    subject: "[CashClip] ACTION REQUIRED — PayPal webhook secret missing, withdrawals will stay stuck",
+    text: `PayPal payouts are configured but PAYPAL_WEBHOOK_ID is NOT set (detected ${safeSource}).\n\nWithout the webhook secret, PayPal's status callbacks cannot be verified and every callback is rejected (401). Payouts can still go out, but withdrawals never clear — they stay stuck in "paying"/"pending" indefinitely.\n\nPayPal mode: ${alert.mode}\n\nTo fix: set PAYPAL_WEBHOOK_ID in the Production app secrets and re-publish the API. Confirm the webhook is registered in PayPal Developer → CashClip Payouts app → Webhooks (URL: https://api.cash-clip.app/api/paypal/webhook).\n\n— CashClip operations`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml() or are static
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #E53935;padding-bottom:12px">⚠️ PayPal Webhook Secret Missing</h2>
+        <p style="color:#333">PayPal payouts are configured but <code>PAYPAL_WEBHOOK_ID</code> is <strong>not set</strong> (detected ${safeSource}).</p>
+        <p style="color:#333">Without the webhook secret, PayPal's status callbacks cannot be verified and every callback is rejected (<strong>401</strong>). Payouts can still go out, but withdrawals never clear — they stay stuck in <strong>paying</strong>/<strong>pending</strong> indefinitely.</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:8px 0;font-weight:600;color:#555;width:140px">PayPal mode</td><td style="padding:8px 0;font-family:monospace">${safeMode}</td></tr>
+        </table>
+        <p style="margin-top:20px;color:#333"><strong>To fix:</strong> set <code>PAYPAL_WEBHOOK_ID</code> in the Production app secrets and re-publish the API. Confirm the webhook is registered in PayPal Developer → CashClip Payouts app → Webhooks (URL: <code>https://api.cash-clip.app/api/paypal/webhook</code>).</p>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
+      </div>`,
+  });
+}
+
+/**
  * Notify a referrer that one of their referred friends cashed out and they
  * earned a referral bonus. Fire-and-forget; skipped when email is unconfigured
  * or the referrer has no email address on file.

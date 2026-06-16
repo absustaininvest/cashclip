@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { storage } from "./storage";
 import { RESERVED_ADMIN_USERNAMES } from "./auth";
 import { isPayPalConfigured, isPayPalWebhookConfigured } from "./paypal";
+import { alertPayPalWebhookSecretMissing } from "./lib/paypalWebhookAlert";
 import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
 import { loadRuntimeSettings } from "./lib/runtimeSettings";
 import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
@@ -93,6 +94,9 @@ const server = app.listen(port, (err) => {
       { secret: "PAYPAL_WEBHOOK_ID" },
       "PayPal payouts are configured but PAYPAL_WEBHOOK_ID is NOT set — webhook signature verification is disabled, all PayPal status callbacks will be rejected (401), and withdrawals will stay stuck in 'paying'/'pending'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
     );
+    // Active push alert (email) so the owner reacts without watching the hub.
+    // Throttled in-memory once per cooldown so a restart loop can't spam.
+    alertPayPalWebhookSecretMissing("startup");
   }
 
   seedAdmins().catch((e) => logger.error({ err: e }, "Admin seed failed"));
