@@ -1,24 +1,26 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, NativeModules, Platform } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { BannerAd, BannerAdSize } from "react-native-google-mobile-ads";
+import { isAdMobAvailable, getAdUnitId } from "@/lib/admob";
 import Colors from "@/constants/colors";
 
-const BANNER_UNIT_ID = "ca-app-pub-8679658921848348/3883360799";
-
-const ADMOB_NATIVE_AVAILABLE =
-  Platform.OS !== "web" &&
-  Boolean(NativeModules.GoogleMobileAds || NativeModules.RNGoogleMobileAds);
-
+// Unit ID is wired from lib/admob.ts so dev builds use Google's test banner ID
+// and production builds use the real recovered banner unit
+// (ca-app-pub-8679658921848348/3883360799). Rendering only happens on native
+// builds where the AdMob SDK is present; the web variant is a no-op stub.
 export default function InFeedBanner() {
   const [visible, setVisible] = useState(false);
 
-  if (!ADMOB_NATIVE_AVAILABLE) return null;
+  if (!isAdMobAvailable) return null;
+
+  const unitId = getAdUnitId("banner");
+  if (!unitId) return null;
 
   return (
     <View style={styles.wrapper}>
       {visible && <Text style={styles.label}>Sponsored</Text>}
       <BannerAd
-        unitId={BANNER_UNIT_ID}
+        unitId={unitId}
         size={BannerAdSize.BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdLoaded={() => setVisible(true)}
