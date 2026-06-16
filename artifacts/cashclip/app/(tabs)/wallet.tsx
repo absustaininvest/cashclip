@@ -31,6 +31,7 @@ import {
   setSeenQualifiedReferrals,
   canWithdraw,
   recordWithdrawalAttempt,
+  PAYPAL_EMAIL_CACHE_KEY,
   type UserStats,
   type Transaction,
   type WithdrawalTier,
@@ -50,6 +51,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useCelebration } from "@/lib/CelebrationContext";
 import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
+import { secureGet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
 import { isPlausiblePayPalDomain } from "@workspace/validation";
 
@@ -357,13 +359,16 @@ export default function WalletScreen() {
       return;
     }
 
-    const [integrity, srv, eligibility] = await Promise.all([
+    const [integrity, srv, eligibility, cachedEmail] = await Promise.all([
       checkDeviceIntegrity(),
       fetchServerBalance(),
       // Client-side UX pre-check (advisory only — server enforces authoritatively).
       // The daily-cap branch is reliable; the hold branch may be stale after a
       // reinstall. Either way the server will catch any ineligible request.
       canWithdraw(),
+      // Locally cached email from a prior (possibly cancelled) modal session.
+      // Used only as a fallback when the server has no email on record.
+      secureGet(PAYPAL_EMAIL_CACHE_KEY),
     ]);
 
     if (!integrity.clean) {
@@ -404,7 +409,11 @@ export default function WalletScreen() {
     // Use the profile-locked PayPal email (write-once). Fall back to last-used
     // email from the server only if the profile email isn't set yet (shouldn't
     // normally happen since openWithdrawModal guards on user.paypalEmail above).
-    const lockedEmail = user?.paypalEmail ?? srv?.lastPaypalEmail ?? null;
+    // Finally, fall back to the locally cached email so a user who typed an
+    // address but cancelled before withdrawing doesn't have to retype it. The
+    // server values always take precedence over the local cache.
+    const lockedEmail =
+      user?.paypalEmail ?? srv?.lastPaypalEmail ?? cachedEmail ?? null;
     setPaypalEmail(lockedEmail ?? "");
     setPaypalEmailError(null);
     setWithdrawError(null);

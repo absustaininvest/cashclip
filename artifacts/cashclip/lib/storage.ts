@@ -12,6 +12,11 @@ import { apiRequest } from "./query-client";
 // keep working while the single source of truth lives in "./points".
 export { DISPLAY_POINTS_PER_DOLLAR, dollarsToPoints, formatPoints };
 
+// Locally cached PayPal payout email. Lets the Profile input and withdrawal
+// modal pre-fill a previously typed address even before it's saved to the
+// server. Server-provided email always takes precedence over this cache.
+export const PAYPAL_EMAIL_CACHE_KEY = "cashclip_paypal_email_v1";
+
 const KEYS = {
   BALANCE: "cashclip_balance",
   TOTAL_EARNED: "cashclip_total_earned",

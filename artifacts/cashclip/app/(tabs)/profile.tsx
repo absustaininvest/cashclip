@@ -19,7 +19,8 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from "@expo-google-fonts/outfit";
 import Colors from "@/constants/colors";
-import { getUserStats, getReferralEarnings, getTotalReferrals, getUnreadNotificationCount, type UserStats } from "@/lib/storage";
+import { getUserStats, getReferralEarnings, getTotalReferrals, getUnreadNotificationCount, PAYPAL_EMAIL_CACHE_KEY, type UserStats } from "@/lib/storage";
+import { secureGet, secureSet } from "@/lib/secure-store";
 import { apiRequest } from "@/lib/query-client";
 import { getDisplayPointsPerDollar } from "@/lib/points";
 import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
@@ -152,6 +153,33 @@ export default function ProfileScreen() {
     }
   }, [paypalInput, refreshUser]);
 
+  const handlePaypalInputChange = useCallback((value: string) => {
+    setPaypalInput(value);
+    setPaypalError(null);
+    // Persist a valid typed email locally so the field survives navigating away
+    // before saving (and app restarts). Fire-and-forget — a storage failure
+    // just means we don't pre-fill next time. The server value still wins.
+    const trimmed = value.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(trimmed)) {
+      secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
+    }
+  }, []);
+
+  // Pre-fill the input from the locally cached email when the user hasn't yet
+  // saved one to the server. The server-locked email (rendered separately)
+  // always takes precedence, so we only read the cache when it's absent.
+  useEffect(() => {
+    if (user?.paypalEmail) return;
+    let active = true;
+    secureGet(PAYPAL_EMAIL_CACHE_KEY).then((cached) => {
+      if (active && cached) {
+        setPaypalInput((prev) => (prev ? prev : cached));
+      }
+    });
+    return () => { active = false; };
+  }, [user?.paypalEmail]);
+
   if (!fontsLoaded || !stats) return null;
 
   const achievements = getAchievements(stats, t);
@@ -252,7 +280,7 @@ export default function ProfileScreen() {
                   placeholder="your@paypal.com"
                   placeholderTextColor={Colors.textMuted}
                   value={paypalInput}
-                  onChangeText={(v) => { setPaypalInput(v); setPaypalError(null); }}
+                  onChangeText={handlePaypalInputChange}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
