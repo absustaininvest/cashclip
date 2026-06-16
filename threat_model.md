@@ -25,6 +25,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 - **Public website to admin portal boundary** — `artifacts/absustain` is mostly public marketing content but also serves a same-origin admin UI route (`/sc-portal`), so same-origin script injection or browser UI-redressing/frame-embedding issues would endanger admin tokens and privileged actions initiated from the browser. Because the admin SPA is bundled into the public website build, any hardcoded operator metadata embedded in frontend code is effectively public even if the route itself is login-gated.
 - **Public operator-metadata endpoints** — read-only routes that reveal live integration, health, or setup state sit at a public/admin trust boundary because they expose internal providers, secret presence, and operational readiness to unauthenticated users.
 - **Production vs dev-only code** — mock/demo artifacts and test-only paths are out of scope unless production reachability is demonstrated. Assume `NODE_ENV=production` in deployed environments.
+- **Tracked release credentials in temp/export paths** — temporary- or archive-looking paths such as `.eas-tmp/`, `exports/`, or attached-asset vaults remain in scope when the repository tracks live signing keys, store API keys, provisioning profiles, or other release credentials. Location alone does not make them dev-only.
 
 ## Scan Anchors
 
@@ -35,6 +36,7 @@ This monorepo contains two production-facing products: the CashClip rewards plat
 - **Production abuse-control anchor:** prioritize DB-backed or otherwise shared enforcement on login/TOTP, password reset, sponsored visits, withdrawals, support-ticket email submission, and provider-backed survey/offerwall availability and completion routes; memory-only counters do not hold across replicas.
 - **Public vs authenticated vs admin:** public marketing/lead routes, integration-status reads, and webhook endpoints are internet-reachable; most CashClip balance/reward routes are authenticated; `/api/admin/*`, venture file routes, and integration management are admin-only.
 - **Usually out of scope:** test files, mockup sandboxes, build scripts, and purely local/development tooling unless a production route or deployment path exposes them.
+- **Exception to build-artifact out-of-scope guidance:** tracked build or export artifacts that contain live Apple or Google release credentials stay in scope because repository disclosure would directly endanger the production mobile release chain.
 
 ## Threat Categories
 
