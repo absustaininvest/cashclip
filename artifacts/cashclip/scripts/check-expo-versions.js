@@ -54,6 +54,7 @@ console.error('Expo package version mismatches detected:');
 });
 console.error('');
 console.error(
-  'Fix: pnpm --filter @workspace/cashclip exec expo install --fix'
+  'Fix automatically by running:\n' +
+    '  pnpm --filter @workspace/cashclip run fix:versions'
 );
 process.exit(1);

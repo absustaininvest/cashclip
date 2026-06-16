@@ -31,7 +31,8 @@
     "postinstall": "patch-package",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "check:versions": "node scripts/check-expo-versions.js"
+    "check:versions": "node scripts/check-expo-versions.js",
+    "fix:versions": "pnpm exec expo install --fix"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
