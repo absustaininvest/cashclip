@@ -26,6 +26,15 @@ collapses to zero height on no-fill. Placements live at:
 `app/(tabs)/index.tsx` (in-feed, Home), `app/game/_layout.tsx` + `app/games.tsx`
 (anchored, bottom of game screens).
 
+**Size constant — use ANCHORED, never INLINE for in-feed:** the Home in-feed
+banner must use `BannerAdSize.ANCHORED_ADAPTIVE_BANNER` (same as BackgroundBanner).
+`INLINE_ADAPTIVE_BANNER` lets AdMob serve **tall** creatives (a full-screen-ish
+square, e.g. a yellow QR "Fast Scan" ad) that dominate the Home tab. A plan-agent
+task once flipped it to INLINE "for better fill/revenue" — that caused the giant
+banner. ANCHORED still adapts to device width (good fill) but locks height to a
+normal strip, so it can never go tall. **Why:** INLINE has no height ceiling unless
+you pass a `maxHeight` in requestOptions; ANCHORED is the simpler safe default.
+
 **Cannot be verified here:** actual fill, on-device layout, and AdMob dashboard
 impressions need a real EAS build on a physical device — out of reach of the
 workspace. Do NOT autonomously trigger an EAS build to "verify" (owner manages
