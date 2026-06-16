@@ -4643,6 +4643,7 @@ export function IntegrationHubPanel({
     clientIdSet: boolean;
     secretSet: boolean;
     webhookSet: boolean;
+    webhookMissing: boolean;
     mode: string;
     configured: boolean;
     fullyConfigured: boolean;
@@ -4997,14 +4998,21 @@ export function IntegrationHubPanel({
       {(() => {
         const fullyConfigured = paypalStatus?.fullyConfigured ?? false;
         const isLive = paypalStatus?.mode === "live";
+        // Distinct, dangerous state: payout credentials ARE set so payouts can go
+        // out, but the webhook secret is missing — PayPal's status callbacks are
+        // all rejected and withdrawals stay stuck. Flag this in red, separately
+        // from "PayPal not configured at all".
+        const webhookMissing = paypalStatus?.webhookMissing ?? false;
         const dotStatus: "green" | "amber" | "red" =
           paypalStatus === null
             ? "amber"
             : fullyConfigured
               ? "green"
-              : paypalStatus.clientIdSet || paypalStatus.secretSet
-                ? "amber"
-                : "red";
+              : webhookMissing
+                ? "red"
+                : paypalStatus.clientIdSet || paypalStatus.secretSet
+                  ? "amber"
+                  : "red";
         const label =
           paypalStatus === null
             ? "Loading…"
@@ -5012,9 +5020,11 @@ export function IntegrationHubPanel({
               ? isLive
                 ? "Live payouts active"
                 : "Sandbox mode — credentials set"
-              : paypalStatus.clientIdSet || paypalStatus.secretSet
-                ? "Partially configured — some secrets missing"
-                : "Not configured — payouts disabled";
+              : webhookMissing
+                ? "Webhook secret missing — callbacks failing"
+                : paypalStatus.clientIdSet || paypalStatus.secretSet
+                  ? "Partially configured — some secrets missing"
+                  : "Not configured — payouts disabled";
         const dotColor =
           dotStatus === "green" ? "bg-[#00E676]" : dotStatus === "amber" ? "bg-amber-400" : "bg-red-400";
         const pingColor =
@@ -5062,6 +5072,28 @@ export function IntegrationHubPanel({
                 </p>
               </div>
             </div>
+            {paypalStatus !== null && webhookMissing && (
+              <div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3">
+                <p className="text-red-800 text-sm font-semibold mb-1">⚠ Webhook secret missing — payout callbacks are failing</p>
+                <p className="text-red-700 text-xs leading-relaxed">
+                  PayPal credentials are set, so payouts can go out — but{" "}
+                  <span className="font-mono">PAYPAL_WEBHOOK_ID</span> is{" "}
+                  <span className="font-semibold">not set</span>, so every PayPal status
+                  callback is rejected (401). Withdrawals will stay stuck in{" "}
+                  <span className="italic">"paying"/"pending"</span> until this is fixed.
+                  Add the secret in{" "}
+                  <span className="font-semibold">Publishing → Production app secrets</span>,
+                  then re-publish the API:
+                </p>
+                <ul className="mt-2 space-y-0.5 text-xs text-red-700">
+                  <li>
+                    <span className="font-mono">PAYPAL_WEBHOOK_ID</span> — webhook ID from
+                    developer.paypal.com → Webhooks (register URL:{" "}
+                    <span className="font-mono">https://api.cash-clip.app/api/paypal/webhook</span>)
+                  </li>
+                </ul>
+              </div>
+            )}
             {paypalStatus !== null && !paypalStatus.configured && (
               <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
                 <p className="text-amber-800 text-sm font-semibold mb-1">⚠ Payouts are disabled</p>

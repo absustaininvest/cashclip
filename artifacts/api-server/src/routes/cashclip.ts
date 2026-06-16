@@ -87,6 +87,11 @@ interface RevenueAllocation {
 const ADMIN_ALERT_DEFAULT_EMAIL = "support@absustaininvest.com";
 const ADMIN_ALERT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// One-shot guard so the "PayPal webhook secret missing" alarm is logged loudly
+// the first time a callback arrives without PAYPAL_WEBHOOK_ID set, rather than
+// on every rejected callback (which would drown the signal in attack noise).
+let paypalWebhookMissingWarned = false;
+
 interface FundingMetrics {
   totalRevenueSources: number;
   activePartners: number;
@@ -1939,15 +1944,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const secretSet = !!(process.env.PAYPAL_SECRET || process.env.PAYPAL_CLIENT_SECRET);
     const webhookSet = isPayPalWebhookConfigured();
     const mode = process.env.PAYPAL_MODE || "sandbox";
+    const credsConfigured = isPayPalConfigured();
     const fullyConfigured = clientIdSet && secretSet && webhookSet;
+    // Dangerous, distinct state: payout credentials ARE set (payouts can go out),
+    // but the webhook secret is missing so PayPal's status callbacks fail closed
+    // (401). Withdrawals then sit in "paying"/"pending" forever with nothing to
+    // clear them. Surface this separately from "PayPal not configured at all".
+    const webhookMissing = credsConfigured && !webhookSet;
+    const status = fullyConfigured
+      ? mode === "live"
+        ? "live"
+        : "sandbox"
+      : webhookMissing
+        ? "webhook-missing"
+        : "incomplete";
     res.json({
       clientIdSet,
       secretSet,
       webhookSet,
+      webhookMissing,
       mode,
-      configured: isPayPalConfigured(),
+      configured: credsConfigured,
       fullyConfigured,
-      status: fullyConfigured ? (mode === "live" ? "live" : "sandbox") : "incomplete",
+      status,
     });
   });
 
@@ -1975,6 +1994,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rawBody = (req as unknown as Record<string, unknown>).rawBody as Buffer | undefined;
       if (!rawBody) {
         res.status(400).json({ error: "Missing raw body" }); return;
+      }
+
+      // Loud, distinct alarm when the rejection is specifically caused by the
+      // webhook secret being absent (vs a normal forged/bad-signature reject).
+      // In production this is the silent-failure mode the operator must fix:
+      // payouts can still go out, but every PayPal status callback is 401'd, so
+      // withdrawals never clear. Surface it once per process so it stands out in
+      // the deployment logs instead of looking like routine attack noise.
+      if (!isPayPalWebhookConfigured() && !paypalWebhookMissingWarned) {
+        paypalWebhookMissingWarned = true;
+        req.log?.error(
+          { secret: "PAYPAL_WEBHOOK_ID" },
+          "PayPal webhook callback received but PAYPAL_WEBHOOK_ID is NOT set — signature verification is disabled, all callbacks will be rejected (401) and withdrawals will stay stuck in 'paying'/'pending'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
+        );
       }
 
       const verification = await verifyPayPalWebhook(

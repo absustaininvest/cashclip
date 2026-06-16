@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { storage } from "./storage";
 import { RESERVED_ADMIN_USERNAMES } from "./auth";
+import { isPayPalConfigured, isPayPalWebhookConfigured } from "./paypal";
 import { loadPersistedIntegrationKeys } from "./lib/integrationKeyStore";
 import { loadRuntimeSettings } from "./lib/runtimeSettings";
 import { startWebhookAuditCleanupJob } from "./jobs/webhookAuditCleanup";
@@ -80,6 +81,20 @@ const server = app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Loud startup alarm for the silent PayPal-payout failure mode: credentials
+  // are set (so payouts CAN go out) but PAYPAL_WEBHOOK_ID is missing, which
+  // makes /api/paypal/webhook fail closed (401) on every PayPal status
+  // callback. Withdrawals then stay stuck in "paying"/"pending" forever. This
+  // surfaces it in the deployment logs immediately rather than after payouts
+  // pile up. Operators can also see it in the admin Integration Hub.
+  if (isPayPalConfigured() && !isPayPalWebhookConfigured()) {
+    logger.error(
+      { secret: "PAYPAL_WEBHOOK_ID" },
+      "PayPal payouts are configured but PAYPAL_WEBHOOK_ID is NOT set — webhook signature verification is disabled, all PayPal status callbacks will be rejected (401), and withdrawals will stay stuck in 'paying'/'pending'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
+    );
+  }
+
   seedAdmins().catch((e) => logger.error({ err: e }, "Admin seed failed"));
   loadRuntimeSettings().catch((e) => logger.error({ err: e }, "Runtime settings load failed"));
   startWebhookAuditCleanupJob();
