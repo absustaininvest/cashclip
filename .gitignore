@@ -1,0 +1,16 @@
+# Apple signing credentials — never commit these to the repository
+# (revoke and rotate any that were previously committed)
+*.p8
+*.p12
+*.mobileprovision
+*.key.pem
+
+# EAS temporary credential downloads
+.eas-tmp/
+
+# Distribution certificate archives
+DistCert_*.zip
+
+# Keystore files (Android signing)
+*.jks
+*.keystore
