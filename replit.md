@@ -66,6 +66,15 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 - **EAS Build**: `scripts/eas-build-ios.sh` — reads `EXPO_TOKLAST` secret
 - **Expo account**: username `absustainabilityinvestments`, login email `support@absustainabilityinvestments.com`. If EAS builds fail auth, regenerate a token from expo.dev while logged in with that email and update `EXPO_TOKLAST`
 
+#### Build durability — the recurring build failure, root-caused & fixed (Jun 16 2026)
+
+The "CashClip build keeps failing" symptom was actually **two independent pnpm ⇄ React-Native bugs at once**, both from pnpm's strict/isolated `node_modules` layout conflicting with tools that assume a flat tree. Re-pinning hashes only fixed it until the next dependency bump — these fixes are permanent:
+
+1. **iOS `Install pods` phase fails after every `expo` patch bump.** Never hardcode a `node_modules/.pnpm/<pkg>@<ver>_<peerhash>/…` path anywhere (app.json extraPods, Podfile, scripts). pnpm bakes the resolved peer version into that virtual-store folder name, so e.g. `expo` 54.0.34→54.0.35 renames the folder and CocoaPods can't find the podspec. The `EXUpdatesInterface` extraPod now lives **only in `app.config.js`**, where its path is resolved dynamically (`require.resolve` → `path.relative` to the generated `ios/` dir). It is no longer in `app.json`. Add any future local-podspec extraPods the same way.
+2. **Metro/deploy bundle: `Cannot find module '@babel/generator'`.** RN tooling (`react-native-worklets/plugin`, `babel-preset-expo`) does undeclared bare `require('@babel/*')`. Fixed by `publicHoistPattern: ["*eslint*","*prettier*","@babel/*"]` in `pnpm-workspace.yaml` (hoists Babel to root `node_modules`). Do **not** use `nodeLinker: hoisted` — it relocates `@expo/metro-config` away from `expo` and breaks `expo/package.json` resolution.
+
+Verify before any build: `node -e` eval of `app.config.js` (pod path uses the **current** expo hash and the dir exists) → local iOS Metro bundle returns HTTP 200 → root `pnpm run typecheck` passes (the deploy gate typechecks the whole monorepo). Note: a `pnpm install` running while a dev workflow is up corrupts the live Metro/Vite process (mid-install `patch-package_tmp_*` watch ENOENT + transient `@babel` errors) — **restart dev workflows after any reinstall**; those errors are concurrency artifacts, not the bug.
+
 ### Backend (artifacts/api-server/)
 
 - **Framework**: Express 5 + TypeScript
