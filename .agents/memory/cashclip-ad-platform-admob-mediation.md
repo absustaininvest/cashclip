@@ -40,6 +40,12 @@ Rewarded rewards credit server-side ONLY: AdMob SSV `GET /api/admob/ssv` (ECDSA-
 
 This is a compiled-SDK change. Bumped app.json buildNumber "47" / versionCode 44 (runtimeVersion still "1.0.0"). Live build 40 / build 46 do NOT have this adapter set. Smoke-test via `[AdInit]` logs + a real rewarded view landing as a pending `rewarded_ad` token.
 
+## ironSource/LevelPlay reporting is ALIVE — keep the admin reconciliation widget
+
+Swapping the *orchestrator* to AdMob did NOT kill ironSource/LevelPlay as an *account*. **Unity acquired ironSource**, so LevelPlay is now the merged Unity reporting surface. Owner confirmed (Jun 16 2026, screenshots) CashClip owns BOTH a Unity Ads account and an ironSource/LevelPlay account, under two Unity orgs: "AB Sustainability Investments" and "AB Sustainability Investments AS Publisher" — real revenue shows (e.g. $0.83 ironSource+Unity).
+
+**Therefore the admin `LevelPlayReconciliationWidget` (absustain Admin.tsx, `/api/admin/levelplay/revenue`, pulls the IronSource Reporting API) is LEGITIMATE — do NOT propose removing it as "dead."** Owner explicitly declined removal. The widget compares real DB revenue vs the live merged ironSource/Unity reporting account.
+
 ## Operator follow-ups (owner-driven, one step at a time)
 
 AdMob console: confirm the rewarded ad unit + SSV callback URL, and a mediation group listing all four networks with their credentials (Unity game IDs, ironSource app key/instance, Pangle app/placement, Chartboost app id/signature).
