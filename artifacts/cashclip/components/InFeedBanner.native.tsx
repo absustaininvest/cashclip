@@ -17,7 +17,7 @@ export default function InFeedBanner() {
   if (!unitId) return null;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, !visible && styles.hidden]}>
       {visible && <Text style={styles.label}>Sponsored</Text>}
       <BannerAd
         unitId={unitId}
@@ -35,6 +35,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 16,
     marginBottom: 8,
+  },
+  hidden: {
+    height: 0,
+    marginBottom: 0,
+    overflow: "hidden",
   },
   label: {
     fontFamily: "Outfit_400Regular",
