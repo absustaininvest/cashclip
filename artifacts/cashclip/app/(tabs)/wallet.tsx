@@ -51,39 +51,7 @@ import { useCelebration } from "@/lib/CelebrationContext";
 import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { t as tFn, type Translations } from "@/lib/i18n";
-
-const PAYPAL_DISPOSABLE_DOMAINS = new Set([
-  "mailinator.com","guerrillamail.com","guerrillamail.info","guerrillamail.biz",
-  "guerrillamail.de","guerrillamail.net","guerrillamail.org","guerrillamailblock.com",
-  "grr.la","sharklasers.com","spam4.me","maildrop.cc","dispostable.com",
-  "fakeinbox.com","tempmail.com","temp-mail.org","throwaway.email","getnada.com",
-  "mailnull.com","spamgourmet.com","trashmail.at","trashmail.io","trashmail.me",
-  "trashmail.net","trashmail.xyz","wegwerfmail.de","wegwerfmail.net","wegwerfmail.org",
-  "10minutemail.com","10minutemail.net","mailnesia.com","discard.email","filzmail.com",
-  "boun.cr","trbvm.com","yopmail.com","throwam.com",
-]);
-
-const SHORT_SLD_TRUSTED_TLDS = new Set([
-  "com","net","org","gov","edu","mil","int","io","app","dev",
-]);
-
-function isPlausiblePayPalDomain(email: string): boolean {
-  const normalized = email.trim().toLowerCase();
-  const atIndex = normalized.lastIndexOf("@");
-  if (atIndex < 0) return false;
-  const domain = normalized.slice(atIndex + 1);
-  if (!domain) return false;
-  const labels = domain.split(".");
-  if (labels.length < 2) return false;
-  if (labels.some((l) => l.length < 2)) return false;
-  if (labels.length === 2) {
-    const sld = labels[0]!;
-    const tld = labels[1]!;
-    if (sld.length <= 3 && !SHORT_SLD_TRUSTED_TLDS.has(tld)) return false;
-  }
-  if (PAYPAL_DISPOSABLE_DOMAINS.has(domain)) return false;
-  return true;
-}
+import { isPlausiblePayPalDomain } from "@workspace/validation";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   const colonIdx = rawMsg.indexOf(":");
