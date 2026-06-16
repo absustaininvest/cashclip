@@ -6925,246 +6925,6 @@ function RevenuePanel({
   );
 }
 
-// ─── App Config Panel ────────────────────────────────────────────────────────
-// Version reconciliation reference. No user or admin-sensitive data.
-
-// What is actually live on user devices right now.
-const LIVE_BUILD = {
-  iosBuildNumber: "29",
-  appVersion: "1.0.0",
-  runtimeVersion: "1.0.0",
-  androidBuildNumber: "38",
-  androidStatus: "Internal testing (not yet public)",
-  appStoreStatus: "Approved — live on App Store",
-  bundleId: "app.replit.cashclip",
-  easProjectId: "aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
-  otaUpdatesUrl: "https://u.expo.dev/aac2a3d9-56b6-49ab-b254-9b80e98bab2f",
-  otaChannel: "production",
-} as const;
-
-// What app.json currently contains — numbers for the NEXT native build,
-// not yet submitted or live anywhere.
-const NEXT_BUILD = {
-  appVersion: "1.1.0",
-  runtimeVersion: "1.0.0",
-  iosBuildNumber: "41",
-  androidVersionCode: 42,
-  expoSdkVersion: "54",
-  newArchEnabled: true,
-  ios: {
-    deploymentTarget: "15.1",
-    supportsTablet: false,
-    encryptionExempt: true,
-    pushEnvironment: "production",
-    admobAppId: "ca-app-pub-8679658921848348~6212139107",
-    skAdNetworkCount: 76,
-  },
-  android: {
-    minSdkVersion: 25,
-    compileSdkVersion: 36,
-    targetSdkVersion: 36,
-    buildToolsVersion: "36.0.0",
-    kotlinVersion: "2.1.20",
-    admobAppId: "ca-app-pub-8679658921848348~6212139107",
-  },
-  adNetworks: {
-    platform: "LevelPlay (ironSource mediation)",
-    ironsourceAppKey: "2690d87e5",
-    demandSources: ["Unity Ads", "Pangle"],
-  },
-  plugins: [
-    "@logrocket/react-native",
-    "expo-notifications",
-    "@sentry/react-native/expo",
-    "expo-router",
-    "expo-font",
-    "expo-web-browser",
-    "expo-tracking-transparency",
-    "expo-build-properties",
-    "withAndroidManifestFix",
-  ],
-  sentry: {
-    organization: "ab-sustainability-investments",
-    project: "cash-clip",
-  },
-} as const;
-
-function ConfigRow({
-  label,
-  value,
-  mono = false,
-  badge,
-}: {
-  label: string;
-  value: string | number | boolean;
-  mono?: boolean;
-  badge?: "green" | "blue" | "gray";
-}) {
-  const display =
-    typeof value === "boolean" ? (value ? "Yes" : "No") : String(value);
-  const badgeColor =
-    badge === "green"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-      : badge === "blue"
-        ? "bg-blue-100 text-blue-700 border-blue-200"
-        : "bg-gray-100 text-gray-600 border-gray-200";
-  return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-      <span className="text-gray-500 text-sm">{label}</span>
-      {badge ? (
-        <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full border ${badgeColor}`}
-        >
-          {display}
-        </span>
-      ) : (
-        <span
-          className={`text-sm font-medium text-gray-900 ${mono ? "font-mono text-xs bg-gray-100 px-2 py-0.5 rounded" : ""}`}
-        >
-          {display}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function ConfigSection({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className="w-4 h-4 text-emerald-500" />
-        <h3 className="font-['Space_Grotesk'] font-semibold text-gray-900 text-sm uppercase tracking-wider">
-          {title}
-        </h3>
-      </div>
-      <div className="space-y-0">{children}</div>
-    </div>
-  );
-}
-
-function AppConfigPanel() {
-  const live = LIVE_BUILD;
-  const next = NEXT_BUILD;
-  return (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 rounded-xl bg-emerald-100">
-          <Server className="w-5 h-5 text-emerald-600" />
-        </div>
-        <div>
-          <h2 className="font-['Space_Grotesk'] text-xl font-bold text-gray-900">
-            App Configuration
-          </h2>
-          <p className="text-gray-400 text-sm">
-            Version reconciliation reference — no user data.
-          </p>
-        </div>
-      </div>
-
-      {/* ── LIVE BUILD (reconciliation anchor) ─────────────────────────── */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-        <span className="font-['Space_Grotesk'] font-bold text-gray-900 text-sm uppercase tracking-wider">
-          Live on App Store — reconciliation anchor
-        </span>
-      </div>
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8">
-          <ConfigRow label="App Version" value={live.appVersion} badge="green" />
-          <ConfigRow label="iOS Build #" value={live.iosBuildNumber} badge="green" />
-          <ConfigRow label="Runtime Version" value={live.runtimeVersion} badge="blue" />
-          <ConfigRow label="App Store Status" value={live.appStoreStatus} badge="green" />
-          <ConfigRow label="Android Build #" value={live.androidBuildNumber} />
-          <ConfigRow label="Android Status" value={live.androidStatus} badge="gray" />
-          <ConfigRow label="OTA Channel" value={live.otaChannel} badge="blue" />
-          <ConfigRow label="Bundle ID" value={live.bundleId} mono />
-          <ConfigRow label="EAS Project ID" value={live.easProjectId} mono />
-        </div>
-        <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center gap-2">
-          <Wifi className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="text-gray-500 text-xs">OTA URL: </span>
-          <span className="text-gray-900 text-xs font-mono">{live.otaUpdatesUrl}</span>
-        </div>
-      </div>
-
-      {/* ── NEXT BUILD (app.json — not yet live) ───────────────────────── */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
-        <span className="font-['Space_Grotesk'] font-bold text-gray-500 text-sm uppercase tracking-wider">
-          Next native build — app.json (not yet submitted or live)
-        </span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {/* Versions */}
-        <ConfigSection title="Versions" icon={Rocket}>
-          <ConfigRow label="App Version" value={next.appVersion} />
-          <ConfigRow label="Runtime Version" value={next.runtimeVersion} badge="blue" />
-          <ConfigRow label="iOS Build #" value={next.iosBuildNumber} />
-          <ConfigRow label="Android versionCode" value={next.androidVersionCode} />
-          <ConfigRow label="Expo SDK" value={next.expoSdkVersion} />
-          <ConfigRow label="New Architecture" value={next.newArchEnabled} badge="green" />
-        </ConfigSection>
-
-        {/* iOS */}
-        <ConfigSection title="iOS Config" icon={Smartphone}>
-          <ConfigRow label="Deployment Target" value={next.ios.deploymentTarget} />
-          <ConfigRow label="Supports Tablet" value={next.ios.supportsTablet} badge="gray" />
-          <ConfigRow label="Encryption Exempt" value={next.ios.encryptionExempt} badge="green" />
-          <ConfigRow label="Push Environment" value={next.ios.pushEnvironment} badge="blue" />
-          <ConfigRow label="AdMob App ID" value={next.ios.admobAppId} mono />
-          <ConfigRow label="SKAdNetwork IDs" value={`${next.ios.skAdNetworkCount} entries`} />
-        </ConfigSection>
-
-        {/* Android */}
-        <ConfigSection title="Android Config" icon={Smartphone}>
-          <ConfigRow label="Min SDK" value={next.android.minSdkVersion} />
-          <ConfigRow label="Compile SDK" value={next.android.compileSdkVersion} />
-          <ConfigRow label="Target SDK" value={next.android.targetSdkVersion} />
-          <ConfigRow label="Build Tools" value={next.android.buildToolsVersion} mono />
-          <ConfigRow label="Kotlin" value={next.android.kotlinVersion} mono />
-          <ConfigRow label="AdMob App ID" value={next.android.admobAppId} mono />
-        </ConfigSection>
-
-        {/* Ad Networks */}
-        <ConfigSection title="Ad Networks" icon={DollarSign}>
-          <ConfigRow label="Platform" value={next.adNetworks.platform} />
-          <ConfigRow label="App Key" value={next.adNetworks.ironsourceAppKey} mono />
-          <ConfigRow label="Demand Sources" value={next.adNetworks.demandSources.join(", ")} />
-        </ConfigSection>
-
-        {/* Sentry + Plugins */}
-        <ConfigSection title="Monitoring & Plugins" icon={Layers}>
-          <ConfigRow label="Sentry Org" value={next.sentry.organization} mono />
-          <ConfigRow label="Sentry Project" value={next.sentry.project} mono />
-          <div className="pt-2">
-            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              Plugins ({next.plugins.length})
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {next.plugins.map((p) => (
-                <span
-                  key={p}
-                  className="text-xs bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded font-mono"
-                >
-                  {p}
-                </span>
-              ))}
-            </div>
-          </div>
-        </ConfigSection>
-      </div>
-    </div>
-  );
-}
-
 type Tab =
   | "submissions"
   | "hub"
@@ -7176,8 +6936,7 @@ type Tab =
   | "publishers"
   | "security"
   | "securitylog"
-  | "withdrawals"
-  | "appconfig";
+  | "withdrawals";
 
 interface WithdrawalRow {
   id: string;
@@ -7488,7 +7247,6 @@ function Dashboard({
     { id: "publishers", label: "Publisher Program", icon: Megaphone },
     { id: "ventures", label: "Ventures", icon: Layers },
     { id: "inbox", label: "Inbox", icon: Inbox },
-    { id: "appconfig", label: "App Config", icon: Server },
     { id: "account", label: "Account", icon: User },
     { id: "security", label: "Security", icon: Shield },
     { id: "securitylog", label: "Security Log", icon: History },
@@ -7740,7 +7498,6 @@ function Dashboard({
             <ChangePasswordPanel token={token} />
           </div>
         )}
-        {tab === "appconfig" && <AppConfigPanel />}
         {tab === "security" && <TwoFactorPanel token={token} />}
         {tab === "securitylog" && <SecurityLogPanel token={token} onLogout={onLogout} />}
       </main>
