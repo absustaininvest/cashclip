@@ -19,4 +19,6 @@ EAS build ID: `e8a9b69e-6068-4ad7-a4f9-cea57da96c2d`
 
 **EAS build script:** `artifacts/cashclip/scripts/eas-build-ios-46.sh` — uses git-wrapper trick + reads ASC key from `attached_assets/AuthKey_DGVBV8VV95_*.p8`. Workflow: "EAS iOS Build 46".
 
-**Remaining minor mismatches (non-blocking):** expo-font ~14.0.10 (expect ~14.0.12), expo-router ~6.0.17 (expect ~6.0.24), expo-updates ~29.0.17 (expect ~29.0.18).
+**SDK 54 patch mismatches resolved:** expo-font → ~14.0.12, expo-router → ~6.0.24, expo-updates → ~29.0.18 (expo doctor clean).
+
+**TestFlight confirmation (Jun 16 2026):** owner installed build 46 via TestFlight on a real device and confirmed it works end-to-end against production — balance, ATT consent, terms/privacy, ad playback, reward claim, and wallet pending-points all functional. Critically, ATT consent clears and does NOT re-fire on relaunch (the splash/consent deadlock that got build 38 rejected under Apple 2.1a is gone). Build 46 is the confirmed-good submission candidate.
