@@ -24,6 +24,8 @@ a dev restart — NOT when you merely change a production env var. Same family o
 gotcha as prod secrets only taking effect after re-publish. In tests (no esbuild)
 it is undefined and the handler reports `lastDeployedAt: null`.
 
+**Ad-card copy must track the live orchestrator (Jun 16 2026):** the `adUnavailReason` note for `admob`/`ironsource` once hardcoded "LevelPlay SDK compiled into the app build" — stale after the swap back to AdMob. Now AdMob says "Google Mobile Ads SDK… in the live app build"; ironSource is labeled **"Unity ➣ ironSource"** (its name in `integrations.ts`) with a "demand source via Unity mediation" note. **Why:** ironSource Ads *direct demand network was sunset Apr 30 2026* — ironSource demand now flows through Unity's SDK (owner-confirmed via the ironSource "No Data" report). Don't reintroduce LevelPlay wording. Server copy → needs a Publish to show on the live hub.
+
 **"Users online" = `users.lastSeenAt`**, touched best-effort in `authMiddleware`
 (per-replica ~60s throttle map) with the DB UPDATE additionally guarded by a
 `lastSeenAt < now() - 50s` WHERE clause so it stays correct across autoscaled
