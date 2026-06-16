@@ -3,6 +3,11 @@ import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
+// React 19 requires this flag so act() flushes async effects in the node env.
+// Without it react-test-renderer warns "The current testing environment is not
+// configured to support act(...)" and async state updates leak between tests.
+(global as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 // ── In-memory AsyncStorage ─────────────────────────────────────────────────────
 // All real storage helpers (getSeenQualifiedReferrals / setSeenQualifiedReferrals)
 // run against this in-memory map, so storage round-trips are fully exercised.
@@ -220,8 +225,16 @@ vi.mock("@/lib/LanguageContext", () => ({
   }),
 }));
 
+// The withdrawal modal gates on user.paypalEmail (write-once profile email) and
+// derives the suspicious-email warning from it. Drive it from a mutable lever so
+// individual tests can mount the screen with a plausible or disposable saved
+// email. Default is a plausible address so the modal opens cleanly.
+let authPaypalEmail: string | null = "saver@gmail.com";
 vi.mock("@/lib/AuthContext", () => ({
-  useAuth: () => ({ token: "fake-token", user: { id: "u1", username: "tester" } }),
+  useAuth: () => ({
+    token: "fake-token",
+    user: { id: "u1", username: "tester", paypalEmail: authPaypalEmail },
+  }),
 }));
 vi.mock("@/lib/CelebrationContext", () => ({
   useCelebration: () => ({ celebrate: vi.fn() }),
@@ -331,6 +344,7 @@ beforeEach(() => {
   bonusFireCount = 0;
   capturedAmount = 0;
   prevModalVisible = false;
+  authPaypalEmail = "saver@gmail.com";
 });
 
 // ── Bonus fires on first qualifying load ──────────────────────────────────────
@@ -551,11 +565,13 @@ describe("Wallet referral bonus — second loadData in the same session does not
 
 // ── Suspicious-email warning banner in the withdrawal modal ───────────────────
 //
-// openWithdrawModal calls fetchServerBalance() and checks the returned
-// lastPaypalEmail against the PAYPAL_DISPOSABLE_DOMAINS list and the
-// isPlausiblePayPalDomain heuristic. When the saved email is flagged the
-// banner "Your saved PayPal email may not be accepted" is shown inside the
-// modal; when the email passes the check the banner must be absent.
+// openWithdrawModal reads the write-once profile email (user.paypalEmail) and
+// runs it through isPlausiblePayPalDomain from @workspace/validation. When the
+// saved email is on the disposable list or fails the plausibility heuristic the
+// banner "...may not be accepted..." is shown inside the modal and the confirm
+// button is disabled; when the email passes the check the banner is absent and
+// the confirm button is usable. The email itself is locked (write-once), so the
+// validation surface here is the saved email, not free-text typing.
 describe("Wallet withdrawal modal — suspicious-email warning banner", () => {
   // Helper: render the screen, wait for initial load, then press the withdraw
   // button and flush the async openWithdrawModal handler.
@@ -571,65 +587,51 @@ describe("Wallet withdrawal modal — suspicious-email warning banner", () => {
     await flush();
   }
 
-  it("shows the warning banner when the saved PayPal email is on a disposable domain", async () => {
-    fetchServerBalanceMock.mockResolvedValue({
-      balance: 5,
-      totalEarned: 5,
-      lastPaypalEmail: "user@mailinator.com",
-    });
+  async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
+    fetchServerBalanceMock.mockResolvedValue({ balance: 5, totalEarned: 5 });
     fetchReferralStatsMock.mockResolvedValue(null);
-
     let tr!: TestRenderer.ReactTestRenderer;
     await act(async () => {
       tr = TestRenderer.create(React.createElement(WalletScreen));
     });
     await flush();
+    return tr;
+  }
+
+  it("shows the warning banner when the saved PayPal email is on a disposable domain", async () => {
+    authPaypalEmail = "user@mailinator.com";
+    const tr = await renderScreen();
 
     await openModal(tr);
 
     const texts = allText(tr.root);
-    expect(
-      texts.some((t) => t.includes("may not be accepted")),
-    ).toBe(true);
+    expect(texts.some((t) => t.includes("may not be accepted"))).toBe(true);
   });
 
   it("does NOT show the warning banner when the saved PayPal email has a plausible domain", async () => {
-    fetchServerBalanceMock.mockResolvedValue({
-      balance: 5,
-      totalEarned: 5,
-      lastPaypalEmail: "user@gmail.com",
-    });
-    fetchReferralStatsMock.mockResolvedValue(null);
-
-    let tr!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tr = TestRenderer.create(React.createElement(WalletScreen));
-    });
-    await flush();
+    authPaypalEmail = "user@gmail.com";
+    const tr = await renderScreen();
 
     await openModal(tr);
 
     const texts = allText(tr.root);
-    expect(
-      texts.some((t) => t.includes("may not be accepted")),
-    ).toBe(false);
+    expect(texts.some((t) => t.includes("may not be accepted"))).toBe(false);
   });
 });
 
-// ── Inline PayPal email validation — typing into the withdrawal modal ─────────
+// ── Saved PayPal email validation gates the confirm button ────────────────────
 //
-// handlePaypalEmailChange fires isPlausiblePayPalDomain on every keystroke.
-// When a disposable-domain email is typed the inline paypalEmailError text
-// appears and the withdraw-confirm button becomes disabled, independently of
-// the saved-email warning that fires on modal open.
-describe("Wallet withdrawal modal — inline PayPal email validation on typing", () => {
-  // Balance ≥ $5 makes getWithdrawalTiers return [$3, $5] tiers.
-  // lastPaypalEmail: null ensures no savedEmailWarning so we test the
-  // inline validation path in isolation.
-  const BALANCE_RESP = { balance: 5, totalEarned: 5, lastPaypalEmail: null };
-
+// The withdrawal email is locked (write-once profile email), so there is no
+// free-text typing in the modal. The anti-fraud surface that remains is the
+// validation of that saved email: a disposable or implausible saved domain must
+// flag the warning banner AND disable the withdraw-confirm button (so the user
+// contacts support instead of hitting a guaranteed server-side rejection),
+// while a plausible saved domain must leave the confirm button usable. Each
+// assertion routes through isPlausiblePayPalDomain from @workspace/validation.
+describe("Wallet withdrawal modal — saved PayPal email validation gates confirm", () => {
   async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
-    fetchServerBalanceMock.mockResolvedValue(BALANCE_RESP);
+    // Balance ≥ $5 makes getWithdrawalTiers return selectable tiers.
+    fetchServerBalanceMock.mockResolvedValue({ balance: 5, totalEarned: 5 });
     fetchReferralStatsMock.mockResolvedValue(null);
     let tr!: TestRenderer.ReactTestRenderer;
     await act(async () => {
@@ -669,68 +671,56 @@ describe("Wallet withdrawal modal — inline PayPal email validation on typing",
     await flush();
   }
 
-  async function typeEmail(
-    tr: TestRenderer.ReactTestRenderer,
-    email: string,
-  ): Promise<void> {
-    const input = tr.root.find(
-      (n) => n.props.testID === "withdraw-paypal-email",
-    );
-    await act(async () => {
-      input.props.onChangeText(email);
-    });
-    await flush();
-  }
-
-  it("shows the inline error when a disposable-domain email is typed", async () => {
+  it("disables the withdraw-confirm button when the saved email is on a disposable domain", async () => {
+    authPaypalEmail = "user@yopmail.com";
     const tr = await renderScreen();
     await openWithdrawModal(tr);
     await selectFirstTier(tr);
-    await typeEmail(tr, "user@mailinator.com");
 
-    const texts = allText(tr.root);
-    expect(texts.some((t) => t.includes("isn't accepted"))).toBe(true);
-  });
-
-  it("does NOT show the inline error when a plausible email is typed", async () => {
-    const tr = await renderScreen();
-    await openWithdrawModal(tr);
-    await selectFirstTier(tr);
-    await typeEmail(tr, "user@gmail.com");
-
-    const texts = allText(tr.root);
-    expect(texts.some((t) => t.includes("isn't accepted"))).toBe(false);
-  });
-
-  it("disables the withdraw-confirm button while the inline email error is present", async () => {
-    const tr = await renderScreen();
-    await openWithdrawModal(tr);
-    await selectFirstTier(tr);
-    await typeEmail(tr, "user@yopmail.com");
-
-    const confirmBtn = tr.root.find(
-      (n) => n.props.testID === "withdraw-confirm",
-    );
+    // Warning banner is present (exercises isPlausiblePayPalDomain).
+    expect(allText(tr.root).some((t) => t.includes("may not be accepted"))).toBe(true);
+    // Confirm button is blocked even though a tier is selected.
+    const confirmBtn = tr.root.find((n) => n.props.testID === "withdraw-confirm");
     expect(confirmBtn.props.disabled).toBe(true);
   });
 
-  it("clears the inline error and re-enables the confirm button when the user fixes a bad email", async () => {
+  it("keeps the withdraw-confirm button usable when the saved email is plausible", async () => {
+    authPaypalEmail = "user@gmail.com";
     const tr = await renderScreen();
     await openWithdrawModal(tr);
     await selectFirstTier(tr);
 
-    // Step 1: type a disposable-domain email → error appears, button disabled.
-    await typeEmail(tr, "user@mailinator.com");
-    expect(allText(tr.root).some((t) => t.includes("isn't accepted"))).toBe(true);
-    expect(
-      tr.root.find((n) => n.props.testID === "withdraw-confirm").props.disabled,
-    ).toBe(true);
+    // No warning banner for a plausible saved email.
+    expect(allText(tr.root).some((t) => t.includes("may not be accepted"))).toBe(false);
+    // With a tier selected and a valid locked email, confirm is enabled.
+    const confirmBtn = tr.root.find((n) => n.props.testID === "withdraw-confirm");
+    expect(confirmBtn.props.disabled).toBe(false);
+  });
 
-    // Step 2: retype with a plausible email → error must be gone, button re-enabled.
-    await typeEmail(tr, "user@gmail.com");
-    expect(allText(tr.root).some((t) => t.includes("isn't accepted"))).toBe(false);
-    expect(
-      tr.root.find((n) => n.props.testID === "withdraw-confirm").props.disabled,
-    ).toBe(false);
+  it("flags an implausibly short domain that is not on the disposable list", async () => {
+    // "ab.co": SLD ≤ 3 chars on an untrusted TLD → isPlausiblePayPalDomain false.
+    // This proves the heuristic (not just the disposable Set) is exercised.
+    authPaypalEmail = "user@ab.co";
+    const tr = await renderScreen();
+    await openWithdrawModal(tr);
+
+    expect(allText(tr.root).some((t) => t.includes("may not be accepted"))).toBe(true);
+  });
+
+  it("flags every known disposable domain it is given", async () => {
+    const disposable = [
+      "user@mailinator.com",
+      "user@guerrillamail.com",
+      "user@trashmail.net",
+      "user@10minutemail.com",
+    ];
+    for (const email of disposable) {
+      authPaypalEmail = email;
+      const tr = await renderScreen();
+      await openWithdrawModal(tr);
+      expect(
+        allText(tr.root).some((t) => t.includes("may not be accepted")),
+      ).toBe(true);
+    }
   });
 });

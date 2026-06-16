@@ -415,10 +415,21 @@ export default function WalletScreen() {
     const lockedEmail =
       user?.paypalEmail ?? srv?.lastPaypalEmail ?? cachedEmail ?? null;
     setPaypalEmail(lockedEmail ?? "");
-    setPaypalEmailError(null);
+    // Even though the email is locked (write-once), a legacy / last-used address
+    // could sit on a disposable or implausible domain the payout processor will
+    // reject. Surface the warning banner and block the confirm button so the
+    // user contacts support instead of hitting a server-side rejection.
+    const lockedTrimmed = lockedEmail?.trim() ?? "";
+    const suspiciousSaved =
+      !!lockedTrimmed && !isPlausiblePayPalDomain(lockedTrimmed);
+    setSavedEmailWarning(suspiciousSaved);
+    setPaypalEmailError(
+      suspiciousSaved
+        ? "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+        : null,
+    );
     setWithdrawError(null);
     setWithdrawErrorCode(null);
-    setSavedEmailWarning(false);
     setShowWithdrawModal(true);
   }, [user, t]);
 
@@ -770,6 +781,14 @@ export default function WalletScreen() {
               </View>
             ) : (
             <>
+            {savedEmailWarning && (
+              <View style={styles.savedEmailWarningBanner}>
+                <Feather name="alert-triangle" size={15} color="#F59E0B" />
+                <Text style={styles.savedEmailWarningText}>
+                  Your saved PayPal email may not be accepted for payouts — contact support if it's incorrect.
+                </Text>
+              </View>
+            )}
             <Text style={styles.modalBalance}>
               {t.wallet.available}: ${serverBalance.toFixed(2)}
             </Text>
