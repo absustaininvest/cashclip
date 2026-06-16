@@ -42,7 +42,7 @@
 
 ---
 
-## B. NOT on V29 — native changes that only land with build 41
+## B. NOT on V29 — native changes that only land with build 46
 
 These can't ride OTA; they need the new native build:
 - **Splash-freeze fix** (the bug that froze the 1.1.0/38 generation) — splash now hides on fonts-ready, consent screen shows after.
