@@ -542,7 +542,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Key is present; verification is always "unsupported" for client SDKs
           // because the native module presence can only be checked on-device.
           adUnavailReason =
-            "Native adapter required — ad system active only when LevelPlay SDK is compiled into the app build";
+            s.id === "admob"
+              ? "Native adapter required — ads serve only when the Google Mobile Ads SDK is compiled into the live app build"
+              : "Demand source via Unity mediation — serves only when its adapter is compiled into the live app build";
         }
       }
 

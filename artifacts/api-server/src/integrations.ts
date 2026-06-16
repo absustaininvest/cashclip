@@ -53,7 +53,7 @@ export const integrations: Integration[] = [
   },
   {
     id: "ironsource",
-    name: "IronSource (Unity LevelPlay)",
+    name: "Unity ➣ ironSource",
     category: "ads",
     envKey: "IRONSOURCE_APP_KEY",
     signupUrl: "https://platform.ironsrc.com",

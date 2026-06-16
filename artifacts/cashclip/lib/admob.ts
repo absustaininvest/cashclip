@@ -33,7 +33,11 @@ export const AD_UNITS = {
     android: "ca-app-pub-8679658921848348/4959956862",
     default: "ca-app-pub-8679658921848348/8403546965",
   }) as string,
-  banner: "ca-app-pub-8679658921848348/3883360799",
+  banner: Platform.select({
+    ios: "ca-app-pub-8679658921848348/3883360799",
+    android: "ca-app-pub-8679658921848348/5368280275",
+    default: "ca-app-pub-8679658921848348/3883360799",
+  }) as string,
   native: "ca-app-pub-8679658921848348/4968536047",
 };
 
