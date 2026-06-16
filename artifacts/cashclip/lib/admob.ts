@@ -23,7 +23,11 @@ export const ADMOB_APP_ID = Platform.select({
 }) as string;
 
 export const AD_UNITS = {
-  rewarded: "ca-app-pub-8679658921848348/7282036986",
+  rewarded: Platform.select({
+    ios: "ca-app-pub-8679658921848348/7282036986",
+    android: "ca-app-pub-8679658921848348/8659630355",
+    default: "ca-app-pub-8679658921848348/7282036986",
+  }) as string,
   interstitial: "ca-app-pub-8679658921848348/8403546965",
   banner: "ca-app-pub-8679658921848348/3883360799",
   native: "ca-app-pub-8679658921848348/4968536047",
