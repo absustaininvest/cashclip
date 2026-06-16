@@ -25,7 +25,6 @@ import Chipley from "@/components/Chipley";
 import RewardSuccessModal from "@/components/RewardSuccessModal";
 import {
   getUserStats,
-  getTransactions,
   getWithdrawalTiers,
   getSeenQualifiedReferrals,
   setSeenQualifiedReferrals,
@@ -40,6 +39,7 @@ import {
   refreshPendingFromServer,
   claimAllReady,
   fetchServerBalance,
+  fetchTransactions,
   fetchReferralStats,
   formatPoints,
   formatCountdown,
@@ -92,8 +92,14 @@ function TransactionItem({ item, t }: { item: Transaction; t: Translations }) {
     item.type === "checkin" ? "check-circle" :
     item.type === "spin" ? "rotate-cw" :
     item.type === "mission" ? "target" :
+    item.type === "refund" ? "corner-up-left" :
+    item.type === "adjustment" ? "sliders" :
     "dollar-sign";
-  const iconColor = item.type === "withdrawn" ? Colors.error : item.type === "bonus" ? Colors.accent : Colors.primary;
+  const iconColor =
+    item.type === "withdrawn" ? Colors.error :
+    item.type === "bonus" || item.type === "refund" ? Colors.accent :
+    item.type === "adjustment" ? (isPositive ? Colors.primary : Colors.error) :
+    Colors.primary;
 
   const date = new Date(item.timestamp);
   const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -225,11 +231,12 @@ export default function WalletScreen() {
     setLoadError(false);
     setServerError(false);
 
-    // Step 1: local reads — always populate the UI, even if server calls fail.
+    // Step 1: local stats read — populates non-money UI (streak, counts) even if
+    // server calls fail. The activity feed is NO LONGER read from local notes;
+    // it comes from the server ledger in Step 2 so it always matches the balance.
     try {
-      const [s, txns] = await Promise.all([getUserStats(), getTransactions()]);
+      const s = await getUserStats();
       setStats(s);
-      setTransactions(txns);
     } catch {
       // Local storage failed entirely — nothing to show.
       setLoadError(true);
@@ -242,9 +249,10 @@ export default function WalletScreen() {
     // return null on failure rather than throwing, so each null return counts as
     // a partial server failure and must set serverError.
     try {
-      const [srv, pending] = await Promise.all([
+      const [srv, pending, txns] = await Promise.all([
         fetchServerBalance(),
         refreshPendingFromServer(),
+        fetchTransactions(),
       ]);
 
       if (srv) {
@@ -257,8 +265,14 @@ export default function WalletScreen() {
         setPendingState(pending);
       }
 
-      // Either call returning null means at least one server piece failed.
-      if (!srv || !pending) {
+      // The activity feed is server-authoritative: show only the real ledger so
+      // the list can never sum to more than the withdrawable balance. On failure
+      // show an empty feed (with the serverError banner) rather than stale local
+      // notes that would resurrect the phantom.
+      setTransactions(txns ?? []);
+
+      // Any call returning null means at least one server piece failed.
+      if (!srv || !pending || !txns) {
         setServerError(true);
       }
 

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, apiRequestSafe } from "./query-client";
+import type { Transaction } from "./storage";
 import { POINTS_PER_DOLLAR, pointsToUsd, formatPoints, setDisplayPointsPerDollar } from "./points";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -562,6 +563,54 @@ export async function fetchServerBalance(): Promise<{ balance: number; totalEarn
       totalEarned: Number(data.totalEarned) || 0,
       lastPaypalEmail: typeof data.lastPaypalEmail === "string" ? data.lastPaypalEmail : null,
     };
+  } catch {
+    return null;
+  }
+}
+
+// ── TRANSACTION HISTORY (server-authoritative) ───────────────────────────────
+// The wallet activity feed is the real earnings_ledger from the server, NOT
+// on-device notes. Local notes used to list rewards the server never recorded,
+// so the list could sum to far more than the withdrawable balance (the "where
+// is my money" phantom). Reading the ledger here keeps the feed and the balance
+// in lockstep: only server-recognized money shows up.
+const LEDGER_TYPE_MAP: Record<string, Transaction["type"]> = {
+  withdrawal: "withdrawn",
+  withdrawn: "withdrawn",
+  bonus: "bonus",
+  referral: "referral",
+  checkin: "checkin",
+  spin: "spin",
+  mission: "mission",
+  survey: "survey",
+  game: "game",
+  earned: "earned",
+  // Admin/operator ledger rows — keep them honest instead of disguising an
+  // operator correction as a normal earning or a user-initiated withdrawal.
+  adjustment: "adjustment",
+  withdrawal_refund: "refund",
+  refund: "refund",
+};
+
+export async function fetchTransactions(limit = 100): Promise<Transaction[] | null> {
+  try {
+    const res = await apiRequest("GET", `/api/transactions?limit=${limit}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const rows = Array.isArray(data?.transactions) ? data.transactions : [];
+    return rows.map((r: any): Transaction => {
+      const amount = Number(r.amount) || 0;
+      const rawType = String(r.type ?? "").toLowerCase();
+      const type = LEDGER_TYPE_MAP[rawType] ?? (amount < 0 ? "withdrawn" : "earned");
+      const parsed = r.createdAt ? new Date(r.createdAt).getTime() : Date.now();
+      return {
+        id: String(r.id),
+        type,
+        amount,
+        description: String(r.description ?? ""),
+        timestamp: Number.isFinite(parsed) ? parsed : Date.now(),
+      };
+    });
   } catch {
     return null;
   }

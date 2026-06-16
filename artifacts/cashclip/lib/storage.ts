@@ -70,7 +70,7 @@ const KEYS = {
 
 export interface Transaction {
   id: string;
-  type: "earned" | "withdrawn" | "bonus" | "referral" | "checkin" | "spin" | "mission" | "survey" | "game";
+  type: "earned" | "withdrawn" | "bonus" | "referral" | "checkin" | "spin" | "mission" | "survey" | "game" | "adjustment" | "refund";
   amount: number;
   description: string;
   timestamp: number;
