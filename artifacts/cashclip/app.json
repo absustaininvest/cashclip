@@ -380,7 +380,7 @@
       "package": "app.replit.cashclip",
       "versionCode": 44,
       "config": {
-        "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
+        "googleMobileAdsAppId": "ca-app-pub-8679658921848348~2934376019"
       },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -427,7 +427,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-8679658921848348~6212139107",
+          "androidAppId": "ca-app-pub-8679658921848348~2934376019",
           "iosAppId": "ca-app-pub-8679658921848348~6212139107",
           "delayAppMeasurementInit": false
         }

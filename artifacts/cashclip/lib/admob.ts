@@ -16,7 +16,11 @@ import {
 // callback (GET /api/admob/ssv, Google ECDSA verified) plus the begin/complete
 // fallback — the client never credits points (see SERVER_ONLY_ACTIONS server-side).
 
-export const ADMOB_APP_ID = "ca-app-pub-8679658921848348~6212139107";
+export const ADMOB_APP_ID = Platform.select({
+  ios: "ca-app-pub-8679658921848348~6212139107",
+  android: "ca-app-pub-8679658921848348~2934376019",
+  default: "ca-app-pub-8679658921848348~6212139107",
+}) as string;
 
 export const AD_UNITS = {
   rewarded: "ca-app-pub-8679658921848348/7282036986",
