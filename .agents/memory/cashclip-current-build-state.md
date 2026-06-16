@@ -15,6 +15,8 @@ EAS build ID: `e8a9b69e-6068-4ad7-a4f9-cea57da96c2d`
 
 **Jun 16 2026 — AdMob mediation swap (pending build):** app.json bumped to buildNumber "47" / versionCode 44 for the next native build, which reverts the orchestrator from LevelPlay back to AdMob (Unity/ironSource/Pangle/Chartboost retained as AdMob adapters). Not yet built/submitted. See `cashclip-ad-platform-admob-mediation.md`. Builds 40/46 do NOT contain this adapter set.
 
+**Jun 16 2026 — owner declined the new build (no build needed).** Owner confirmed (with an AdMob Mediation-groups screenshot showing CashClip_Rewarded groups earning live revenue) that the live App Store build (40) ALREADY runs AdMob as the rewarded orchestrator and is earning — so AdMob ad setup is live/working without a new build. The only thing the pending build 47 would add is **Chartboost** as a 4th demand source (plus the LevelPlay revert); that's an incremental revenue add, deferred to a future build at the owner's discretion. The "build & submit" task was closed WITHOUT producing/submitting a build per explicit owner approval. Don't auto-trigger a build for the AdMob swap — it's owner-gated.
+
 **What fixed pod install (build 46):** Removed `expo-dev-client@^56.0.20` and downgraded `expo-notifications@^56.0.17` → `~0.32.17` from `dependencies` in package.json. Both were SDK 56 packages in an SDK 54 project, pulling in `expo-manifests@56.x` which conflicted with `expo-manifests@1.0.11` needed by `expo-updates@29.x`, causing CocoaPods to fail resolving `EXManifests`.
 
 **Also fixed:** `expo-device` bumped from `~7.0.3` → `~8.0.10` (SDK 54 expected).
