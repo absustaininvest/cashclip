@@ -189,8 +189,11 @@ export default function AdminScreen() {
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
 
-  const [userList, setUserList] = useState<Array<{ id: string; username: string; email?: string; emailVerified?: boolean; role: string; balance: string; totalEarned: string; createdAt: string; isPublisher?: boolean; adCredits?: string }>>([]);
+  const [userList, setUserList] = useState<Array<{ id: string; username: string; email?: string; emailVerified?: boolean; role: string; balance: string; totalEarned: string; createdAt: string; isPublisher?: boolean; adCredits?: string; country?: string | null; profileComplete?: boolean }>>([]);
+  const [userTotal, setUserTotal] = useState(0);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoadingMore, setUsersLoadingMore] = useState(false);
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [resetPasswordMap, setResetPasswordMap] = useState<Record<string, string>>({});
   const [resetLoadingId, setResetLoadingId] = useState<string | null>(null);
@@ -208,24 +211,65 @@ export default function AdminScreen() {
     setBrands(b);
   }, []);
 
+  const fetchUsersPage = useCallback(async (offset: number, search: string) => {
+    const savedToken = await secureGet("cashclip_auth_token");
+    if (!savedToken) return null;
+    const qs = `?limit=100&offset=${offset}${search ? `&search=${encodeURIComponent(search)}` : ""}`;
+    const res = await globalThis.fetch(
+      new URL(`/api/admin/users${qs}`, getApiUrl()).toString(),
+      { headers: { Authorization: `Bearer ${savedToken}` } },
+    );
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  }, []);
+
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const savedToken = await secureGet("cashclip_auth_token");
-      if (!savedToken) { setUsersLoading(false); return; }
-      const res = await globalThis.fetch(
-        new URL("/api/admin/users?limit=200", getApiUrl()).toString(),
-        { headers: { Authorization: `Bearer ${savedToken}` } },
-      );
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json();
-      setUserList(data.users ?? []);
+      const data = await fetchUsersPage(0, appliedSearch);
+      if (data) {
+        setUserList(data.users ?? []);
+        setUserTotal(typeof data.total === "number" ? data.total : (data.users?.length ?? 0));
+      }
     } catch (err: any) {
       console.error("Failed to load users:", err?.message);
     } finally {
       setUsersLoading(false);
     }
-  }, []);
+  }, [fetchUsersPage, appliedSearch]);
+
+  const loadMoreUsers = useCallback(async () => {
+    if (usersLoadingMore || usersLoading) return;
+    setUsersLoadingMore(true);
+    try {
+      const data = await fetchUsersPage(userList.length, appliedSearch);
+      if (data) {
+        setUserList((prev) => [...prev, ...(data.users ?? [])]);
+        if (typeof data.total === "number") setUserTotal(data.total);
+      }
+    } catch (err: any) {
+      console.error("Failed to load more users:", err?.message);
+    } finally {
+      setUsersLoadingMore(false);
+    }
+  }, [fetchUsersPage, appliedSearch, userList.length, usersLoadingMore, usersLoading]);
+
+  const runUserSearch = useCallback(async () => {
+    const term = userSearch.trim();
+    setAppliedSearch(term);
+    setUsersLoading(true);
+    try {
+      const data = await fetchUsersPage(0, term);
+      if (data) {
+        setUserList(data.users ?? []);
+        setUserTotal(typeof data.total === "number" ? data.total : (data.users?.length ?? 0));
+      }
+    } catch (err: any) {
+      console.error("Failed to search users:", err?.message);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [userSearch, fetchUsersPage]);
 
   const handleGrantPublisher = useCallback(async (userId: string, grant: boolean) => {
     setPublisherLoadingId(userId);
@@ -1157,7 +1201,7 @@ export default function AdminScreen() {
           <View style={styles.usersHeaderRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.usersTitle}>CashClip Users</Text>
-              <Text style={styles.usersSubtitle}>{userList.length} total registered users</Text>
+              <Text style={styles.usersSubtitle}>{appliedSearch ? `${userTotal} match "${appliedSearch}"` : `${userTotal} total registered users`}</Text>
             </View>
             <View style={styles.usersHeaderActions}>
               <Pressable onPress={loadUsers} style={styles.usersRefreshBtn}>
@@ -1177,12 +1221,13 @@ export default function AdminScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={userSearch}
                 onChangeText={setUserSearch}
+                onSubmitEditing={runUserSearch}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
               />
             </View>
-            <Pressable style={styles.usersSearchBtn}>
+            <Pressable style={styles.usersSearchBtn} onPress={runUserSearch}>
               <Text style={styles.usersSearchBtnText}>Search</Text>
             </Pressable>
           </View>
@@ -1237,11 +1282,6 @@ export default function AdminScreen() {
                     <View style={{ width: 22 }} />
                   </View>
                   {userList
-                    .filter((u) => {
-                      const q = userSearch.trim().toLowerCase();
-                      if (!q) return true;
-                      return u.username.toLowerCase().includes(q) || String((u as any).email || "").toLowerCase().includes(q);
-                    })
                     .map((u, i) => (
                       <View key={u.id}>
                         <Pressable
@@ -1254,13 +1294,13 @@ export default function AdminScreen() {
                             </View>
                             <View>
                               <Text style={styles.withdrawalUser}>{u.username}</Text>
-                              <Text style={styles.userStatusPill}>Incomplete</Text>
+                              <Text style={styles.userStatusPill}>{u.profileComplete ? "Complete" : "Incomplete"}</Text>
                             </View>
                           </View>
                           <Text style={[styles.userCellText, { width: 190 }]} numberOfLines={1}>{(u as any).email || "—"}</Text>
                           <Text style={[styles.userCellText, { width: 90, textAlign: "right" }]}>${Number(u.balance).toFixed(2)}</Text>
                           <Text style={[styles.userCellText, { width: 90, textAlign: "right" }]}>${Number(u.totalEarned).toFixed(2)}</Text>
-                          <Text style={[styles.userCellText, { width: 90, textAlign: "right" }]}>US</Text>
+                          <Text style={[styles.userCellText, { width: 90, textAlign: "right" }]}>{u.country || "—"}</Text>
                           <Text style={[styles.userCellText, { width: 90, textAlign: "right" }]}>{getTimeAgo(u.createdAt)}</Text>
                           <Feather name={expandedUserId === u.id ? "chevron-up" : "chevron-down"} size={14} color={Colors.textMuted} style={{ marginLeft: 8 }} />
                         </Pressable>
@@ -1343,6 +1383,26 @@ export default function AdminScreen() {
               </ScrollView>
             )}
           </View>
+          {userList.length < userTotal && (
+            <Pressable
+              onPress={loadMoreUsers}
+              disabled={usersLoadingMore}
+              style={({ pressed }) => [{
+                marginTop: 8,
+                marginBottom: 16,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: "center" as const,
+                borderWidth: 1,
+                borderColor: Colors.primary,
+                opacity: pressed ? 0.7 : 1,
+              }]}
+            >
+              {usersLoadingMore
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <Text style={{ fontFamily: "Outfit_700Bold", fontSize: 13, color: Colors.primary }}>Load more — showing {userList.length} of {userTotal}</Text>}
+            </Pressable>
+          )}
         </View>
       </View>
 
