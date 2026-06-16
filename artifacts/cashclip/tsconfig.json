@@ -19,7 +19,8 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",
-    "**/*.spec.tsx"
+    "**/*.spec.tsx",
+    ".expo/types/**/*.ts"
   ],
   "references": [
     {
