@@ -148,14 +148,15 @@ export async function getUserStats(): Promise<UserStats> {
 }
 
 export async function addEarnings(amount: number, description: string, type: Transaction["type"] = "earned"): Promise<void> {
-  await trackDailyEarning(amount);
   await ensureAccountCreated();
 
-  const balance = await getNumber(KEYS.BALANCE, 0);
-  const totalEarned = await getNumber(KEYS.TOTAL_EARNED, 0);
-  await setNumber(KEYS.BALANCE, balance + amount);
-  await setNumber(KEYS.TOTAL_EARNED, totalEarned + amount);
-
+  // The client NEVER mints balance. Real money is granted ONLY by the server
+  // (earn tokens via /api/earnings/*, provider webhooks, AdMob SSV). Writing a
+  // local "balance" here was the phantom number users saw ("where is my $10?")
+  // that the server never recorded. Spendable balance and lifetime earnings are
+  // now read exclusively from the server (GET /api/balance) on Home, Wallet and
+  // Profile. We keep a local transaction entry only as a UI activity note; it
+  // does not move any balance.
   const tx: Transaction = {
     id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
     type,

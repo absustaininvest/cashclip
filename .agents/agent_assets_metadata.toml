@@ -205,12 +205,6 @@ type = "image"
 title = "CashClip Icon — Flat 256×256 (smaller)"
 
 [[outputs]]
-id = "0CRJqqDGE7lrREpaw5tzC"
-uri = "file://exports/CashClip_Session_Recap.md"
-type = "text"
-title = "CashClip — Session Recap & Status Script"
-
-[[outputs]]
 id = "Ayjx3gLHCSUIjKz0sa0Xg"
 uri = "file://artifacts/cashclip/store-assets/android/cashclip-icon-512.png"
 type = "image"
@@ -265,12 +259,6 @@ type = "image"
 title = "7 — Profile (name covered)"
 
 [[outputs]]
-id = "NGsMgujzyJYTLaSNEIo68"
-uri = "file://exports/CashClip_Holy_Grail_Notes.pdf"
-type = "pdf"
-title = "CashClip — The Holy Grail Notes"
-
-[[outputs]]
 id = "1IN8p-yJ3FpIYnpR2xBwk"
 uri = "file://exports/CashClip_Project_Build29-39_2026-06-10.zip"
 type = "unspecified"
@@ -281,12 +269,6 @@ id = "BjRR3S1uBLIOnTsJACzp3"
 uri = "file://exports/expo-artifacts/v29-files-all.tar.gz"
 type = "unspecified"
 title = "V29 files bundle (layout, RESTORE, app.json, MANIFEST, credentials notes, sentry.properties)"
-
-[[outputs]]
-id = "_9TP9uZNuVqP5kNtpqKTd"
-uri = "file://exports/CashClip_Covered_Fixes_Manuscript.pdf"
-type = "pdf"
-title = "CashClip — Covered Fixes Manuscript"
 
 [[outputs]]
 id = "xobyrvey8IgxqDoxyToqs"

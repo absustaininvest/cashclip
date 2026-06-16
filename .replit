@@ -51,14 +51,6 @@ args = "board-fit-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "cashclip-test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS iOS Build 44"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "EAS iOS Build 46"
 
 [[workflows.workflow.tasks]]
@@ -110,33 +102,6 @@ args = "pnpm --filter cashclip exec vitest run app/game/board-fit.test.tsx"
 
 [workflows.workflow.metadata]
 isValidation = true
-
-[[workflows.workflow]]
-name = "cashclip-test"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/cashclip run test components/TrackingConsentGate.test.tsx"
-
-[[workflows.workflow]]
-name = "EAS iOS Build 44"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = """
-mkdir -p /tmp/fake-bin && printf '#!/bin/bash
-case \"$1\" in
-  add|commit|stash|checkout|reset|clean|push|pull|fetch|rm) exit 0 ;;
-  *) exec /usr/bin/git \"$@\" ;;
-esac' > /tmp/fake-bin/git && chmod +x /tmp/fake-bin/git && cat attached_assets/AuthKey_DGVBV8VV95_1781550317339.p8 > /tmp/AuthKey_DGVBV8VV95.p8 && cd artifacts/cashclip && PATH=\"/tmp/fake-bin:$PATH\" EXPO_TOKEN=\"$EXPO_TOKLAST\" pnpm exec eas workflow:run build-and-submit-ios.yml --non-interactive"""
 
 [[workflows.workflow]]
 name = "EAS iOS Build 46"
