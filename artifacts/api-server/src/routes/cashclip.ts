@@ -2455,6 +2455,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/users/:userId/reset-password", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
+      // Require a real, attributed admin identity. The console-token path never
+      // sets req.userId, so a shared-secret-only caller is rejected here — it
+      // cannot silently take over an account without a durable audit trail.
+      if (!req.userId) {
+        res.status(403).json({
+          error: "This action requires an authenticated admin account. Console-token-only access is not permitted for account-recovery operations.",
+          code: "ADMIN_IDENTITY_REQUIRED",
+        });
+        return;
+      }
       const userId = String(req.params["userId"] ?? "");
       const { newPassword } = req.body ?? {};
       if (typeof newPassword !== "string" || newPassword.length < 8) {
@@ -2478,14 +2488,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // never alter a user's credentials without a persisted audit trail.
       await db.transaction(async (tx) => {
         await storage.updateUserPassword(userId, hashed, tx);
-        if (req.userId) {
-          await storage.recordSecurityAudit({
-            actorUserId: req.userId,
-            targetUserId: userId,
-            event: "admin_password_reset",
-            ip: getClientIp(req),
-          }, tx);
-        }
+        await storage.recordSecurityAudit({
+          actorUserId: req.userId!,
+          targetUserId: userId,
+          event: "admin_password_reset",
+          ip: getClientIp(req),
+        }, tx);
       });
       req.log?.info({ adminId: req.userId, targetUserId: userId }, "admin reset user password — prior tokens invalidated");
       res.json({ message: "Password reset successfully", username: target.username });
@@ -2500,6 +2508,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // operator. Gated behind the high-privilege secrets passphrase.
   app.post("/api/admin/users/:userId/factory-reset", adminMiddleware, secretsPassphraseMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
+      // Require a real, attributed admin identity. The console-token path never
+      // sets req.userId, so a shared-secret-only caller is rejected here — it
+      // cannot silently clear TOTP or invalidate sessions without a durable audit
+      // trail. Both ADMIN_TOKEN and SECRETS_PASSPHRASE together are not enough;
+      // a real admin account bearer token is required.
+      if (!req.userId) {
+        res.status(403).json({
+          error: "This action requires an authenticated admin account. Console-token-only access is not permitted for account-recovery operations.",
+          code: "ADMIN_IDENTITY_REQUIRED",
+        });
+        return;
+      }
       const userId = String(req.params["userId"] ?? "");
       const target = await storage.getUser(userId);
       if (!target) {
@@ -2521,14 +2541,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // operator can never take over an account without a persisted audit trail.
       const { tokenVersion } = await db.transaction(async (tx) => {
         const result = await storage.factoryResetUser(userId, hashed, tx);
-        if (req.userId) {
-          await storage.recordSecurityAudit({
-            actorUserId: req.userId,
-            targetUserId: userId,
-            event: "admin_factory_reset",
-            ip: getClientIp(req),
-          }, tx);
-        }
+        await storage.recordSecurityAudit({
+          actorUserId: req.userId!,
+          targetUserId: userId,
+          event: "admin_factory_reset",
+          ip: getClientIp(req),
+        }, tx);
         return result;
       });
       req.log?.warn(

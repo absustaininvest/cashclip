@@ -368,7 +368,25 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
     } catch (err) {
       logger.warn({ err, ip }, "adminMiddleware failed to clear console-token attempts");
     }
-    // Token verified — skip the Bearer check entirely.
+    // Console-token is restricted to safe, read-only HTTP methods. It does NOT
+    // bind a durable admin-account identity (req.userId stays unset), so any
+    // state-mutating operation (POST/PUT/PATCH/DELETE) would run without an
+    // attributable actor and without a durable security-audit trail. Operators
+    // must use an authenticated admin account (Bearer JWT) for all writes.
+    const method = req.method?.toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      req.log?.warn(
+        { route: req.originalUrl, ip, method },
+        "Admin console-token rejected for state-mutating method — admin account JWT required",
+      );
+      res.status(403).json({
+        error:
+          "Console-token access is restricted to read-only requests. Use an authenticated admin account (Bearer JWT) for state-mutating operations.",
+        code: "ADMIN_IDENTITY_REQUIRED",
+      });
+      return;
+    }
+    // Token verified — allow read-only access.
     next();
     return;
   }

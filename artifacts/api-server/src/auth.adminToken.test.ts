@@ -63,6 +63,12 @@ async function buildApp(): Promise<Express> {
   app.get("/admin/thing", adminMiddleware, (_req, res) => {
     res.json({ ok: true });
   });
+  app.post("/admin/mutate", adminMiddleware, (_req, res) => {
+    res.json({ ok: true });
+  });
+  app.delete("/admin/mutate", adminMiddleware, (_req, res) => {
+    res.json({ ok: true });
+  });
   return app;
 }
 
@@ -168,5 +174,38 @@ describe("adminMiddleware console-token throttle", () => {
     // Failing closed must not record or clear anything.
     expect(mockRecordLoginAttempt).not.toHaveBeenCalled();
     expect(mockClearLoginAttempts).not.toHaveBeenCalled();
+  });
+
+  it("allows GET requests via a valid console token (read-only is permitted)", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .get("/admin/thing")
+      .set("x-console-token", CONSOLE_TOKEN);
+
+    // The handler resolves after the middleware passes; no auth header means
+    // the Bearer path is skipped and the console-token path carries through.
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it("blocks POST via console-token with 403 — state-mutating methods require a real admin account", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/admin/mutate")
+      .set("x-console-token", CONSOLE_TOKEN)
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("ADMIN_IDENTITY_REQUIRED");
+  });
+
+  it("blocks DELETE via console-token with 403", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .delete("/admin/mutate")
+      .set("x-console-token", CONSOLE_TOKEN);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("ADMIN_IDENTITY_REQUIRED");
   });
 });
