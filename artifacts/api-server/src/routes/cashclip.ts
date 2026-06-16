@@ -3734,109 +3734,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  This prevents direct API calls from claiming rewards without any
    *  actual visit interaction.
    */
+  // ── POST /api/earn/sponsored/:id/begin ──────────────────────────────────────
+  // DISABLED — returns 410 Gone.
+  //
+  // The full sponsored-visit chain (/begin → /r → /ack → /c → /visit) is
+  // reproducible by a scripted HTTP client:
+  //   1. Call /begin to obtain the attempt token and visitSessionToken.
+  //   2. Call /r/:token?vst=... to stamp redirectedAt and witnessNonce.
+  //   3. Wait the minimum interstitial dwell.
+  //   4. Call /ack/:token?vst=... to obtain the ackToken.
+  //   5. Call /c/:token?ack=... with spoofed Sec-Fetch-* headers to set witnessedAt.
+  //   6. Wait MIN_SPONSORED_VISIT_MS, then call /visit to settle money.
+  //
+  // No advertiser-controlled or third-party attested signal is required at any
+  // step. Sec-Fetch-* headers, IP/UA strings, and elapsed-time checks are all
+  // client-spoofable anti-abuse hints, not proof of a real page view.
+  //
+  // The endpoint is disabled until a server-verifiable external attestation
+  // (e.g. a signed partner postback with per-attempt nonce binding and replay
+  // protection from a partner system we control or trust) is added to the
+  // settlement path. The campaign browse and admin endpoints are unaffected.
   app.post("/api/earn/sponsored/:id/begin", authMiddleware, sponsoredBeginRateLimiter, async (req: AuthRequest, res) => {
-    try {
-      const campaignId = String(req.params.id);
-      const {
-        db: dbClient,
-        campaigns: campaignsTable,
-        campaignClicks: clicksTable,
-        campaignVisitAttempts: attemptsTable,
-      } = await import("@workspace/db");
-      const { eq: drizzleEqLocal, and: drizzleAndLocal } = await import("drizzle-orm");
-
-      const [campaign] = await dbClient.select().from(campaignsTable)
-        .where(drizzleEqLocal(campaignsTable.id, campaignId));
-      if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
-      if (campaign.status !== "active") { res.status(400).json({ error: "Campaign is not active" }); return; }
-      if (campaign.userId === req.userId) { res.status(400).json({ error: "You cannot visit your own campaign" }); return; }
-
-      const remaining = Number(campaign.totalBudget) - Number(campaign.spent);
-      if (remaining < Number(campaign.rewardPerVisit)) {
-        res.status(400).json({ error: "Campaign budget exhausted" }); return;
-      }
-
-      const [already] = await dbClient.select({ id: clicksTable.campaignId })
-        .from(clicksTable)
-        .where(drizzleAndLocal(
-          drizzleEqLocal(clicksTable.campaignId, campaignId),
-          drizzleEqLocal(clicksTable.visitorUserId, req.userId!),
-        ));
-      if (already) { res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true }); return; }
-
-      // Stateful attempt: 32 random bytes (64 hex chars) — unguessable single-use
-      // token bound to (user, campaign). The token is the public handle for both
-      // the /r/:token redirect endpoint and the /visit settle call.
-      const { randomBytes, createHmac: _hmacBegin, createHash: _hashBegin } = await import("crypto");
-      const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-      // Validate the server-issued install token.
-      // The token is minted by /api/device/register (auth-required, per-user
-      // rate-limited, DB-backed). It is an access gate: it proves the client
-      // went through a server-mediated credential issuance step and is not
-      // freely rotatable on a per-request basis.
-      //
-      // We store SHA-256(installToken) in the attempt row. /visit verifies this
-      // hash matches so the same credential must be presented end-to-end — a
-      // pure token-identity consistency check with no device-hash involvement.
-      //
-      // FAIL-CLOSED: missing, malformed, unknown, or cross-user tokens → 400/403.
-      const beginRawInstallToken = String(req.headers["x-install-token"] ?? "").slice(0, 64);
-      if (!beginRawInstallToken || !/^[a-f0-9]{64}$/.test(beginRawInstallToken)) {
-        res.status(400).json({ error: "Invalid or missing install token — call /api/device/register first." });
-        return;
-      }
-      const beginInstallTokenHash = _hashBegin("sha256").update(beginRawInstallToken).digest("hex");
-      const { deviceInstalls: deviceInstallsTable } = await import("@workspace/db");
-      const { eq: _eqInstall } = await import("drizzle-orm");
-      const [installRecord] = await dbClient.select().from(deviceInstallsTable)
-        .where(_eqInstall(deviceInstallsTable.tokenHash, beginInstallTokenHash));
-      if (!installRecord) {
-        res.status(403).json({ error: "Unrecognised install token — call /api/device/register first." });
-        return;
-      }
-      if (installRecord.userId !== req.userId) {
-        res.status(403).json({ error: "Install token does not belong to this account." });
-        return;
-      }
-
-      // Store the install token hash (not deviceHash) so /visit can confirm
-      // the same server-issued credential is presented end-to-end.
-      await dbClient.insert(attemptsTable).values({
-        token,
-        campaignId,
-        userId: req.userId!,
-        rewardSnapshot: String(campaign.rewardPerVisit),
-        expiresAt,
-        deviceHash: beginInstallTokenHash,
-      });
-
-      // Build the redirect URL on our own domain. The mobile/web client opens
-      // THIS url, which means the server gets a real HTTP fetch it can stamp
-      // before 302'ing to the advertiser. /visit will require redirectedAt to
-      // be set, so a script that never hits the redirect URL cannot settle.
-      const base = process.env.PUBLIC_BASE_URL
-        ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : `${req.protocol}://${req.get("host")}`);
-
-      // visitSessionToken (VST): HMAC-SHA256(attemptToken:userId:vst, JWT_ACCESS_SECRET).
-      // Returned to the authenticated caller at /begin time ONLY — not derivable from
-      // the /r/:token response. /r validates VST, /ack requires it. This ensures the
-      // witness chain requires a value that appears in the /begin response (not just
-      // the /r response), binding the chain to the originating authenticated session.
-      // The server re-derives VST on demand from the stored attempt row (no extra column).
-      const _vBeginSecret = process.env.JWT_ACCESS_SECRET ?? "";
-      const visitSessionToken = _hmacBegin("sha256", _vBeginSecret)
-        .update(token + ":" + req.userId! + ":vst")
-        .digest("hex");
-
-      const redirectUrl = `${base.replace(/\/+$/, "")}/api/earn/sponsored/r/${token}?vst=${visitSessionToken}`;
-
-      res.json({ attemptToken: token, redirectUrl });
-    } catch (err: any) {
-      req.log?.error({ err }, "Sponsored visit begin failed");
-      res.status(500).json({ error: "Failed to begin visit" });
-    }
+    res.status(410).json({
+      error: "Sponsored-visit rewards are temporarily disabled. Check back soon.",
+      disabled: true,
+    });
   });
 
   /** Public redirect proxy for sponsored visits.
@@ -3962,12 +3884,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a single-use witness nonce stored only in the DB.
       // The nonce is NEVER returned to the client — it lives server-side only.
       // /ack re-derives the ackToken from the DB-stored nonce; /c validates it.
-      // This prevents a script from extracting the nonce via Set-Cookie response
-      // headers (HttpOnly only stops browser JS; any HTTP client can read headers).
+      // Critically: the nonce must NOT appear in any response header or cookie
+      // so that an HTTP client cannot extract it and replay the witness chain.
+      // HttpOnly only prevents browser JavaScript from reading document.cookie;
+      // any HTTP client can read Set-Cookie response headers directly.
       const { randomBytes: _rnd } = await import("node:crypto");
       const witnessNonce = _rnd(24).toString("hex");
-      res.setHeader("Set-Cookie",
-        `cc_w=${witnessNonce}; HttpOnly; Path=/api/earn/sponsored; Max-Age=600; SameSite=Strict`);
       const ackPath = "/api/earn/sponsored/ack/" + token;
       const completionPath = "/api/earn/sponsored/c/" + token;
 
@@ -4530,18 +4452,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ─────────────────────────────────────────────────────────────────────
 
       if (!attempt.settledAt && !attempt.witnessedAt) {
-        // Burn the witness nonce so the ackToken cannot be replayed.
-        // witnessedAt is NOT set here. It is set exclusively by the platform
-        // delivery pixel endpoint (/api/earn/sponsored/pixel/:deliveryNonce)
-        // after this redirect completes and the user's browser loads the
-        // delivery pixel on the publisher's landing page.
+        // Burn the witness nonce (single-use) and set witnessedAt atomically.
+        //
+        // Previous design: /c burned the nonce and issued a `cashclip_witness`
+        // Set-Cookie credential that the delivery pixel endpoint later validated.
+        // Problem: HttpOnly prevents browser JS from reading document.cookie, but
+        // any HTTP client can read the Set-Cookie response header directly, extract
+        // the credential, and replay it to /delivery. This made the witness step
+        // fully scriptable by the claimant.
+        //
+        // New design: /c sets witnessedAt directly after passing all of the same
+        // checks (HMAC ack token, IP/UA binding, Sec-Fetch navigation headers,
+        // dwell gate). No credential is emitted in any response header or body —
+        // the witness proof is exclusively the server-side state update triggered
+        // by the authenticated /c navigation. There is no separate cookie or pixel
+        // step for an attacker to extract and replay.
         await dbClient.update(attemptsTable)
-          .set({ witnessNonce: null })
+          .set({
+            witnessNonce: null,
+            witnessedAt: drizzleSql`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
+          })
           .where(drizzleAndLocal(
             drizzleEqLocal(attemptsTable.token, token),
-            drizzleSql`${attemptsTable.witnessNonce} IS NOT NULL`,
+            drizzleSql`${attemptsTable.settledAt} IS NULL`,
           ));
-        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: nonce burned; minting delivery nonce for pixel");
+        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: witnessedAt set directly (no cookie emitted)");
       }
 
       if (!targetUrl) {
@@ -4564,72 +4499,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // ── Platform witness cookie (HttpOnly — not accessible to publisher) ──
-      // Issued AFTER all validation and targetUrl scheme checks succeed.
-      //
-      // Security design — why a first-party HttpOnly cookie, not a URL param:
-      //   All prior witness models (postback, nonce in URL) disclosed the
-      //   witness credential to the publisher's server or page via URL
-      //   parameters, allowing a malicious publisher to replay those credentials
-      //   from their own backend and self-attest any visit.
-      //
-      //   The HttpOnly cookie model breaks self-attestation:
-      //     1. The witness proof (witnessToken) is a random 32-byte value
-      //        placed in an HttpOnly Set-Cookie on the platform's own domain
-      //        (api.cash-clip.app). HttpOnly means JavaScript on the publisher's
-      //        page CANNOT read it. Being first-party to api.cash-clip.app, it
-      //        is completely invisible to code on the publisher's domain.
-      //     2. The witnessToken is NOT in the redirect URL. The publisher sees
-      //        only cashclip_t=<attemptToken> — the delivery pixel URL (/delivery/
-      //        <token>) does not contain the secret, so calling the pixel endpoint
-      //        directly from their server provides no cookie and fails.
-      //     3. When the user's browser loads the publisher's page and the page
-      //        includes <img src="https://api.cash-clip.app/api/earn/sponsored/
-      //        delivery/<token>">, the browser automatically attaches the cookie
-      //        to that cross-origin image request (SameSite=None; Secure).
-      //     4. A publisher server calling the delivery URL has no access to the
-      //        user's browser cookie store — the witnessToken is a credential
-      //        that only the browser that executed the /c navigation possesses.
-      //     5. Short-lived (SPONSORED_DELIVERY_NONCE_TTL_MS, default 5 min).
-      //     6. Single-use: deliveryNonce cleared in DB when witnessedAt is set.
-      //     7. Cookie path scoped to the specific delivery URL so concurrent
-      //        visits from the same browser don't overwrite each other's cookie.
-      //
-      // Placement: MUST run after all validation and targetUrl scheme checks.
-      // ─────────────────────────────────────────────────────────────────────
-      if (!attempt.settledAt && !attempt.witnessedAt) {
-        const { randomBytes: _rb, createHash: _ch2 } = await import("node:crypto");
-        const witnessToken = _rb(32).toString("hex");
-        const witnessTokenHash = _ch2("sha256").update(witnessToken).digest("hex");
-        const DELIVERY_NONCE_TTL = Math.max(
-          60_000,
-          parseInt(process.env.SPONSORED_DELIVERY_NONCE_TTL_MS ?? String(5 * 60_000), 10),
-        );
-        await dbClient.update(attemptsTable)
-          .set({
-            deliveryNonce: witnessTokenHash,
-            deliveryNonceExpiresAt: new Date(Date.now() + DELIVERY_NONCE_TTL),
-          })
-          .where(drizzleEqLocal(attemptsTable.token, token));
-
-        // The cookie path is scoped to exactly this attempt's delivery URL so
-        // that parallel visits in the same browser cannot clobber each other.
-        // SameSite=None allows the cookie to be sent on the cross-origin image
-        // request from the publisher's page (a different origin) to api.cash-clip.app.
-        const cookiePath = `/api/earn/sponsored/delivery/${token}`;
-        const cookieMaxAgeSec = Math.floor(DELIVERY_NONCE_TTL / 1000);
-        res.setHeader("Set-Cookie", [
-          `cashclip_witness=${witnessToken}`,
-          `HttpOnly`,
-          `Secure`,
-          `SameSite=None`,
-          `Path=${cookiePath}`,
-          `Max-Age=${cookieMaxAgeSec}`,
-        ].join("; "));
-        req.log?.info?.({ token: token.slice(0, 8) + "…" }, "Sponsored /c: witness cookie set (HttpOnly)");
-      }
-
-      parsedTarget.searchParams.set("cashclip_t", token);
       const advertiserRedirect = parsedTarget.toString();
 
       res.setHeader("Cache-Control", "no-store");
@@ -4663,169 +4532,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  /**
-   * Platform delivery pixel — the ONLY path that sets witnessedAt.
+  /** DEPRECATED — witnessedAt is now set directly by GET /api/earn/sponsored/c/:token.
    *
-   * The /c redirect sends the browser to the publisher's page with only
-   * cashclip_t=<attemptToken> in the URL. Simultaneously, /c sets an HttpOnly,
-   * SameSite=None; Secure cookie `cashclip_witness=<witnessToken>` on the
-   * platform domain (api.cash-clip.app), scoped to this endpoint's path.
+   *  The previous design issued a `cashclip_witness` Set-Cookie in the /c response
+   *  and required the publisher's page to embed a 1×1 tracking pixel that sent that
+   *  cookie back to this endpoint. The flaw: HttpOnly prevents browser JS from reading
+   *  document.cookie, but any HTTP client can read the Set-Cookie response header
+   *  directly. A scripted client could extract the cookie value from the /c response
+   *  header and replay it here, setting witnessedAt without a genuine page visit.
    *
-   * The publisher's page must embed:
-   *   <img src="https://api.cash-clip.app/api/earn/sponsored/delivery/<token>"
-   *        style="display:none" width="1" height="1" crossorigin />
+   *  witnessedAt is now set inside /c itself after all existing checks (HMAC ack token,
+   *  IP/UA binding, Sec-Fetch navigation headers, dwell gate) pass. No credential is
+   *  emitted in any response header or body, removing the replay surface entirely.
    *
-   * The browser automatically attaches the cashclip_witness cookie to this
-   * cross-origin image request (SameSite=None allows it). The endpoint hashes
-   * the cookie value and compares to the stored SHA-256(witnessToken) in the
-   * DB. On match, witnessedAt is set.
-   *
-   * Security: the witnessToken is NEVER in the URL. Publisher JS cannot read
-   * it (HttpOnly). A publisher server calling this endpoint directly has no
-   * access to the user's browser cookie — only the browser that navigated
-   * through /c carries the credential. Static campaign callbackKey is not
-   * accepted here at all; there is no static credential path to witnessedAt.
-   *
-   * Returns a 1×1 transparent GIF so the <img> tag renders silently.
-   * Rate-limited at the IP level (fail-closed).
+   *  Returns 410 Gone so any publisher pages that still embed the pixel fail visibly
+   *  rather than silently misfiring. Publishers should remove the pixel tag.
    */
-  app.get("/api/earn/sponsored/delivery/:token", async (req, res) => {
-    // 1×1 transparent GIF — returned for ALL outcomes so that broken pixels
-    // don't leave visible broken-image icons on the publisher's page.
-    const TRANSPARENT_GIF = Buffer.from(
-      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
-      "base64",
-    );
-    const sendPixel = () => {
-      res.setHeader("Content-Type", "image/gif");
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.end(TRANSPARENT_GIF);
-    };
-
-    try {
-      const attemptToken = String(req.params.token ?? "");
-      if (!attemptToken || !/^[a-f0-9]{64}$/.test(attemptToken)) {
-        sendPixel(); return;
-      }
-
-      // ── Per-IP rate limit ──────────────────────────────────────────────────
-      {
-        const { getClientIp: _dip } = await import("../lib/clientIp");
-        const { recordLoginAttempt: _drl } = await import("../lib/dbRateLimit");
-        const _dipVal = _dip(req);
-        const _dLimit = Math.max(1, parseInt(process.env.SPONSORED_PIXEL_IP_LIMIT ?? "60", 10));
-        try {
-          const { allowed } = await _drl(`sponsored:pixel:ip:${_dipVal}`, _dLimit, 60 * 60 * 1000);
-          if (!allowed) {
-            req.log?.warn?.({ ip: _dipVal }, "Sponsored pixel rate limit exceeded (IP)");
-            sendPixel(); return;
-          }
-        } catch (rlErr) {
-          req.log?.error?.({ err: rlErr }, "Sponsored pixel IP rate-limit check failed — failing closed");
-          sendPixel(); return;
-        }
-      }
-      // ──────────────────────────────────────────────────────────────────────
-
-      // ── HttpOnly cookie validation (the core witness gate) ─────────────────
-      // The cashclip_witness cookie was set by /c on the platform's own domain
-      // during the user's browser navigation. It is HttpOnly and first-party to
-      // api.cash-clip.app, so:
-      //   • Publisher JS running on a different origin cannot read it.
-      //   • A publisher server calling this endpoint directly sends no cookie —
-      //     the user's browser cookie store is not accessible to a server.
-      //   • Only the browser that navigated through /c carries this credential.
-      //
-      // Parse the raw Cookie header instead of relying on a cookie-parser
-      // middleware so the security logic is explicit and self-contained.
-      const rawCookieHeader = String(req.headers["cookie"] ?? "");
-      let witnessTokenFromCookie: string | null = null;
-      for (const part of rawCookieHeader.split(";")) {
-        const [k, ...vs] = part.trim().split("=");
-        if (k?.trim() === "cashclip_witness") {
-          witnessTokenFromCookie = vs.join("=").trim() || null;
-          break;
-        }
-      }
-      if (!witnessTokenFromCookie || !/^[a-f0-9]{64}$/.test(witnessTokenFromCookie)) {
-        req.log?.warn?.({
-          token: attemptToken.slice(0, 8) + "…",
-          hasCookie: !!witnessTokenFromCookie,
-        }, "Sponsored pixel: witness cookie absent or malformed — witnessedAt not set");
-        sendPixel(); return;
-      }
-      // ──────────────────────────────────────────────────────────────────────
-
-      const { createHash: _pixelHash, timingSafeEqual: _pixelTse } = await import("node:crypto");
-      const cookieHash = _pixelHash("sha256").update(witnessTokenFromCookie).digest("hex");
-
-      const {
-        db: dbClient,
-        campaignVisitAttempts: attemptsTable,
-      } = await import("@workspace/db");
-      const { sql: drizzleSqlP, eq: drizzleEqP, and: drizzleAndP } = await import("drizzle-orm");
-
-      const [attempt] = await dbClient.select().from(attemptsTable)
-        .where(drizzleEqP(attemptsTable.token, attemptToken));
-
-      if (!attempt) {
-        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: attempt not found");
-        sendPixel(); return;
-      }
-      if (!attempt.deliveryNonce || !attempt.deliveryNonceExpiresAt) {
-        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: no delivery nonce stored");
-        sendPixel(); return;
-      }
-      if (attempt.deliveryNonceExpiresAt.getTime() < Date.now()) {
-        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" }, "Sponsored pixel: delivery nonce expired");
-        sendPixel(); return;
-      }
-      if (attempt.settledAt || attempt.witnessedAt) {
-        sendPixel(); return;
-      }
-
-      // Constant-time comparison of cookie-derived hash vs stored hash.
-      let cookieHashBuf: Buffer, storedHashBuf: Buffer;
-      try {
-        cookieHashBuf = Buffer.from(cookieHash, "hex");
-        storedHashBuf = Buffer.from(attempt.deliveryNonce, "hex");
-      } catch {
-        cookieHashBuf = Buffer.alloc(0);
-        storedHashBuf = Buffer.alloc(1);
-      }
-      if (
-        cookieHashBuf.length !== storedHashBuf.length ||
-        !_pixelTse(cookieHashBuf, storedHashBuf)
-      ) {
-        req.log?.warn?.({ token: attemptToken.slice(0, 8) + "…" },
-          "Sponsored pixel: witness cookie hash mismatch — witnessedAt not set");
-        sendPixel(); return;
-      }
-
-      // All checks passed — set witnessedAt atomically and clear nonce (single-use).
-      await dbClient.update(attemptsTable)
-        .set({
-          witnessedAt: drizzleSqlP`COALESCE(${attemptsTable.witnessedAt}, NOW())`,
-          deliveryNonce: null,
-          deliveryNonceExpiresAt: null,
-        })
-        .where(drizzleAndP(
-          drizzleEqP(attemptsTable.id, attempt.id),
-          drizzleSqlP`${attemptsTable.witnessedAt} IS NULL`,
-        ));
-      req.log?.info?.({
-        token: attemptToken.slice(0, 8) + "…",
-        attemptId: attempt.id,
-        campaignId: attempt.campaignId,
-      }, "Sponsored pixel: witnessedAt set via HttpOnly witness cookie");
-
-      sendPixel();
-    } catch (err: any) {
-      req.log?.error?.({ err }, "Sponsored pixel handler error");
-      // Always return the pixel — broken image on publisher page = poor UX.
-      try { sendPixel(); } catch { /* already sent */ }
-    }
+  app.get("/api/earn/sponsored/delivery/:token", (_req, res) => {
+    res.status(410).json({
+      error: "This endpoint is no longer active. witnessedAt is now set directly by GET /api/earn/sponsored/c/:token.",
+    });
   });
 
   /**
@@ -4838,11 +4564,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * a malicious publisher could call /postback immediately from their own
    * server to self-attest any visit, bypassing the intended witness gate.
    *
-   * witnessedAt is now set exclusively by GET /api/earn/sponsored/delivery/:nonce
-   * (the platform delivery pixel), which requires a random per-attempt nonce
-   * that is only mintable after completing the /c chain, redeemed via a
-   * browser-origin image request (Sec-Fetch-Dest: image, Sec-Fetch-Site:
-   * cross-site), and expires after a short TTL.
+   * witnessedAt is now set directly inside GET /api/earn/sponsored/c/:token
+   * after the HMAC ack token, IP/UA binding, Sec-Fetch navigation headers, and
+   * dwell gate all pass. No credential is emitted in any response header or
+   * body, so there is no replay surface for a malicious publisher to exploit.
    *
    * This endpoint is retained for publisher integrations that call it and
    * validates the callbackKey to confirm the caller is the campaign owner,
@@ -4970,460 +4695,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *  Requires a visitToken from /begin, and enforces a minimum dwell time
    *  to prove the user actually had the page open.
    */
-  app.post("/api/earn/sponsored/:id/visit", authMiddleware, async (req: AuthRequest, res) => {
-    // Declared outside the try block so releaseIpSlot is reachable from the
-    // outer catch. ipKey is set once computed inside the try.
-    let ipSlotConsumed = false;
-    let ipKey = "";
-    const releaseIpSlot = async (reason: string) => {
-      if (!ipSlotConsumed) return;
-      ipSlotConsumed = false;
-      try {
-        const { decrementLoginAttempt } = await import("../lib/dbRateLimit");
-        await decrementLoginAttempt(ipKey);
-      } catch (decErr) {
-        req.log?.warn({ err: decErr, reason }, "Sponsored /visit IP cap decrement failed");
-      }
-    };
-    try {
-      const campaignId = String(req.params.id);
-
-      // Resolve device hash from the server-issued install token.
-      // The install token is server-generated (not client-minted), rate-limited
-      // at issuance, and stored in device_installs. By looking up the device
-      // hash here, the Sybil key is server-owned and cannot be rotated per-
-      // request by changing a header value.
-      //
-      // FAIL-CLOSED: missing / malformed / unknown / cross-user tokens → 400/403.
-      // The stored hash from the attempt row (written at /begin) is then compared
-      // against the install record's hash to prevent token swapping between steps.
-      const visitRawInstallToken = String(req.headers["x-install-token"] ?? "").slice(0, 64);
-      if (!visitRawInstallToken || !/^[a-f0-9]{64}$/.test(visitRawInstallToken)) {
-        req.log?.warn({ userId: req.userId }, "Sponsored visit refused — missing or malformed X-Install-Token");
-        res.status(400).json({ error: "Invalid or missing install token — call /api/device/register first." });
-        return;
-      }
-      const { createHash: hashFn } = await import("crypto");
-      const visitInstallTokenHash = hashFn("sha256").update(visitRawInstallToken).digest("hex");
-      // Install record is validated against the attempt further below once the
-      // attempt row is loaded. visitInstallTokenHash is available from here on.
-
-      // Per-IP daily settle cap — the most important damage limiter. Even if
-      // an attacker bypasses the witness gate with a headless browser, this
-      // bounds how much money any single source IP can drain in 24h across
-      // any number of Sybil accounts. Default 8/day; override via env.
-      //
-      // ATOMIC consume-on-check design: we increment the counter BEFORE
-      // settlement so that concurrent requests each get a unique counter value
-      // and cannot all race past the same pre-increment count. If the slot is
-      // over the limit, or if the subsequent settlement fails for a legitimate
-      // reason (budget exhausted, dwell-time too short, already visited, …),
-      // we decrement the counter back so the user is not soft-banned for the
-      // day. We only keep the slot consumed when a settlement actually
-      // succeeds and money is moved. This eliminates the TOCTOU window that
-      // previously allowed N concurrent requests to all observe count=0 and
-      // all credit rewards before any increment landed.
-      const { getClientIp: getIp } = await import("../lib/clientIp");
-      const { recordLoginAttempt: consumeSlot } = await import("../lib/dbRateLimit");
-      const visitIpLimit = Math.max(1, parseInt(process.env.SPONSORED_VISIT_IP_LIMIT ?? "8", 10));
-      ipKey = `sponsored:visit:ip:${getIp(req)}`;
-      try {
-        const ipCheck = await consumeSlot(ipKey, visitIpLimit, 24 * 60 * 60 * 1000);
-        ipSlotConsumed = true;
-        if (!ipCheck.allowed) {
-          // Over the daily cap — release the slot immediately so that rejected
-          // requests do not erode the budget for legitimate subsequent attempts
-          // from the same network (prevents cap exhaustion via unanswered probes).
-          await releaseIpSlot("over-limit");
-          res.status(429).json({
-            error: "Daily sponsored-visit limit reached for this network. Try again tomorrow.",
-          });
-          return;
-        }
-      } catch (rateErr: any) {
-        // Fail-closed: money-bearing endpoint must never fall back to
-        // unlimited when the abuse-control DB lookup throws.
-        req.log?.error({ err: rateErr }, "Sponsored /visit IP rate-limit lookup failed");
-        res.status(503).json({ error: "Rate-limit check unavailable — please retry." });
-        return;
-      }
-      // Accept attemptToken (current) or visitToken (older clients).
-      const body = (req.body ?? {}) as { attemptToken?: string; visitToken?: string };
-      const attemptToken = body.attemptToken ?? body.visitToken;
-
-      if (!attemptToken || typeof attemptToken !== "string" || !/^[a-f0-9]{64}$/.test(attemptToken)) {
-        await releaseIpSlot("invalid-token-format");
-        res.status(400).json({ error: "attemptToken is required — call /begin first." });
-        return;
-      }
-
-      const {
-        db: dbClient,
-        campaigns: campaignsTable,
-        campaignClicks: clicksTable,
-        campaignVisitAttempts: attemptsTable,
-        users: usersTable,
-        earningsLedger: ledgerTable,
-      } = await import("@workspace/db");
-      const { sql: drizzleSql, eq: drizzleEqLocal, and: drizzleAndLocal } = await import("drizzle-orm");
-
-      // ── Stateful attempt verification ────────────────────────────────────
-      // Replaces the old JWT-only model. The attempt row carries trusted
-      // server-observed state: redirectedAt is set only when our /r/:token
-      // endpoint was actually fetched, so a script that never opens the
-      // redirect URL cannot settle.
-      const [attempt] = await dbClient.select().from(attemptsTable)
-        .where(drizzleEqLocal(attemptsTable.token, attemptToken));
-      if (!attempt) {
-        await releaseIpSlot("invalid-attempt-token");
-        res.status(400).json({ error: "Invalid or expired visit token." }); return;
-      }
-      if (attempt.userId !== req.userId || attempt.campaignId !== campaignId) {
-        await releaseIpSlot("token-mismatch");
-        res.status(400).json({ error: "Visit token does not match this campaign." }); return;
-      }
-      if (attempt.expiresAt.getTime() < Date.now()) {
-        await releaseIpSlot("token-expired");
-        res.status(400).json({ error: "Visit token expired — please try again." }); return;
-      }
-      if (attempt.settledAt) {
-        await releaseIpSlot("already-settled");
-        res.status(409).json({ error: "Visit already claimed", alreadyVisited: true }); return;
-      }
-      if (!attempt.redirectedAt) {
-        await releaseIpSlot("not-redirected");
-        res.status(400).json({ error: "Open the visit link before claiming the reward." }); return;
-      }
-      // witnessedAt must be set — proves the platform's /c redirect hop fired.
-      // witnessedAt is set by /api/earn/sponsored/c/:token when the platform's
-      // completion redirect verifies the HMAC ack token (bound to JWT_ACCESS_SECRET
-      // + witnessNonce), Fetch-Metadata browser-navigation headers, IP/UA binding,
-      // and the interstitial dwell gate. A script that completes the redirect chain
-      // must genuinely navigate through /c (a real browser navigation) before this
-      // flag is set; the server will not set it from any publisher-controlled path.
-      if (!attempt.witnessedAt) {
-        await releaseIpSlot("not-witnessed");
-        res.status(400).json({
-          error: "Visit not confirmed — please reopen the link in your browser and stay on the page.",
-        });
-        return;
-      }
-
-      // Dwell time is measured from witnessedAt (set by the advertiser pixel),
-      // not redirectedAt. This means:
-      //   • The interstitial minimum dwell (MIN_INTERSTITIAL_DWELL_MS, default 5 s)
-      //     elapses between /r and /c.
-      //   • This additional dwell (MIN_SPONSORED_VISIT_MS, default 10 s) elapses
-      //     between the pixel firing (witnessedAt) and /visit.
-      //   • Total minimum time: ~15 s per claim, fully server-enforced.
-      const MIN_VISIT_MS = parseInt(process.env.MIN_SPONSORED_VISIT_MS ?? "10000", 10);
-      const elapsed = Date.now() - attempt.witnessedAt!.getTime();
-      if (elapsed < MIN_VISIT_MS) {
-        await releaseIpSlot("dwell-too-short");
-        res.status(400).json({
-          error: "Visit recorded too quickly — please spend a moment on the page.",
-          retryAfterMs: Math.ceil(MIN_VISIT_MS - elapsed),
-        });
-        return;
-      }
-      // ─────────────────────────────────────────────────────────────────────
-
-      // ── Install token: access gate + cross-step token consistency ────────
-      // The install token (X-Install-Token) is a server-issued, per-user rate-
-      // limited access credential.  It is NOT a Sybil detection key.  Its sole
-      // role here is:
-      //
-      //   1. Access gate: the token must exist in device_installs (issued by
-      //      /api/device/register) and must belong to this authenticated user.
-      //      A client cannot mint a valid token without going through the
-      //      server-mediated, rate-limited registration step.
-      //   2. Cross-step consistency: if the attempt row has a stored token hash
-      //      (written by /begin), we verify that the same server-issued token is
-      //      being presented at /visit. This prevents token swapping between the
-      //      two steps. Pre-migration attempts (null stored hash) skip this check
-      //      and proceed — they are protected by the same server-authoritative
-      //      payout gates listed below.
-      //
-      // No device-based Sybil cap is applied at payout time. Device UUID is a
-      // client-supplied identifier; a modified client can rotate it freely and
-      // produce unlimited synthetic device identities regardless of any server-
-      // side check that trusts it. Applying such a cap would give false
-      // confidence in a bypassable control. The device hash from the install
-      // record is stored in campaign_clicks for telemetry/forensics only.
-      //
-      // Payout decisions rely exclusively on server-authoritative gates:
-      //   - Per-account daily visit COUNT cap (DB-backed, enforced below)
-      //   - Per-IP daily settle cap (DB-backed, enforced above)
-      //   - Per-account per-campaign dedup (atomic in the transaction below)
-      //   - Per-account daily earnings cap (enforced in the transaction below)
-      //   - witnessedAt proof (enforced above)
-      //   - Minimum dwell time (enforced above)
-      //   - Campaign budget limit (atomic in the transaction below)
-      let deviceHash = attempt.deviceHash ?? "";   // kept for campaign_clicks logging only
-      try {
-        const { db: dbInstall, deviceInstalls: diTable } = await import("@workspace/db");
-        const { eq: eqInstall } = await import("drizzle-orm");
-        const [visitInstall] = await dbInstall.select().from(diTable)
-          .where(eqInstall(diTable.tokenHash, visitInstallTokenHash));
-        if (!visitInstall) {
-          req.log?.warn({ userId: req.userId }, "Sponsored visit refused — unrecognised install token");
-          await releaseIpSlot("unknown-install-token");
-          res.status(403).json({ error: "Unrecognised install token — call /api/device/register first." });
-          return;
-        }
-        if (visitInstall.userId !== req.userId) {
-          req.log?.warn({ userId: req.userId, tokenOwner: visitInstall.userId }, "Sponsored visit refused — install token cross-user");
-          await releaseIpSlot("install-token-cross-user");
-          res.status(403).json({ error: "Install token does not belong to this account." });
-          return;
-        }
-        // Cross-step consistency: if /begin stored the install token hash, the
-        // same token must be presented now.  null means a pre-migration attempt
-        // — skip the check and proceed (other gates cover payout integrity).
-        if (attempt.deviceHash !== null && visitInstallTokenHash !== attempt.deviceHash) {
-          req.log?.warn(
-            { userId: req.userId, storedHashPrefix: attempt.deviceHash.slice(0, 8) },
-            "Sponsored visit refused — install token mismatch between /begin and /visit",
-          );
-          await releaseIpSlot("install-token-mismatch");
-          res.status(400).json({ error: "Credential mismatch — please restart the visit from the app." });
-          return;
-        }
-        // deviceHash from the install record is stored in campaign_clicks for
-        // fraud telemetry and forensics only — NOT used as a payout-deny gate.
-        // The device UUID is client-supplied at registration; a modified client
-        // can rotate it per account, so any settlement-time cap keyed to it
-        // gives false confidence without hardware attestation (iOS DeviceCheck /
-        // Android Play Integrity). Payout gating uses only server-authoritative
-        // signals listed below.
-        deviceHash = visitInstall.deviceHash;
-
-        // ── Per-account daily visit count cap (server-authoritative) ─────────
-        // Keyed to req.userId from the verified JWT — no client-supplied device
-        // identity involved. Counts settled sponsored visits in the past 24h.
-        // This is the primary server-authoritative anti-farming bound at payout
-        // time. Fail-closed: 503 on DB error. Configurable via
-        // SPONSORED_VISIT_ACCOUNT_DAILY_MAX (default 10).
-        // Complements: per-IP cap (cross-account same-IP), per-campaign dedup
-        // (atomic), per-account earnings cap, witnessedAt, dwell time, budget.
-        const acctVisitMax = Math.max(
-          1,
-          parseInt(process.env.SPONSORED_VISIT_ACCOUNT_DAILY_MAX ?? "10", 10),
-        );
-        const { sql: sqlAcct } = await import("drizzle-orm");
-        const acctRows = await dbInstall.execute(sqlAcct`
-          SELECT COUNT(*)::int AS n
-          FROM campaign_clicks
-          WHERE visitor_user_id = ${req.userId!}
-            AND created_at >= NOW() - INTERVAL '24 hours'
-        `);
-        const acctCount = Number((acctRows.rows[0] as { n: number }).n);
-        if (acctCount >= acctVisitMax) {
-          req.log?.warn(
-            { userId: req.userId, acctCount, acctVisitMax },
-            "Sponsored visit refused — per-account daily visit count cap reached",
-          );
-          await releaseIpSlot("account-daily-visit-cap");
-          res.status(429).json({ error: "Daily sponsored-visit limit reached for this account. Try again tomorrow." });
-          return;
-        }
-      } catch (devErr: any) {
-        req.log?.error({ err: devErr }, "Install token / account visit cap check failed");
-        await releaseIpSlot("install-token-check-error");
-        res.status(503).json({ error: "Abuse check unavailable — please retry." });
-        return;
-      }
-      // ─────────────────────────────────────────────────────────────────────
-
-      // Pre-flight: load campaign just to validate target and self-visit.
-      // The authoritative budget/active checks happen inside the transaction
-      // below via a conditional UPDATE so the result is race-free.
-      const [campaign] = await dbClient.select().from(campaignsTable).where(drizzleEqLocal(campaignsTable.id, campaignId));
-      if (!campaign) { await releaseIpSlot("campaign-not-found"); res.status(404).json({ error: "Campaign not found" }); return; }
-      if (campaign.userId === req.userId) { await releaseIpSlot("self-visit"); res.status(400).json({ error: "You cannot visit your own campaign" }); return; }
-
-      // Use the reward amount captured at /begin time (rewardSnapshot), NOT the
-      // current campaign.rewardPerVisit. This locks the payout to what was
-      // promised when the user initiated the visit, protecting against any
-      // campaign update that occurs between /begin and /visit settlement.
-      const reward = Number(attempt.rewardSnapshot);
-      const rewardStr = reward.toFixed(2);
-      const campaignTitle = campaign.title;
-
-      // Sanity guard: snapshot should never exceed rewardPerVisit by more than
-      // a rounding epsilon. If it does, something is wrong with the attempt row.
-      if (reward <= 0 || reward > Number(campaign.rewardPerVisit) + 0.005) {
-        req.log?.error(
-          { campaignId, userId: req.userId, snapshot: reward, live: Number(campaign.rewardPerVisit) },
-          "Reward snapshot out of range — refusing settlement",
-        );
-        await releaseIpSlot("reward-snapshot-invalid");
-        res.status(400).json({ error: "Invalid visit token — please start a new visit." });
-        return;
-      }
-
-      // ── Atomic settlement ────────────────────────────────────────────────
-      // All three writes (click, campaign spend, user credit) run in one
-      // PostgreSQL transaction. The conditional UPDATE on the campaign
-      // refuses to spend the last budget slice once it has already been
-      // consumed by a concurrent request, so multiple users hitting the
-      // boundary cannot all be credited.
-      //
-      // Errors thrown here roll the whole transaction back, including the
-      // click insert — so a budget-exhausted race never leaves a settled
-      // click row without a matching credit.
-      type SettlementError = "BUDGET_EXHAUSTED" | "ALREADY_VISITED" | "USER_MISSING" | "DAILY_CAP";
-
-      // Per-user daily sponsored-earnings cap (default $1/day).
-      // Enforced inside the transaction so concurrent /visit calls cannot
-      // both squeeze past the boundary. Set SPONSORED_DAILY_CAP=0 to disable.
-      const dailyCapRaw = process.env.SPONSORED_DAILY_CAP;
-      const dailyCap = dailyCapRaw === undefined ? 1.0 : parseFloat(dailyCapRaw);
-      const dailyCapEnabled = Number.isFinite(dailyCap) && dailyCap > 0;
-
-      try {
-        await dbClient.transaction(async (tx: Parameters<Parameters<typeof dbClient.transaction>[0]>[0]) => {
-          // 0a. Per-user advisory lock so concurrent /visit settlements by
-          // the same user serialize through the cap check below. Without
-          // this, two parallel requests against different campaigns can
-          // both read the same pre-cap SUM and both squeeze past the cap.
-          // hashtext() of the userId UUID gives a stable int4 we cast to
-          // bigint for the xact-scoped lock (released at COMMIT/ROLLBACK).
-          await tx.execute(drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${req.userId!})::bigint)`);
-
-          // 0b. Daily cap check (defense against Sybil-style automation).
-          if (dailyCapEnabled) {
-            const sumRows = await tx.execute(drizzleSql`
-              SELECT COALESCE(SUM(reward_granted), 0)::text AS total
-              FROM campaign_clicks
-              WHERE visitor_user_id = ${req.userId!}
-                AND created_at >= NOW() - INTERVAL '24 hours'
-            `);
-            const usedToday = parseFloat(String((sumRows.rows[0] as { total: string }).total));
-            if (Number.isFinite(usedToday) && usedToday + reward > dailyCap + 1e-9) {
-              const err = new Error("DAILY_CAP") as Error & { settlement?: SettlementError };
-              err.settlement = "DAILY_CAP";
-              throw err;
-            }
-          }
-
-          // 1. Insert click first. The unique (campaignId, visitorUserId)
-          // index catches double-visits as a Postgres 23505 error which we
-          // map to ALREADY_VISITED below.
-          await tx.insert(clicksTable).values({
-            campaignId,
-            visitorUserId: req.userId!,
-            rewardGranted: rewardStr,
-            visitorDeviceHash: deviceHash,
-          });
-
-          // 2. Conditional spend. Only succeeds when the campaign is still
-          // active AND has at least `reward` worth of remaining budget.
-          // Auto-flips status to 'ended' when this spend would exhaust it.
-          const updated = await tx.update(campaignsTable)
-            .set({
-              spent: drizzleSql`${campaignsTable.spent} + ${rewardStr}`,
-              clicks: drizzleSql`${campaignsTable.clicks} + 1`,
-              status: drizzleSql`CASE WHEN ${campaignsTable.spent} + ${rewardStr} >= ${campaignsTable.totalBudget} THEN 'ended' ELSE ${campaignsTable.status} END`,
-              updatedAt: new Date(),
-            })
-            .where(drizzleAndLocal(
-              drizzleEqLocal(campaignsTable.id, campaignId),
-              drizzleSql`${campaignsTable.status} = 'active'`,
-              drizzleSql`${campaignsTable.spent} + ${rewardStr} <= ${campaignsTable.totalBudget}`,
-            ))
-            .returning({ id: campaignsTable.id });
-
-          if (updated.length === 0) {
-            const err = new Error("BUDGET_EXHAUSTED") as Error & { settlement?: SettlementError };
-            err.settlement = "BUDGET_EXHAUSTED";
-            throw err;
-          }
-
-          // 3. Credit the visitor (balance + totalEarned + ledger entry).
-          const credited = await tx.update(usersTable)
-            .set({
-              balance: drizzleSql`${usersTable.balance} + ${rewardStr}`,
-              totalEarned: drizzleSql`${usersTable.totalEarned} + ${rewardStr}`,
-            })
-            .where(drizzleEqLocal(usersTable.id, req.userId!))
-            .returning({ id: usersTable.id });
-
-          if (credited.length === 0) {
-            const err = new Error("USER_MISSING") as Error & { settlement?: SettlementError };
-            err.settlement = "USER_MISSING";
-            throw err;
-          }
-
-          await tx.insert(ledgerTable).values({
-            userId: req.userId!,
-            amount: rewardStr,
-            type: "bonus",
-            description: `Sponsored visit: ${campaignTitle}`,
-            refId: campaignId,
-            provider: "publisher",
-          });
-
-          // 4. Mark the attempt single-use. The WHERE settled_at IS NULL
-          // guard means a racing second /visit on the same attempt token
-          // sees zero updates and we abort (alongside the unique-click
-          // index, this is belt-and-suspenders against replay).
-          const consumed = await tx.update(attemptsTable)
-            .set({ settledAt: new Date() })
-            .where(drizzleAndLocal(
-              drizzleEqLocal(attemptsTable.token, attemptToken),
-              drizzleSql`${attemptsTable.settledAt} IS NULL`,
-            ))
-            .returning({ id: attemptsTable.id });
-          if (consumed.length === 0) {
-            const err = new Error("ALREADY_CLAIMED") as Error & { settlement?: SettlementError };
-            err.settlement = "ALREADY_VISITED";
-            throw err;
-          }
-        });
-      } catch (txErr: any) {
-        const settlement: SettlementError | undefined = txErr?.settlement;
-        if (settlement === "BUDGET_EXHAUSTED") {
-          await releaseIpSlot("budget-exhausted");
-          res.status(400).json({ error: "Campaign budget exhausted" }); return;
-        }
-        if (settlement === "DAILY_CAP") {
-          await releaseIpSlot("per-user-daily-cap");
-          res.status(429).json({
-            error: "Daily sponsored-visit earnings cap reached. Try again tomorrow.",
-            dailyCap,
-          });
-          return;
-        }
-        if (settlement === "USER_MISSING") {
-          await releaseIpSlot("user-missing");
-          res.status(404).json({ error: "User not found" }); return;
-        }
-        // Unique constraint violation = already visited.
-        if (txErr?.code === "23505" || txErr?.cause?.code === "23505") {
-          await releaseIpSlot("already-visited");
-          res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true }); return;
-        }
-        throw txErr;
-      }
-
-      // Settlement succeeded — IP slot is legitimately consumed. Clear the
-      // flag so the outer catch does not double-decrement on an unrelated error.
-      ipSlotConsumed = false;
-
-      req.log?.info({ userId: req.userId, campaignId, reward }, "Sponsored visit recorded");
-      res.json({ ok: true, reward, message: `You earned $${reward.toFixed(2)}!` });
-    } catch (err: any) {
-      // Release the IP slot for any unhandled error so that unexpected failures
-      // do not permanently consume a user's daily allowance.
-      await releaseIpSlot("unhandled-error");
-      if (err?.code === "23505") {
-        res.status(409).json({ error: "Already visited this campaign", alreadyVisited: true });
-        return;
-      }
-      req.log?.error({ err }, "Record sponsored visit failed");
-      res.status(500).json({ error: "Failed to record visit" });
-    }
+  // ── POST /api/earn/sponsored/:id/visit ──────────────────────────────────────
+  // DISABLED — returns 410 Gone. See /api/earn/sponsored/:id/begin for rationale.
+  app.post("/api/earn/sponsored/:id/visit", authMiddleware, (_req: AuthRequest, res) => {
+    res.status(410).json({
+      error: "Sponsored-visit rewards are temporarily disabled. Check back soon.",
+      disabled: true,
+    });
   });
 
   /**
