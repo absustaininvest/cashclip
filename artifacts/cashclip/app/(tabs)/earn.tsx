@@ -1569,32 +1569,6 @@ export default function EarnScreen() {
           ))}
         </View>
 
-        {/* Surveys */}
-        <Pressable
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/surveys"); }}
-          style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
-        >
-          <LinearGradient
-            colors={["#1A1A2E", "#0D1B2A"]}
-            style={{
-              borderRadius: 16, padding: 16, marginBottom: 16,
-              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              borderWidth: 1, borderColor: "rgba(78, 205, 196, 0.2)",
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(78, 205, 196, 0.12)", alignItems: "center", justifyContent: "center" }}>
-                <MaterialCommunityIcons name="clipboard-text-outline" size={22} color="#4ECDC4" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: "Outfit_700Bold", fontSize: 15, color: Colors.text }}>{t.earn.paidSurveys}</Text>
-                <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textSecondary }}>{t.earn.earnPerSurvey}</Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={20} color="#4ECDC4" />
-          </LinearGradient>
-        </Pressable>
-
         {/* Offerwalls */}
         <Pressable
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/offerwalls"); }}

@@ -177,20 +177,6 @@ export type GetTransactionsParams = {
   limit?: number;
 };
 
-export type GetRevenueSources200SourcesItem = { [key: string]: unknown };
-
-export type GetRevenueSources200 = {
-  sources?: GetRevenueSources200SourcesItem[];
-};
-
-export type GetRevenueAllocation200 = { [key: string]: unknown };
-
-export type GetRevenueMetrics200 = { [key: string]: unknown };
-
-export type GetRevenueTransparency200 = { [key: string]: unknown };
-
-export type GetRevenueMargin200 = { [key: string]: unknown };
-
 export type GetIntegrationsStatus200 = { [key: string]: unknown };
 
 export type GetIntegration200 = { [key: string]: unknown };

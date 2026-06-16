@@ -710,32 +710,6 @@ export declare const CompleteOfferResponse: zod.ZodObject<{
     verified?: boolean | undefined;
 }>;
 /**
- * @summary Get revenue sources
- */
-export declare const GetRevenueSourcesResponse: zod.ZodObject<{
-    sources: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>, "many">>;
-}, "strip", zod.ZodTypeAny, {
-    sources?: zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">[] | undefined;
-}, {
-    sources?: zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">[] | undefined;
-}>;
-/**
- * @summary Get revenue allocation
- */
-export declare const GetRevenueAllocationResponse: zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>;
-/**
- * @summary Get revenue metrics
- */
-export declare const GetRevenueMetricsResponse: zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>;
-/**
- * @summary Get revenue transparency info
- */
-export declare const GetRevenueTransparencyResponse: zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>;
-/**
- * @summary Get revenue margin breakdown
- */
-export declare const GetRevenueMarginResponse: zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>;
-/**
  * @summary Get integration statuses
  */
 export declare const GetIntegrationsStatusResponse: zod.ZodObject<{}, "passthrough", zod.ZodTypeAny, zod.objectOutputType<{}, zod.ZodTypeAny, "passthrough">, zod.objectInputType<{}, zod.ZodTypeAny, "passthrough">>;

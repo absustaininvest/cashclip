@@ -295,33 +295,6 @@ export const CompleteOfferResponse = zod.object({
 });
 
 /**
- * @summary Get revenue sources
- */
-export const GetRevenueSourcesResponse = zod.object({
-  sources: zod.array(zod.object({}).passthrough()).optional(),
-});
-
-/**
- * @summary Get revenue allocation
- */
-export const GetRevenueAllocationResponse = zod.object({}).passthrough();
-
-/**
- * @summary Get revenue metrics
- */
-export const GetRevenueMetricsResponse = zod.object({}).passthrough();
-
-/**
- * @summary Get revenue transparency info
- */
-export const GetRevenueTransparencyResponse = zod.object({}).passthrough();
-
-/**
- * @summary Get revenue margin breakdown
- */
-export const GetRevenueMarginResponse = zod.object({}).passthrough();
-
-/**
  * @summary Get integration statuses
  */
 export const GetIntegrationsStatusResponse = zod.object({}).passthrough();

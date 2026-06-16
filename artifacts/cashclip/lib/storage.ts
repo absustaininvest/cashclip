@@ -766,25 +766,6 @@ export async function getSurveyStats(): Promise<{ completed: number; earnings: n
   };
 }
 
-export interface RevenueSource {
-  id: string;
-  name: string;
-  type: "ads" | "surveys" | "sponsors" | "affiliate" | "data";
-  description: string;
-  icon: string;
-  allocationPercent: number;
-  active: boolean;
-}
-
-export function getRevenueSources(): RevenueSource[] {
-  return [
-    { id: "video_ads", name: "Video Advertisements", type: "ads", description: "Revenue from in-app video ad placements served to users", icon: "play-circle", allocationPercent: 35, active: true },
-    { id: "survey_partners", name: "Partner Surveys", type: "surveys", description: "Third-party research firms paying for user survey responses", icon: "clipboard", allocationPercent: 20, active: true },
-    { id: "affiliate", name: "Affiliate Programs", type: "affiliate", description: "Commission from partner product recommendations and signups", icon: "link", allocationPercent: 15, active: true },
-    { id: "data_insights", name: "Anonymized Data Insights", type: "data", description: "Aggregated, anonymized trend data sold to market researchers", icon: "bar-chart-2", allocationPercent: 12, active: true },
-  ];
-}
-
 export interface SponsorBrand {
   id: string;
   name: string;
@@ -821,15 +802,6 @@ export async function getSponsorBrandsByType(type: "ads" | "surveys" | "games"):
   return [];
 }
 
-
-export function getRevenueAllocation(): { userPayouts: number; operations: number; growth: number; reserve: number } {
-  return {
-    userPayouts: 55,
-    operations: 20,
-    growth: 15,
-    reserve: 10,
-  };
-}
 
 const GAME_COOLDOWN_KEYS: Record<string, string> = {
   "scratch-card": KEYS.LAST_SCRATCH_DATE,

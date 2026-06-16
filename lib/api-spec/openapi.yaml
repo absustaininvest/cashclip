@@ -20,8 +20,6 @@ tags:
     description: Survey operations
   - name: offerwalls
     description: Offerwall operations
-  - name: revenue
-    description: Revenue information
   - name: integrations
     description: Integration status
   - name: admin
@@ -332,76 +330,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionCompleteResponse"
-
-  /revenue/sources:
-    get:
-      operationId: getRevenueSources
-      tags: [revenue]
-      summary: Get revenue sources
-      responses:
-        "200":
-          description: Revenue sources
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  sources:
-                    type: array
-                    items:
-                      type: object
-
-  /revenue/allocation:
-    get:
-      operationId: getRevenueAllocation
-      tags: [revenue]
-      summary: Get revenue allocation
-      responses:
-        "200":
-          description: Revenue allocation
-          content:
-            application/json:
-              schema:
-                type: object
-
-  /revenue/metrics:
-    get:
-      operationId: getRevenueMetrics
-      tags: [revenue]
-      summary: Get revenue metrics
-      responses:
-        "200":
-          description: Revenue metrics
-          content:
-            application/json:
-              schema:
-                type: object
-
-  /revenue/transparency:
-    get:
-      operationId: getRevenueTransparency
-      tags: [revenue]
-      summary: Get revenue transparency info
-      responses:
-        "200":
-          description: Revenue transparency
-          content:
-            application/json:
-              schema:
-                type: object
-
-  /revenue/margin:
-    get:
-      operationId: getRevenueMargin
-      tags: [revenue]
-      summary: Get revenue margin breakdown
-      responses:
-        "200":
-          description: Revenue margin
-          content:
-            application/json:
-              schema:
-                type: object
 
   /integrations/status:
     get:

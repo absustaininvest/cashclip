@@ -1,5 +1,5 @@
 import type { QueryKey, UseMutationOptions, UseMutationResult, UseQueryOptions, UseQueryResult } from "@tanstack/react-query";
-import type { AdminGetPaypalStatus200, AdminGetWithdrawalsParams, AdminPayoutWithdrawal200, AdminUpdateWithdrawal200, AdminUpdateWithdrawalBody, AuthCredentials, AuthResponse, BalanceResponse, CompleteSessionRequest, ErrorResponse, GetIntegration200, GetIntegrationsStatus200, GetRevenueAllocation200, GetRevenueMargin200, GetRevenueMetrics200, GetRevenueSources200, GetRevenueTransparency200, GetTransactionsParams, HealthStatus, OffersResponse, ProvidersResponse, SessionCompleteResponse, SessionStartResponse, StartOfferRequest, StartSurveyRequest, SurveysResponse, TransactionsResponse, UserResponse, WithdrawalCreatedResponse, WithdrawalRequest, WithdrawalsResponse } from "./api.schemas";
+import type { AdminGetPaypalStatus200, AdminGetWithdrawalsParams, AdminPayoutWithdrawal200, AdminUpdateWithdrawal200, AdminUpdateWithdrawalBody, AuthCredentials, AuthResponse, BalanceResponse, CompleteSessionRequest, ErrorResponse, GetIntegration200, GetIntegrationsStatus200, GetTransactionsParams, HealthStatus, OffersResponse, ProvidersResponse, SessionCompleteResponse, SessionStartResponse, StartOfferRequest, StartSurveyRequest, SurveysResponse, TransactionsResponse, UserResponse, WithdrawalCreatedResponse, WithdrawalRequest, WithdrawalsResponse } from "./api.schemas";
 import { customFetch } from "../custom-fetch";
 import type { ErrorType, BodyType } from "../custom-fetch";
 type AwaitedInput<T> = PromiseLike<T> | T;
@@ -402,121 +402,6 @@ export declare const useCompleteOffer: <TError = ErrorType<unknown>, TContext = 
 }) => UseMutationResult<Awaited<ReturnType<typeof completeOffer>>, TError, {
     data: BodyType<CompleteSessionRequest>;
 }, TContext>;
-/**
- * @summary Get revenue sources
- */
-export declare const getGetRevenueSourcesUrl: () => string;
-export declare const getRevenueSources: (options?: RequestInit) => Promise<GetRevenueSources200>;
-export declare const getGetRevenueSourcesQueryKey: () => readonly ["/api/revenue/sources"];
-export declare const getGetRevenueSourcesQueryOptions: <TData = Awaited<ReturnType<typeof getRevenueSources>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueSources>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}) => UseQueryOptions<Awaited<ReturnType<typeof getRevenueSources>>, TError, TData> & {
-    queryKey: QueryKey;
-};
-export type GetRevenueSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueSources>>>;
-export type GetRevenueSourcesQueryError = ErrorType<unknown>;
-/**
- * @summary Get revenue sources
- */
-export declare function useGetRevenueSources<TData = Awaited<ReturnType<typeof getRevenueSources>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueSources>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-};
-/**
- * @summary Get revenue allocation
- */
-export declare const getGetRevenueAllocationUrl: () => string;
-export declare const getRevenueAllocation: (options?: RequestInit) => Promise<GetRevenueAllocation200>;
-export declare const getGetRevenueAllocationQueryKey: () => readonly ["/api/revenue/allocation"];
-export declare const getGetRevenueAllocationQueryOptions: <TData = Awaited<ReturnType<typeof getRevenueAllocation>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueAllocation>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}) => UseQueryOptions<Awaited<ReturnType<typeof getRevenueAllocation>>, TError, TData> & {
-    queryKey: QueryKey;
-};
-export type GetRevenueAllocationQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueAllocation>>>;
-export type GetRevenueAllocationQueryError = ErrorType<unknown>;
-/**
- * @summary Get revenue allocation
- */
-export declare function useGetRevenueAllocation<TData = Awaited<ReturnType<typeof getRevenueAllocation>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueAllocation>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-};
-/**
- * @summary Get revenue metrics
- */
-export declare const getGetRevenueMetricsUrl: () => string;
-export declare const getRevenueMetrics: (options?: RequestInit) => Promise<GetRevenueMetrics200>;
-export declare const getGetRevenueMetricsQueryKey: () => readonly ["/api/revenue/metrics"];
-export declare const getGetRevenueMetricsQueryOptions: <TData = Awaited<ReturnType<typeof getRevenueMetrics>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueMetrics>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}) => UseQueryOptions<Awaited<ReturnType<typeof getRevenueMetrics>>, TError, TData> & {
-    queryKey: QueryKey;
-};
-export type GetRevenueMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueMetrics>>>;
-export type GetRevenueMetricsQueryError = ErrorType<unknown>;
-/**
- * @summary Get revenue metrics
- */
-export declare function useGetRevenueMetrics<TData = Awaited<ReturnType<typeof getRevenueMetrics>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueMetrics>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-};
-/**
- * @summary Get revenue transparency info
- */
-export declare const getGetRevenueTransparencyUrl: () => string;
-export declare const getRevenueTransparency: (options?: RequestInit) => Promise<GetRevenueTransparency200>;
-export declare const getGetRevenueTransparencyQueryKey: () => readonly ["/api/revenue/transparency"];
-export declare const getGetRevenueTransparencyQueryOptions: <TData = Awaited<ReturnType<typeof getRevenueTransparency>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueTransparency>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}) => UseQueryOptions<Awaited<ReturnType<typeof getRevenueTransparency>>, TError, TData> & {
-    queryKey: QueryKey;
-};
-export type GetRevenueTransparencyQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueTransparency>>>;
-export type GetRevenueTransparencyQueryError = ErrorType<unknown>;
-/**
- * @summary Get revenue transparency info
- */
-export declare function useGetRevenueTransparency<TData = Awaited<ReturnType<typeof getRevenueTransparency>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueTransparency>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-};
-/**
- * @summary Get revenue margin breakdown
- */
-export declare const getGetRevenueMarginUrl: () => string;
-export declare const getRevenueMargin: (options?: RequestInit) => Promise<GetRevenueMargin200>;
-export declare const getGetRevenueMarginQueryKey: () => readonly ["/api/revenue/margin"];
-export declare const getGetRevenueMarginQueryOptions: <TData = Awaited<ReturnType<typeof getRevenueMargin>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueMargin>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}) => UseQueryOptions<Awaited<ReturnType<typeof getRevenueMargin>>, TError, TData> & {
-    queryKey: QueryKey;
-};
-export type GetRevenueMarginQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueMargin>>>;
-export type GetRevenueMarginQueryError = ErrorType<unknown>;
-/**
- * @summary Get revenue margin breakdown
- */
-export declare function useGetRevenueMargin<TData = Awaited<ReturnType<typeof getRevenueMargin>>, TError = ErrorType<unknown>>(options?: {
-    query?: UseQueryOptions<Awaited<ReturnType<typeof getRevenueMargin>>, TError, TData>;
-    request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-};
 /**
  * @summary Get integration statuses
  */
