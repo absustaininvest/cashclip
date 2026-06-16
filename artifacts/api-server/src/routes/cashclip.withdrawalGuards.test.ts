@@ -776,6 +776,7 @@ describe("POST /api/withdrawals — fake/implausible PayPal domain rejection", (
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBeDefined();
+      expect(res.body.code).toBe("INVALID_PAYPAL_EMAIL");
       expect(mockCreateWithdrawalAtomic).not.toHaveBeenCalled();
     });
   }

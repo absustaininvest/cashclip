@@ -1467,10 +1467,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(paypalEmail)) {
-        res.status(400).json({ error: "Invalid PayPal email" }); return;
+        res.status(400).json({ error: "Invalid PayPal email", code: "INVALID_PAYPAL_EMAIL" }); return;
       }
       if (!isPlausiblePayPalDomain(paypalEmail)) {
-        res.status(400).json({ error: "PayPal email domain is not accepted. Please use a real PayPal email address." }); return;
+        res.status(400).json({ error: "PayPal email domain is not accepted. Please use a real PayPal email address.", code: "INVALID_PAYPAL_EMAIL" }); return;
       }
 
       const tier = resolveTierForAmount(numericAmount);
