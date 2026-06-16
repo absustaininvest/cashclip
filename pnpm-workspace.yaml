@@ -27,6 +27,22 @@
 # ============================================================================
 minimumReleaseAge: 1440
 
+# ============================================================================
+# publicHoistPattern: hoist the Babel compiler toolchain to the root
+# node_modules. React Native's Metro transformer + react-native-worklets/plugin
+# do bare `require('@babel/generator')` (and friends) WITHOUT declaring them,
+# relying on a flat layout. Under pnpm's strict isolation those bare requires
+# fail → Metro "Cannot find module '@babel/generator'" → HTTP 500 bundle
+# failure → cashclip build/deploy fails. Hoisting just @babel/* to root makes
+# those requires resolve, covers future bare-requires in the same toolchain,
+# and (unlike a full `nodeLinker: hoisted`) leaves Expo's packages co-located
+# with `expo` so @expo/metro-config still resolves `expo/package.json`.
+# ============================================================================
+publicHoistPattern:
+  - "*eslint*"
+  - "*prettier*"
+  - "@babel/*"
+
 minimumReleaseAgeExclude:
   # Exclude @replit scoped packages from the minimum release age check.
   # These are published by Replit and trusted — the supply-chain attack vector
@@ -197,9 +213,4 @@ overrides:
   js-yaml: ">=4.2.0"
   # GHSA-4x5r-pxfx-6jf8: @babel/core arbitrary file read via sourceMappingURL comment.
   "@babel/core": ">=7.29.6"
-  # Pin @babel/generator alongside @babel/core so only ONE version exists. The core
-  # override left a 2nd generator version, which blocked pnpm from hoisting it; that
-  # broke react-native-worklets/plugin's bare require('@babel/generator') → Metro
-  # "Cannot find module '@babel/generator'" → HTTP 500 → cashclip bundle/deploy fail.
-  "@babel/generator": ">=7.29.6"
   # (tmp security override is in package.json pnpm.overrides — see GHSA-7c78-jf6q-g5cm)

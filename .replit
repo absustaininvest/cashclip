@@ -57,6 +57,14 @@ args = "EAS iOS Build 46"
 task = "workflow.run"
 args = "cashclip-expo-versions"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Clean Reinstall"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Bundle Verify"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -125,6 +133,39 @@ args = "pnpm --filter @workspace/cashclip run check:versions"
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "Clean Reinstall"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "(rm -rf node_modules artifacts/*/node_modules lib/*/node_modules lib/integrations/*/node_modules scripts/node_modules && pnpm install --ignore-scripts) ; echo \"===CLEAN_INSTALL_EXIT:$?===\""
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Bundle Verify"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = """
+cd /home/runner/workspace/artifacts/cashclip
+  fuser -k 8081/tcp 2>/dev/null; sleep 1
+  export EXPO_PUBLIC_DOMAIN=cash-clip.app
+  pnpm exec expo start --no-dev --minify --localhost > /tmp/metro3.log 2>&1 &
+  MPID=$!
+  for i in $(seq 1 60); do curl -sf http://localhost:8081/status >/dev/null 2>&1 && { echo \"metro up at ${i}s\"; break; }; sleep 1; done
+  curl -s --max-time 300 -o /tmp/ios3.bundle -w \"RESULT HTTP=%{http_code} size=%{size_download}
+\" \"http://localhost:8081/artifacts/cashclip/node_modules/expo-router/entry.bundle?platform=ios&dev=false&hot=false&lazy=false&minify=true\"
+  echo \"--- metro errors (expect none) ---\"; grep -iE \"babel/generator|Cannot find module|Bundling failed|error:\" /tmp/metro3.log | head -5 || echo \"(none)\"
+  kill $MPID 2>/dev/null; fuser -k 8081/tcp 2>/dev/null
+  echo BUNDLE_TEST_DONE"""
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 3001
 externalPort = 3001
@@ -140,6 +181,10 @@ externalPort = 5173
 [[ports]]
 localPort = 8080
 externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
 
 [[ports]]
 localPort = 22757
