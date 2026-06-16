@@ -16,7 +16,7 @@
  * reaching into module internals.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, vi, type MockInstance } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
@@ -43,7 +43,7 @@ vi.mock("../storage", () => ({
     listSentReplies: vi.fn().mockResolvedValue([]),
     getWithdrawalRequests: vi.fn().mockResolvedValue([]),
     getUserWithdrawals: vi.fn().mockResolvedValue([]),
-    createWithdrawalRequest: i vi.fn(),
+    createWithdrawalRequest: vi.fn(),
     updateWithdrawalStatus: vi.fn(),
     listUsers: vi.fn().mockResolvedValue([]),
     deleteUser: vi.fn(),
