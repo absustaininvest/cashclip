@@ -108,6 +108,20 @@ function sanitizeRevenueMicros(value: unknown): string | null {
   return String(capped);
 }
 
+// Resolve the recipient address for a withdrawal status-update email. Mirrors
+// the request-time fallback (`user.email || paypalEmail`): prefer the account
+// email, but fall back to the PayPal address so users who signed up without an
+// account email still receive paid/rejected notifications. Best-effort — never
+// throws; on any lookup failure it falls back to the PayPal address.
+async function resolveStatusUpdateToEmail(userId: string, paypalEmail: string): Promise<string> {
+  try {
+    const recipient = await storage.getUser(userId);
+    return recipient?.email || paypalEmail;
+  } catch {
+    return paypalEmail;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
   registerSurveyRoutes(app);
@@ -1746,7 +1760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           refId: claimed.id,
         });
         sendWithdrawalStatusUpdate({
-          toEmail: claimed.paypalEmail,
+          toEmail: await resolveStatusUpdateToEmail(claimed.userId, claimed.paypalEmail),
           username: claimed.username,
           amount: claimed.amount,
           totalPayout: claimed.totalPayout,
@@ -2013,7 +2027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `PayPal webhook: ${eventType}`,
         );
         sendWithdrawalStatusUpdate({
-          toEmail: withdrawal.paypalEmail,
+          toEmail: await resolveStatusUpdateToEmail(withdrawal.userId, withdrawal.paypalEmail),
           username: withdrawal.username,
           amount: withdrawal.amount,
           totalPayout: withdrawal.totalPayout,
@@ -2046,7 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             refId: claimed.id,
           });
           sendWithdrawalStatusUpdate({
-            toEmail: claimed.paypalEmail,
+            toEmail: await resolveStatusUpdateToEmail(claimed.userId, claimed.paypalEmail),
             username: claimed.username,
             amount: claimed.amount,
             totalPayout: claimed.totalPayout,
