@@ -135,6 +135,11 @@ export default function ProfileScreen() {
     setPaypalError(null);
     try {
       await apiRequest("POST", "/api/profile/paypal-email", { email: trimmed });
+      // Keep the local cache in sync with what we just saved, even if the value
+      // was pre-filled from cache and saved without being re-typed (which would
+      // otherwise skip handlePaypalInputChange). Fire-and-forget — the server
+      // value still takes precedence on the next load.
+      secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
       await refreshUser();
       setPaypalInput("");
       Alert.alert("PayPal email saved", `${trimmed} has been linked to your account. This cannot be changed later.`);
