@@ -1031,7 +1031,7 @@ export default function EarnScreen() {
       return;
     }
 
-    // LevelPlay native build pending — show the in-app ad modal directly.
+    // AdMob native build pending — show the in-app ad modal directly.
     // Kick off a server challenge before the modal opens so completeAdView()
     // can issue a proper earn token when the user finishes watching.
     setAdLoading(false);

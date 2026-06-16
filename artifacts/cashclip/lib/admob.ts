@@ -1,6 +1,7 @@
-import { Platform, NativeModules } from "react-native";
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import type { RewardedAd as RewardedAdType, RewardedAdReward } from "react-native-google-mobile-ads";
 import {
   trackAdImpression,
   trackAdCompletion,
@@ -8,66 +9,63 @@ import {
   trackAdLoadFailed,
 } from "./ad-analytics";
 
-// LevelPlay (ironSource mediation) is the primary ad platform.
-// Unity Ads, Pangle, and Chartboost are demand sources managed by LevelPlay.
+// Google AdMob is the mediation ORCHESTRATOR. Unity Ads, ironSource, Pangle, and
+// Chartboost are retained as DEMAND SOURCES — each wired as an AdMob mediation
+// adapter (Android Gradle dependency + iOS pod), bidding/serving underneath
+// AdMob's auction. Rewarded-ad rewards credit ONLY server-side via the AdMob SSV
+// callback (GET /api/admob/ssv, Google ECDSA verified) plus the begin/complete
+// fallback — the client never credits points (see SERVER_ONLY_ACTIONS server-side).
 
-// CRITICAL: check native module presence BEFORE ever calling
-// require("ironsource-mediation"). The package's top-level JS creates a
-// NativeEventEmitter that crashes immediately if IronSourceMediation isn't
-// compiled into the binary (V40/V41 and earlier builds don't have it).
-const LP_NATIVE_AVAILABLE = Boolean(NativeModules.IronSourceMediation);
+export const ADMOB_APP_ID = "ca-app-pub-8679658921848348~6212139107";
 
-// Unity Ads adapter wires its own NativeEventEmitter inside ironsource-mediation.
-// If the Unity native module is absent (e.g. adapter present in Gradle but not
-// yet linked, or running on a build without the Unity pod/AAR), constructing
-// that emitter throws "NativeEventEmitter requires a non-null argument" and
-// crashes the app before any JS guard can run.  Check for the module
-// explicitly and skip init when it is missing.
-// The module is typically registered as "UnityAds" by the Unity Ads SDK.
-const UNITY_NATIVE_AVAILABLE =
-  !LP_NATIVE_AVAILABLE || // skip check entirely when IronSource itself is absent
-  Boolean(
-    NativeModules.UnityAds ||
-    NativeModules.UnityAdsPlugin ||
-    NativeModules.RNUnityAds
-  );
+export const AD_UNITS = {
+  rewarded: "ca-app-pub-8679658921848348/7282036986",
+  interstitial: "ca-app-pub-8679658921848348/8403546965",
+  banner: "ca-app-pub-8679658921848348/3883360799",
+  native: "ca-app-pub-8679658921848348/4968536047",
+};
 
-// ─── Diagnostic: log module-presence state once at startup ───────────────────
-// These lines are the primary smoke-test signal for build ≥41.
-// In a native build with the Unity adapter compiled in you should see:
-//   [AdInit] LP_NATIVE_AVAILABLE = true  UNITY_NATIVE_AVAILABLE = true
-// If Unity is missing you will see UNITY_NATIVE_AVAILABLE = false and ads will
-// be disabled until the next native build that includes the adapter.
-console.log(
-  `[AdInit] LP_NATIVE_AVAILABLE = ${LP_NATIVE_AVAILABLE}  UNITY_NATIVE_AVAILABLE = ${UNITY_NATIVE_AVAILABLE}` +
-  (LP_NATIVE_AVAILABLE && !UNITY_NATIVE_AVAILABLE
-    ? "  ← Unity module absent; ad system will be disabled"
-    : "")
-);
+export const TEST_AD_UNITS = {
+  rewarded: Platform.select({
+    ios: "ca-app-pub-3940256099942544/1712485313",
+    android: "ca-app-pub-3940256099942544/5224354917",
+    default: "",
+  }),
+  interstitial: Platform.select({
+    ios: "ca-app-pub-3940256099942544/4411468910",
+    android: "ca-app-pub-3940256099942544/1033173712",
+    default: "",
+  }),
+  banner: Platform.select({
+    ios: "ca-app-pub-3940256099942544/2934735716",
+    android: "ca-app-pub-3940256099942544/6300978111",
+    default: "",
+  }),
+  native: Platform.select({
+    ios: "ca-app-pub-3940256099942544/3986624511",
+    android: "ca-app-pub-3940256099942544/2247696110",
+    default: "",
+  }),
+};
 
-export const ADMOB_APP_ID = "";
-export const AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
-export const TEST_AD_UNITS = { rewarded: "", interstitial: "", banner: "", native: "" };
+const isDev = __DEV__;
 
-export function getAdUnitId(_type: "rewarded" | "interstitial" | "banner" | "native"): string {
-  return ""; // LevelPlay uses placement names, not AdMob ad unit IDs
+export function getAdUnitId(type: "rewarded" | "interstitial" | "banner" | "native"): string {
+  if (isDev) return TEST_AD_UNITS[type] || "";
+  return AD_UNITS[type] || TEST_AD_UNITS[type] || "";
 }
 
 export const isAdMobAvailable =
   Platform.OS !== "web" &&
-  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
-  LP_NATIVE_AVAILABLE &&
-  UNITY_NATIVE_AVAILABLE;
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 /**
- * Returns a short human-readable reason string when the LevelPlay ad system is
- * unavailable, or null when it is ready. Derived from the same boolean guards
- * that gate `isAdMobAvailable` so the diagnosis always matches the gate.
+ * Returns a short human-readable reason string when the AdMob ad system is
+ * unavailable, or null when it is ready to be used. Derived from the same guard
+ * that gates `isAdMobAvailable` so the diagnosis always matches the gate.
  *
  * Example values:
- *   "Expo Go / web"              — running in Expo Go or a browser
- *   "IronSource not in build"    — IronSourceMediation native module absent
- *   "Unity native module not found" — Unity module missing (NativeEventEmitter crash guard)
+ *   "Expo Go / web"  — running in Expo Go or a browser (no native AdMob SDK)
  */
 export function getAdUnavailabilityReason(): string | null {
   if (isAdMobAvailable) return null;
@@ -77,414 +75,575 @@ export function getAdUnavailabilityReason(): string | null {
   ) {
     return "Expo Go / web";
   }
-  if (!LP_NATIVE_AVAILABLE) return "IronSource not in build";
-  if (!UNITY_NATIVE_AVAILABLE) return "Unity native module not found";
   return null;
 }
 
-let lpInitialized = false;
-let lpRewardedAvailable = false;
-let lpUserId: string | null = null;
+let adMobInitialized = false;
+let nonPersonalizedOnly = true;
+let ssvUserId: string | null = null;
 
+// ─── Fill-state notification ─────────────────────────────────────────────────
+// A callback the app registers (in _layout via setFillChangeCallback) so the
+// server can be told whenever rewarded-ad fill becomes available/unavailable.
+// For AdMob, "fill available" == a preloaded rewarded ad is cached and valid.
 type FillChangeCallback = (fillAvailable: boolean) => void;
 let fillChangeCallback: FillChangeCallback | null = null;
+let lastFillReported: boolean | null = null;
 
 export function setFillChangeCallback(cb: FillChangeCallback | null): void {
   fillChangeCallback = cb;
 }
 
+// Fire the fill callback only when the value actually changes, so we don't spam
+// the server with redundant ad-fill POSTs.
+function notifyFill(available: boolean): void {
+  if (lastFillReported === available) return;
+  lastFillReported = available;
+  fillChangeCallback?.(available);
+}
+
 export function getAdFillState(): {
-  lpInitialized: boolean;
+  initialized: boolean;
   rewardedFillAvailable: boolean;
   adSystemActive: boolean;
 } {
   return {
-    lpInitialized,
-    rewardedFillAvailable: lpRewardedAvailable,
-    adSystemActive: isAdMobAvailable && lpInitialized,
+    initialized: adMobInitialized,
+    rewardedFillAvailable: isPreloadedAdValid(),
+    adSystemActive: isAdMobAvailable && adMobInitialized,
   };
 }
-// Set to true by onAdRewarded, consumed and cleared by onAdClosed
-let lpEarnedRewardThisSession = false;
-let pendingRewardResolve: ((rewarded: boolean) => void) | null = null;
-let pendingInterstitialResolve: ((ok: boolean) => void) | null = null;
-let adShowStartTime = 0;
-// Cached from the most recent ImpressionData event (revenue in micros).
-// onImpressionSuccess fires at ad show time; onAdRewarded fires shortly after.
-// Cleared after it is consumed so stale revenue doesn't leak across sessions.
-let lpLastImpressionRevenueMicros: number | null = null;
 
-function getAppKey(): string {
-  try {
-    const extra = Constants.expoConfig?.extra as Record<string, unknown> | undefined;
-    const key = extra?.ironsourceAppKey;
-    if (typeof key === "string" && key.length > 0) return key;
-  } catch {}
-  return "";
-}
-
-// ─── Identity ────────────────────────────────────────────────────────────────
-
+// Identifies the logged-in user to AdMob Server-Side Verification (SSV).
+// Without this, Google's SSV callback arrives with no user_id and the server
+// cannot credit the reward to anyone — so rewarded ads never pay out.
+//
+// When the identity changes (login, logout, or user switch), any ad that was
+// preloaded under the OLD identity must be thrown away: showing it would send
+// Google's SSV callback with the wrong (or empty) user_id, causing a missed
+// credit or — worse — crediting the previous user.
 export function setAdMobUserId(userId: string | null): void {
-  lpUserId = userId;
-  if (!lpInitialized || !userId) return;
-  try {
-    const IronSource = require("ironsource-mediation").default;
-    void IronSource.setDynamicUserId(userId);
-  } catch {}
+  const normalized = userId && userId.length > 0 ? userId : null;
+  if (normalized === ssvUserId) return;
+  ssvUserId = normalized;
+  // Bump the generation so any preload request already in flight under the old
+  // identity is ignored when it finishes loading (it would carry a stale id).
+  preloadGeneration++;
+  clearPreloadRetryTimer();
+  preloadRetryCount = 0;
+  preloadInProgress = false;
+  discardPreloadedAd();
+  notifyFill(false);
 }
 
-// ─── Consent ─────────────────────────────────────────────────────────────────
+function shouldUseNonPersonalizedOnly(): boolean {
+  return nonPersonalizedOnly;
+}
 
-export async function requestAdsConsent(): Promise<void> {
-  // ATT is handled by TrackingConsentGate before this runs. We forward the
-  // consent signal to LevelPlay so it passes it to demand partners (Unity,
-  // Pangle, etc.). Android is always personalized.
-  if (!isAdMobAvailable) return;
-  try {
-    const IronSource = require("ironsource-mediation").default;
-    const consented = Platform.OS === "android" || (await resolveATTGranted());
-    await IronSource.setConsent(consented);
-  } catch (e) {
-    console.warn("LevelPlay setConsent failed:", e);
+function buildAdRequestConfig() {
+  return {
+    requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
+    ...(ssvUserId ? { serverSideVerificationOptions: { userId: ssvUserId } } : {}),
+    keywords: [
+      "rewards",
+      "cashback",
+      "earn money",
+      "survey",
+      "gaming",
+      "gift cards",
+      "finance",
+      "mobile games",
+    ],
+    contentUrl: "https://cash-clip.app",
+  };
+}
+
+async function resolvePersonalizationConsent(): Promise<void> {
+  if (Platform.OS === "android") {
+    nonPersonalizedOnly = false;
+    return;
   }
-}
-
-async function resolveATTGranted(): Promise<boolean> {
   try {
     const { getTrackingPermissionsAsync } = require("expo-tracking-transparency");
     const { status } = await getTrackingPermissionsAsync();
     // expo-tracking-transparency returns "authorized" (the raw iOS ATT string),
     // not the generic Expo PermissionStatus "granted". Accept both defensively.
-    return status === "authorized" || status === "granted";
+    nonPersonalizedOnly = !(status === "authorized" || status === "granted");
   } catch {
-    return false;
+    nonPersonalizedOnly = true;
   }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+export function isAdMobReady(): boolean {
+  return isAdMobAvailable && adMobInitialized;
+}
+
+export async function requestAdsConsent(): Promise<void> {
+  if (!isAdMobAvailable) return;
+  try {
+    const { AdsConsent, AdsConsentStatus } = require("react-native-google-mobile-ads");
+    const info = await AdsConsent.requestInfoUpdate();
+    if (
+      info.isConsentFormAvailable &&
+      (info.status === AdsConsentStatus.REQUIRED || info.status === AdsConsentStatus.UNKNOWN)
+    ) {
+      await AdsConsent.showForm();
+    }
+  } catch (e) {
+    console.warn("AdsConsent request failed:", e);
+  }
+}
 
 export async function initializeAdMob(): Promise<boolean> {
   if (!isAdMobAvailable) {
-    if (LP_NATIVE_AVAILABLE && !UNITY_NATIVE_AVAILABLE) {
-      console.warn(
-        "[AdInit] LevelPlay: Unity Ads native module not found — ad system disabled to prevent NativeEventEmitter crash. " +
-        "Build ≥41 with the Unity adapter compiled in is required to enable ads."
-      );
-    } else if (!LP_NATIVE_AVAILABLE) {
-      console.log("[AdInit] LevelPlay native module absent — running in OTA/web mode, ads disabled");
-    }
+    console.log("[AdInit] AdMob native module absent — running in OTA/web mode, ads disabled");
     return false;
   }
+
   try {
-    const IronSource = require("ironsource-mediation").default;
-    const appKey = getAppKey();
-    if (!appKey) {
-      console.warn("LevelPlay: ironsourceAppKey not configured in app.json extra");
-      return false;
-    }
-
-    // Consent must be set before init
-    await requestAdsConsent();
-
-    // Set user ID before init so S2S reward callbacks carry the correct user
-    if (lpUserId) await IronSource.setDynamicUserId(lpUserId);
-
-    // Impression-level revenue listener (ARM — Ad Revenue Measurement).
-    // onImpressionSuccess fires at the moment an impression is recorded; the
-    // revenue field (dollars) is converted to micros and cached so onAdRewarded
-    // can attach the real per-impression value to the reward_earned analytics
-    // event. ARM SDK Postbacks must be enabled in the IronSource dashboard
-    // (Reporting → ARM → SDK Postbacks) for ImpressionData.revenue to be non-null.
-    //
-    // Correctness rules:
-    //  1. We ALWAYS write lpLastImpressionRevenueMicros (including null for
-    //     missing/invalid revenue) so a previous ad's value can never bleed
-    //     into a later reward event that has no revenue of its own.
-    //  2. We only cache revenue for REWARDED impressions — other formats
-    //     (interstitial, banner) must not pollute the rewarded revenue slot.
-    //
-    // Format detection covers both the modern SDK (adFormat = "REWARDED") and
-    // the deprecated adUnit string ("RewardedVideo") used by older native SDKs.
-    // If format is absent entirely we fail open (treat as rewarded) so a future
-    // SDK change never silently drops real revenue.
+    // ATT and AdsConsent are handled by TrackingConsentGate before this runs.
+    // Resolve personalization consent now so ad requests use the correct flag.
+    await resolvePersonalizationConsent();
+    const mobileAds = require("react-native-google-mobile-ads").default;
+    // initialize() resolves with the per-adapter initialization statuses. Logging
+    // them is the primary smoke-test signal that all four demand-source adapters
+    // (Unity / ironSource / Pangle / Chartboost) are compiled into the binary and
+    // mediating under AdMob. A missing adapter simply won't appear in this list.
+    const statuses = await mobileAds().initialize();
+    adMobInitialized = true;
     try {
-      IronSource.setImpressionDataListener({
-        onImpressionSuccess: (data?: {
-          revenue?: number | null;
-          adFormat?: string | null;
-          adUnit?: string | null;
-          precision?: string | null;
-          adNetwork?: string | null;
-        }) => {
-          // Normalise format: prefer adFormat (AdFormat enum, e.g. "REWARDED"),
-          // fall back to legacy adUnit (e.g. "RewardedVideo" → "REWARDEDVIDEO").
-          const fmt = (data?.adFormat ?? data?.adUnit ?? "").toUpperCase();
-          // Accept "REWARDED" (modern AdFormat enum) or "REWARDEDVIDEO"
-          // (deprecated adUnit value from older native SDK versions).
-          // When fmt is empty (unknown format) we fail open — better to cache
-          // a potentially non-rewarded value than to silently drop real revenue.
-          const isRewarded =
-            !fmt ||
-            fmt === "REWARDED" ||      // AdFormat.REWARDED (ironsource-mediation ≥3)
-            fmt === "REWARDEDVIDEO";   // legacy adUnit "RewardedVideo" (deprecated)
-          if (!isRewarded) {
-            // Not a rewarded impression — leave cache untouched so the rewarded
-            // slot isn't clobbered by an unrelated format's revenue.
-            return;
-          }
-          // Always update the cache (including null) for rewarded impressions so
-          // stale values from a previous session cannot carry forward.
-          if (data?.revenue != null && Number.isFinite(data.revenue) && data.revenue > 0) {
-            lpLastImpressionRevenueMicros = Math.round(data.revenue * 1_000_000);
-            console.log(
-              `[ARM] Impression revenue cached: ${lpLastImpressionRevenueMicros} micros` +
-              ` ($${data.revenue.toFixed(6)}) network=${data?.adNetwork ?? "?"} precision=${data?.precision ?? "?"}`
-            );
-          } else {
-            lpLastImpressionRevenueMicros = null;
-            if (data != null) {
-              // Non-null data but null/zero revenue — ARM toggle may be off in dashboard
-              // (Reporting → ARM → SDK Postbacks). Enable it so revenue flows.
-              console.warn(
-                "[ARM] onImpressionSuccess fired but revenue is null/0. " +
-                "Enable ARM SDK Postbacks in the IronSource dashboard: Reporting → ARM → SDK Postbacks."
-              );
-            }
-          }
-        },
-      });
-    } catch (e) {
-      console.warn("LevelPlay: setImpressionDataListener failed:", e);
+      const summary = Array.isArray(statuses)
+        ? statuses.map((s) => `${s?.name ?? "?"}=${s?.state}`).join(", ")
+        : "(no adapter status array)";
+      console.log(`[AdInit] AdMob initialized — mediation adapters: ${summary}`);
+    } catch {
+      console.log("[AdInit] AdMob initialized (adapter status unavailable)");
     }
-
-    // Rewarded video listener — LevelPlay uses auto-load mode so the SDK
-    // manages inventory. onAdAvailable/onAdUnavailable reflect fill state.
-    // Each registration is wrapped independently so a failure in one listener's
-    // wiring does not abort the whole init or leave the app in a crashed state.
-    try {
-      IronSource.setLevelPlayRewardedVideoListener({
-        onAdAvailable: () => {
-          lpRewardedAvailable = true;
-          fillChangeCallback?.(true);
-        },
-        onAdUnavailable: () => {
-          lpRewardedAvailable = false;
-          fillChangeCallback?.(false);
-        },
-        onAdOpened: () => {
-          // Reset impression revenue cache at the start of each new ad session
-          // so that a stale value from a previous watch cannot attach to this one.
-          lpLastImpressionRevenueMicros = null;
-          adShowStartTime = Date.now();
-          trackAdImpression("rewarded");
-        },
-        onAdRewarded: () => {
-          // Fired before onAdClosed — set flag so onAdClosed can resolve correctly.
-          // Consume the cached impression revenue (if any) so it doesn't bleed
-          // into the next ad session.
-          lpEarnedRewardThisSession = true;
-          const revenueMicros = lpLastImpressionRevenueMicros ?? undefined;
-          lpLastImpressionRevenueMicros = null;
-          trackAdRewardEarned("rewarded", 1, "rewarded", revenueMicros);
-        },
-        onAdClosed: () => {
-          const earned = lpEarnedRewardThisSession;
-          lpEarnedRewardThisSession = false;
-          const duration = Date.now() - adShowStartTime;
-          trackAdCompletion("rewarded", duration);
-          if (pendingRewardResolve) {
-            pendingRewardResolve(earned);
-            pendingRewardResolve = null;
-          }
-        },
-        onAdShowFailed: (error: unknown) => {
-          const err = error as { errorCode?: number; errorMessage?: string } | null;
-          trackAdLoadFailed("rewarded", String(err?.errorCode ?? ""), err?.errorMessage);
-          lpEarnedRewardThisSession = false;
-          if (pendingRewardResolve) {
-            pendingRewardResolve(false);
-            pendingRewardResolve = null;
-          }
-        },
-      });
-    } catch (e) {
-      console.warn("LevelPlay: setLevelPlayRewardedVideoListener failed:", e);
-    }
-
-    try {
-      IronSource.setLevelPlayInterstitialListener({
-        onAdReady: () => {},
-        onAdLoadFailed: (error: unknown) => {
-          const err = error as { errorCode?: number; errorMessage?: string } | null;
-          trackAdLoadFailed("interstitial", String(err?.errorCode ?? ""), err?.errorMessage);
-        },
-        onAdOpened: () => {
-          adShowStartTime = Date.now();
-          trackAdImpression("interstitial");
-        },
-        onAdClosed: () => {
-          const duration = Date.now() - adShowStartTime;
-          trackAdCompletion("interstitial", duration);
-          if (pendingInterstitialResolve) {
-            pendingInterstitialResolve(true);
-            pendingInterstitialResolve = null;
-          }
-        },
-        onAdShowFailed: () => {
-          if (pendingInterstitialResolve) {
-            pendingInterstitialResolve(false);
-            pendingInterstitialResolve = null;
-          }
-        },
-      });
-    } catch (e) {
-      console.warn("LevelPlay: setLevelPlayInterstitialListener failed:", e);
-    }
-
-    await IronSource.init(appKey);
-    lpInitialized = true;
-    console.log(
-      "[AdInit] LevelPlay init succeeded — UNITY_NATIVE_AVAILABLE = true, ads are ACTIVE." +
-      " If rewarded ads still don't load, check the Unity Game ID and mediation placement in the IronSource dashboard."
-    );
-
-    // Check initial fill after init and notify reporter
-    try {
-      const available = await IronSource.isRewardedVideoAvailable();
-      lpRewardedAvailable = !!available;
-      console.log(`[AdInit] Rewarded ad immediately available after init: ${!!available}`);
-      fillChangeCallback?.(!!available);
-    } catch {}
-
-    // Pre-warm interstitial for the first natural break
-    try { void IronSource.loadInterstitial(); } catch {}
-
     return true;
   } catch (e) {
-    console.warn("LevelPlay init failed:", e);
+    console.warn("[AdInit] AdMob initialization failed:", e);
+    adMobInitialized = false;
     return false;
   }
 }
 
-// ─── Rewarded video ──────────────────────────────────────────────────────────
+const AD_EXPIRY_MS = 55 * 60 * 1000;
+const AD_LOAD_TIMEOUT_MS = 15_000;
 
-export function isAdMobReady(): boolean {
-  return isAdMobAvailable && lpInitialized && lpRewardedAvailable;
+interface PreloadedAd {
+  ad: RewardedAdType;
+  loadedAt: number;
+  userId: string | null;
+  cleanupListeners: () => void;
+}
+
+let preloadedRewardedAd: PreloadedAd | null = null;
+let preloadInProgress = false;
+let preloadRetryCount = 0;
+let preloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+// Incremented whenever the SSV identity changes; lets in-flight preloads detect
+// that their identity is stale by the time they finish loading.
+let preloadGeneration = 0;
+
+const MAX_PRELOAD_RETRIES = 3;
+const PRELOAD_RETRY_BASE_DELAY_MS = 5_000;
+const PRELOAD_RETRY_MULTIPLIER = 3;
+
+function clearPreloadRetryTimer(): void {
+  if (preloadRetryTimer !== null) {
+    clearTimeout(preloadRetryTimer);
+    preloadRetryTimer = null;
+  }
+}
+
+function schedulePreloadRetry(adUnitId?: string): void {
+  if (preloadRetryCount >= MAX_PRELOAD_RETRIES) {
+    preloadRetryCount = 0;
+    return;
+  }
+
+  const delay = PRELOAD_RETRY_BASE_DELAY_MS * Math.pow(PRELOAD_RETRY_MULTIPLIER, preloadRetryCount);
+  preloadRetryCount++;
+
+  preloadRetryTimer = setTimeout(() => {
+    preloadRetryTimer = null;
+    preloadRewardedAd(adUnitId);
+  }, delay);
+}
+
+function isPreloadedAdValid(): boolean {
+  if (!preloadedRewardedAd) return false;
+  // A cached ad is only usable for the user it was requested for; otherwise its
+  // SSV user_id is stale and the reward would be missed or misattributed. A null
+  // identity (not logged in / auth not settled yet) can never be credited, so an
+  // ad requested without one must never be served.
+  if (preloadedRewardedAd.userId === null || preloadedRewardedAd.userId !== ssvUserId) {
+    return false;
+  }
+  return Date.now() - preloadedRewardedAd.loadedAt < AD_EXPIRY_MS;
 }
 
 export function isRewardedAdPreloaded(): boolean {
-  // LevelPlay auto-manages its inventory — "preloaded" means an ad is available
-  return isAdMobReady();
+  return isPreloadedAdValid();
 }
 
-export function preloadRewardedAd(_adUnitId?: string): void {
-  // No-op: LevelPlay handles auto-loading in the background after init()
-}
+export function preloadRewardedAd(adUnitId?: string): void {
+  if (!isAdMobAvailable || !adMobInitialized) return;
+  if (preloadInProgress || isPreloadedAdValid()) return;
 
-export async function showRewardedAd(
-  _adUnitId?: string
-): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
-  if (!isAdMobAvailable) {
-    console.warn("[AdInit] showRewardedVideo skipped — ad platform unavailable (platform/build guard)");
-    return { rewarded: false };
+  clearPreloadRetryTimer();
+
+  if (preloadedRewardedAd && !isPreloadedAdValid()) {
+    discardPreloadedAd();
   }
-  if (!lpInitialized) {
-    console.warn("[AdInit] showRewardedVideo skipped — LevelPlay not yet initialized (call initializeAdMob first)");
-    return { rewarded: false };
-  }
-  if (!lpRewardedAvailable) {
-    console.warn("[AdInit] showRewardedVideo skipped — no fill (lpRewardedAvailable=false); check Unity mediation placement configuration");
-    void trackAdLoadFailed("rewarded", "NO_FILL", "lpRewardedAvailable=false");
-    return { rewarded: false };
-  }
-  if (!lpUserId) {
-    console.warn("[AdInit] showRewardedVideo skipped — no userId (call setAdMobUserId before showing ads)");
-    return { rewarded: false };
-  }
+
+  preloadInProgress = true;
 
   try {
-    const IronSource = require("ironsource-mediation").default;
-    // Refresh user ID on every show so S2S callback carries the right user
-    await IronSource.setDynamicUserId(lpUserId);
+    const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require("react-native-google-mobile-ads");
+    const unitId = adUnitId || getAdUnitId("rewarded") || TestIds.REWARDED;
 
-    return await new Promise((resolve) => {
-      let settled = false;
+    // Capture the identity (and its generation) this ad is being requested for,
+    // so we never serve it to a different user later (see isPreloadedAdValid).
+    const requestUserId = ssvUserId;
+    const requestGeneration = preloadGeneration;
+    const rewarded = RewardedAd.createForAdRequest(unitId, buildAdRequestConfig());
 
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        pendingRewardResolve = null;
-        lpEarnedRewardThisSession = false;
-        trackAdLoadFailed("rewarded", "TIMEOUT", "Ad show timed out");
-        resolve({ rewarded: false, timedOut: true });
-      }, 30_000);
+    const unsubscribeLoaded = rewarded.addAdEventListener(
+      RewardedAdEventType.LOADED,
+      () => {
+        preloadInProgress = false;
+        // The user changed while this ad was loading — its SSV id is now stale,
+        // so throw it away instead of caching it.
+        if (requestGeneration !== preloadGeneration) {
+          cleanup();
+          return;
+        }
+        preloadRetryCount = 0;
+        preloadedRewardedAd = {
+          ad: rewarded,
+          loadedAt: Date.now(),
+          userId: requestUserId,
+          cleanupListeners: cleanup,
+        };
+        notifyFill(true);
+      }
+    );
 
-      pendingRewardResolve = (rewarded) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        resolve({ rewarded, type: "rewarded", amount: rewarded ? 1 : 0 });
-      };
+    const unsubscribeError = rewarded.addAdEventListener(
+      AdEventType.ERROR,
+      (error: unknown) => {
+        console.warn("Rewarded ad preload failed:", error);
+        const errObj = error as { code?: string; message?: string } | null;
+        trackAdLoadFailed("rewarded", errObj?.code, errObj?.message);
+        preloadInProgress = false;
+        cleanup();
+        notifyFill(false);
+        schedulePreloadRetry(adUnitId);
+      }
+    );
 
-      IronSource.showRewardedVideo();
-    });
+    function cleanup() {
+      unsubscribeLoaded?.();
+      unsubscribeError?.();
+    }
+
+    rewarded.load();
   } catch (e) {
-    console.warn("LevelPlay showRewardedVideo failed:", e);
+    console.warn("Rewarded ad preload error:", e);
+    preloadInProgress = false;
+    schedulePreloadRetry(adUnitId);
+  }
+}
+
+function discardPreloadedAd(): void {
+  if (preloadedRewardedAd) {
+    preloadedRewardedAd.cleanupListeners();
+    preloadedRewardedAd = null;
+  }
+}
+
+interface PreloadedAdResult {
+  rewarded: boolean;
+  type?: string;
+  amount?: number;
+  error?: boolean;
+}
+
+function showPreloadedAd(): Promise<PreloadedAdResult> {
+  const cached = preloadedRewardedAd!;
+  preloadedRewardedAd = null;
+  cached.cleanupListeners();
+  // The preloaded ad is now being consumed — fill is no longer available until
+  // the next preload completes.
+  notifyFill(false);
+
+  const { RewardedAdEventType, AdEventType } = require("react-native-google-mobile-ads");
+  const rewarded = cached.ad;
+
+  return new Promise((resolve) => {
+    let earned = false;
+    let rewardAmount = 0;
+    let rewardType = "";
+    const showTime = Date.now();
+
+    const unsubscribeEarned = rewarded.addAdEventListener(
+      RewardedAdEventType.EARNED_REWARD,
+      ((reward: RewardedAdReward) => {
+        earned = true;
+        rewardType = reward.type;
+        rewardAmount = reward.amount;
+      }) as Parameters<typeof rewarded.addAdEventListener>[1]
+    );
+
+    const unsubscribeClosed = rewarded.addAdEventListener(
+      AdEventType.CLOSED,
+      () => {
+        const durationMs = Date.now() - showTime;
+        trackAdCompletion("rewarded", durationMs);
+        if (earned) {
+          trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
+        }
+        cleanup();
+        preloadRewardedAd();
+        resolve({ rewarded: earned, type: rewardType || "rewarded", amount: rewardAmount });
+      }
+    );
+
+    const unsubscribeError = rewarded.addAdEventListener(
+      AdEventType.ERROR,
+      (error: unknown) => {
+        console.warn("Preloaded rewarded ad show error:", error);
+        cleanup();
+        preloadRewardedAd();
+        resolve({ rewarded: false, error: true });
+      }
+    );
+
+    function cleanup() {
+      unsubscribeEarned?.();
+      unsubscribeClosed?.();
+      unsubscribeError?.();
+    }
+
+    trackAdImpression("rewarded");
+    rewarded.show();
+  });
+}
+
+function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
+  const { RewardedAd, RewardedAdEventType, AdEventType, TestIds } = require("react-native-google-mobile-ads");
+  const unitId = adUnitId || getAdUnitId("rewarded") || TestIds.REWARDED;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let adShown = false;
+
+    const rewarded = RewardedAd.createForAdRequest(unitId, buildAdRequestConfig());
+
+    let earned = false;
+    let rewardAmount = 0;
+    let rewardType = "";
+
+    const timeoutId = setTimeout(() => {
+      if (settled || adShown) return;
+      settled = true;
+      console.warn(`Rewarded ad load timed out after ${AD_LOAD_TIMEOUT_MS}ms`);
+      trackAdLoadFailed("rewarded", "TIMEOUT", `Ad failed to load within ${AD_LOAD_TIMEOUT_MS}ms`);
+      cleanup();
+      preloadRewardedAd();
+      resolve({ rewarded: false, timedOut: true });
+    }, AD_LOAD_TIMEOUT_MS);
+
+    const unsubscribeEarned = rewarded.addAdEventListener(
+      RewardedAdEventType.EARNED_REWARD,
+      (reward: { type: string; amount: number }) => {
+        earned = true;
+        rewardType = reward.type;
+        rewardAmount = reward.amount;
+      }
+    );
+
+    const loadStartTime = Date.now();
+
+    const unsubscribeLoaded = rewarded.addAdEventListener(
+      RewardedAdEventType.LOADED,
+      () => {
+        if (settled) return;
+        adShown = true;
+        clearTimeout(timeoutId);
+        trackAdImpression("rewarded");
+        rewarded.show();
+      }
+    );
+
+    const unsubscribeClosed = rewarded.addAdEventListener(
+      AdEventType.CLOSED,
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        const durationMs = Date.now() - loadStartTime;
+        trackAdCompletion("rewarded", durationMs);
+        if (earned) {
+          trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
+        }
+        cleanup();
+        preloadRewardedAd();
+        resolve({ rewarded: earned, type: rewardType || "rewarded", amount: rewardAmount });
+      }
+    );
+
+    const unsubscribeError = rewarded.addAdEventListener(
+      AdEventType.ERROR,
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        console.warn("Rewarded ad failed to load:", error);
+        const errObj = error as { code?: string; message?: string } | null;
+        trackAdLoadFailed("rewarded", errObj?.code, errObj?.message);
+        cleanup();
+        preloadRewardedAd();
+        resolve({ rewarded: false });
+      }
+    );
+
+    function cleanup() {
+      unsubscribeEarned?.();
+      unsubscribeLoaded?.();
+      unsubscribeClosed?.();
+      unsubscribeError?.();
+    }
+
+    rewarded.load();
+  });
+}
+
+export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boolean; type?: string; amount?: number; timedOut?: boolean }> {
+  if (!isAdMobReady()) {
+    return { rewarded: false };
+  }
+
+  // Rewarded ads only pay out via Google's SSV callback, which requires the
+  // user_id. If we don't yet know who the user is, showing an ad would burn an
+  // impression that can never be credited — skip it rather than mislead the user.
+  if (!ssvUserId) {
+    return { rewarded: false };
+  }
+
+  if (!adUnitId && isPreloadedAdValid()) {
+    const result = await showPreloadedAd();
+    if (result.error) {
+      return loadAndShowOnDemand(adUnitId);
+    }
+    return result;
+  }
+
+  discardPreloadedAd();
+
+  try {
+    return await loadAndShowOnDemand(adUnitId);
+  } catch (e) {
+    console.warn("Rewarded ad error:", e);
+    preloadRewardedAd();
     return { rewarded: false };
   }
 }
 
-// ─── Interstitial ────────────────────────────────────────────────────────────
-
+// Minimum gap between interstitials so they stay non-annoying. Interstitials
+// only fire at natural transitions (e.g. finishing a game round) and are capped
+// to at most one per this window across the whole app.
 const INTERSTITIAL_MIN_GAP_MS = 4 * 60 * 1000;
 const INTERSTITIAL_LAST_AT_KEY = "cashclip_last_interstitial_at";
 
-export async function showInterstitialAd(_adUnitId?: string): Promise<boolean> {
-  if (!lpInitialized || !isAdMobAvailable) return false;
-  try {
-    const IronSource = require("ironsource-mediation").default;
-    const ready = await IronSource.isInterstitialReady();
-    if (!ready) {
-      void IronSource.loadInterstitial();
-      return false;
-    }
-    return await new Promise((resolve) => {
-      let settled = false;
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        pendingInterstitialResolve = null;
-        resolve(false);
-      }, 15_000);
-
-      pendingInterstitialResolve = (ok) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        resolve(ok);
-      };
-
-      adShowStartTime = Date.now();
-      IronSource.showInterstitial();
-    });
-  } catch (e) {
-    console.warn("LevelPlay interstitial failed:", e);
-    return false;
-  }
-}
-
+/**
+ * Frequency-capped interstitial. Call this at natural transition points. It
+ * shows an interstitial only if AdMob is ready and the last one was more than
+ * INTERSTITIAL_MIN_GAP_MS ago. Impressions/completions are tracked inside
+ * showInterstitialAd, so these count in the ads-revenue analytics path.
+ * Fails closed (returns false) on any error so it never blocks the user.
+ */
 export async function maybeShowInterstitial(): Promise<boolean> {
-  if (!lpInitialized || !isAdMobAvailable) return false;
+  if (!isAdMobReady()) return false;
   try {
     const raw = await AsyncStorage.getItem(INTERSTITIAL_LAST_AT_KEY);
     const last = raw ? parseInt(raw, 10) : 0;
     if (Number.isFinite(last) && last > 0 && Date.now() - last < INTERSTITIAL_MIN_GAP_MS) {
       return false;
     }
+    // Stamp the time up-front so rapid transitions or a slow ad load can't
+    // queue two interstitials back-to-back.
     await AsyncStorage.setItem(INTERSTITIAL_LAST_AT_KEY, Date.now().toString());
     return await showInterstitialAd();
-  } catch {
+  } catch (e) {
+    console.warn("maybeShowInterstitial error:", e);
+    return false;
+  }
+}
+
+export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
+  if (!isAdMobReady()) return false;
+
+  try {
+    const { InterstitialAd, AdEventType, TestIds } = require("react-native-google-mobile-ads");
+    const unitId = adUnitId || getAdUnitId("interstitial") || TestIds.INTERSTITIAL;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let adShown = false;
+
+      const interstitial = InterstitialAd.createForAdRequest(unitId, buildAdRequestConfig());
+
+      const loadStartTime = Date.now();
+
+      const timeoutId = setTimeout(() => {
+        if (settled || adShown) return;
+        settled = true;
+        console.warn(`Interstitial ad load timed out after ${AD_LOAD_TIMEOUT_MS}ms`);
+        trackAdLoadFailed("interstitial", "TIMEOUT", `Ad failed to load within ${AD_LOAD_TIMEOUT_MS}ms`);
+        cleanup();
+        resolve(false);
+      }, AD_LOAD_TIMEOUT_MS);
+
+      const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+        if (settled) return;
+        adShown = true;
+        clearTimeout(timeoutId);
+        trackAdImpression("interstitial");
+        interstitial.show();
+      });
+
+      const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        const durationMs = Date.now() - loadStartTime;
+        trackAdCompletion("interstitial", durationMs);
+        cleanup();
+        resolve(true);
+      });
+
+      const unsubscribeError = interstitial.addAdEventListener(AdEventType.ERROR, (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        const errObj = error as { code?: string; message?: string } | null;
+        trackAdLoadFailed("interstitial", errObj?.code, errObj?.message);
+        cleanup();
+        resolve(false);
+      });
+
+      function cleanup() {
+        unsubscribeLoaded?.();
+        unsubscribeClosed?.();
+        unsubscribeError?.();
+      }
+
+      interstitial.load();
+    });
+  } catch (e) {
+    console.warn("Interstitial ad error:", e);
     return false;
   }
 }

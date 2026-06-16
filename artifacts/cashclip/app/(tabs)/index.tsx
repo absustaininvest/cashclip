@@ -259,7 +259,7 @@ export default function HomeScreen() {
       return;
     }
 
-    // LevelPlay native build pending — show the in-app ad card directly.
+    // AdMob native build pending — show the in-app ad card directly.
     // Reward is issued via recordEarnAction("ad_view") on completion; no
     // challenge token needed since begin/complete endpoints are disabled (410).
     const card = PLACEHOLDER_CARDS[index % PLACEHOLDER_CARDS.length];

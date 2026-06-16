@@ -335,10 +335,11 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
             <Text style={styles.bold}>How we use it. </Text>
             Your data is used to operate your account, credit earnings, verify payouts,
             detect fraud, and deliver personalized advertising through our ad network
-            partners (LevelPlay / ironSource, Unity Ads, and survey/offerwall providers).
+            partners (Google AdMob, Unity Ads, ironSource, Pangle, Chartboost, and
+            survey/offerwall providers).
             {"\n\n"}
             <Text style={styles.bold}>Advertising partners. </Text>
-            When you allow tracking, your IDFA is shared with LevelPlay and our mediation
+            When you allow tracking, your IDFA is shared with Google AdMob and our mediation
             partners to personalize ads and measure campaign performance. No name, phone
             number, or email is shared with advertisers.
             {"\n\n"}

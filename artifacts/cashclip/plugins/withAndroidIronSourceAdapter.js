@@ -2,7 +2,7 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 
 /**
  * Adds the Google Mobile Ads ironSource mediation adapter to the Android build.
- * Required for ironSource (LevelPlay) to bid/serve through AdMob mediation on
+ * Required for ironSource to bid/serve as a demand source through AdMob mediation on
  * Android. Companion to the iOS GoogleMobileAdsMediationIronSource pod in
  * extraPods. The ironSource SDK itself is hosted on the ironSource Maven repo
  * (https://android-sdk.is.com/), added via expo-build-properties extraMavenRepos.

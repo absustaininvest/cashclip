@@ -2,7 +2,7 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 
 /**
  * Adds the Google Mobile Ads Unity mediation adapter to the Android build.
- * Required for Unity LevelPlay mediation to serve ads on Android.
+ * Required for Unity Ads to bid/serve as a demand source through AdMob mediation on Android.
  * Companion to the iOS GoogleMobileAdsMediationUnity pod in extraPods.
  *
  * Staged: May 2026 — activate with the June 1 build (bump versionCode).

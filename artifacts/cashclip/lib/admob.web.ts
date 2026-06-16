@@ -58,10 +58,14 @@ export function setFillChangeCallback(_cb: ((fillAvailable: boolean) => void) | 
   // no-op on web
 }
 
+export function getAdUnavailabilityReason(): string | null {
+  return "Expo Go / web";
+}
+
 export function getAdFillState(): {
-  lpInitialized: boolean;
+  initialized: boolean;
   rewardedFillAvailable: boolean;
   adSystemActive: boolean;
 } {
-  return { lpInitialized: false, rewardedFillAvailable: false, adSystemActive: false };
+  return { initialized: false, rewardedFillAvailable: false, adSystemActive: false };
 }

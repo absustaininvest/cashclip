@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.replit.cashclip",
-      "buildNumber": "46",
+      "buildNumber": "47",
       "entitlements": {
         "aps-environment": "production"
       },
@@ -378,7 +378,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 43,
+      "versionCode": 44,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~6212139107"
       },
@@ -425,6 +425,14 @@
         }
       ],
       [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-8679658921848348~6212139107",
+          "iosAppId": "ca-app-pub-8679658921848348~6212139107",
+          "delayAppMeasurementInit": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
@@ -433,6 +441,18 @@
               {
                 "name": "EXUpdatesInterface",
                 "path": "../../../node_modules/.pnpm/expo-updates-interface@2.0.0_expo@54.0.34/node_modules/expo-updates-interface/ios"
+              },
+              {
+                "name": "GoogleMobileAdsMediationUnity"
+              },
+              {
+                "name": "GoogleMobileAdsMediationIronSource"
+              },
+              {
+                "name": "GoogleMobileAdsMediationPangle"
+              },
+              {
+                "name": "GoogleMobileAdsMediationChartboost"
               }
             ]
           },
@@ -449,14 +469,18 @@
           }
         }
       ],
-      "./plugins/withAndroidManifestFix"
+      "./plugins/withAndroidManifestFix",
+      "./plugins/withAndroidUnityAdapter",
+      "./plugins/withAndroidIronSourceAdapter",
+      "./plugins/withAndroidPangleAdapter",
+      "./plugins/withAndroidChartboostAdapter",
+      "./plugins/withChartboostPodSource"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
     },
     "extra": {
-      "ironsourceAppKey": "2690d87e5",
       "eas": {
         "projectId": "aac2a3d9-56b6-49ab-b254-9b80e98bab2f"
       }
