@@ -1,11 +1,29 @@
 **/node_modules/
 .git/
 *.log
+
+# Large local-only dirs (not needed by EAS build)
 attached_assets/
 exports/
 .local/
 .cache/
+.config/
+.pythonlibs/
+.upm/
 snapshots/
+screenshots/
+docs/
+.github/
+.agents/
+
+# EAS temp
+.eas-tmp/
+
+# Pre-compiled build outputs (EAS compiles from source)
 dist/
 static-build/
-.eas-tmp/
+artifacts/api-server/dist/
+artifacts/absustain/dist/
+
+# App Store / Play Store marketing assets (not runtime code)
+artifacts/cashclip/store-assets/
