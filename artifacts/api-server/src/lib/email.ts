@@ -839,15 +839,17 @@ export function sendPayPalAmbiguousAlert(alert: {
  * callback.
  */
 export function sendPayPalWebhookSecretMissingAlert(alert: {
-  /** Where the condition was detected — "startup" or "callback". */
-  source: "startup" | "callback";
+  /** Where the condition was detected — "startup", "callback", or "payout". */
+  source: "startup" | "callback" | "payout";
   mode: string;
 }): void {
   const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
   const safeSource =
     alert.source === "startup"
       ? "on API startup"
-      : "when a PayPal status callback was received";
+      : alert.source === "payout"
+        ? "while sending a PayPal payout — this withdrawal will stay stuck"
+        : "when a PayPal status callback was received";
   const safeMode = escapeHtml(alert.mode);
   sendBestEffort({
     to,

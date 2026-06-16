@@ -1875,6 +1875,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(409).json({ error: "Withdrawal cannot be paid in its current state" }); return;
       }
 
+      // Proactive operator alert at the exact money-moving moment. We only
+      // reach here with payout credentials configured, but if PAYPAL_WEBHOOK_ID
+      // is missing, PayPal's status callback for this batch will be rejected
+      // (401) and the withdrawal will stay stuck in "paying" forever — no
+      // callback can ever clear it. Warn loudly NOW, before the money leaves,
+      // instead of waiting for a callback that can never be verified. This
+      // complements the startup + callback alerts: a long-running replica whose
+      // startup alert was throttled/missed still warns the operator the instant
+      // a real payout goes out without a webhook configured.
+      const webhookMissing = !isPayPalWebhookConfigured();
+      if (webhookMissing) {
+        req.log?.error(
+          { secret: "PAYPAL_WEBHOOK_ID", withdrawalId: claimed.id },
+          "Sending a PayPal payout while PAYPAL_WEBHOOK_ID is NOT set — the status callback will be rejected (401) and this withdrawal will stay stuck in 'paying'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
+        );
+        // Throttled email alert (shared with startup/callback sources) so a
+        // batch of payouts can't flood the operator inbox.
+        alertPayPalWebhookSecretMissing("payout");
+      }
+
       const result = await sendPayPalPayout(
         claimed.id,
         claimed.paypalEmail,
@@ -1897,6 +1917,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           withdrawal: fresh,
           batchId: result.batchId,
           note: "Payout submitted to PayPal. Final status will be updated via webhook.",
+          // Surface the danger state in the operator's response so the admin UI
+          // can flag it inline right after sending: the money has gone out but
+          // PAYPAL_WEBHOOK_ID is missing, so PayPal's status callback will be
+          // rejected and this withdrawal will stay stuck in "paying".
+          ...(webhookMissing
+            ? {
+                webhookMissing: true,
+                warning:
+                  "PAYPAL_WEBHOOK_ID is not set — PayPal's status callback for this payout will be rejected (401) and the withdrawal will stay stuck in 'paying'. Set PAYPAL_WEBHOOK_ID in Production app secrets and re-publish the API.",
+              }
+            : {}),
         });
       } else if (result.ambiguous) {
         // The request was dispatched but the outcome is uncertain (network

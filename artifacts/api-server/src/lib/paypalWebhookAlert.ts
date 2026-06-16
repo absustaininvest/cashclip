@@ -44,7 +44,7 @@ let hasAlerted = false;
  * for tests/observability.
  */
 export function alertPayPalWebhookSecretMissing(
-  source: "startup" | "callback",
+  source: "startup" | "callback" | "payout",
   now: number = Date.now(),
 ): boolean {
   if (hasAlerted && now - lastAlertAt < resolveCooldownMs()) {

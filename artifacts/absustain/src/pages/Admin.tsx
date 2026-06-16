@@ -7234,6 +7234,13 @@ function WithdrawalsPanel({ token }: { token: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Payout failed");
+      // The payout went out, but if PAYPAL_WEBHOOK_ID is missing the status
+      // callback will be rejected and this withdrawal will stay stuck in
+      // "paying". Surface the server's warning inline so the operator fixes it
+      // immediately (the Integration Hub also flags this persistently).
+      if (data.webhookMissing && typeof data.warning === "string") {
+        setActionError(data.warning);
+      }
       await load();
     } catch (e: any) {
       setActionError(e.message);
