@@ -43,7 +43,7 @@ vi.mock("../storage", () => ({
     listSentReplies: vi.fn().mockResolvedValue([]),
     getWithdrawalRequests: vi.fn().mockResolvedValue([]),
     getUserWithdrawals: vi.fn().mockResolvedValue([]),
-    createWithdrawalRequest: vi.fn(),
+    createWithdrawalRequest: i vi.fn(),
     updateWithdrawalStatus: vi.fn(),
     listUsers: vi.fn().mockResolvedValue([]),
     deleteUser: vi.fn(),
