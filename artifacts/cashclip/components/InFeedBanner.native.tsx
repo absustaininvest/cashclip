@@ -21,7 +21,7 @@ export default function InFeedBanner() {
       {visible && <Text style={styles.label}>Sponsored</Text>}
       <BannerAd
         unitId={unitId}
-        size={BannerAdSize.BANNER}
+        size={BannerAdSize.INLINE_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdLoaded={() => setVisible(true)}
         onAdFailedToLoad={() => setVisible(false)}
