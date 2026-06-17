@@ -474,8 +474,8 @@ importers:
         specifier: 0.81.5
         version: 0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0)
       react-native-google-mobile-ads:
-        specifier: ^14.11.0
-        version: 14.11.0(expo@54.0.35)(react@19.1.0)
+        specifier: 16.3.3
+        version: 16.3.3(expo@54.0.35)(react@19.1.0)
       vexo-analytics:
         specifier: ^1.5.7
         version: 1.5.7(@react-navigation/native@7.2.2(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -1553,7 +1553,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {node: '>=0.10.0'}
+    engines: {'0': node >=0.10.0}
 
   '@expo/cli@54.0.24':
     resolution: {integrity: sha512-5xse1bEgnVUBhOrtttc6xTNJVvjyTRavpzuF0/0nuj+312vfSbk7EiRbG+xJ2pW/iZxnhLPJkFCrPYG0nmheAQ==}
@@ -6938,8 +6938,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  react-native-google-mobile-ads@14.11.0:
-    resolution: {integrity: sha512-OWCuk4fR7eLyQT4u2A98tAdgTTFA5/QXUxQEt89LtBJUSALh/Go3wye7X+259b/lszbOOFMxojpPFIMSKeCXmQ==}
+  react-native-google-mobile-ads@16.3.3:
+    resolution: {integrity: sha512-7AFdH3sUyAvwJc7dNJ7sxqfKJVWcdPRx5HdfWQOEsJTp9y+wOJ2V6cnLNkgBjZQG/W/ODZQDq4pKg51zBju2eg==}
     peerDependencies:
       expo: '>=47.0.0'
     peerDependenciesMeta:
@@ -15773,7 +15773,7 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(react@19.1.0)
 
-  react-native-google-mobile-ads@14.11.0(expo@54.0.35)(react@19.1.0):
+  react-native-google-mobile-ads@16.3.3(expo@54.0.35)(react@19.1.0):
     dependencies:
       '@iabtcf/core': 1.5.6
       use-deep-compare-effect: 1.8.1(react@19.1.0)

@@ -103,7 +103,7 @@
     "expo-updates": "~29.0.18",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-google-mobile-ads": "^14.11.0",
+    "react-native-google-mobile-ads": "16.3.3",
     "vexo-analytics": "^1.5.7"
   }
 }
