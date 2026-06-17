@@ -611,9 +611,9 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
 // ─────────────────────────────────────────────────────────────────────────────
 const DECLINE_CANCEL_LABEL = "Continue Without";
 const DECLINE_OPEN_SETTINGS_LABEL = "Open Tracking Settings";
-const DECLINE_ALERT_TITLE = "This Will Reduce Your Earnings";
+const DECLINE_ALERT_TITLE = "Continue Without Personalized Ads?";
 const DECLINE_ALERT_MESSAGE =
-  "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.";
+  "Without tracking, your ads and offers won't be personalized.\n\nYou can turn it on anytime under Settings → Privacy & Security → Tracking.";
 
 describe('Decline Alert — "Continue Without" button label is consistent', () => {
   /**

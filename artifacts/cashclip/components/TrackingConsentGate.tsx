@@ -182,8 +182,8 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
 
   function declineDisclosures() {
     Alert.alert(
-      "This Will Reduce Your Earnings",
-      "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.",
+      "Continue Without Personalized Ads?",
+      "Without tracking, your ads and offers won't be personalized.\n\nYou can turn it on anytime under Settings → Privacy & Security → Tracking.",
       [
         {
           text: "Open Tracking Settings",
