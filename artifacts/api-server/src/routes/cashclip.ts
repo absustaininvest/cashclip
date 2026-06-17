@@ -543,8 +543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // because the native module presence can only be checked on-device.
           adUnavailReason =
             s.id === "admob"
-              ? "Native adapter required — ads serve only when the Google Mobile Ads SDK is compiled into the live app build"
-              : "Demand source via Unity mediation — serves only when its adapter is compiled into the live app build";
+              ? "Mediation orchestrator — ads serve only when the Google Mobile Ads SDK is compiled into the live app build"
+              : "Demand source via AdMob mediation — serves only when its adapter is compiled into the live app build";
         }
       }
 
