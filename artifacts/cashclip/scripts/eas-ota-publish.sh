@@ -22,16 +22,25 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="${EXPO_TOKLAST}"
+# Skip the fingerprint compute step so a single-platform publish finishes well
+# under the 120s window. Does NOT change which runtime is targeted (app.json's
+# runtimeVersion is a fixed string).
+export EAS_SKIP_AUTO_FINGERPRINT="${EAS_SKIP_AUTO_FINGERPRINT:-1}"
 
 if [ -z "$EXPO_TOKEN" ]; then
   echo "OTA_PUBLISH_FATAL: EXPO_TOKLAST not set in workflow env"
   exit 1
 fi
 
+# Single platform by default (iOS) to stay fast and never trip a native build.
+# Override with OTA_PLATFORM=android or OTA_PLATFORM=all when both are needed.
+PLATFORM="${OTA_PLATFORM:-ios}"
+
 RUNTIME=$(node -p "require('./app.json').expo.runtimeVersion" 2>/dev/null || echo "?")
-echo "OTA_PUBLISH_START $(date -u +%FT%TZ) runtime=${RUNTIME}"
+echo "OTA_PUBLISH_START $(date -u +%FT%TZ) runtime=${RUNTIME} platform=${PLATFORM}"
 pnpm exec eas update \
   --branch production \
+  --platform "${PLATFORM}" \
   --message "${OTA_MESSAGE:-OTA -> runtime ${RUNTIME} / production channel (existing builds, no new build): current v1.1.0 codebase}" \
   --non-interactive
 EXIT=$?
