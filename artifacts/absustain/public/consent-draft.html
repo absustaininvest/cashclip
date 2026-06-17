@@ -39,11 +39,13 @@
   }
   .statusbar .right { display: flex; gap: 7px; align-items: center; font-size: 12px; }
   .content { padding: 18px 24px 8px; }
-  .iconwrap {
-    width: 64px; height: 64px; border-radius: 18px;
-    background: rgba(0,230,118,.10);
-    display: flex; align-items: center; justify-content: center;
-    margin: 14px auto 18px;
+  .hero { position: relative; width: 132px; margin: 10px auto 16px; }
+  .chipley { width: 132px; height: auto; display: block; filter: drop-shadow(0 10px 22px rgba(0,230,118,.22)); }
+  .shieldbadge {
+    position: absolute; right: -2px; bottom: 4px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #00E676; display: flex; align-items: center; justify-content: center;
+    border: 3px solid #0A0A0F;
   }
   .title {
     font-size: 26px; font-weight: 700; color: #fff; text-align: center; margin-bottom: 10px;
@@ -91,11 +93,14 @@
       </div>
 
       <div class="content">
-        <div class="iconwrap">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#00E676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="M9 12l2 2 4-4"/>
-          </svg>
+        <div class="hero">
+          <img class="chipley" src="/chipley-wave.png" alt="Chipley waving" />
+          <span class="shieldbadge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </span>
         </div>
 
         <div class="title">Your Privacy &amp; Earnings</div>
