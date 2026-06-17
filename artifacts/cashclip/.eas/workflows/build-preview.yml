@@ -18,6 +18,11 @@ jobs:
             cd ../../
             git fetch --depth=2 origin HEAD 2>/dev/null || true
             pnpm --filter @workspace/scripts run check-build-number -- --committed
+      - run:
+          name: Check Expo package versions
+          command: |
+            cd ../../
+            pnpm --filter @workspace/cashclip run check:versions
       - eas/build:
           name: EAS Build (preview)
           inputs:
