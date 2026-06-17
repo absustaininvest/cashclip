@@ -24,8 +24,11 @@
 4. **The app's per-impression revenue-capture code is written and OTA'd** to the
    ~428 live users.
 5. **The admin's app-reported ad revenue is still $0 — and that is EXPECTED.**
-   It CANNOT be fixed by any further server push or OTA. It needs a new **native
-   build** (build 46+) to become the live build. See §2.
+   We already **SENT** the OTA that carries the capture code (group `d41ff6f9`,
+   it is live on phones); it still reads $0 because the missing piece is
+   **native**, not JavaScript. An OTA updates only JS, so no further OTA or
+   server push can change it — only a new **native build** (build 46+) becoming
+   the live build will. See §1.
 
 If a future session is tempted to "push another server fix to make revenue show
 up" — STOP. That is the circle. The remaining work is a native build, not a
@@ -33,7 +36,39 @@ server push.
 
 ---
 
-## 1. The revenue-mirror truth (read before touching revenue)
+## 1. Where the source of truth lives + the revenue-mirror truth
+
+### 1.0 Where is the source of truth? (the question that keeps coming up)
+There are **two** different "truths," and mixing them up is what causes the
+circles:
+
+- **Your app's own data — users, balances, survey credits, withdrawals.**
+  Source of truth = **the server / database.** This is where it begins; the
+  server decides who gets credited and how much. *This part is correct — the
+  main server IS the origin for app data.*
+- **Ad REVENUE — the money AdMob / Unity actually pay you.**
+  Source of truth = **the ad networks' own dashboards (AdMob, Unity), NOT the
+  server.** The networks run the auction, count impressions, and pay the money.
+  The server only knows what the *app* reports; the app only knows what the
+  *native ad SDK on the phone* hands it. For ad revenue the server is a
+  downstream **mirror**, not the origin.
+
+So "the main server is where it all begins" is true for app data, but ad money
+**begins outside us, at the networks.** That is why the admin can honestly show
+$0 while the Unity/AdMob dashboards show real earnings — same reality, two
+ledgers, and the bridge between them is the native build.
+
+### 1.1 Why the OTA we sent did NOT make the mirror non-zero
+We **did** transmit an OTA (group `d41ff6f9`, build-46 codebase → live build-29
+users, runtime `1.0.0`). It carried the JavaScript that listens for each ad's
+payout and reports it. That JS is live on phones. But an OTA can update **only
+JavaScript**, and the broken link is **native**: build 29's ad SDK never hands
+the `PAID` payout event up to the JS layer, so our listener waits for an event
+that never arrives. The OTA was the correct thing to try; it *proved* the limit.
+That is exactly why **no further OTA or server push will help** — only a native
+build (46+) becoming live will.
+
+### 1.2 The revenue-mirror facts (read before touching revenue)
 
 - **Unity and AdMob ARE earning real money.** This is visible in the official
   Unity and AdMob provider dashboards. **Never tell the owner "Unity earns $0."**
