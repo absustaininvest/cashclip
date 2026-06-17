@@ -379,6 +379,9 @@
     "android": {
       "package": "app.replit.cashclip",
       "versionCode": 45,
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID"
+      ],
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~2934376019"
       },
@@ -460,8 +463,7 @@
             "kotlinVersion": "2.1.20",
             "extraMavenRepos": [
               "https://android-sdk.is.com/",
-              "https://artifact.bytedance.com/repository/pangle",
-              "https://cboost.jfrog.io/artifactory/chartboost-ads/"
+              "https://artifact.bytedance.com/repository/pangle"
             ]
           }
         }
@@ -470,7 +472,7 @@
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
       "./plugins/withAndroidPangleAdapter",
-      "./plugins/withAndroidChartboostAdapter"
+      "./plugins/withChartboostPodSource"
     ],
     "experiments": {
       "typedRoutes": true,
