@@ -1,4 +1,4 @@
-const { withAndroidManifest } = require('@expo/config-plugins');
+const { withAndroidManifest } = require('expo/config-plugins');
 
 /**
  * Fixes Android Manifest merger conflict with react-native-google-mobile-ads.

@@ -1,4 +1,4 @@
-const { withAppBuildGradle } = require('@expo/config-plugins');
+const { withAppBuildGradle } = require('expo/config-plugins');
 
 /**
  * Adds the Google Mobile Ads Pangle (TikTok Audience Network) mediation adapter

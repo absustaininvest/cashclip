@@ -468,8 +468,7 @@
       "./plugins/withAndroidManifestFix",
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
-      "./plugins/withAndroidPangleAdapter",
-      "./plugins/withAndroidChartboostAdapter"
+      "./plugins/withAndroidPangleAdapter"
     ],
     "experiments": {
       "typedRoutes": true,
