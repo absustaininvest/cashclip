@@ -49,6 +49,15 @@ export const PAYPAL_DISPOSABLE_DOMAINS = new Set([
 ]);
 
 /**
+ * Single friendly, user-facing message shown whenever a PayPal payout email is
+ * rejected — either by the client-side `isPlausiblePayPalDomain` pre-check or by
+ * the server returning `code: "INVALID_PAYPAL_EMAIL"`. Kept here so the wording
+ * stays identical across the Profile save form and the withdrawal flow.
+ */
+export const INVALID_PAYPAL_EMAIL_MESSAGE =
+  "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account.";
+
+/**
  * TLDs where a short SLD (≤ 3 chars) is plausible for a real PayPal account.
  * Established brands like aol.com, qq.com, msn.com, sky.com all fall here.
  * Country-code or speculative TLDs like .co, .cc, .biz are excluded — a

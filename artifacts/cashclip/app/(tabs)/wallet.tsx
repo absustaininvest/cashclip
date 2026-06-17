@@ -53,7 +53,7 @@ import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { secureGet, secureSet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
-import { isPlausiblePayPalDomain } from "@workspace/validation";
+import { isPlausiblePayPalDomain, INVALID_PAYPAL_EMAIL_MESSAGE } from "@workspace/validation";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   const colonIdx = rawMsg.indexOf(":");
@@ -437,11 +437,7 @@ export default function WalletScreen() {
     const suspiciousSaved =
       !!lockedTrimmed && !isPlausiblePayPalDomain(lockedTrimmed);
     setSavedEmailWarning(suspiciousSaved);
-    setPaypalEmailError(
-      suspiciousSaved
-        ? "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-        : null,
-    );
+    setPaypalEmailError(suspiciousSaved ? INVALID_PAYPAL_EMAIL_MESSAGE : null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
     setShowWithdrawModal(true);
@@ -466,9 +462,7 @@ export default function WalletScreen() {
     // pre-fill next time.
     secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalEmailError(
-        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-      );
+      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
     } else {
       setPaypalEmailError(null);
     }
@@ -482,9 +476,7 @@ export default function WalletScreen() {
       return;
     }
     if (!isPlausiblePayPalDomain(paypalEmail.trim())) {
-      setPaypalEmailError(
-        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-      );
+      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
       return;
     }
 
@@ -522,8 +514,15 @@ export default function WalletScreen() {
       const fallback = "Failed to submit withdrawal request";
       const rawMsg = err instanceof Error ? err.message : fallback;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setWithdrawError(extractApiErrorMessage(rawMsg, fallback));
-      setWithdrawErrorCode(extractApiErrorCode(rawMsg));
+      const code = extractApiErrorCode(rawMsg);
+      // Reuse the single friendly PayPal-email message so the wording matches
+      // the Profile save form when the server rejects the payout address.
+      setWithdrawError(
+        code === "INVALID_PAYPAL_EMAIL"
+          ? INVALID_PAYPAL_EMAIL_MESSAGE
+          : extractApiErrorMessage(rawMsg, fallback),
+      );
+      setWithdrawErrorCode(code);
     } finally {
       setSubmitting(false);
     }

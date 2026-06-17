@@ -26,7 +26,7 @@ import { getDisplayPointsPerDollar } from "@/lib/points";
 import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
-import { isPlausiblePayPalDomain } from "@workspace/validation";
+import { isPlausiblePayPalDomain, INVALID_PAYPAL_EMAIL_MESSAGE } from "@workspace/validation";
 import type { Translations } from "@/lib/i18n";
 
 interface Achievement {
@@ -136,9 +136,7 @@ export default function ProfileScreen() {
     // check the wallet uses at withdrawal time so a user can't lock in an address
     // they'll never be able to cash out to (which would strand their balance).
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalError(
-        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-      );
+      setPaypalError(INVALID_PAYPAL_EMAIL_MESSAGE);
       return;
     }
     setPaypalSaving(true);
@@ -155,7 +153,9 @@ export default function ProfileScreen() {
       Alert.alert("PayPal email saved", `${trimmed} has been linked to your account. This cannot be changed later.`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save.";
-      if (msg.includes("CONFLICT")) {
+      if (msg.includes("INVALID_PAYPAL_EMAIL")) {
+        setPaypalError(INVALID_PAYPAL_EMAIL_MESSAGE);
+      } else if (msg.includes("CONFLICT")) {
         setPaypalError("This PayPal email is already linked to another account.");
       } else if (msg.includes("ALREADY_SET")) {
         setPaypalError("PayPal email has already been set.");
