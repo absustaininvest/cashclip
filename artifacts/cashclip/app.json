@@ -460,7 +460,8 @@
             "kotlinVersion": "2.1.20",
             "extraMavenRepos": [
               "https://android-sdk.is.com/",
-              "https://artifact.bytedance.com/repository/pangle"
+              "https://artifact.bytedance.com/repository/pangle",
+              "https://cboost.jfrog.io/artifactory/chartboost-ads/"
             ]
           }
         }
@@ -468,7 +469,8 @@
       "./plugins/withAndroidManifestFix",
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
-      "./plugins/withAndroidPangleAdapter"
+      "./plugins/withAndroidPangleAdapter",
+      "./plugins/withAndroidChartboostAdapter"
     ],
     "experiments": {
       "typedRoutes": true,
