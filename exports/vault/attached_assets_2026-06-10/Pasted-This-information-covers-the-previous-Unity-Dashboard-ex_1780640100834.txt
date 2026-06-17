@@ -1,0 +1,110 @@
+This information covers the previous Unity Dashboard experience.
+If you use the New Unity Dashboard, refer to docs.unity.com/monetization or docs.unity.com/user-acquisition.
+​
+
+
+Unity Ads Monetization
+Unity Ads SDK integration
+Privacy
+Mediation integration guides
+Optimization
+References
+Grow your game
+Unity Ads
+Monetization Stats API
+Use the Monetization Stats API to programmatically access your ad performance data in CSV format for custom reporting and analysis.
+Read time 2 minutes
+Last updated a day ago
+Use the Monetization Stats API to retrieve monetization data directly in CSV format. The API fetches the same statistics that are available on the developer dashboard, however you can use it to programmatically pull data for your own uses.
+Important
+Mediation partners need a Unity API key in order to gather accurate reporting for the Unity Ads network. If you already use the deprecated Applifier Statistics API in your mediated integration, consult your mediation partner before migrating to the Monetization Statistics API. Note that you can still use the Monetization Statistics API to ping Unity's network for reporting data directly. All unmediated customers can safely migrate to the new API.
+Authentication
+Note
+The Monetization Stats API requires your Organization ID, and that ID will be changed when transferring a project.
+Note
+Transferring a project changes the Organization ID, which is required for accessing the Monetization Statistics API.
+The endpoint uses an API key from the Unity Monetization Dashboard. Select Setup > API Access from the secondary navigation menu, then copy the API key from the Monetization Stats API Access section, or select Create API Key if none exists.
+Note
+The Monetization Statistics API generates a unique key for each user. For mediation integration purposes, any individual's key will work for the entire Organization.
+You must include the API key as the "apikey=<token>" query parameter, or using the authentication header "Authorization: Token <token>". The redirect URL fetches the data. This is standard HTTP behavior that is supported by all HTTP clients.
+If the authentication fails, the authentication server responds with an HTTP/2 error code, and a message in the body. For example:
+400 {"errors":[{"msg":"access token required"}]}
+Request Format
+To retrieve statistics data from the Unity Ads service, use the following GET request, where <organizationId> is the Organization core ID of your Unity Organization:
+GET
+https://monetization.api.unity.com/stats/v1/operate/organizations/<organizationId>
+Query parameters
+The API supports various ways to split your data. Some are required for a successful request.
+Parameter
+Description
+Required?
+Notes
+apikey
+The API authentication key retrieved from the Monetization dashboard.	No. Use the Authentication header instead.	Not applicable.
+fields
+A comma-separated list that defines the columns of available fields:
+adrequest_count
+start_count
+view_count
+available_sum
+revenue_sum
+Yes	Not applicable.
+groupBy
+A comma-separated list that expands the rows, splitting data by the following fields:
+placement (splits data by Ad Unit ID)
+country
+platform
+game (game ID)
+No	Not applicable.
+scale
+A value that splits data by time resolution. Each day splits at 00:00 UTC. Supported options include:
+hour
+day
+week
+month
+year
+all
+Yes	Not applicable.
+start
+The start time of data set, in ISO 8601 format.	Yes	Not applicable.
+end
+The end time of data set, in ISO 8601 format.	Yes	Not applicable.
+gameIds
+A comma-separated list of source game IDs by which to filter results.
+No	To obtain source IDs, you can make a request using groupBy=game.
+This API supports returning CSV or JSON files. Specify the output format in the "Accept" header as follows:
+For CSV, use "Accept: text/csv".
+For JSON, use "Accept: application/json".
+Following is an example request, using real parameters (with the exception of placeholder Organization core ID and API key):
+curl
+https://monetization.api.unity.com/stats/v1/operate/organizations/:organizationId?groupBy=country,placement,platform,game&fields=adrequest_count,available_sum,revenue_sum,start_count,view_count&scale=hour&start=2020-05-01T00:00:00Z&end=2020-06-01T23:59:00Z&apikey=:apiKeyValue -H "Accept: text/csv" --output stats.csv
+Note
+Splitting data across multiple dimensions causes the CSV to grow exponentially, which might cause some large data sets to time-out. The request times out if the server takes more than 60 seconds to process the request.
+Request status codes
+The endpoint returns the following status codes indicating the result of the request:
+Code
+Description
+200
+The request succeeded.
+400
+The organizationId, or another required parameter was omitted from the query.
+401
+The API key is missing from the request or invalid.
+404
+Organization not found.
+408
+The request timed out.
+429
+Request rate limit exceeded.
+500
+The request failed for an unknown reason.
+503
+The service is unavailable.
+Copyright © 2026 Unity Technologies
+Legal
+Privacy Policy
+Cookies
+Do Not Sell or Share My Personal Information
+Your Privacy Choices (Cookie Settings)
+"Unity", Unity logos, and other Unity trademarks are trademarks or registered trademarks of Unity Technologies or its affiliates in the U.S and elsewhere (more info here). Other names or brands are trademarks of their respective owners.
+Some pages are machine-translated for convenience, and may contain inaccuracies. In the event of conflicting information, the English version is authoritative.

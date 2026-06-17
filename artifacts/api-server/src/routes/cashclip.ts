@@ -1453,11 +1453,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paypalEmail: paypalEmail.trim(),
       }).catch(() => {});
 
-      // Referral qualification fires only on confirmed payout (PayPal SUCCEEDED
-      // webhook or admin manual-paid), NOT here. Triggering it at withdrawal
-      // request time allows referral farms to earn bonuses that survive payout
-      // failures: referred user gets their balance back on rejection/refund, but
-      // referrer would already keep the bonus. See the SUCCEEDED handler below.
+      // Referral qualification: if THIS user was referred and just completed a
+      // cash-out of at least the qualifying amount ($3), credit their referrer
+      // once. All offered tiers are >= $3, but we gate on the constant so the
+      // rule stays explicit and survives any future tier change. Idempotent and
+      // best-effort — never blocks or fails the user's withdrawal response.
+      if (user.referredBy && tier.amount >= REFERRAL_QUALIFY_USD - 1e-9) {
+        storage
+          .qualifyReferral({ referredUserId: req.userId!, bonusUsd: REFERRAL_BONUS_USD })
+          .then((r) => {
+            if (r.credited && r.referrerId) {
+              req.log?.info({ referredUserId: req.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited");
+              const bonusStr = REFERRAL_BONUS_USD.toFixed(2);
+              storage.insertUserNotification({
+                userId: r.referrerId,
+                title: "Referral bonus earned! 🎉",
+                message: `Your friend just cashed out — you earned $${bonusStr}!`,
+                type: "referral",
+              }).catch((err) => {
+                req.log?.error({ err, referrerId: r.referrerId }, "Failed to insert referral notification");
+              });
+              if (r.referrerEmail) {
+                sendReferralBonusEarned({
+                  toEmail: r.referrerEmail,
+                  referrerUsername: r.referrerUsername ?? "there",
+                  bonusUsd: bonusStr,
+                });
+              }
+            }
+          })
+          .catch((err) => {
+            req.log?.error({ err, referredUserId: req.userId }, "Referral qualification failed");
+          });
+      }
 
       // Velocity flag (operator only): alert when a user makes their 2nd (or any
       // further) withdrawal in the same day — the realistic "more than twice a
@@ -1587,35 +1615,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         if (!claimed) {
           res.status(409).json({ error: "Withdrawal is no longer in paying status" }); return;
-        }
-        // Referral qualification on confirmed payout (admin manual-paid path).
-        // qualifyReferral is idempotent, so retrying this admin action is safe.
-        if (parseFloat(claimed.amount) >= REFERRAL_QUALIFY_USD - 1e-9) {
-          storage.qualifyReferral({ referredUserId: claimed.userId, bonusUsd: REFERRAL_BONUS_USD })
-            .then((r) => {
-              if (r.credited && r.referrerId) {
-                req.log?.info({ referredUserId: claimed.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited (admin manual-paid)");
-                const bonusStr = REFERRAL_BONUS_USD.toFixed(2);
-                storage.insertUserNotification({
-                  userId: r.referrerId,
-                  title: "Referral bonus earned! 🎉",
-                  message: `Your friend just cashed out — you earned $${bonusStr}!`,
-                  type: "referral",
-                }).catch((err) => {
-                  req.log?.error({ err, referrerId: r.referrerId }, "Failed to insert referral notification");
-                });
-                if (r.referrerEmail) {
-                  sendReferralBonusEarned({
-                    toEmail: r.referrerEmail,
-                    referrerUsername: r.referrerUsername ?? "there",
-                    bonusUsd: bonusStr,
-                  });
-                }
-              }
-            })
-            .catch((err) => {
-              req.log?.error({ err, referredUserId: claimed.userId }, "Referral qualification failed (admin manual-paid)");
-            });
         }
         res.json({ withdrawal: claimed }); return;
       }
@@ -1914,7 +1913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
-        const paidClaimed = await storage.updateWithdrawalStatusIfStatus(
+        await storage.updateWithdrawalStatusIfStatus(
           withdrawal.id,
           ["paying"],
           "paid",
@@ -1927,36 +1926,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalPayout: withdrawal.totalPayout,
           status: "paid",
         });
-        // Referral qualification on confirmed payout only. qualifyReferral is
-        // idempotent (stamps referralCreditedAt once) so a duplicate SUCCEEDED
-        // event is harmless.
-        if (paidClaimed && parseFloat(withdrawal.amount) >= REFERRAL_QUALIFY_USD - 1e-9) {
-          storage.qualifyReferral({ referredUserId: withdrawal.userId, bonusUsd: REFERRAL_BONUS_USD })
-            .then((r) => {
-              if (r.credited && r.referrerId) {
-                req.log?.info({ referredUserId: withdrawal.userId, referrerId: r.referrerId }, "Referral qualified — referrer credited (PayPal SUCCEEDED)");
-                const bonusStr = REFERRAL_BONUS_USD.toFixed(2);
-                storage.insertUserNotification({
-                  userId: r.referrerId,
-                  title: "Referral bonus earned! 🎉",
-                  message: `Your friend just cashed out — you earned $${bonusStr}!`,
-                  type: "referral",
-                }).catch((err) => {
-                  req.log?.error({ err, referrerId: r.referrerId }, "Failed to insert referral notification");
-                });
-                if (r.referrerEmail) {
-                  sendReferralBonusEarned({
-                    toEmail: r.referrerEmail,
-                    referrerUsername: r.referrerUsername ?? "there",
-                    bonusUsd: bonusStr,
-                  });
-                }
-              }
-            })
-            .catch((err) => {
-              req.log?.error({ err, referredUserId: withdrawal.userId }, "Referral qualification failed (PayPal SUCCEEDED)");
-            });
-        }
         res.status(200).json({ status: "ok" }); return;
       }
 
