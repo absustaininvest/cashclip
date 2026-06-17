@@ -47,15 +47,15 @@ args = "absustain-seo-noindex"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "board-fit-tests"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "EAS iOS Build 46"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "EAS Android Build"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "cashclip-test"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -101,17 +101,6 @@ task = "shell.exec"
 args = "pnpm --filter absustain exec vitest run src/components/Seo.test.tsx"
 
 [[workflows.workflow]]
-name = "board-fit-tests"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter cashclip exec vitest run app/game/board-fit.test.tsx"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "EAS iOS Build 46"
 author = "agent"
 
@@ -132,6 +121,17 @@ args = "bash artifacts/cashclip/scripts/eas-build-android.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "cashclip-test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter cashclip exec vitest run"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[workflows.workflow]]
 name = "api-server-typecheck"
