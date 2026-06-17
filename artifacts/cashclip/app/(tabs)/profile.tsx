@@ -26,6 +26,7 @@ import { getDisplayPointsPerDollar } from "@/lib/points";
 import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
+import { isPlausiblePayPalDomain } from "@workspace/validation";
 import type { Translations } from "@/lib/i18n";
 
 interface Achievement {
@@ -131,6 +132,15 @@ export default function ProfileScreen() {
     if (!trimmed) { setPaypalError("Please enter your PayPal email."); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmed)) { setPaypalError("Enter a valid email address."); return; }
+    // The PayPal email is write-once. Run the same disposable/implausible-domain
+    // check the wallet uses at withdrawal time so a user can't lock in an address
+    // they'll never be able to cash out to (which would strand their balance).
+    if (!isPlausiblePayPalDomain(trimmed)) {
+      setPaypalError(
+        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+      );
+      return;
+    }
     setPaypalSaving(true);
     setPaypalError(null);
     try {
