@@ -43,6 +43,13 @@ Diverging" / $0 app-reported stays correct/by-design until a fresh EAS build
 
 **Admin relabel companion:** `reconMirrorInactive = appReported===0 && official>0`
 flips the badge to neutral "Official only" and explains the $0 is by design.
-Caveat (open, owner to decide): once the mirror build is live this flag could
-mask a genuine future regression back to $0 — gating it on a server-driven
-"mirror expected active" flag/cutover would close that hole (needs an API deploy).
+
+**Cutover gate (closed):** the relabel is now gated on a server-driven cutover
+signal so it can't mask a genuine future regression to $0. Set the env flag
+`ADMOB_MIRROR_EXPECTED_ACTIVE` truthy on the **production** deployment once the
+PAID-capable native build is the LIVE build (then republish — env-only, no DB).
+The revenue route (`GET /api/admin/admob/revenue`) echoes it as
+`mirrorExpectedActive`; the admin badge keeps "Official only" only while that is
+false. After cutover a $0 reconciliation reads as "Diverging" (amber alert).
+**Why:** before cutover $0 is by design; after it, $0 is a real regression and
+must not be softened. Default false = nothing changes until an operator flips it.

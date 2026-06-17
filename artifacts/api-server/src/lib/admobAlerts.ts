@@ -69,6 +69,22 @@ function envFlag(name: string): boolean {
   return /^(1|true|yes|on)$/i.test(raw.trim());
 }
 
+/**
+ * The app's per-impression revenue mirror (AdMob `onPaidEvent` → `revenueMicros`)
+ * only fills once a PAID-capable native build is the LIVE build. Until that
+ * cutover, app-reported revenue is $0 BY DESIGN and a $0 reconciliation is not a
+ * real discrepancy. After the cutover, revenue SHOULD be flowing, so the same $0
+ * is a genuine regression that must surface as an alert — not be masked by the
+ * friendly "by design" relabel.
+ *
+ * This flag is the cutover signal: set `ADMOB_MIRROR_EXPECTED_ACTIVE` truthy on
+ * the production deployment once the PAID-capable build is live. Defaults to
+ * false (pre-cutover) so nothing changes until an operator flips it.
+ */
+export function isAdmobMirrorExpectedActive(): boolean {
+  return envFlag("ADMOB_MIRROR_EXPECTED_ACTIVE");
+}
+
 export function getAdmobAlertConfig(): AdmobAlertConfig {
   return {
     staleAfterMs: Math.round(envNum("ADMOB_ALERT_STALE_HOURS", DEFAULT_STALE_HOURS) * 60 * 60 * 1000),

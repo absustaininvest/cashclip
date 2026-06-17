@@ -19,6 +19,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   evaluateAdmobAlerts,
   getRecentAdmobAlerts,
+  isAdmobMirrorExpectedActive,
   _resetAdmobAlertsForTests,
   type AdmobReconciliationInput,
 } from "./admobAlerts";
@@ -187,5 +188,32 @@ describe("admobAlerts", () => {
       expect(resolved).toBeTruthy();
       expect(resolved!.status).toBe("resolved");
     });
+  });
+
+  describe("isAdmobMirrorExpectedActive", () => {
+    const KEY = "ADMOB_MIRROR_EXPECTED_ACTIVE";
+    beforeEach(() => {
+      delete process.env[KEY];
+    });
+
+    it("defaults to false (pre-cutover) when the flag is unset", () => {
+      expect(isAdmobMirrorExpectedActive()).toBe(false);
+    });
+
+    it.each(["1", "true", "yes", "on", "TRUE", " on "])(
+      "is true when the flag is a truthy value (%s)",
+      (value) => {
+        process.env[KEY] = value;
+        expect(isAdmobMirrorExpectedActive()).toBe(true);
+      },
+    );
+
+    it.each(["0", "false", "no", "off", ""])(
+      "stays false for a non-truthy value (%s)",
+      (value) => {
+        process.env[KEY] = value;
+        expect(isAdmobMirrorExpectedActive()).toBe(false);
+      },
+    );
   });
 });

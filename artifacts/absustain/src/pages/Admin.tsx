@@ -6259,6 +6259,10 @@ interface AdMobRevenueData {
     differencePct: number | null;
     currency: string;
   };
+  // Server-driven cutover signal: true once the PAID-capable build is live and
+  // app-reported revenue SHOULD be flowing. Before cutover a $0 reconciliation
+  // is by design; after it, $0 is a genuine regression that must alert.
+  mirrorExpectedActive?: boolean;
   fetchedAt?: string;
 }
 
@@ -6420,8 +6424,16 @@ function RevenuePanel({
   // live yet. Until that build ships, "app-reported" is $0 by design — that's
   // NOT a real discrepancy, so don't flag it as "Diverging". AdMob official is
   // the source of truth in the meantime.
+  //
+  // Gated on the server's cutover signal: once the PAID-capable build is live
+  // (`mirrorExpectedActive`), revenue SHOULD be flowing, so a $0 reconciliation
+  // is a genuine regression and must surface as "Diverging" — not be masked by
+  // the friendly "Official only" relabel. Before the cutover the relabel stands.
   const reconMirrorInactive =
-    !!recon && recon.appReportedEarnings === 0 && recon.officialEarnings > 0;
+    !!recon &&
+    data?.mirrorExpectedActive !== true &&
+    recon.appReportedEarnings === 0 &&
+    recon.officialEarnings > 0;
 
   return (
     <div className="space-y-6">

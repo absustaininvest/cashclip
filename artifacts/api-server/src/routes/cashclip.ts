@@ -43,7 +43,12 @@ import {
   getRecentAlerts,
   getRejectionSummary,
 } from "../lib/webhookAlerts";
-import { evaluateAdmobAlerts, getRecentAdmobAlerts, getAdmobAlertConfig } from "../lib/admobAlerts";
+import {
+  evaluateAdmobAlerts,
+  getRecentAdmobAlerts,
+  getAdmobAlertConfig,
+  isAdmobMirrorExpectedActive,
+} from "../lib/admobAlerts";
 import {
   getSetting,
   setSetting,
@@ -284,6 +289,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastSyncedAt,
         stale,
         reconciliation,
+        // Cutover signal: once the PAID-capable build is live the app-revenue
+        // mirror SHOULD be flowing, so a $0 reconciliation must read as a real
+        // alert ("Diverging") rather than the by-design "Official only" relabel.
+        mirrorExpectedActive: isAdmobMirrorExpectedActive(),
         fetchedAt: new Date().toISOString(),
       });
     } catch (err) {
