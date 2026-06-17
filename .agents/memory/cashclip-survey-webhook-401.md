@@ -1,45 +1,44 @@
 ---
-name: CashClip surveys never credit — webhook 401 (integration setup, not the app)
-description: Surveys complete on provider side but users never get paid because CPX+BitLabs postbacks are rejected 401 in prod; server-only secret fix, never a rebuild.
+name: CashClip surveys never credit — diagnose webhook end-to-end before blaming code
+description: Surveys complete on provider side but users aren't credited. Prove the server with a signed status=0 probe before touching secrets/code — a "0 credited" can simply mean the provider postback URL was never saved.
 ---
 
-# Surveys don't pay users — it's the integration webhook handshake, NOT the app/build
+# Surveys don't pay users — it's the integration setup, NOT the app/build
 
 **Symptom (owner-reported, repeatedly):** users finish surveys but never get credited
 in-app. Owner correctly insisted "it's the integration setup," not the app, and was
-frustrated by repeated suggestions to rebuild/ship a new native version.
+frustrated by repeated suggestions to rebuild/ship a new native version. It is NEVER a
+native build / App Store / Play review issue — same single handshake covers all providers.
 
-**Confirmed via production read-only SQL (Jun 2026):**
-- `webhook_audit`: every CPX postback rejected `401` reason "Invalid provider-specific
-  signature for cpx" (dozens/day since ~Jun 5). BitLabs identical: `401` "Invalid
-  provider-specific signature for bitlabs".
-- `reward_sessions` (source=survey): CPX = **162 pending, 0 ever completed**; BitLabs = 0
-  sessions. So crediting has NEVER worked, it is not a delay.
-- CPX publisher dashboard shows REAL completes + money (~$1.64/day, ~3 DAU) — proof the
-  money exists on the provider side; only the callback to our server is broken.
+## Current verified state (Jun 17 2026) — supersedes the old "401 secret mismatch" note
 
-**Root cause:** provider webhook signature mismatch. The webhook secret our server uses
-must equal the provider dashboard's signing salt:
-- CPX verifier (webhookAuth.ts): compares `md5(`${trans_id}-${secret}`)` to the
-  `secure_hash`/`hash` query param, secret = `CPX_WEBHOOK_SECRET`. Guard DISABLES
-  crediting if `CPX_WEBHOOK_SECRET === CPX_API_KEY`. 401 = it reached the compare and
-  mismatched → prod `CPX_WEBHOOK_SECRET` ≠ CPX dashboard "Secure Hash" salt.
-- BitLabs verifier: HMAC-SHA1 over the cleaned full URL using `BITLABS_WEBHOOK_SECRET`.
+Re-diagnosed live. The CPX webhook server side is **correct and proven on production**:
+- Route `GET /api/surveys/webhook/cpx` runs `verifyWebhook("cpx", req)`; **bad signature → 403** (not 401), good signature → 200.
+- CPX secret is **`CPX_API_KEY`** (the per-app "Secure Hash"), NOT a separate `CPX_WEBHOOK_SECRET`. CPX issues no separate webhook secret; the same Secure Hash signs the wall link (`buildCpxWallUrl`) and the postback. If the wall loads (sessions get created), `CPX_API_KEY` is correct.
+- CPX postback signature = `md5(`${trans_id}-${SecureHash}`)` vs `secure_hash`/`hash` query param. Replay guard: rejects `trans_id === ext_user_id`.
+- Crediting only fires when `status === "1" || "completed"`; otherwise 200 with no DB write.
 
-**Fix is SERVER-ONLY — no native build, no App Store/Play review:**
-1. Match the secret: set prod `CPX_WEBHOOK_SECRET` to the CPX dashboard "Secure Hash"
-   (Apps → app → Postback/Secure Hash), and `BITLABS_WEBHOOK_SECRET` to BitLabs' signing
-   secret. One secret at a time (batching secret boxes has pasted values into wrong
-   fields before).
-2. These must live in **Production app secrets (Publishing)**, not just the workspace
-   Secrets tab, then **re-publish the API** to take effect.
-3. Re-test: a real completion should flip a `reward_sessions` row pending→completed and
-   write an `earnings_ledger` entry; `webhook_audit` should show 200 instead of 401.
+**Prod data at diagnosis:** `reward_sessions` source=survey → CPX **260 pending, 0 completed, 0 ever**; BitLabs 0 sessions. `unsettled_completions` **empty**. No `/api/surveys/webhook/cpx` hits in deployment logs. Zero completed AND zero unsettled AND zero log hits = **postbacks were never arriving** → the CPX Main Postback URL had not been saved in the CPX dashboard yet (owner was mid-configuration). It was NOT a signature/secret mismatch.
 
-**Why this matters:** do NOT answer "surveys don't pay" with a rebuild — build 29 (iOS)
-is live and a new build risks rejection (38 froze on splash). The same single handshake
-fix makes BOTH CPX and BitLabs pay. Native treadmill ≠ this fix.
+## The safe live probe that settles it (no prod writes)
 
-**How to apply:** verify with prod read-only SQL on `webhook_audit` (provider, reason,
-status_code) and `reward_sessions` (status by provider) before/after; fix is secret match
-in Production + republish.
+Compute `md5(`${transId}-${CPX_API_KEY}`)` in a Node script (bash env has the secret; the
+code_execution sandbox does NOT), then call the **production** webhook with **`status=0`**
+(so the crediting block is skipped → no credit, no unsettled row — pure verification test):
+- VALID signature → **200 OK** ⇒ prod `CPX_API_KEY` matches and real completions will credit.
+- INVALID signature (control) → **403 Forbidden** ⇒ verifier is actually checking.
+Both `api.cash-clip.app` and apex `cash-clip.app` route `/api/*` to the API server (both
+returned 200/403 identically), so the host in the dashboard URL is not the failure point.
+
+## Correct CPX Main Postback URL (owner's was already correct)
+
+`https://api.cash-clip.app/api/surveys/webhook/cpx?status={status}&trans_id={trans_id}&survey_id={survey_id}&ext_user_id={user_id}&amount_local={amount_local}&secure_hash={secure_hash}`
+- `ext_user_id={user_id}` is required (server matches the pending session by it); `amount_local` is **ignored** server-side (reward is the server-committed `expectedReward`, clamped) — harmless to include.
+- apex `cash-clip.app` host also works, but `api.cash-clip.app` is the canonical API host baked into builds.
+
+**Why this matters / how to apply:** before answering "surveys don't pay" with code or
+secret changes, run the signed status=0 probe + check `reward_sessions`/`unsettled_completions`/logs.
+If the server proves out (200 valid / 403 invalid) but credits are 0, the fix is **dashboard
+configuration (save the postback URL)**, then confirm a real completion flips a session
+pending→completed. Only if the probe 403s on a VALID signature is it a real secret/snapshot
+mismatch (then match the secret in Production Publishing secrets + republish).
