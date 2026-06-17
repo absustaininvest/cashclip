@@ -1251,58 +1251,76 @@ export function registerEarningsRoutes(app: Express): void {
         res.status(200).send("OK"); return;
       }
 
-      // ── 5. Replay prevention (transaction_id deduplication) ─────────────
-      if (transaction_id) {
-        const [dup] = await db
-          .select({ id: earnTokens.id })
-          .from(earnTokens)
-          .where(eq(earnTokens.transactionId, transaction_id))
-          .limit(1);
-
-        if (dup) {
-          logger.warn({ ...ctx, transactionId: transaction_id }, "AdMob SSV: duplicate — skipped");
-          res.status(200).send("OK"); return;
-        }
-      }
-
-      // ── 6. Daily rewarded_ad cap ────────────────────────────────────────
-      const now      = new Date();
-      const dayStart = new Date(now);
-      dayStart.setUTCHours(0, 0, 0, 0);
-
-      const [{ todayCount }] = await db
-        .select({ todayCount: count() })
-        .from(earnTokens)
-        .where(and(
-          eq(earnTokens.userId, user_id),
-          eq(earnTokens.actionType, "rewarded_ad"),
-          gte(earnTokens.earnedAt, dayStart),
-        ));
-
-      if (Number(todayCount) >= ACTION_CONFIG.rewarded_ad.dailyCap) {
-        logger.info({ ...ctx, userId: user_id }, "AdMob SSV: daily ad cap reached");
-        res.status(200).send("OK"); return;
-      }
-
-      // ── 7. Issue earn token ─────────────────────────────────────────────
-      const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+      // ── 5–7. Atomic cap enforcement ──────────────────────────────────────
+      // Replay prevention, daily cap check, and token insert are wrapped in a
+      // single transaction with a FOR UPDATE lock on the user row. This
+      // serialises concurrent SSV callbacks for the same account so that two
+      // valid callbacks racing near the cap boundary cannot both observe a
+      // sub-cap count and both insert a new token (bypassing the daily limit).
       const snapshot = await snapshotRateString();
-      await db.insert(earnTokens).values({
-        userId:        user_id,
-        points:        ACTION_CONFIG.rewarded_ad.points!,
-        actionType:    "rewarded_ad",
-        description:   `Rewarded ad · SSV verified · ${reward_item ?? "reward"}`,
-        earnedAt:      now,
-        claimableAt,
-        status:        "pending",
-        transactionId: transaction_id ?? null,
-        usdPerPointSnapshot: snapshot,
+      const issued = await db.transaction(async (tx) => {
+        // Lock the user row for the duration of this transaction so any other
+        // concurrent SSV callback for the same user must wait.
+        await tx.execute(sql`SELECT id FROM ${users} WHERE id = ${user_id} FOR UPDATE`);
+
+        // Replay prevention: unique index on transaction_id already prevents
+        // a duplicate insert, but we check first to return early and skip the
+        // (now redundant) cap query.
+        if (transaction_id) {
+          const [dup] = await tx
+            .select({ id: earnTokens.id })
+            .from(earnTokens)
+            .where(eq(earnTokens.transactionId, transaction_id))
+            .limit(1);
+
+          if (dup) {
+            logger.warn({ ...ctx, transactionId: transaction_id }, "AdMob SSV: duplicate — skipped");
+            return false;
+          }
+        }
+
+        // Daily cap check — runs inside the lock so the count is stable.
+        const now      = new Date();
+        const dayStart = new Date(now);
+        dayStart.setUTCHours(0, 0, 0, 0);
+
+        const [{ todayCount }] = await tx
+          .select({ todayCount: count() })
+          .from(earnTokens)
+          .where(and(
+            eq(earnTokens.userId, user_id),
+            eq(earnTokens.actionType, "rewarded_ad"),
+            gte(earnTokens.earnedAt, dayStart),
+          ));
+
+        if (Number(todayCount) >= ACTION_CONFIG.rewarded_ad.dailyCap) {
+          logger.info({ ...ctx, userId: user_id }, "AdMob SSV: daily ad cap reached");
+          return false;
+        }
+
+        // Issue earn token.
+        const claimableAt = new Date(now.getTime() + PENDING_WINDOW_MS);
+        await tx.insert(earnTokens).values({
+          userId:        user_id,
+          points:        ACTION_CONFIG.rewarded_ad.points!,
+          actionType:    "rewarded_ad",
+          description:   `Rewarded ad · SSV verified · ${reward_item ?? "reward"}`,
+          earnedAt:      now,
+          claimableAt,
+          status:        "pending",
+          transactionId: transaction_id ?? null,
+          usdPerPointSnapshot: snapshot,
+        });
+
+        return true;
       });
 
-      logger.info(
-        { userId: user_id, rewardItem: reward_item, rewardAmount: reward_amount, transactionId: transaction_id },
-        "AdMob SSV: earn token issued",
-      );
+      if (issued) {
+        logger.info(
+          { userId: user_id, rewardItem: reward_item, rewardAmount: reward_amount, transactionId: transaction_id },
+          "AdMob SSV: earn token issued",
+        );
+      }
 
       res.status(200).send("OK");
     } catch (err) {

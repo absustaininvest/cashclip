@@ -923,10 +923,15 @@ export class DatabaseStorage implements IStorage {
   // (>= minWithdrawalUsd) cash-out BEFORE referral enforcement shipped, so they
   // never triggered `qualifyReferral`. These are users with `referredBy` set,
   // `referralCreditedAt` still NULL, and at least one withdrawal at or above the
-  // qualifying amount. We match the forward rule exactly — which fires on
-  // withdrawal *request* creation regardless of final status — so withdrawal
-  // status is intentionally not filtered here. The returned ids are then fed
-  // through the same idempotent `qualifyReferral` path, so re-running is safe.
+  // qualifying amount.
+  //
+  // NOTE: The forward rule now fires on payout *success* (PayPal webhook
+  // SUCCEEDED or admin "paid" confirmation), not on withdrawal request creation.
+  // This backfill intentionally does NOT filter by withdrawal status — it
+  // captures historical pre-enforcement requests where we can no longer
+  // determine success with certainty, so it errs on the side of crediting.
+  // The returned ids are fed through the same idempotent `qualifyReferral`
+  // path, so re-running is safe.
   async getReferralBackfillCandidates(
     minWithdrawalUsd: number,
   ): Promise<{ id: string; username: string; referredBy: string }[]> {
