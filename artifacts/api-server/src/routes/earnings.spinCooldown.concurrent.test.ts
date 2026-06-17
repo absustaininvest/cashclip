@@ -114,7 +114,6 @@ async function spinTokenCount(userId: string): Promise<number> {
 
 beforeAll(async () => {
   process.env["JWT_ACCESS_SECRET"] = JWT_SECRET;
-  delete process.env["JWT_EDDSA_KEY"];
   delete process.env["JWT_ACCESS_SECRET_PREV"];
   delete process.env["ADMIN_TOKEN"];
 
