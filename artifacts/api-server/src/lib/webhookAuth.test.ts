@@ -24,6 +24,7 @@ const SECRETS = {
   TAPJOY_WEBHOOK_SECRET: "tapjoy-secret-xyz",
   ADGATE_WEBHOOK_SECRET: "adgate-secret-xyz",
   OFFERTORO_WEBHOOK_SECRET: "offertoro-secret-xyz",
+  CPX_API_KEY: "cpx-secure-hash-xyz",
 };
 
 beforeAll(() => {
@@ -679,5 +680,77 @@ describe("logWebhookVerificationFailure — write-throttle", () => {
 
     // Fail-open: insert should still be called to preserve audit trail
     expect(insertWebhookAuditMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("verifyWebhook — cpx (Secure Hash, replay-protected)", () => {
+  // CPX uses ONE per-app Secure Hash (stored as CPX_API_KEY) for both the survey
+  // wall link and the postback signature: secure_hash = md5(trans_id + "-" + hash).
+  const secureHash = SECRETS.CPX_API_KEY;
+
+  it("accepts a genuine postback signed md5(trans_id-SecureHash)", () => {
+    const transId = "tx_12345";
+    const sig = md5(`${transId}-${secureHash}`);
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({
+        method: "GET",
+        query: { trans_id: transId, ext_user_id: "user_1", survey_id: "s1", status: "1", secure_hash: sig },
+      }),
+    );
+    expect(res.ok).toBe(true);
+  });
+
+  it("accepts the hash under the ?hash= alias", () => {
+    const transId = "tx_alias";
+    const sig = md5(`${transId}-${secureHash}`);
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({ method: "GET", query: { trans_id: transId, ext_user_id: "user_2", hash: sig } }),
+    );
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects when secure_hash is missing", () => {
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({ method: "GET", query: { trans_id: "tx_1", ext_user_id: "user_1" } }),
+    );
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/Invalid provider-specific signature/);
+  });
+
+  it("rejects a forged/incorrect signature", () => {
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({ method: "GET", query: { trans_id: "tx_1", ext_user_id: "user_1", secure_hash: "deadbeef" } }),
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects the wall-hash replay where trans_id == ext_user_id", () => {
+    // The client holds its wall hash md5(userId-SecureHash). Replaying it with
+    // trans_id = userId would otherwise satisfy md5(trans_id-SecureHash).
+    const userId = "user_attacker";
+    const wallHash = md5(`${userId}-${secureHash}`);
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({ method: "GET", query: { trans_id: userId, ext_user_id: userId, secure_hash: wallHash } }),
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("reports not-configured when CPX_API_KEY is unset", () => {
+    delete process.env.CPX_API_KEY;
+    reloadWebhookSecrets();
+    const res = verifyWebhook(
+      "cpx",
+      makeReq({ method: "GET", query: { trans_id: "t", ext_user_id: "u", secure_hash: "x" } }),
+    );
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/not configured/);
+    // restore for any subsequent tests
+    process.env.CPX_API_KEY = secureHash;
+    reloadWebhookSecrets();
   });
 });

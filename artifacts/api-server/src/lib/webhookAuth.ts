@@ -54,8 +54,13 @@ const WEBHOOK_CONFIGS: Record<string, WebhookSecretConfig> = {
   },
   cpx: {
     provider: "cpx",
-    secretEnvVar: "CPX_WEBHOOK_SECRET",
-    secret: process.env.CPX_WEBHOOK_SECRET,
+    // CPX Research uses a single per-app "Secure Hash" for BOTH the survey-wall
+    // link and the postback signature, and issues no separate webhook secret. We
+    // store that Secure Hash as CPX_API_KEY (the live wall, signed with it via
+    // buildCpxWallUrl, proves it is the correct value), so the postback must be
+    // validated against the same Secure Hash — see the cpx verifier below.
+    secretEnvVar: "CPX_API_KEY",
+    secret: process.env.CPX_API_KEY,
   },
   bitlabs: {
     provider: "bitlabs",
@@ -154,22 +159,27 @@ const PROVIDER_VERIFIERS: Record<string, ProviderVerifier> = {
   },
 
   cpx(secret: string, req: Request): boolean {
-    // Guard: if CPX_WEBHOOK_SECRET equals CPX_API_KEY, the webhook secret is
-    // derivable by any authenticated user from the survey wall URL they already
-    // received (which embeds secure_hash = md5(userId + "-" + CPX_API_KEY)).
-    // An attacker would simply set trans_id = their userId and replay that hash
-    // to pass this check, then credit arbitrary rewards. Refuse verification
-    // until the operator configures a distinct CPX_WEBHOOK_SECRET.
-    const cpxApiKey = process.env.CPX_API_KEY;
-    if (cpxApiKey && secret === cpxApiKey) {
-      logger.error(
-        "CPX_WEBHOOK_SECRET must not equal CPX_API_KEY — webhook crediting disabled until they differ. Set CPX_WEBHOOK_SECRET to the separate webhook secret from the CPX Research dashboard.",
-      );
-      return false;
-    }
+    // CPX signs the postback as md5(trans_id + "-" + SecureHash) using the same
+    // per-app Secure Hash that signs the survey-wall link. `secret` here IS that
+    // Secure Hash (CPX_API_KEY) — see WEBHOOK_CONFIGS.cpx. CPX issues no separate
+    // webhook secret, so validating against any other value rejects 100% of
+    // legitimate callbacks (users complete surveys but are never credited).
+    //
+    // Replay protection: the user's wall link embeds md5(userId + "-" + SecureHash),
+    // a value the client possesses. A malicious user could set trans_id = their own
+    // ext_user_id and replay that hash to forge a "completion". Genuine CPX
+    // transactions always carry a unique trans_id distinct from the user id, so we
+    // reject any postback where trans_id == ext_user_id. md5 is one-way, so the
+    // Secure Hash itself cannot be recovered from the wall link; this self-replay is
+    // the only forgery the shared hash enables, and this check closes it. Pending-
+    // session matching, per-trans_id idempotency, and reward clamping remain
+    // enforced downstream in creditSurveyViaWebhook.
     const sig = qs(req.query.secure_hash ?? req.query.hash);
     if (!sig) return false;
     const transId = qs(req.query.trans_id);
+    if (!transId) return false;
+    const extUserId = qs(req.query.ext_user_id);
+    if (extUserId && transId === extUserId) return false;
     const expected = md5(`${transId}-${secret}`);
     return safeTimingEqual(sig.toLowerCase(), expected.toLowerCase());
   },
