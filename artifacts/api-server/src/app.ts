@@ -311,6 +311,30 @@ app.get("/app-ads.txt", (_req, res) => {
   );
 });
 
+// Digital Asset Links — verifies Android App Links for app.replit.cashclip.
+// The fingerprint is the Play app-signing (deployment) key SHA-256, because
+// installed apps are re-signed by Google with that key.
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  res.type("application/json").send(
+    JSON.stringify(
+      [
+        {
+          relation: ["delegate_permission/common.handle_all_urls"],
+          target: {
+            namespace: "android_app",
+            package_name: "app.replit.cashclip",
+            sha256_cert_fingerprints: [
+              "B0:CA:FE:F7:63:2A:93:6C:EA:A6:26:0E:B9:42:C3:72:2F:29:A5:05:BA:C3:4C:C6:0A:47:66:B6:22:34:DF:46",
+            ],
+          },
+        },
+      ],
+      null,
+      2,
+    ) + "\n",
+  );
+});
+
 app.use("/api", router);
 registerRoutes(app);
 

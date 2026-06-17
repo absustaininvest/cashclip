@@ -28,10 +28,11 @@ if [ -z "$EXPO_TOKEN" ]; then
   exit 1
 fi
 
-echo "OTA_PUBLISH_START $(date -u +%FT%TZ)"
+RUNTIME=$(node -p "require('./app.json').expo.runtimeVersion" 2>/dev/null || echo "?")
+echo "OTA_PUBLISH_START $(date -u +%FT%TZ) runtime=${RUNTIME}"
 pnpm exec eas update \
   --branch production \
-  --message "Honest AdMob per-impression revenue capture (rewarded+interstitial PAID event -> server) + correct Android banner ad unit ID" \
+  --message "${OTA_MESSAGE:-OTA -> runtime ${RUNTIME} / production channel (existing builds, no new build): current v1.1.0 codebase}" \
   --non-interactive
 EXIT=$?
 echo "OTA_PUBLISH_EXIT=${EXIT}"

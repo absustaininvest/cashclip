@@ -47,14 +47,6 @@ args = "absustain-seo-noindex"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "EAS iOS Build 46"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS Android Build"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "cashclip-test"
 
 [[workflows.workflow.tasks]]
@@ -99,28 +91,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter absustain exec vitest run src/components/Seo.test.tsx"
-
-[[workflows.workflow]]
-name = "EAS iOS Build 46"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash artifacts/cashclip/scripts/eas-build-ios-46.sh"
-
-[[workflows.workflow]]
-name = "EAS Android Build"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash artifacts/cashclip/scripts/eas-build-android.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow]]
 name = "cashclip-test"

@@ -375,7 +375,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 44,
+      "versionCode": 45,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~2934376019"
       },
