@@ -19,7 +19,7 @@ description: Which build is live, what's in progress, and the runtime version pi
 `https://expo.dev/artifacts/eas/n2o4hfj-EIhs99h29_NNWAwyuqex4jXnnet7zRXv1NI.ipa`
 EAS build ID: `e8a9b69e-6068-4ad7-a4f9-cea57da96c2d`
 
-**Submission plan:** run `eas submit --platform ios --profile production --non-interactive` (ASC key DGVBV8VV95 wired in eas.json submit.production.ios; EAS submit key `87Z27CQ96U` held by EAS).
+**Submission — owner handled it himself (Jun 17 2026).** Owner confirmed he already submitted build 46 to the App Store directly and does NOT want/need an agent-run `eas submit` or a fresh build. Do not auto-run the submission. The exposed key concern is also resolved: DGVBV8VV95 was revoked by the owner, and the fresh Admin Team Key `4CZ93ZJV6B` is now in `APPLE_ASC_KEY_ID`/`APPLE_ASC_PRIVATE_KEY` (validated 200 on Apple apps/certificates/profiles/bundleIds — authenticates cleanly). The `eas-submit-ios.sh` + `asc-key-env.sh` wrappers materialize the .p8 from secrets if ever needed.
 
 **Why runtimeVersion 1.0.0:** all future builds target runtime 1.0.0.
 
