@@ -1,5 +1,6 @@
 import { logger } from "./logger";
 import { sendPayPalWebhookSecretMissingAlert } from "./email";
+import { reserveDedupeSlot, releaseDedupeSlot } from "./dedupe";
 
 /**
  * Operator push-alert (email) for the silent PayPal-payout failure mode:
@@ -12,13 +13,17 @@ import { sendPayPalWebhookSecretMissingAlert } from "./email";
  * sends an active email — matching the AdMob/withdrawal operator-alert pattern —
  * so the owner reacts without watching the hub.
  *
- * Throttled in-memory once per cooldown window so it cannot spam the inbox on
- * every rejected callback. Like the AdMob alert debounce, this state is
- * per-process/per-replica (best-effort), which is acceptable: the worst case is
- * one email per replica per cooldown, not one per callback.
+ * Throttled to at most once per cooldown window so it cannot spam the inbox on
+ * every rejected callback. Unlike the AdMob alert (which throttles in-memory,
+ * per-replica), this throttle is DB-backed via the shared `dedupe_slots` table,
+ * so the cooldown is enforced GLOBALLY across the whole autoscaled fleet — one
+ * email per cooldown for the entire deployment, not one per replica.
  */
 
 const DEFAULT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h
+
+/** Shared dedupe-slot key gating the alert across every replica. */
+const DEDUPE_KEY = "paypal_webhook_secret_missing_alert";
 
 function resolveCooldownMs(): number {
   const raw = process.env.PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS;
@@ -34,37 +39,57 @@ function resolveCooldownMs(): number {
   return n;
 }
 
-let lastAlertAt = 0;
-let hasAlerted = false;
-
 /**
  * Send the missing-webhook-secret operator alert email, throttled to at most
- * once per cooldown window. Fire-and-forget; never throws. Returns true when an
- * email was actually dispatched (i.e. not suppressed by the cooldown), mainly
- * for tests/observability.
+ * once per cooldown window across the whole fleet. Fire-and-forget; never
+ * throws. Resolves true when an email was actually dispatched (i.e. this caller
+ * won the shared cooldown slot), mainly for tests/observability.
+ *
+ * The throttle is reserved in the DB FIRST so concurrent callbacks on different
+ * replicas can't both slip through; only the caller that reserves a fresh slot
+ * sends. If the email send fails the slot is released so a later callback can
+ * retry rather than the alert being silently lost for a whole cooldown window.
  */
-export function alertPayPalWebhookSecretMissing(
+export async function alertPayPalWebhookSecretMissing(
   source: "startup" | "callback" | "payout",
-  now: number = Date.now(),
-): boolean {
-  if (hasAlerted && now - lastAlertAt < resolveCooldownMs()) {
+): Promise<boolean> {
+  let reserved: { count: number; duplicate: boolean };
+  try {
+    reserved = await reserveDedupeSlot(DEDUPE_KEY, resolveCooldownMs());
+  } catch (err) {
+    // The shared throttle store is unreachable. Suppress rather than fail open
+    // so a database blip can't turn PayPal's callback retries into an inbox
+    // flood; the loud server log and the admin Integration Hub flag still
+    // surface the underlying webhook-missing condition.
+    logger.error(
+      { err, source },
+      "PayPal webhook-secret-missing alert throttle unavailable; suppressing email",
+    );
+    return false;
+  }
+
+  if (reserved.duplicate) {
     return false; // within cooldown — suppress to avoid inbox flooding
   }
-  hasAlerted = true;
-  lastAlertAt = now;
+
   try {
-    sendPayPalWebhookSecretMissingAlert({
+    await sendPayPalWebhookSecretMissingAlert({
       source,
       mode: process.env.PAYPAL_MODE || "sandbox",
     });
   } catch (err) {
-    logger.error({ err, source }, "Failed to send PayPal webhook-secret-missing alert email");
+    logger.error(
+      { err, source },
+      "Failed to send PayPal webhook-secret-missing alert email",
+    );
+    // The guarded operation did not complete — release the slot so the next
+    // callback within the window can retry instead of the alert being lost.
+    await releaseDedupeSlot(DEDUPE_KEY).catch((relErr) =>
+      logger.warn(
+        { err: relErr },
+        "Failed to release PayPal webhook-secret-missing alert slot after send failure",
+      ),
+    );
   }
   return true;
-}
-
-/** Test-only helper to reset the throttle state. */
-export function _resetPayPalWebhookAlertForTests(): void {
-  lastAlertAt = 0;
-  hasAlerted = false;
 }

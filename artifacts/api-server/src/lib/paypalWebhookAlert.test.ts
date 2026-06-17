@@ -5,37 +5,44 @@
  * PayPal status callback is rejected and withdrawals stay stuck. We want an
  * active email alert, but PayPal retries failed deliveries, so the same
  * condition can fire on every callback. These tests prove the alert is
- * debounced to at most once per cooldown window — matching the AdMob alert
- * pattern — so it cannot flood the operator inbox.
+ * debounced to at most once per cooldown window — and, unlike the AdMob alert,
+ * that throttle is DB-backed (the shared `dedupe_slots` table) so the cooldown
+ * holds GLOBALLY across the whole autoscaled fleet, not just per replica.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const mockSend = vi.fn();
+const mockReserve = vi.fn();
+const mockRelease = vi.fn();
 
 vi.mock("./email", () => ({
   sendPayPalWebhookSecretMissingAlert: (...args: unknown[]) => mockSend(...args),
+}));
+
+vi.mock("./dedupe", () => ({
+  reserveDedupeSlot: (...args: unknown[]) => mockReserve(...args),
+  releaseDedupeSlot: (...args: unknown[]) => mockRelease(...args),
 }));
 
 vi.mock("./logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import {
-  alertPayPalWebhookSecretMissing,
-  _resetPayPalWebhookAlertForTests,
-} from "./paypalWebhookAlert";
+import { alertPayPalWebhookSecretMissing } from "./paypalWebhookAlert";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  _resetPayPalWebhookAlertForTests();
   delete process.env.PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS;
   delete process.env.PAYPAL_MODE;
+  // Default: a fresh slot is reserved (not a duplicate) so the email goes out.
+  mockReserve.mockResolvedValue({ count: 1, duplicate: false });
+  mockRelease.mockResolvedValue(undefined);
 });
 
 describe("alertPayPalWebhookSecretMissing", () => {
-  it("sends an email the first time it is called", () => {
-    const sent = alertPayPalWebhookSecretMissing("callback", 1_000);
+  it("sends an email when it wins a fresh shared cooldown slot", async () => {
+    const sent = await alertPayPalWebhookSecretMissing("callback");
     expect(sent).toBe(true);
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith(
@@ -43,43 +50,73 @@ describe("alertPayPalWebhookSecretMissing", () => {
     );
   });
 
-  it("suppresses repeat alerts within the cooldown window", () => {
-    expect(alertPayPalWebhookSecretMissing("callback", 0)).toBe(true);
-    // A flood of callbacks just after — all within the default 6h cooldown.
-    expect(alertPayPalWebhookSecretMissing("callback", 1_000)).toBe(false);
-    expect(alertPayPalWebhookSecretMissing("callback", 60_000)).toBe(false);
-    expect(alertPayPalWebhookSecretMissing("callback", 6 * 60 * 60 * 1000 - 1)).toBe(false);
-    expect(mockSend).toHaveBeenCalledTimes(1);
+  it("reserves the shared dedupe slot with the configured cooldown window", async () => {
+    await alertPayPalWebhookSecretMissing("callback");
+    expect(mockReserve).toHaveBeenCalledTimes(1);
+    expect(mockReserve).toHaveBeenCalledWith(
+      "paypal_webhook_secret_missing_alert",
+      6 * 60 * 60 * 1000,
+    );
   });
 
-  it("fires again once the cooldown window elapses", () => {
-    expect(alertPayPalWebhookSecretMissing("startup", 0)).toBe(true);
-    const sixHours = 6 * 60 * 60 * 1000;
-    expect(alertPayPalWebhookSecretMissing("callback", sixHours)).toBe(true);
-    expect(mockSend).toHaveBeenCalledTimes(2);
+  it("suppresses the email when the shared slot is already held (duplicate)", async () => {
+    // Another replica already reserved the slot within this cooldown window.
+    mockReserve.mockResolvedValue({ count: 2, duplicate: true });
+    const sent = await alertPayPalWebhookSecretMissing("callback");
+    expect(sent).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it("honours a custom cooldown from PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS", () => {
+  it("honours a custom cooldown from PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS", async () => {
     process.env.PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS = "1000";
-    expect(alertPayPalWebhookSecretMissing("callback", 0)).toBe(true);
-    expect(alertPayPalWebhookSecretMissing("callback", 500)).toBe(false);
-    expect(alertPayPalWebhookSecretMissing("callback", 1000)).toBe(true);
-    expect(mockSend).toHaveBeenCalledTimes(2);
+    await alertPayPalWebhookSecretMissing("callback");
+    expect(mockReserve).toHaveBeenCalledWith(
+      "paypal_webhook_secret_missing_alert",
+      1000,
+    );
   });
 
-  it("passes through the configured PayPal mode", () => {
+  it("falls back to the default cooldown on an invalid override", async () => {
+    process.env.PAYPAL_WEBHOOK_ALERT_COOLDOWN_MS = "not-a-number";
+    await alertPayPalWebhookSecretMissing("callback");
+    expect(mockReserve).toHaveBeenCalledWith(
+      "paypal_webhook_secret_missing_alert",
+      6 * 60 * 60 * 1000,
+    );
+  });
+
+  it("passes through the configured PayPal mode", async () => {
     process.env.PAYPAL_MODE = "live";
-    alertPayPalWebhookSecretMissing("startup", 0);
+    await alertPayPalWebhookSecretMissing("startup");
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({ source: "startup", mode: "live" }),
     );
   });
 
-  it("does not throw or count an email when the send helper fails", () => {
+  it("suppresses (does not flood) when the shared throttle store is unreachable", async () => {
+    mockReserve.mockRejectedValue(new Error("db down"));
+    const sent = await alertPayPalWebhookSecretMissing("callback");
+    expect(sent).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("releases the slot when the email send fails so a later callback can retry", async () => {
     mockSend.mockImplementationOnce(() => {
       throw new Error("smtp down");
     });
-    // Throttle still advances (returns true — it attempted), but no crash.
-    expect(() => alertPayPalWebhookSecretMissing("callback", 0)).not.toThrow();
+    await expect(
+      alertPayPalWebhookSecretMissing("callback"),
+    ).resolves.toBe(true);
+    expect(mockRelease).toHaveBeenCalledWith("paypal_webhook_secret_missing_alert");
+  });
+
+  it("does not throw when both the send and the release fail", async () => {
+    mockSend.mockImplementationOnce(() => {
+      throw new Error("smtp down");
+    });
+    mockRelease.mockRejectedValueOnce(new Error("db down"));
+    await expect(
+      alertPayPalWebhookSecretMissing("callback"),
+    ).resolves.toBe(true);
   });
 });
