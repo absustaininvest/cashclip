@@ -53,7 +53,7 @@ import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { secureGet, secureSet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
-import { isPlausiblePayPalDomain, INVALID_PAYPAL_EMAIL_MESSAGE } from "@workspace/validation";
+import { isPlausiblePayPalDomain } from "@workspace/validation";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   const colonIdx = rawMsg.indexOf(":");
@@ -437,7 +437,7 @@ export default function WalletScreen() {
     const suspiciousSaved =
       !!lockedTrimmed && !isPlausiblePayPalDomain(lockedTrimmed);
     setSavedEmailWarning(suspiciousSaved);
-    setPaypalEmailError(suspiciousSaved ? INVALID_PAYPAL_EMAIL_MESSAGE : null);
+    setPaypalEmailError(suspiciousSaved ? t.wallet.invalidPaypalEmail : null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
     setShowWithdrawModal(true);
@@ -462,11 +462,11 @@ export default function WalletScreen() {
     // pre-fill next time.
     secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
+      setPaypalEmailError(t.wallet.invalidPaypalEmail);
     } else {
       setPaypalEmailError(null);
     }
-  }, []);
+  }, [t]);
 
   const handleWithdraw = useCallback(async () => {
     if (!selectedTier || !paypalEmail.trim()) return;
@@ -476,7 +476,7 @@ export default function WalletScreen() {
       return;
     }
     if (!isPlausiblePayPalDomain(paypalEmail.trim())) {
-      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
+      setPaypalEmailError(t.wallet.invalidPaypalEmail);
       return;
     }
 
@@ -519,7 +519,7 @@ export default function WalletScreen() {
       // the Profile save form when the server rejects the payout address.
       setWithdrawError(
         code === "INVALID_PAYPAL_EMAIL"
-          ? INVALID_PAYPAL_EMAIL_MESSAGE
+          ? t.wallet.invalidPaypalEmail
           : extractApiErrorMessage(rawMsg, fallback),
       );
       setWithdrawErrorCode(code);

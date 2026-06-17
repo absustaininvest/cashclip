@@ -110,7 +110,17 @@ vi.mock("@/lib/LanguageContext", () => ({
       {},
       {
         get: () =>
-          new Proxy({}, { get: (_s, key) => (typeof key === "string" ? key : "") }),
+          new Proxy(
+            {},
+            {
+              get: (_s, key) =>
+                key === "invalidPaypalEmail"
+                  ? "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+                  : typeof key === "string"
+                    ? key
+                    : "",
+            },
+          ),
       },
     ),
   }),

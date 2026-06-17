@@ -26,7 +26,7 @@ import { getDisplayPointsPerDollar } from "@/lib/points";
 import { fetchServerBalance, fetchConversionRate } from "@/lib/earn-client";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
-import { isPlausiblePayPalDomain, INVALID_PAYPAL_EMAIL_MESSAGE } from "@workspace/validation";
+import { isPlausiblePayPalDomain } from "@workspace/validation";
 import type { Translations } from "@/lib/i18n";
 
 interface Achievement {
@@ -136,7 +136,7 @@ export default function ProfileScreen() {
     // check the wallet uses at withdrawal time so a user can't lock in an address
     // they'll never be able to cash out to (which would strand their balance).
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalError(INVALID_PAYPAL_EMAIL_MESSAGE);
+      setPaypalError(t.wallet.invalidPaypalEmail);
       return;
     }
     setPaypalSaving(true);
@@ -154,7 +154,7 @@ export default function ProfileScreen() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save.";
       if (msg.includes("INVALID_PAYPAL_EMAIL")) {
-        setPaypalError(INVALID_PAYPAL_EMAIL_MESSAGE);
+        setPaypalError(t.wallet.invalidPaypalEmail);
       } else if (msg.includes("CONFLICT")) {
         setPaypalError("This PayPal email is already linked to another account.");
       } else if (msg.includes("ALREADY_SET")) {
@@ -166,7 +166,7 @@ export default function ProfileScreen() {
     } finally {
       setPaypalSaving(false);
     }
-  }, [paypalInput, refreshUser]);
+  }, [paypalInput, refreshUser, t]);
 
   const handlePaypalInputChange = useCallback((value: string) => {
     setPaypalInput(value);
@@ -187,13 +187,11 @@ export default function ProfileScreen() {
       return;
     }
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalError(
-        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
-      );
+      setPaypalError(t.wallet.invalidPaypalEmail);
     } else {
       setPaypalError(null);
     }
-  }, []);
+  }, [t]);
 
   // Pre-fill the input from the locally cached email when the user hasn't yet
   // saved one to the server. The server-locked email (rendered separately)

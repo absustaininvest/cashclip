@@ -125,6 +125,7 @@ const en = {
       walletLoadError: "Couldn't load wallet",
       walletLoadErrorSub: "Check your connection and try again.",
       tryAgain: "Try Again",
+      invalidPaypalEmail: "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account.",
     },
     profile: {
       defaultUsername: "CashClip User",
@@ -673,6 +674,7 @@ const translations: Record<Language, Translations> = {
       walletLoadError: "No se pudo cargar la billetera",
       walletLoadErrorSub: "Verifica tu conexión e intenta de nuevo.",
       tryAgain: "Intentar de Nuevo",
+      invalidPaypalEmail: "Este dominio de correo no se acepta para pagos de PayPal. Usa la dirección de correo vinculada a tu cuenta real de PayPal.",
     },
     profile: {
       defaultUsername: "Usuario CashClip",
