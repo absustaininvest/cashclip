@@ -98,12 +98,12 @@ describe("beginSpin quietly retries a retryable 503", () => {
   it("retries after a retryable 503 and succeeds when a later attempt returns 2xx", async () => {
     scriptResponses([
       retryable503(),
-      okRes({ challengeToken: SPIN_CHALLENGE }),
+      okRes({ challengeToken: SPIN_CHALLENGE, points: 10 }),
     ]);
 
     const result = await runWithTimers(() => beginSpin());
 
-    expect(result).toEqual({ ok: true, challengeToken: SPIN_CHALLENGE });
+    expect(result).toEqual({ ok: true, challengeToken: SPIN_CHALLENGE, points: 10 });
     expect(apiRequestSafe).toHaveBeenCalledTimes(2);
   });
 
@@ -111,12 +111,12 @@ describe("beginSpin quietly retries a retryable 503", () => {
     scriptResponses([
       retryable503(),
       retryable503(),
-      okRes({ challengeToken: SPIN_CHALLENGE }),
+      okRes({ challengeToken: SPIN_CHALLENGE, points: 10 }),
     ]);
 
     const result = await runWithTimers(() => beginSpin());
 
-    expect(result).toEqual({ ok: true, challengeToken: SPIN_CHALLENGE });
+    expect(result).toEqual({ ok: true, challengeToken: SPIN_CHALLENGE, points: 10 });
     expect(apiRequestSafe).toHaveBeenCalledTimes(3);
   });
 

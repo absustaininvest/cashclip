@@ -29,8 +29,6 @@ export default defineConfig({
       "app/(tabs)/earn.error-states.test.tsx",
       "app/(tabs)/earn.ladder.test.tsx",
       "app/(tabs)/earn.milestone.test.tsx",
-      // 2 retry-logic assertions fail (begin-spin retryable 503 handling).
-      "lib/spin-retry.test.ts",
       // 7 referral-bonus assertions fail — owned by "Keep the referral bonus
       // celebration from re-appearing after the app restarts".
       "app/(tabs)/wallet.bonus.test.tsx",
