@@ -20,6 +20,10 @@ Re-diagnosed live. The CPX webhook server side is **correct and proven on produc
 
 **Prod data at diagnosis:** `reward_sessions` source=survey → CPX **260 pending, 0 completed, 0 ever**; BitLabs 0 sessions. `unsettled_completions` **empty**. No `/api/surveys/webhook/cpx` hits in deployment logs. Zero completed AND zero unsettled AND zero log hits = **postbacks were never arriving** → the CPX Main Postback URL had not been saved in the CPX dashboard yet (owner was mid-configuration). It was NOT a signature/secret mismatch.
 
+## RESOLVED (Jun 17 2026, owner-confirmed)
+
+Owner tested the CPX webhook end-to-end in production and confirmed it **green/solid** — real survey completions now credit. The missing piece was exactly as diagnosed: the CPX Main Postback URL had to be saved in the CPX dashboard; once saved, completions flow and credit. CPX crediting is no longer an open concern. (BitLabs is separate: the in-app "BitLabs temporarily unavailable" banner is the designed fail-open on provider availability, not a crediting failure.)
+
 ## The safe live probe that settles it (no prod writes)
 
 Compute `md5(`${transId}-${CPX_API_KEY}`)` in a Node script (bash env has the secret; the
