@@ -1,0 +1,25 @@
+Here's the honest record, papi — pulled straight from the commit log (roughly 16:45 → 23:30, ~7 hours of work). Grouped so you can tick through it:
+✅ Done & merged (and published live to the API/web)
+1. The big one — build failure killed for good
+* Root-caused the recurring CashClip build failure to two separate pnpm⇄React-Native bugs and fixed both permanently (dynamic iOS pod path + Babel hoisting). Verified, reviewed, merged, documented.
+2. Security hardening (real money protection)
+* Fixed 15 dependency vulnerabilities
+* Closed all client-timed reward endpoints (game/ad/sponsored) so they can't be faked
+* Removed the console-token admin bypass, locked admin writes to verified admin identity
+* Reward-integrity fixes + security scan
+3. AdMob / ad config
+* Corrected Android AdMob app ID + platform-specific IDs
+* Updated ad unit IDs (rewarded + cross-platform)
+* Android demand adapters (Unity/ironSource/Pangle/Chartboost) confirmed wired
+* Ad analytics relabeled as estimated payouts (honesty)
+4. Wallet / ledger
+* Wallet feed now reads server data exactly — matches the production ledger (no more client guesses)
+5. Website (AB Sustainability)
+* Updated to reflect the three real ventures, removed outdated financial data
+6. Apple signing
+* New Apple signing key wired into the build process
+⏳ What's left (the real gates)
+1. Ship a live build — this is the big one. Everything above (new wallet look, AdMob adapters, security) is in the code but live users are still on build 29. Build 46 has it all but is TestFlight-only. Needs a real EAS build → App Store submission.
+2. ASC key verification — a new key (3685WS5P35) is wired in, but I can't confirm it actually works until a real submit attempt. That's the gate blocking #1.
+3. Android → Play Store production — promote a build with the AdMob adapters so Android actually starts earning.
+So honestly: the code work is in great shape — the remaining work is almost entirely getting a build live (iOS submit + Android promote). Want to take a run at the ASC key + build next? That unlocks everything at once.
