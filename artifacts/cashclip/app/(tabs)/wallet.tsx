@@ -51,7 +51,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useCelebration } from "@/lib/CelebrationContext";
 import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
-import { secureGet } from "@/lib/secure-store";
+import { secureGet, secureSet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
 import { isPlausiblePayPalDomain } from "@workspace/validation";
 
@@ -459,6 +459,12 @@ export default function WalletScreen() {
       setPaypalEmailError(null);
       return;
     }
+    // Persist a valid typed email locally so it survives cancelling the
+    // withdrawal (e.g. balance too low) before a payout is ever saved, matching
+    // the Profile screen's behavior. Fire-and-forget — the server value still
+    // takes precedence on the next open; a storage failure just means no
+    // pre-fill next time.
+    secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
     if (!isPlausiblePayPalDomain(trimmed)) {
       setPaypalEmailError(
         "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
