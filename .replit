@@ -57,6 +57,14 @@ args = "api-server-typecheck"
 task = "workflow.run"
 args = "absustain-typecheck"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "EAS iOS Build 48"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "EAS Android Build"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -124,6 +132,28 @@ args = "pnpm --filter @workspace/absustain run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "EAS iOS Build 48"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/cashclip/scripts/eas-build-ios-46.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "EAS Android Build"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/cashclip/scripts/eas-build-android.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 3001
