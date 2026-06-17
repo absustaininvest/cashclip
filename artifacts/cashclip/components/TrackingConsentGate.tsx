@@ -237,8 +237,8 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
             <Text style={styles.cardBody}>
               CashClip uses Apple's Advertising Identifier to link your in-app activity
               with ad networks. This lets advertisers show you relevant ads and measure
-              performance — which is how you earn cash. No name, email, or contact info
-              is shared with advertisers.
+              performance — which is how earnings flow within the platform. No name,
+              email, or contact information is shared with advertisers.
             </Text>
           </View>
 
@@ -248,9 +248,9 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               <Text style={styles.cardTitle}>Ad Personalization</Text>
             </View>
             <Text style={styles.cardBody}>
-              Allowing personalization matches you with the highest-paying surveys and
-              offers for your profile. Declining limits you to non-personalized content
-              and significantly reduces earning potential.
+              By allowing custom personalization, CashClip matches you with offers and
+              surveys enhanced for your profile. Please note that this feature is
+              available, but it is not required to join and is completely optional.
             </Text>
           </View>
 
