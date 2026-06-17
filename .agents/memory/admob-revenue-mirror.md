@@ -30,12 +30,16 @@ interstitial). Do NOT also put revenue on `reward_earned` or it double-counts.
 NATIVE change — it only takes effect in a fresh EAS build, never via OTA. Until
 that build is the LIVE build, app-reported $0 is correct/by-design.
 
-**Verified live (Jun 17 2026):** after the OTA wired the PAID→micros listener
-(group d41ff6f9, runtime 1.0.0/production), PRODUCTION app-reported revenue is
-STILL $0. Of 16,554 lifetime `ad_events`, ZERO carry `revenue_micros` — across
-all types (impression/reward_earned/completion/load_failed) and both iOS+Android,
-including the 134 completions (latest Jun 16). Events keep flowing, just no
-revenue. Confirms the native-change conclusion: build 29's bundled
+**Verified live (Jun 17 2026, re-confirmed same day):** after the OTA wired the
+PAID→micros listener (group d41ff6f9, runtime 1.0.0/production), PRODUCTION
+app-reported revenue is STILL $0. Re-check showed 16,574 lifetime `ad_events`,
+ZERO carry `revenue_micros` (latest event Jun 17 02:37) — across all types
+(impression/reward_earned/completion/load_failed) and both iOS+Android. Events
+keep flowing, just no revenue. The PAID listener + server SUM(revenue_micros)→
+appReportedEarnings code is confirmed present/correct; the only gap is the native
+build. Nothing will change until build 46+ is the LIVE build (it isn't — live is
+still build 29; submission is blocked on the invalid/exposed ASC key). Confirms
+the native-change conclusion: build 29's bundled
 react-native-google-mobile-ads native SDK does not deliver `AdEventType.PAID` to
 the OTA'd JS listener, so the JS-only OTA cannot close the gap. The "+100%
 Diverging" / $0 app-reported stays correct/by-design until a fresh EAS build
