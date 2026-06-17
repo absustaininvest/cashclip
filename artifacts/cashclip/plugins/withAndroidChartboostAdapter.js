@@ -3,8 +3,9 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 /**
  * Adds the Google Mobile Ads Chartboost mediation adapter to the Android build.
  * Required for Chartboost to bid/serve through AdMob mediation on Android.
- * Companion to the iOS GoogleMobileAdsMediationChartboost pod in extraPods (whose
- * CocoaPods source is added by withChartboostPodSource). The adapter and the
+ * Companion to the iOS GoogleMobileAdsMediationChartboost pod in extraPods, which
+ * (along with the Chartboost SDK it depends on) is now published to the standard
+ * CocoaPods trunk CDN — no custom pod source is needed. The adapter and the
  * Chartboost SDK it pulls in are published to Google's Maven and Maven Central,
  * both already on the Expo Android build, so no extra repo is needed.
  */
