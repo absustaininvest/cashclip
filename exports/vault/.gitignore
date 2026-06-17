@@ -1,0 +1,6 @@
+# Deny all vault contents from being tracked in git.
+# This directory holds local-only backups (signing certs, provisioning
+# profiles, export archives, screenshots). None of these should ever
+# appear in the repository.
+*
+!.gitignore
