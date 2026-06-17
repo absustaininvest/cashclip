@@ -378,7 +378,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 45,
+      "versionCode": 46,
       "permissions": [
         "com.google.android.gms.permission.AD_ID"
       ],
