@@ -170,7 +170,6 @@ export default function ProfileScreen() {
 
   const handlePaypalInputChange = useCallback((value: string) => {
     setPaypalInput(value);
-    setPaypalError(null);
     // Persist a valid typed email locally so the field survives navigating away
     // before saving (and app restarts). Fire-and-forget — a storage failure
     // just means we don't pre-fill next time. The server value still wins.
@@ -178,6 +177,21 @@ export default function ProfileScreen() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (emailRegex.test(trimmed)) {
       secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
+    }
+    // Live warning as the user types — mirror the wallet withdrawal modal so the
+    // disposable/implausible-domain feedback appears before they commit the
+    // write-once email, not only after they tap Save. Only flag a syntactically
+    // complete email so we don't warn mid-typing.
+    if (!trimmed || !emailRegex.test(trimmed)) {
+      setPaypalError(null);
+      return;
+    }
+    if (!isPlausiblePayPalDomain(trimmed)) {
+      setPaypalError(
+        "This email domain isn't accepted for PayPal payouts. Please use the email address linked to your real PayPal account."
+      );
+    } else {
+      setPaypalError(null);
     }
   }, []);
 
