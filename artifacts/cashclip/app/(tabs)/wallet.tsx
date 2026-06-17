@@ -387,8 +387,8 @@ export default function WalletScreen() {
 
     if (!integrity.clean) {
       Alert.alert(
-        "Device Not Supported",
-        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+        t.wallet.deviceNotSupportedTitle,
+        t.wallet.deviceNotSupportedMsg
       );
       return;
     }
@@ -472,7 +472,7 @@ export default function WalletScreen() {
     if (!selectedTier || !paypalEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(paypalEmail.trim())) {
-      Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
+      Alert.alert(t.wallet.invalidEmailTitle, t.wallet.invalidEmailMsg);
       return;
     }
     if (!isPlausiblePayPalDomain(paypalEmail.trim())) {
@@ -483,8 +483,8 @@ export default function WalletScreen() {
     const integrity = await checkDeviceIntegrity();
     if (!integrity.clean) {
       Alert.alert(
-        "Device Not Supported",
-        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
+        t.wallet.deviceNotSupportedTitle,
+        t.wallet.deviceNotSupportedMsg
       );
       return;
     }

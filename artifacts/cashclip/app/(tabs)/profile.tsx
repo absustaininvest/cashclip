@@ -129,9 +129,9 @@ export default function ProfileScreen() {
 
   const handleSavePaypal = useCallback(async () => {
     const trimmed = paypalInput.trim().toLowerCase();
-    if (!trimmed) { setPaypalError("Please enter your PayPal email."); return; }
+    if (!trimmed) { setPaypalError(t.profile.enterPaypalEmail); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmed)) { setPaypalError("Enter a valid email address."); return; }
+    if (!emailRegex.test(trimmed)) { setPaypalError(t.profile.enterValidEmail); return; }
     // The PayPal email is write-once. Run the same disposable/implausible-domain
     // check the wallet uses at withdrawal time so a user can't lock in an address
     // they'll never be able to cash out to (which would strand their balance).
@@ -150,15 +150,15 @@ export default function ProfileScreen() {
       secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
       await refreshUser();
       setPaypalInput("");
-      Alert.alert("PayPal email saved", `${trimmed} has been linked to your account. This cannot be changed later.`);
+      Alert.alert(t.profile.paypalEmailSavedTitle, t.profile.paypalEmailSavedMsg.replace("{{email}}", trimmed));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save.";
       if (msg.includes("INVALID_PAYPAL_EMAIL")) {
         setPaypalError(t.wallet.invalidPaypalEmail);
       } else if (msg.includes("CONFLICT")) {
-        setPaypalError("This PayPal email is already linked to another account.");
+        setPaypalError(t.profile.paypalEmailLinkedOther);
       } else if (msg.includes("ALREADY_SET")) {
-        setPaypalError("PayPal email has already been set.");
+        setPaypalError(t.profile.paypalEmailAlreadySet);
         await refreshUser();
       } else {
         setPaypalError(msg || "Failed to save.");
