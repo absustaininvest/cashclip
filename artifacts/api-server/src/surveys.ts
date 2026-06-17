@@ -448,9 +448,9 @@ export function registerSurveyRoutes(app: Express): void {
       logWebhookVerificationFailure(req, "bitlabs", auth.reason ?? "unknown");
       res.status(403).json({ error: "Forbidden" }); return;
     }
-    const params = { ...req.query, ...req.body };
-    // uid = BitLabs default param name; user_id = custom mapped name
-    const { survey_id, user_id, uid, val, reason, tx, cashback_state } = params;
+    // Use only the signed query string — req.body is not covered by the BitLabs HMAC
+    // and must not be allowed to override the verified query parameters.
+    const { survey_id, user_id, uid, val, reason, tx, cashback_state } = req.query;
     const resolvedUserId = (user_id || uid) as string | undefined;
     // survey_id for surveys; tx for cashback and magic receipts
     const resolvedRefId = (survey_id || tx) as string | undefined;

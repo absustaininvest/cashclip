@@ -93,21 +93,30 @@ export async function createOAuthState(): Promise<string> {
 }
 
 /**
- * One-time, atomic verification: a single `DELETE ... RETURNING` consumes the
- * stored state, so only one concurrent caller can ever get the row back. The
- * loser (or a replay) sees no row and fails closed.
+ * One-time, atomic verification: validates the provided state against the
+ * stored value BEFORE consuming it, so unauthenticated callers with a wrong
+ * state cannot delete the pending row and disrupt the legitimate operator flow.
+ *
+ * Flow:
+ *  1. SELECT the stored row and validate timing + constant-time state equality.
+ *  2. Only if valid, DELETE WHERE key AND value both match — so a concurrent
+ *     race that already deleted the row results in 0 rows returned and fails
+ *     closed without double-consuming.
  */
 export async function verifyAndConsumeOAuthState(
   provided: string,
 ): Promise<boolean> {
   if (!provided) return false;
   const { db, appSettings } = await import("@workspace/db");
-  const { eq } = await import("drizzle-orm");
-  const rows = await db
-    .delete(appSettings)
+  const { and, eq } = await import("drizzle-orm");
+
+  // Step 1 — read and validate without consuming.
+  const existing = await db
+    .select()
+    .from(appSettings)
     .where(eq(appSettings.key, STATE_KEY))
-    .returning();
-  const stored = rows[0]?.value;
+    .limit(1);
+  const stored = existing[0]?.value;
   if (!stored) return false;
   const sep = stored.indexOf(":");
   if (sep < 0) return false;
@@ -117,7 +126,16 @@ export async function verifyAndConsumeOAuthState(
   const a = Buffer.from(storedState);
   const b = Buffer.from(provided);
   if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  if (!timingSafeEqual(a, b)) return false;
+
+  // Step 2 — state matched; consume atomically.  Matching on both key AND the
+  // exact stored value means a concurrent legitimate callback that already
+  // deleted the row will cause our DELETE to return 0 rows, failing closed.
+  const deleted = await db
+    .delete(appSettings)
+    .where(and(eq(appSettings.key, STATE_KEY), eq(appSettings.value, stored)))
+    .returning();
+  return deleted.length > 0;
 }
 
 export function buildAuthorizeUrl(state: string): string {
