@@ -12,3 +12,5 @@ description: How to confirm an EAS OTA actually reaches a build, and why "OTA no
 **Why:** Repeatedly burned diagnosing "OTA broken" reports that turned out to be (a) the 2nd-cold-launch apply timing or (b) testing a 1.1.0-published update against a 1.0.0 build. The routing itself was correct each time.
 
 **How to apply:** Before changing any update/channel config in response to an "OTA not working" report, first run `eas channel:view` to confirm runtime+branch routing, then have the owner do the two-relaunch test.
+
+**Standing delivery default:** server-side changes go to production FIRST, then the OTA, in that order. Standing OTA target = runtime `1.0.0` / channel `production` (build-46 codebase → live build-29 users) until a new native build replaces build 29. Do not delay this flow by citing past build-failure caution notes; only native-only changes are exempt (they need a fresh EAS build). See `cashclip-current-build-state.md` and replit.md User preferences.
