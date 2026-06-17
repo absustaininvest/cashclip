@@ -34,6 +34,19 @@ function isValidEmail(email: string): boolean {
   return EMAIL_REGEX.test(email.trim());
 }
 
+/**
+ * Thrown by `send` when `rethrow` is set and the message could not be handed
+ * off to the SMTP transport (unconfigured transport, invalid recipient, or a
+ * provider send failure). Lets callers that care about delivery — e.g. payout
+ * status emails — react to a silent failure instead of swallowing it.
+ */
+export class EmailNotSentError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "EmailNotSentError";
+  }
+}
+
 async function send(options: {
   to: string;
   subject: string;
@@ -43,15 +56,20 @@ async function send(options: {
   // omitted → default to the support address
   // null    → send NO Reply-To header at all
   replyTo?: string | null;
+  // When true, surface delivery failures by throwing `EmailNotSentError`
+  // instead of only logging them. Defaults to false (fire-and-forget).
+  rethrow?: boolean;
 }): Promise<void> {
-  const { replyTo, ...mailOptions } = options;
+  const { replyTo, rethrow, ...mailOptions } = options;
   const transport = createTransport();
   if (!transport) {
     logger.warn("Email not configured — ZOHO_SMTP_PASSWORD missing");
+    if (rethrow) throw new EmailNotSentError("email not configured");
     return;
   }
   if (!isValidEmail(mailOptions.to)) {
     logger.warn({ to: mailOptions.to }, "Skipping email — invalid recipient address");
+    if (rethrow) throw new EmailNotSentError("invalid recipient address");
     return;
   }
   const replyToAddr = replyTo === null ? undefined : (replyTo ?? ADMIN_EMAIL);
@@ -60,6 +78,7 @@ async function send(options: {
     logger.info({ to: mailOptions.to, subject: mailOptions.subject }, "Email sent");
   } catch (err) {
     logger.error({ err, to: mailOptions.to, subject: mailOptions.subject }, "Failed to send email");
+    if (rethrow) throw new EmailNotSentError("SMTP send failed", { cause: err });
   }
 }
 
@@ -601,6 +620,10 @@ export async function sendWithdrawalStatusUpdate(options: {
   const msg = statusMessages[status];
   await send({
     to: toEmail,
+    // Payout outcome notifications are money-critical: surface a delivery
+    // failure to the caller (throws EmailNotSentError) instead of silently
+    // swallowing it, so the user isn't left never learning their outcome.
+    rethrow: true,
     subject: msg.subject,
     text: msg.body.replace(/<[^>]+>/g, ""),
     // nosemgrep: javascript.lang.security.html-in-template-string — safeUsername and msg.body use escapeHtml()
@@ -865,6 +888,45 @@ export function sendPayPalWebhookSecretMissingAlert(alert: {
           <tr><td style="padding:8px 0;font-weight:600;color:#555;width:140px">PayPal mode</td><td style="padding:8px 0;font-family:monospace">${safeMode}</td></tr>
         </table>
         <p style="margin-top:20px;color:#333"><strong>To fix:</strong> set <code>PAYPAL_WEBHOOK_ID</code> in the Production app secrets and re-publish the API. Confirm the webhook is registered in PayPal Developer → CashClip Payouts app → Webhooks (URL: <code>https://api.cash-clip.app/api/paypal/webhook</code>).</p>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
+      </div>`,
+  });
+}
+
+/**
+ * Alert the operator that withdrawal status-update (payout outcome) emails are
+ * repeatedly failing to send — a misconfigured SMTP secret or a systematically
+ * bad recipient — so affected users silently never learn their payout outcome.
+ * Debouncing is the caller's responsibility (see withdrawalEmailAlerts.ts) so
+ * this never spams the inbox. Fire-and-forget; never blocks the caller.
+ */
+export function sendWithdrawalEmailFailureAlert(alert: {
+  failureCount: number;
+  windowMs: number;
+  sampleWithdrawalId: string;
+  sampleRecipient: string;
+  sampleReason: string;
+}): void {
+  const to = process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const windowMin = Math.round(alert.windowMs / 60000);
+  const safeId = escapeHtml(alert.sampleWithdrawalId);
+  const safeRecipient = escapeHtml(alert.sampleRecipient);
+  const safeReason = escapeHtml(alert.sampleReason);
+  sendBestEffort({
+    to,
+    subject: `[CashClip] ACTION REQUIRED — ${alert.failureCount} payout emails failed to send`,
+    text: `Withdrawal status-update (payout outcome) emails are failing to deliver.\n\n${alert.failureCount} failures in the last ${windowMin} minutes. Affected users silently never learn whether their withdrawal was paid or rejected.\n\nMost recent failure:\n  Withdrawal ID: ${alert.sampleWithdrawalId}\n  Recipient: ${alert.sampleRecipient}\n  Reason: ${alert.sampleReason}\n\nThis usually means the Zoho SMTP secret (ZOHO_SMTP_PASSWORD) is missing/expired in the Production app secrets, or recipients have invalid addresses. Check the API logs for "withdrawal_email_failure" entries.\n\n— CashClip operations`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml() or are numeric
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid #E53935;padding-bottom:12px">⚠️ Payout Emails Failing to Send</h2>
+        <p style="color:#333"><strong>${alert.failureCount}</strong> withdrawal status-update emails failed to deliver in the last <strong>${windowMin} minutes</strong>. Affected users silently never learn whether their withdrawal was paid or rejected.</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:8px 0;font-weight:600;color:#555;width:140px">Withdrawal ID</td><td style="padding:8px 0;font-size:12px;color:#999">${safeId}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Recipient</td><td style="padding:8px 0">${safeRecipient}</td></tr>
+          <tr><td style="padding:8px 0;font-weight:600;color:#555">Reason</td><td style="padding:8px 0;font-family:monospace">${safeReason}</td></tr>
+        </table>
+        <p style="margin-top:20px;color:#333"><strong>To fix:</strong> confirm <code>ZOHO_SMTP_PASSWORD</code> is set in the Production app secrets, or check whether affected recipients have invalid addresses. Search the API logs for <code>withdrawal_email_failure</code>.</p>
         <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
       </div>`,
   });

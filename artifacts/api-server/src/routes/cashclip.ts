@@ -36,6 +36,7 @@ import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
 import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned, sendPayPalAmbiguousAlert } from "../lib/email";
 import { alertPayPalWebhookSecretMissing } from "../lib/paypalWebhookAlert";
+import { recordWithdrawalEmailFailure } from "../lib/withdrawalEmailAlerts";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
 import { supportTicketRateLimiter } from "../lib/supportTicketRateLimit";
 import {
@@ -105,6 +106,30 @@ async function resolveStatusUpdateToEmail(userId: string, paypalEmail: string): 
   } catch {
     return paypalEmail;
   }
+}
+
+// Fire-and-forget send of a withdrawal status-update email that does NOT
+// silently swallow delivery failures. On a send failure (bad address,
+// misconfigured/unreachable SMTP) it logs the failure with the withdrawal id
+// and recipient and records it for the repeated-failure operator alert, so a
+// user never silently fails to learn their payout outcome.
+function sendWithdrawalStatusUpdateBestEffort(
+  req: Request,
+  withdrawalId: string,
+  options: Parameters<typeof sendWithdrawalStatusUpdate>[0],
+): void {
+  sendWithdrawalStatusUpdate(options).catch((err) => {
+    req.log?.error(
+      { err, withdrawalId, toEmail: options.toEmail, status: options.status },
+      "Failed to send withdrawal status-update email",
+    );
+    recordWithdrawalEmailFailure({
+      withdrawalId,
+      recipient: options.toEmail,
+      status: options.status,
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  });
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1562,14 +1587,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: `Withdrawal rejected${adminNote ? `: ${adminNote}` : ""}`,
           refId: claimed.id,
         });
-        sendWithdrawalStatusUpdate({
+        sendWithdrawalStatusUpdateBestEffort(req, claimed.id, {
           toEmail: await resolveStatusUpdateToEmail(claimed.userId, claimed.paypalEmail),
           username: claimed.username,
           amount: claimed.amount,
           totalPayout: claimed.totalPayout,
           status: "rejected",
           adminNote: adminNote ?? undefined,
-        }).catch(() => {});
+        });
         res.json({ withdrawal: claimed }); return;
       }
 
@@ -1894,13 +1919,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "paid",
           `PayPal webhook: ${eventType}`,
         );
-        sendWithdrawalStatusUpdate({
+        sendWithdrawalStatusUpdateBestEffort(req, withdrawal.id, {
           toEmail: await resolveStatusUpdateToEmail(withdrawal.userId, withdrawal.paypalEmail),
           username: withdrawal.username,
           amount: withdrawal.amount,
           totalPayout: withdrawal.totalPayout,
           status: "paid",
-        }).catch(() => {});
+        });
         res.status(200).json({ status: "ok" }); return;
       }
 
@@ -1927,14 +1952,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description: `PayPal payout failed (${eventType}) — balance refunded`,
             refId: claimed.id,
           });
-          sendWithdrawalStatusUpdate({
+          sendWithdrawalStatusUpdateBestEffort(req, claimed.id, {
             toEmail: await resolveStatusUpdateToEmail(claimed.userId, claimed.paypalEmail),
             username: claimed.username,
             amount: claimed.amount,
             totalPayout: claimed.totalPayout,
             status: "rejected",
             adminNote: `PayPal payout failed: ${eventType}`,
-          }).catch(() => {});
+          });
         }
         res.status(200).json({ status: "ok" }); return;
       }
