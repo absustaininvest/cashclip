@@ -29,6 +29,23 @@ vi.mock("./query-client", () => ({
 // loads cleanly even though no ad functions are exercised here.
 vi.mock("./admob", () => ({ maybeShowInterstitial: vi.fn(async () => {}) }));
 
+// secure-store (imported by storage.ts) imports react-native, whose Flow
+// `import typeof` syntax Vite/Rollup cannot parse in the node test environment.
+// Stub it to a parseable module; Platform.OS "web" routes secure-store through
+// the mocked AsyncStorage above.
+vi.mock("react-native", () => ({
+  Platform: { OS: "web", select: (o: any) => o.web ?? o.default },
+}));
+
+// secure-store imports expo-secure-store, which loads expo-modules-core (native
+// TurboModule bindings) at import time. Platform.OS "web" means it's never
+// actually called, but the import alone fails under node; stub it out.
+vi.mock("expo-secure-store", () => ({
+  getItemAsync: vi.fn(async () => null),
+  setItemAsync: vi.fn(async () => {}),
+  deleteItemAsync: vi.fn(async () => {}),
+}));
+
 import {
   getSeenQualifiedReferrals,
   setSeenQualifiedReferrals,

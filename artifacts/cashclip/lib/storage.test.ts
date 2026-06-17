@@ -23,6 +23,24 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 // Stub it so the test never reaches real AdMob native code.
 vi.mock("./admob", () => ({ maybeShowInterstitial: vi.fn(async () => {}) }));
 
+// storage.ts pulls in query-client and secure-store, both of which import
+// react-native (Flow `import typeof` syntax that Vite/Rollup cannot parse in the
+// node test environment). Stub react-native to a parseable module. Platform.OS
+// is "web" so secure-store routes through the mocked AsyncStorage above, keeping
+// every read/write in the single in-memory backing store.
+vi.mock("react-native", () => ({
+  Platform: { OS: "web", select: (o: any) => o.web ?? o.default },
+}));
+
+// secure-store imports expo-secure-store, which loads expo-modules-core (native
+// TurboModule bindings) at import time. Platform.OS "web" means it's never
+// actually called, but the import alone fails under node; stub it out.
+vi.mock("expo-secure-store", () => ({
+  getItemAsync: vi.fn(async () => null),
+  setItemAsync: vi.fn(async () => {}),
+  deleteItemAsync: vi.fn(async () => {}),
+}));
+
 import {
   markMissionClaimed,
   recordGamePlay,
@@ -123,25 +141,31 @@ describe("marking a mission claimed flips local UI state without crediting the b
   });
 });
 
-describe("game reward stored in display points credits the right local dollars", () => {
-  it("credits a game's display-point reward as its dollar-equivalent in balance and game earnings", async () => {
+// recordGamePlay accrues the local game-earnings STAT (display points converted
+// to their dollar-equivalent, 10,000 pts = $1) for the activity history, but it
+// must NOT move the spendable balance: the client never mints balance — real
+// cash is server-authoritative (GET /api/balance). If addEarnings ever started
+// crediting the local balance again, the balance assertions below would catch it.
+describe("game reward stored in display points accrues game earnings without moving the balance", () => {
+  it("records a game's display-point reward as its dollar-equivalent in game earnings, leaving the balance untouched", async () => {
     await recordGamePlay("trivia", 5000, "Trivia reward");
 
     const expectedDollars = displayPointsToDollars(5000); // 5000 / 10000 = $0.50
     expect(expectedDollars).toBeCloseTo(0.5, 10);
-    expect(await getBalance()).toBeCloseTo(expectedDollars, 10);
+    // Balance stays server-authoritative — local play does not credit it.
+    expect(await getBalance()).toBe(0);
 
     const gameEarnings = parseFloat(store.get(GAME_EARNINGS_KEY)!);
     expect(gameEarnings).toBeCloseTo(expectedDollars, 10);
   });
 
-  it("accumulates across multiple game plays", async () => {
+  it("accumulates game earnings across multiple plays while the balance stays at zero", async () => {
     await recordGamePlay("trivia", 5000, "Trivia reward");
     await recordGamePlay("memory", 2500, "Memory reward");
 
     const expectedDollars = displayPointsToDollars(5000) + displayPointsToDollars(2500);
     expect(expectedDollars).toBeCloseTo(0.75, 10);
-    expect(await getBalance()).toBeCloseTo(expectedDollars, 10);
+    expect(await getBalance()).toBe(0);
     expect(parseFloat(store.get(GAME_EARNINGS_KEY)!)).toBeCloseTo(expectedDollars, 10);
   });
 });

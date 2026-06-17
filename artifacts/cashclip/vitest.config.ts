@@ -19,11 +19,6 @@ export default defineConfig({
     exclude: [
       "**/node_modules/**",
       "**/.git/**",
-      // react-native is imported transitively and vite/rollup cannot parse its
-      // `import typeof` Flow syntax under the node environment, so these collect
-      // 0 tests and error at transform time.
-      "lib/storage.test.ts",
-      "lib/referral-storage.test.ts",
       // Fail to collect with "Cannot find module './ImportMetaRegistry'" —
       // owned by "Fix pre-existing test failures in the earn screen test files".
       "app/(tabs)/earn.error-states.test.tsx",
