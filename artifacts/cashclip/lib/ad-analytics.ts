@@ -126,8 +126,12 @@ export async function trackAdImpression(adUnitType: AdUnitType): Promise<void> {
   await enqueue({ event: "impression", adUnitType });
 }
 
-export async function trackAdCompletion(adUnitType: AdUnitType, durationMs?: number): Promise<void> {
-  await enqueue({ event: "completion", adUnitType, durationMs });
+export async function trackAdCompletion(
+  adUnitType: AdUnitType,
+  durationMs?: number,
+  revenueMicros?: number,
+): Promise<void> {
+  await enqueue({ event: "completion", adUnitType, durationMs, revenueMicros });
 }
 
 export async function trackAdRewardEarned(

@@ -6416,6 +6416,12 @@ function RevenuePanel({
   // "In sync" when official and app-reported agree within 5%.
   const reconInSync =
     !!recon && (recon.differencePct === null || Math.abs(recon.differencePct) <= 5);
+  // The app only began reporting per-impression revenue in a build that isn't
+  // live yet. Until that build ships, "app-reported" is $0 by design — that's
+  // NOT a real discrepancy, so don't flag it as "Diverging". AdMob official is
+  // the source of truth in the meantime.
+  const reconMirrorInactive =
+    !!recon && recon.appReportedEarnings === 0 && recon.officialEarnings > 0;
 
   return (
     <div className="space-y-6">
@@ -6630,12 +6636,18 @@ function RevenuePanel({
                 </p>
                 <span
                   className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    reconInSync
-                      ? "bg-[#00E676]/15 text-emerald-600"
-                      : "bg-amber-500/15 text-amber-300"
+                    reconMirrorInactive
+                      ? "bg-gray-200 text-gray-500"
+                      : reconInSync
+                        ? "bg-[#00E676]/15 text-emerald-600"
+                        : "bg-amber-500/15 text-amber-300"
                   }`}
                 >
-                  {reconInSync ? "In sync" : "Diverging"}
+                  {reconMirrorInactive
+                    ? "Official only"
+                    : reconInSync
+                      ? "In sync"
+                      : "Diverging"}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -6647,21 +6659,26 @@ function RevenuePanel({
                 <RevenueStat
                   label="App-reported"
                   value={fmtMoney(recon.appReportedEarnings)}
-                  hint="from ad events"
+                  hint={reconMirrorInactive ? "mirror not live yet" : "from ad events"}
                 />
                 <RevenueStat
-                  label="Difference"
-                  value={`${fmtMoney(recon.differenceAbs)}${
-                    recon.differencePct !== null
-                      ? ` (${recon.differencePct > 0 ? "+" : ""}${recon.differencePct}%)`
-                      : ""
-                  }`}
+                  label={reconMirrorInactive ? "App revenue mirror" : "Difference"}
+                  value={
+                    reconMirrorInactive
+                      ? "Not active yet"
+                      : `${fmtMoney(recon.differenceAbs)}${
+                          recon.differencePct !== null
+                            ? ` (${recon.differencePct > 0 ? "+" : ""}${recon.differencePct}%)`
+                            : ""
+                        }`
+                  }
+                  hint={reconMirrorInactive ? "ships with next app build" : undefined}
                 />
               </div>
               <p className="text-gray-400 text-xs mt-3">
-                Official AdMob estimated earnings compared with the revenue the app
-                reports per impression for the same period. Small gaps are normal
-                (AdMob figures are estimates and finalize later).
+                {reconMirrorInactive
+                  ? "AdMob official is the source of truth. The live app reports impression counts but not per-impression revenue yet, so \u201Capp-reported\u201D shows $0 by design \u2014 not a real discrepancy. The next app build adds per-impression revenue reporting, after which this mirror fills in and the two figures should track each other."
+                  : "Official AdMob estimated earnings compared with the revenue the app reports per impression for the same period. Small gaps are normal (AdMob figures are estimates and finalize later)."}
               </p>
             </div>
           )}

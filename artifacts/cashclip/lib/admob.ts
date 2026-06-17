@@ -303,6 +303,16 @@ export function isRewardedAdPreloaded(): boolean {
   return isPreloadedAdValid();
 }
 
+// AdMob impression-level ad revenue (PAID event) reports the revenue of a single
+// impression in the account currency's main unit (e.g. 0.0042 = $0.0042). The
+// server stores revenue in micros, so multiply by 1e6. Returns undefined for any
+// missing/invalid value so we never report a bogus number.
+function paidEventToMicros(event: { value?: number } | null | undefined): number | undefined {
+  const value = event?.value;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return undefined;
+  return Math.round(value * 1_000_000);
+}
+
 export function preloadRewardedAd(adUnitId?: string): void {
   if (!isAdMobAvailable || !adMobInitialized) return;
   if (preloadInProgress || isPreloadedAdValid()) return;
@@ -401,6 +411,7 @@ function showPreloadedAd(): Promise<PreloadedAdResult> {
     let earned = false;
     let rewardAmount = 0;
     let rewardType = "";
+    let paidMicros: number | undefined;
     const showTime = Date.now();
 
     const unsubscribeEarned = rewarded.addAdEventListener(
@@ -412,11 +423,18 @@ function showPreloadedAd(): Promise<PreloadedAdResult> {
       }) as Parameters<typeof rewarded.addAdEventListener>[1]
     );
 
+    const unsubscribePaid = rewarded.addAdEventListener(
+      AdEventType.PAID,
+      ((event: { value?: number }) => {
+        paidMicros = paidEventToMicros(event);
+      }) as Parameters<typeof rewarded.addAdEventListener>[1]
+    );
+
     const unsubscribeClosed = rewarded.addAdEventListener(
       AdEventType.CLOSED,
       () => {
         const durationMs = Date.now() - showTime;
-        trackAdCompletion("rewarded", durationMs);
+        trackAdCompletion("rewarded", durationMs, paidMicros);
         if (earned) {
           trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
         }
@@ -438,6 +456,7 @@ function showPreloadedAd(): Promise<PreloadedAdResult> {
 
     function cleanup() {
       unsubscribeEarned?.();
+      unsubscribePaid?.();
       unsubscribeClosed?.();
       unsubscribeError?.();
     }
@@ -460,6 +479,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
     let earned = false;
     let rewardAmount = 0;
     let rewardType = "";
+    let paidMicros: number | undefined;
 
     const timeoutId = setTimeout(() => {
       if (settled || adShown) return;
@@ -478,6 +498,13 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
         rewardType = reward.type;
         rewardAmount = reward.amount;
       }
+    );
+
+    const unsubscribePaid = rewarded.addAdEventListener(
+      AdEventType.PAID,
+      ((event: { value?: number }) => {
+        paidMicros = paidEventToMicros(event);
+      }) as Parameters<typeof rewarded.addAdEventListener>[1]
     );
 
     const loadStartTime = Date.now();
@@ -500,7 +527,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
         settled = true;
         clearTimeout(timeoutId);
         const durationMs = Date.now() - loadStartTime;
-        trackAdCompletion("rewarded", durationMs);
+        trackAdCompletion("rewarded", durationMs, paidMicros);
         if (earned) {
           trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
         }
@@ -527,6 +554,7 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
 
     function cleanup() {
       unsubscribeEarned?.();
+      unsubscribePaid?.();
       unsubscribeLoaded?.();
       unsubscribeClosed?.();
       unsubscribeError?.();
@@ -608,6 +636,7 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
     return new Promise((resolve) => {
       let settled = false;
       let adShown = false;
+      let paidMicros: number | undefined;
 
       const interstitial = InterstitialAd.createForAdRequest(unitId, buildAdRequestConfig());
 
@@ -630,12 +659,19 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
         interstitial.show();
       });
 
+      const unsubscribePaid = interstitial.addAdEventListener(
+        AdEventType.PAID,
+        ((event: { value?: number }) => {
+          paidMicros = paidEventToMicros(event);
+        }) as Parameters<typeof interstitial.addAdEventListener>[1]
+      );
+
       const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
         if (settled) return;
         settled = true;
         clearTimeout(timeoutId);
         const durationMs = Date.now() - loadStartTime;
-        trackAdCompletion("interstitial", durationMs);
+        trackAdCompletion("interstitial", durationMs, paidMicros);
         cleanup();
         resolve(true);
       });
@@ -652,6 +688,7 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
 
       function cleanup() {
         unsubscribeLoaded?.();
+        unsubscribePaid?.();
         unsubscribeClosed?.();
         unsubscribeError?.();
       }
