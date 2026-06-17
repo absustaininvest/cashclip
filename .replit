@@ -59,7 +59,7 @@ args = "absustain-typecheck"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "EAS Android Build 46"
+args = "OTA Production Push"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -130,12 +130,12 @@ args = "pnpm --filter @workspace/absustain run typecheck"
 isValidation = true
 
 [[workflows.workflow]]
-name = "EAS Android Build 46"
+name = "OTA Production Push"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash artifacts/cashclip/scripts/eas-build-android.sh"
+args = "bash artifacts/cashclip/scripts/eas-ota-production.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
