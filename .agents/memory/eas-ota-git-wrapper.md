@@ -34,19 +34,10 @@ cd artifacts/cashclip && \
   pnpm exec eas update --branch production --message "..." --non-interactive
 ```
 
-## Runtime targeting (app.json uses a FIXED-STRING runtimeVersion)
+## Fingerprinting note
 
-`app.json` `expo.runtimeVersion` is a literal string (`"1.0.0"`), NOT `{policy:"fingerprint"}`. So `eas update` always publishes for exactly that string — fingerprinting does NOT auto-fan-out to other runtimes. `eas update` has **no `--runtime-version` flag**.
-
-- To publish for a different runtime (e.g. reach users stuck on runtime `1.1.0`): temporarily edit `app.json` runtimeVersion → `"1.1.0"`, run `eas update`, then **revert to `"1.0.0"`**. Do the two runtimes as two separate publishes.
-- `EAS_SKIP_AUTO_FINGERPRINT=1` just skips the fingerprint compute step (saves time); it does not change which runtime is targeted here. Safe to use.
-
-## Beating the 120s bash limit WITHOUT a managed workflow
-
-Both-platform `eas update` export exceeds the 120s bash tool timeout (killed mid-bundle = NOTHING published, safe — EAS only creates the update group at the very end). But:
-
-- **`--platform ios` (single platform) + warm Metro cache + `EAS_SKIP_AUTO_FINGERPRINT=1` finishes in ~110s**, just under the limit. The first (killed) run warms the cache; the second single-platform run completes. Proven Jun 17 2026.
-- This is the fallback when you CANNOT create a managed workflow (see phantom-workflow desync). Run android and ios as two separate single-platform bash calls if you need both.
+- **With `EAS_SKIP_AUTO_FINGERPRINT=1`**: only creates an update for the runtimeVersion in `app.json` (currently `1.1.0`). Fast but misses live build-29 users (runtimeVersion `1.0.0`).
+- **Without it** (default): EAS computes fingerprints for ALL active builds and creates a separate update group per runtime version. Takes ~30–60s longer but covers both `1.0.0` and `1.1.0` builds in one shot. Prefer this for production fixes.
 
 ## What the sandbox blocks
 

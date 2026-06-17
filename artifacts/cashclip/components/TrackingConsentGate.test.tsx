@@ -150,44 +150,33 @@ beforeEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Consent flag lives in AsyncStorage (wiped on reinstall), NOT the Keychain.
-// This is the core of the "re-show prompt after delete + reinstall" behavior:
-// the flag is intentionally stored where iOS clears it on app deletion.
+// Prove secureGet reads from Keychain, not AsyncStorage
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Consent flag is stored in AsyncStorage, never the Keychain", () => {
-  it("passes through when AsyncStorage has the key (returning user)", async () => {
-    // The "done" flag lives in AsyncStorage — present means an ordinary
-    // returning user who already consented. resolveReturningUser re-checks ATT.
+describe("secure-store.ts — secureGet on native reads Keychain, not AsyncStorage", () => {
+  it("returns null when only AsyncStorage has the key (no Keychain fallback)", async () => {
+    // Populate AsyncStorage with the key but leave Keychain empty.
+    // If secureGet incorrectly fell back to AsyncStorage it would return "1"
+    // and skip the explicit migration path in the gate.
     store.set(DONE_KEY, "1");
-    attStatuses.push("authorized");
 
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
+    // Render the gate — secureGet(DONE_KEY) should return null (Keychain empty),
+    // so the gate must fall through to the AsyncStorage migration check.
+    await renderGate();
 
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(onDone).toHaveBeenCalledTimes(1);
-    expect(requestATTCalled).toBe(false);
-    // Flag must never be promoted into the Keychain (would defeat reinstall reset).
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    // Migration must have occurred: key should now be in Keychain.
+    expect(keychain.get(DONE_KEY)).toBe("1");
   });
 
-  it("ignores a Keychain-only flag and never writes the flag to the Keychain", async () => {
-    // A build-47 user's old flag lived only in the Keychain. After this change
-    // the gate ignores the Keychain entirely — but the ATT short-circuit (the
-    // user already authorized) still passes them through silently.
+  it("returns the value when only Keychain has the key (normal returning-user path)", async () => {
     keychain.set(DONE_KEY, "1");
-    // Two ATT reads on the no-flag path: initial status + post-dialog status.
-    attStatuses.push("authorized", "authorized");
+    // AsyncStorage is empty — proves reading comes from Keychain only.
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
 
     expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(requestATTCalled).toBe(false);
-    // The pass-through wrote the flag to AsyncStorage, not the Keychain.
-    expect(store.get(DONE_KEY)).toBe("1");
   });
 });
 
@@ -206,15 +195,14 @@ describe('TrackingConsentGate — ATT status "denied" on startup', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("writes the DONE_KEY to AsyncStorage (cleared on reinstall), not the Keychain", async () => {
+  it("writes the DONE_KEY to Keychain (SecureStore) so the gate survives reinstall", async () => {
     attStatuses.push("denied");
 
     await renderGate();
 
-    expect(store.get(DONE_KEY)).toBe("1");
-    // Must NOT be written to the Keychain (would survive reinstall and
-    // suppress the re-prompt we now want after delete + reinstall).
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
+    // Must NOT be written to AsyncStorage (would be lost on reinstall).
+    expect(store.has(DONE_KEY)).toBe(false);
   });
 
   it("does not call requestATT() because iOS would never show the dialog again", async () => {
@@ -241,13 +229,13 @@ describe('TrackingConsentGate — ATT status "restricted" on startup', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("writes the DONE_KEY to AsyncStorage (cleared on reinstall), not the Keychain", async () => {
+  it("writes the DONE_KEY to Keychain (SecureStore) so the gate survives reinstall", async () => {
     attStatuses.push("restricted");
 
     await renderGate();
 
-    expect(store.get(DONE_KEY)).toBe("1");
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
+    expect(store.has(DONE_KEY)).toBe(false);
   });
 
   it("does not call requestATT() because iOS would never show the dialog again", async () => {
@@ -260,15 +248,11 @@ describe('TrackingConsentGate — ATT status "restricted" on startup', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Build-47 returning user: flag lives ONLY in the Keychain (now ignored).
-// The gate no longer reads the Keychain flag, so it falls through to the ATT
-// status check. Because the user already authorized, iOS reports a settled
-// status and the gate passes through silently — no disclosures, no re-prompt.
+// Fast-path: DONE_KEY already present in Keychain (returning user)
 // ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — build-47 Keychain-only flag is ignored, ATT short-circuit passes through", () => {
-  it("renders children without showing consent UI (already authorized)", async () => {
+describe("TrackingConsentGate — DONE_KEY already set in Keychain (returning user)", () => {
+  it("renders children immediately without showing any consent UI", async () => {
     keychain.set(DONE_KEY, "1");
-    attStatuses.push("authorized", "authorized");
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
@@ -278,34 +262,33 @@ describe("TrackingConsentGate — build-47 Keychain-only flag is ignored, ATT sh
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call requestATT() — iOS already has a settled status", async () => {
+  it("does not call requestATT() — no ATT dialog for returning users", async () => {
     keychain.set(DONE_KEY, "1");
-    attStatuses.push("authorized", "authorized");
 
     await renderGate();
 
     expect(requestATTCalled).toBe(false);
   });
 
-  it("writes the flag to AsyncStorage (so future launches fast-path), never the Keychain", async () => {
+  it("leaves DONE_KEY intact in Keychain", async () => {
     keychain.set(DONE_KEY, "1");
-    attStatuses.push("authorized", "authorized");
 
     await renderGate();
 
-    expect(store.get(DONE_KEY)).toBe("1");
+    expect(keychain.get(DONE_KEY)).toBe("1");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OTA upgrade scenario: DONE_KEY written by a prior build in AsyncStorage.
-// AsyncStorage still has the key, so the gate fast-paths through without a
-// re-prompt. The flag stays in AsyncStorage (never promoted to the Keychain).
+// OTA upgrade scenario: DONE_KEY written by old build in AsyncStorage
+// After an OTA update the Keychain is empty; AsyncStorage still has the key.
+// The gate must detect it, promote it to Keychain, and never re-prompt.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — OTA upgrade: DONE_KEY already in AsyncStorage", () => {
-  it("passes through without re-prompting when AsyncStorage has the key", async () => {
+describe("TrackingConsentGate — OTA upgrade: DONE_KEY from old build in AsyncStorage", () => {
+  it("passes through without re-prompting when only AsyncStorage has the key", async () => {
+    // Simulate old build: wrote consent_done_v3 to AsyncStorage (not Keychain).
     store.set(DONE_KEY, "1");
-    attStatuses.push("authorized");
+    // Keychain is empty — secureGet returns null here.
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
@@ -315,74 +298,52 @@ describe("TrackingConsentGate — OTA upgrade: DONE_KEY already in AsyncStorage"
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("does not promote the key into the Keychain", async () => {
+  it("promotes the key to Keychain on first launch after the update", async () => {
     store.set(DONE_KEY, "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
-    // The flag must stay out of the Keychain so a reinstall clears it.
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    // After migration, Keychain must hold the key so reinstalls pass through.
+    expect(keychain.get(DONE_KEY)).toBe("1");
   });
 
-  it("does not call requestATT() when the AsyncStorage key is present", async () => {
+  it("does not call requestATT() when the old AsyncStorage key is present", async () => {
     store.set(DONE_KEY, "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
     expect(requestATTCalled).toBe(false);
   });
 
-  it("re-shows the prompt after reinstall (AsyncStorage cleared, status undetermined)", async () => {
-    // Phase 1 — ordinary launch: flag present in AsyncStorage, pass through.
+  it("survives reinstall: subsequent launch with AsyncStorage cleared still skips the gate", async () => {
+    // Phase 1 — first launch after OTA update: migrate AsyncStorage → Keychain.
     store.set(DONE_KEY, "1");
-    attStatuses.push("authorized");
     await renderGate();
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
 
-    // Phase 2 — delete + reinstall: iOS wipes AsyncStorage. The Keychain never
-    // held the flag, so nothing suppresses the prompt. iOS reports undetermined
-    // → the ATT dialog fires again, matching build 40's behavior. The
-    // undetermined path waits 600 ms before re-reading status, so drive the
-    // clock with fake timers (same pattern as the undetermined→denied tests).
+    // Phase 2 — simulate reinstall: iOS clears AsyncStorage but Keychain persists.
     store.clear();
     vi.clearAllMocks();
     attStatuses.length = 0;
     requestATTCalled = false;
-    attStatuses.push("undetermined", "authorized");
-
-    vi.useFakeTimers();
+    // keychain still has the key (Keychain survives reinstall on iOS).
 
     const onDone = vi.fn();
-    let tr2!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tr2 = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: onDone, children: CHILD }),
-      );
-    });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    const tr2 = await renderGate(onDone);
 
-    vi.useRealTimers();
-
-    expect(requestATTCalled).toBe(true);
     expect(childrenVisible(tr2.root)).toBe(true);
+    expect(disclosuresVisible(tr2.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
-    // After consenting again the flag is back in AsyncStorage only.
-    expect(store.get(DONE_KEY)).toBe("1");
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(requestATTCalled).toBe(false);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fast-path: legacy key consent_fully_done_v2 present → promote + skip
+// Fast-path: legacy key consent_fully_done_v2 present → migrate + skip
 // ─────────────────────────────────────────────────────────────────────────────
 describe("TrackingConsentGate — legacy key consent_fully_done_v2 present", () => {
   it("renders children immediately without showing any consent UI", async () => {
     store.set("consent_fully_done_v2", "1");
-    attStatuses.push("authorized");
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
@@ -392,19 +353,16 @@ describe("TrackingConsentGate — legacy key consent_fully_done_v2 present", () 
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("promotes to DONE_KEY in AsyncStorage (not the Keychain)", async () => {
+  it("migrates by writing DONE_KEY to Keychain so future reinstalls also skip the gate", async () => {
     store.set("consent_fully_done_v2", "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
-    expect(store.get(DONE_KEY)).toBe("1");
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
   });
 
   it("does not call requestATT() — no ATT dialog needed", async () => {
     store.set("consent_fully_done_v2", "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
@@ -413,12 +371,11 @@ describe("TrackingConsentGate — legacy key consent_fully_done_v2 present", () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fast-path: legacy key tracking_consent_dismissed_v1 present → promote + skip
+// Fast-path: legacy key tracking_consent_dismissed_v1 present → migrate + skip
 // ─────────────────────────────────────────────────────────────────────────────
 describe("TrackingConsentGate — legacy key tracking_consent_dismissed_v1 present", () => {
   it("renders children immediately without showing any consent UI", async () => {
     store.set("tracking_consent_dismissed_v1", "1");
-    attStatuses.push("authorized");
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
@@ -428,19 +385,16 @@ describe("TrackingConsentGate — legacy key tracking_consent_dismissed_v1 prese
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("promotes to DONE_KEY in AsyncStorage (not the Keychain)", async () => {
+  it("migrates by writing DONE_KEY to Keychain so future reinstalls also skip the gate", async () => {
     store.set("tracking_consent_dismissed_v1", "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
-    expect(store.get(DONE_KEY)).toBe("1");
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
   });
 
   it("does not call requestATT() — no ATT dialog needed", async () => {
     store.set("tracking_consent_dismissed_v1", "1");
-    attStatuses.push("authorized");
 
     await renderGate();
 
@@ -490,7 +444,7 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("writes the DONE_KEY to AsyncStorage (not the Keychain) after the post-dialog denied status", async () => {
+  it("writes the DONE_KEY to Keychain after the post-dialog denied status", async () => {
     attStatuses.push("undetermined", "denied");
 
     vi.useFakeTimers();
@@ -513,8 +467,8 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     vi.useRealTimers();
 
     void tr;
-    expect(store.get(DONE_KEY)).toBe("1");
-    expect(keychain.has(DONE_KEY)).toBe(false);
+    expect(keychain.get(DONE_KEY)).toBe("1");
+    expect(store.has(DONE_KEY)).toBe(false);
   });
 
   it("never reaches setStep('disclosures') when the post-dialog status is denied", async () => {

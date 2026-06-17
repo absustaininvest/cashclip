@@ -143,18 +143,7 @@ This uploads the AAB to Play Console in **draft** mode. You still need to:
 
 ## Notes
 
-- The Android keystore lives in EAS cloud under the org account
-  `absustainabilityinvestments-owner` (project `@absustainabilityinvestments-owner/cashclip`,
-  projectId `aac2a3d9-56b6-49ab-b254-9b80e98bab2f`). Inspect/download a backup via:
-  `eas credentials --platform android`.
-- **Upload key (critical):** Google Play has a permanent UPLOAD key on file with
-  certificate `SHA1: 27:E0:13:62:ED:D6:23:1D:1E:08:09:C3:65:70:DB:89:9B:78:22:6E`.
-  Every production `.aab` MUST be signed with that keystore or Play rejects it with
-  "App Bundle signed with the wrong key." As of Jun 2026 the only keystore stored in
-  EAS is a different one (`SHA1: 85:FD:79:B7:39:C4:14:57:22:60:03:98:B0:30:B8:8F:62:89:81:8C`),
-  auto-generated after the Expo personal→org transfer. The original `27:E0…` keystore
-  must be imported into EAS and set as the active/default Android keystore before any
-  production build. NEVER let a command auto-generate a replacement keystore — losing
-  the `27:E0…` key would force a Google upload-key reset.
+- The keystore EAS generates is stored in EAS cloud under your `expodeveloper20` account.
+  Download a backup via: `eas credentials --platform android`
 - Do NOT change the `package` name after first submission — Google locks it permanently
-- `versionCode` must increment with every new upload (currently `45`)
+- `versionCode` must increment with every new upload (1 → 2 → 3, etc.)

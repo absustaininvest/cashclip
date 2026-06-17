@@ -53,7 +53,7 @@ import { apiRequest } from "@/lib/query-client";
 import { checkDeviceIntegrity } from "@/lib/device-integrity";
 import { secureGet, secureSet } from "@/lib/secure-store";
 import { t as tFn, type Translations } from "@/lib/i18n";
-import { isPlausiblePayPalDomain } from "@workspace/validation";
+import { isPlausiblePayPalDomain, INVALID_PAYPAL_EMAIL_MESSAGE } from "@workspace/validation";
 
 function extractApiErrorMessage(rawMsg: string, fallback: string): string {
   const colonIdx = rawMsg.indexOf(":");
@@ -387,8 +387,8 @@ export default function WalletScreen() {
 
     if (!integrity.clean) {
       Alert.alert(
-        t.wallet.deviceNotSupportedTitle,
-        t.wallet.deviceNotSupportedMsg
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
       );
       return;
     }
@@ -437,7 +437,7 @@ export default function WalletScreen() {
     const suspiciousSaved =
       !!lockedTrimmed && !isPlausiblePayPalDomain(lockedTrimmed);
     setSavedEmailWarning(suspiciousSaved);
-    setPaypalEmailError(suspiciousSaved ? t.wallet.invalidPaypalEmail : null);
+    setPaypalEmailError(suspiciousSaved ? INVALID_PAYPAL_EMAIL_MESSAGE : null);
     setWithdrawError(null);
     setWithdrawErrorCode(null);
     setShowWithdrawModal(true);
@@ -462,29 +462,29 @@ export default function WalletScreen() {
     // pre-fill next time.
     secureSet(PAYPAL_EMAIL_CACHE_KEY, trimmed).catch(() => {});
     if (!isPlausiblePayPalDomain(trimmed)) {
-      setPaypalEmailError(t.wallet.invalidPaypalEmail);
+      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
     } else {
       setPaypalEmailError(null);
     }
-  }, [t]);
+  }, []);
 
   const handleWithdraw = useCallback(async () => {
     if (!selectedTier || !paypalEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(paypalEmail.trim())) {
-      Alert.alert(t.wallet.invalidEmailTitle, t.wallet.invalidEmailMsg);
+      Alert.alert("Invalid Email", "Please enter a valid PayPal email address.");
       return;
     }
     if (!isPlausiblePayPalDomain(paypalEmail.trim())) {
-      setPaypalEmailError(t.wallet.invalidPaypalEmail);
+      setPaypalEmailError(INVALID_PAYPAL_EMAIL_MESSAGE);
       return;
     }
 
     const integrity = await checkDeviceIntegrity();
     if (!integrity.clean) {
       Alert.alert(
-        t.wallet.deviceNotSupportedTitle,
-        t.wallet.deviceNotSupportedMsg
+        "Device Not Supported",
+        "Withdrawals are not available on rooted or jailbroken devices. Please contact support if you believe this is an error."
       );
       return;
     }
@@ -519,7 +519,7 @@ export default function WalletScreen() {
       // the Profile save form when the server rejects the payout address.
       setWithdrawError(
         code === "INVALID_PAYPAL_EMAIL"
-          ? t.wallet.invalidPaypalEmail
+          ? INVALID_PAYPAL_EMAIL_MESSAGE
           : extractApiErrorMessage(rawMsg, fallback),
       );
       setWithdrawErrorCode(code);

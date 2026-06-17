@@ -255,6 +255,9 @@
           },
           {
             "SKAdNetworkIdentifier": "zq492l623r.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "f38h382jlk.skadnetwork"
           }
         ]
       },
@@ -375,7 +378,7 @@
     },
     "android": {
       "package": "app.replit.cashclip",
-      "versionCode": 45,
+      "versionCode": 44,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-8679658921848348~2934376019"
       },

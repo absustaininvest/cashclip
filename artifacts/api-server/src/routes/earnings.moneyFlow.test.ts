@@ -145,6 +145,7 @@ async function ledgerFor(userId: string): Promise<Array<{ amount: string; type: 
 beforeAll(async () => {
   process.env["JWT_ACCESS_SECRET"] = JWT_SECRET;
   // Keep the HS256 path the only one in play.
+  delete process.env["JWT_EDDSA_KEY"];
   delete process.env["JWT_ACCESS_SECRET_PREV"];
   delete process.env["ADMIN_TOKEN"];
 

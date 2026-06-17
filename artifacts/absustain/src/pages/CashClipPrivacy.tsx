@@ -56,7 +56,6 @@ export default function CashClipPrivacy() {
 
       <h2 style={h2}>4. App Tracking Transparency (iOS)</h2>
       <p>On iOS 14.5 and later, we ask for your permission before tracking your activity across other companies' apps and websites. If you grant permission, your advertising identifier (IDFA) may be used to personalize ads and measure ad performance. You can change this permission at any time in your iPhone Settings → Privacy & Security → Tracking.</p>
-      <p>Ad personalization is optional and is not required to use CashClip. You can decline the prompt (or turn tracking off later) and still use the App and earn rewards. Declining only means the ads and offers you see are less tailored to you.</p>
 
       <h2 style={h2}>5. Data Retention</h2>
       <p>We retain your account and transaction data for as long as your account is active or as needed to provide services, comply with legal obligations, resolve disputes, and enforce our agreements. You may request deletion of your account by contacting us (see Section 9).</p>

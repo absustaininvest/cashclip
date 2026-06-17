@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
+import { secureGet, secureSet } from "@/lib/secure-store";
 
 const DONE_KEY = "consent_done_v3";
 
@@ -107,27 +108,28 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     }
 
     (async () => {
-      // ── Fast-path 1: key in AsyncStorage — wiped on app deletion ──────────
-      // The "consent done" flag lives in AsyncStorage (NOT the Keychain) so
-      // that deleting + reinstalling the app clears it and the tracking prompt
-      // fires again, matching build 40's behavior. iOS preserves the Keychain
-      // across reinstalls, which is why we deliberately do not store/read this
-      // flag there. (Auth-token SecureStore usage is unaffected.)
+      // ── Fast-path 1: key in SecureStore (Keychain) — survives reinstalls ───
+      // Written by any build that ships this version of the gate.
       // Re-check ATT status: the user may have revoked tracking via iOS Settings
       // since they last consented. If so, fire onConsentRevoked instead of
       // onConsentDone so the fill callback is never registered.
-      const doneStorage = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
-      if (doneStorage) { await resolveReturningUser(); return; }
+      const doneSecure = await secureGet(DONE_KEY);
+      if (doneSecure) { await resolveReturningUser(); return; }
 
-      // ── Fast-path 2: even older legacy keys — pass through (read-only) ────
-      // Older builds wrote these AsyncStorage keys; honor them for backward
-      // compatibility so existing users aren't re-prompted on an ordinary
-      // upgrade launch. Promote to the current AsyncStorage key (still NOT the
-      // Keychain) so reinstalls remain able to re-show the prompt.
+      // ── Fast-path 2: key in AsyncStorage — written by old builds (≤v39) ───
+      // Migrate it to SecureStore so future reinstalls also pass through.
+      const doneLegacyStorage = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
+      if (doneLegacyStorage) {
+        await secureSet(DONE_KEY, "1").catch(() => {});
+        await resolveReturningUser();
+        return;
+      }
+
+      // ── Fast-path 3: even older legacy keys — migrate + skip ────────────
       const prev1 = await AsyncStorage.getItem("consent_fully_done_v2").catch(() => null);
       const prev2 = await AsyncStorage.getItem("tracking_consent_dismissed_v1").catch(() => null);
       if (prev1 || prev2) {
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         await resolveReturningUser();
         return;
       }
@@ -138,7 +140,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
       if (status === "denied" || status === "restricted") {
         // User previously denied system ATT prompt. iOS will never show it
         // again. Mark consent done so we never show the gate again either.
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
         return;
       }
@@ -150,10 +152,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
 
       // Read back the final status after the ATT dialog (or skip).
       // Treat authorized/granted AND denied/restricted the same: user has
-      // already made their ATT choice — write the key and move on. This is
-      // also what silently passes through an already-consented build-47 user
-      // (whose old flag lived only in the Keychain): iOS reports their real
-      // status here, so they never see the disclosures/terms screens again.
+      // already made their ATT choice — write the key and move on.
       // "unavailable" means the read timed out (3 s race in att.ts). The iOS
       // dialog was already shown, so the user did see it. Treat as a pass-
       // through — the real status will be readable on next launch. Falling
@@ -168,7 +167,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
         statusAfter === "restricted" ||
         statusAfter === "unavailable"
       ) {
-        await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+        await secureSet(DONE_KEY, "1").catch(() => {});
         finish();
         return;
       }
@@ -194,7 +193,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
           text: "Continue Without",
           style: "cancel",
           onPress: async () => {
-            await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+            await secureSet(DONE_KEY, "1").catch(() => {});
             finish();
           },
         },
@@ -203,7 +202,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   }
 
   async function acceptTerms() {
-    await AsyncStorage.setItem(DONE_KEY, "1").catch(() => {});
+    await secureSet(DONE_KEY, "1").catch(() => {});
     finish();
   }
 
@@ -237,8 +236,8 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
             <Text style={styles.cardBody}>
               CashClip uses Apple's Advertising Identifier to link your in-app activity
               with ad networks. This lets advertisers show you relevant ads and measure
-              performance — which is how earnings flow within the platform. No name,
-              email, or contact information is shared with advertisers.
+              performance — which is how you earn cash. No name, email, or contact info
+              is shared with advertisers.
             </Text>
           </View>
 
@@ -248,9 +247,9 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               <Text style={styles.cardTitle}>Ad Personalization</Text>
             </View>
             <Text style={styles.cardBody}>
-              By allowing custom personalization, CashClip matches you with offers and
-              surveys enhanced for your profile. Please note that this feature is
-              available, but it is not required to join and is completely optional.
+              Allowing personalization matches you with the highest-paying surveys and
+              offers for your profile. Declining limits you to non-personalized content
+              and significantly reduces earning potential.
             </Text>
           </View>
 

@@ -293,9 +293,3 @@ id = "XVmsJifKVIKaiINkKfl4j"
 uri = "file://SERVER_SIDE_MANUSCRIPT.md"
 type = "text"
 title = "CashClip — Server-Side Manuscript (Authoritative)"
-
-[[outputs]]
-id = "8lWr03pRX935POy1UMcWi"
-uri = "file://artifacts/cashclip/credentials/upload_certificate.txt"
-type = "text"
-title = "CashClip new upload certificate (for Google Play key reset)"
