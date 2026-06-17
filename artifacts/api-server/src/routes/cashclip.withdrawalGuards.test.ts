@@ -34,6 +34,8 @@ const mockGetWithdrawalById = vi.fn();
 const mockUpdateWithdrawalStatusIfStatus = vi.fn();
 const mockSendPayPalPayout = vi.fn();
 const mockIsPayPalConfigured = vi.fn().mockReturnValue(true);
+const mockSetPaypalEmail = vi.fn();
+const mockInsertUserNotification = vi.fn();
 
 vi.mock("../storage", () => ({
   storage: {
@@ -42,6 +44,8 @@ vi.mock("../storage", () => ({
     createWithdrawalAtomic: (...args: unknown[]) => mockCreateWithdrawalAtomic(...args),
     getWithdrawalById: (...args: unknown[]) => mockGetWithdrawalById(...args),
     updateWithdrawalStatusIfStatus: (...args: unknown[]) => mockUpdateWithdrawalStatusIfStatus(...args),
+    setPaypalEmail: (...args: unknown[]) => mockSetPaypalEmail(...args),
+    insertUserNotification: (...args: unknown[]) => mockInsertUserNotification(...args),
   },
 }));
 
@@ -905,5 +909,54 @@ describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation"
       expect.any(String),
     );
     expect(res.status).toBe(200);
+  });
+});
+
+// ── PayPal email save — consistent error code at point of entry ────────────────
+//
+// POST /api/profile/paypal-email runs the same format-regex and
+// isPlausiblePayPalDomain checks as the withdrawal route, so it must return the
+// same machine-readable code ("INVALID_PAYPAL_EMAIL") on rejection. This lets
+// the client show one consistent message and reject a bad address when the user
+// first saves it — not only later at withdrawal time. A legitimate multi-label
+// address must proceed to storage.setPaypalEmail.
+
+describe("POST /api/profile/paypal-email — INVALID_PAYPAL_EMAIL code parity", () => {
+  beforeEach(() => {
+    // Fresh user with no PayPal email yet so the save path is reachable.
+    mockGetUser.mockResolvedValue(eligibleUser({ paypalEmail: null }));
+    mockSetPaypalEmail.mockResolvedValue({ ok: true });
+    mockInsertUserNotification.mockResolvedValue(undefined);
+  });
+
+  it("returns 400 INVALID_PAYPAL_EMAIL for a known disposable domain and does not call setPaypalEmail", async () => {
+    const res = await withAuth(
+      request(app).post("/api/profile/paypal-email").send({ email: "user@mailinator.com" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_PAYPAL_EMAIL");
+    expect(mockSetPaypalEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_PAYPAL_EMAIL for a short SLD on an untrusted TLD and does not call setPaypalEmail", async () => {
+    const res = await withAuth(
+      request(app).post("/api/profile/paypal-email").send({ email: "user@aaa.co" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_PAYPAL_EMAIL");
+    expect(mockSetPaypalEmail).not.toHaveBeenCalled();
+  });
+
+  it("proceeds to storage.setPaypalEmail for a legitimate multi-label address", async () => {
+    const res = await withAuth(
+      request(app).post("/api/profile/paypal-email").send({ email: "user@ox.ac.uk" }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockSetPaypalEmail).toHaveBeenCalledTimes(1);
+    expect(mockSetPaypalEmail).toHaveBeenCalledWith(USER_ID, "user@ox.ac.uk");
   });
 });

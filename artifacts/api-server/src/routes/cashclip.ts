@@ -1221,10 +1221,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trimmed = email.trim().toLowerCase();
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmed)) {
-        res.status(400).json({ error: "Invalid email format" }); return;
+        res.status(400).json({ error: "Invalid email format", code: "INVALID_PAYPAL_EMAIL" }); return;
       }
       if (!isPlausiblePayPalDomain(trimmed)) {
-        res.status(400).json({ error: "This email domain is not accepted for PayPal payouts." }); return;
+        res.status(400).json({ error: "This email domain is not accepted for PayPal payouts.", code: "INVALID_PAYPAL_EMAIL" }); return;
       }
       const user = await storage.getUser(req.userId!);
       if (!user) { res.status(401).json({ error: "User not found" }); return; }
