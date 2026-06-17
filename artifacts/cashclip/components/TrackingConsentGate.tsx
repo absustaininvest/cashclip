@@ -247,9 +247,9 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               <Text style={styles.cardTitle}>Ad Personalization</Text>
             </View>
             <Text style={styles.cardBody}>
-              Allowing personalization matches you with the highest-paying surveys and
-              offers for your profile. Declining limits you to non-personalized content
-              and significantly reduces earning potential.
+              By allowing custom personalization, CashClip explores more options
+              relevant to you. Please note this is not a requirement, but it helps
+              us serve you better.
             </Text>
           </View>
 
