@@ -34,7 +34,7 @@ import { registerSurveyRoutes } from "../surveys";
 import { registerOfferwallRoutes } from "../offerwalls";
 import { registerEarningsRoutes } from "./earnings";
 import { resolveTierForAmount, getAvailableTiers, WITHDRAWAL_TIERS, DAILY_WITHDRAWAL_MAX, NEW_ACCOUNT_HOLD_HOURS, MAX_WITHDRAWALS_PER_DAY, getDailyPayoutFloatUsd, REFERRAL_QUALIFY_USD, REFERRAL_BONUS_USD } from "../withdrawalTiers";
-import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned, sendPayPalAmbiguousAlert } from "../lib/email";
+import { sendWithdrawalRequestedAdmin, sendWithdrawalRequestedUser, sendWithdrawalVelocityAdmin, sendWithdrawalStatusUpdate, sendSupportTicket, sendPasswordChangedNotice, sendAdminCreditReceipt, sendSupportReply, sendReferralBonusEarned, sendPayPalAmbiguousAlert, sendBroadcastEmail } from "../lib/email";
 import { alertPayPalWebhookSecretMissing } from "../lib/paypalWebhookAlert";
 import { recordWithdrawalEmailFailure } from "../lib/withdrawalEmailAlerts";
 import { publicLeadRateLimiter } from "../lib/publicLeadRateLimit";
@@ -2331,6 +2331,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       req.log?.error({ err }, "Failed to factory reset account");
       res.status(500).json({ error: "Failed to factory reset account" });
+    }
+  });
+
+  app.post("/api/admin/broadcast-email", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      let offset = 0;
+      const limit = 200;
+      let sent = 0;
+      let skipped = 0;
+      let total = 0;
+      while (true) {
+        const { users, total: t } = await storage.getAllUsers(limit, offset);
+        if (offset === 0) total = t;
+        if (users.length === 0) break;
+        for (const user of users) {
+          if (user.email && user.email.trim().length > 0) {
+            sendBroadcastEmail({ to: user.email.trim(), username: user.username });
+            sent++;
+          } else {
+            skipped++;
+          }
+        }
+        offset += users.length;
+        if (offset >= total) break;
+      }
+      req.log?.info({ adminId: req.userId, sent, skipped, total }, "Admin sent broadcast email");
+      res.json({ sent, skipped, total });
+    } catch (err: any) {
+      req.log?.error({ err }, "Failed to send broadcast email");
+      res.status(500).json({ error: "Failed to send broadcast email" });
     }
   });
 

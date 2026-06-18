@@ -2328,6 +2328,28 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
     skippedReferrals: { referrer: string; referredFriend: string }[];
     failedReferrals: { referrer: string; referredFriend: string; error?: string }[];
   } | null>(null);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<{ sent: number; skipped: number; total: number } | null>(null);
+  const [broadcastError, setBroadcastError] = useState("");
+  const [broadcastConfirm, setBroadcastConfirm] = useState(false);
+  async function sendBroadcast() {
+    setBroadcastLoading(true);
+    setBroadcastError("");
+    try {
+      const res = await fetch("/api/admin/broadcast-email", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send");
+      setBroadcastResult(data);
+      setBroadcastConfirm(false);
+    } catch (err: any) {
+      setBroadcastError(err.message || "Failed to send broadcast");
+    } finally {
+      setBroadcastLoading(false);
+    }
+  }
   function downloadBackfillCsv() {
     if (!backfillResult) return;
     const rows: string[][] = [["status", "referrer", "referred_friend", "amount", "error"]];
@@ -3393,6 +3415,49 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Broadcast Email */}
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-100">
+            <Mail className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-['Space_Grotesk'] text-base font-bold text-gray-900">Send Message to All Users</h3>
+            <p className="text-gray-400 text-xs">Sends the community update email (English + Spanish) to every registered user with an email address</p>
+          </div>
+        </div>
+        {broadcastResult ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <p className="text-green-700 text-sm font-semibold">Sent successfully</p>
+            <p className="text-green-600 text-xs mt-1">{broadcastResult.sent} emails sent · {broadcastResult.skipped} skipped (no email on file) · {broadcastResult.total} total users</p>
+            <button onClick={() => setBroadcastResult(null)} className="mt-2 text-xs text-green-500 underline">Dismiss</button>
+          </div>
+        ) : broadcastConfirm ? (
+          <div className="space-y-3">
+            <p className="text-gray-500 text-sm">This will send the community update email to all registered users. This cannot be undone.</p>
+            {broadcastError && <p className="text-red-400 text-xs">{broadcastError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setBroadcastConfirm(false); setBroadcastError(""); }}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-500 text-sm hover:text-gray-900 transition-colors"
+              >Cancel</button>
+              <button
+                onClick={sendBroadcast}
+                disabled={broadcastLoading}
+                className="flex-1 py-2 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50"
+              >{broadcastLoading ? "Sending…" : "Confirm Send"}</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setBroadcastConfirm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-200 rounded-xl text-blue-600 text-sm font-medium hover:bg-blue-200 transition-colors"
+          >
+            <Send className="w-4 h-4" /> Send to All Users
+          </button>
         )}
       </div>
 

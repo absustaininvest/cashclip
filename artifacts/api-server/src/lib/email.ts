@@ -963,3 +963,43 @@ export function sendReferralBonusEarned(options: {
     replyTo: null,
   });
 }
+
+export function sendBroadcastEmail(options: {
+  to: string;
+  username: string;
+}): void {
+  const { to, username } = options;
+  const safeUsername = escapeHtml(username);
+  sendBestEffort({
+    to,
+    subject: "A message from the CashClip Team | Un mensaje del equipo de CashClip",
+    text: `To our CashClip community —\n\nWe owe you honesty. We've been working hard on updates to improve your experience, but in doing so, we moved faster than we should have and created instability instead of progress.\n\nSo we're going back to the foundation. We're rebuilding the right way — clean, verified, and built around what actually works for you. This will take approximately two weeks.\n\nIf you choose to stay, thank you. We're doing this for you. If you need to step away, we completely understand — we will always be here if that's what you choose to do right now.\n\nCashClip is backed by real networks that require real verification. We can't skip that process, and we won't. But when it's done, it will be solid.\n\n— The CashClip Team\n\n---\n\nPara nuestra comunidad de CashClip —\n\nLes debemos honestidad. Hemos estado trabajando duro en mejoras para su experiencia, pero al hacerlo, avanzamos más rápido de lo que debíamos y creamos inestabilidad en lugar de progreso.\n\nPor eso, volvemos a la base. Estamos reconstruyendo de la manera correcta — limpio, verificado, y construido alrededor de lo que realmente funciona para ustedes. Esto tomará aproximadamente dos semanas.\n\nSi eligen quedarse, gracias. Lo hacemos por ustedes. Si necesitan alejarse, lo entendemos completamente — siempre estaremos aquí si eso es lo que eligen hacer ahora.\n\nCashClip está respaldado por redes reales que requieren verificación real. No podemos saltarnos ese proceso, y no lo haremos. Pero cuando esté listo, será sólido.\n\n— El Equipo de CashClip`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:auto;background:#0A0A0F;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#00C853,#00E676);padding:32px 32px 24px;text-align:center">
+          <h1 style="margin:0;font-size:28px;font-weight:800;color:#0A0A0F;letter-spacing:-0.5px">CashClip</h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#0A0A0F;opacity:0.75">A message from our team</p>
+        </div>
+        <div style="padding:32px">
+          <p style="margin:0 0 8px;font-size:15px;color:#e0e0e0">Hi <strong style="color:#fff">${safeUsername}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#b0b0b0;line-height:1.6">We owe you honesty. We've been working hard on updates to improve your experience, but in doing so, we moved faster than we should have and created instability instead of progress.</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#b0b0b0;line-height:1.6">So we're going back to the foundation. We're rebuilding the right way — clean, verified, and built around what actually works for you. <strong style="color:#fff">This will take approximately two weeks.</strong></p>
+          <p style="margin:0 0 16px;font-size:15px;color:#b0b0b0;line-height:1.6">If you choose to stay, thank you. We're doing this for you. If you need to step away, we completely understand — we will always be here if that's what you choose to do right now.</p>
+          <p style="margin:0 0 24px;font-size:15px;color:#b0b0b0;line-height:1.6">CashClip is backed by real networks that require real verification. We can't skip that process, and we won't. But when it's done, it will be solid.</p>
+          <div style="margin:28px 0;padding:20px;background:#111120;border:1px solid #1e1e2e;border-radius:12px">
+            <p style="margin:0 0 4px;font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1px">En español</p>
+            <p style="margin:0 0 12px;font-size:14px;color:#8a8a9a;line-height:1.6">Les debemos honestidad. Hemos estado trabajando duro en mejoras para su experiencia, pero avanzamos más rápido de lo que debíamos y creamos inestabilidad en lugar de progreso.</p>
+            <p style="margin:0 0 12px;font-size:14px;color:#8a8a9a;line-height:1.6">Por eso, volvemos a la base. Estamos reconstruyendo de la manera correcta — limpio, verificado, y construido alrededor de lo que realmente funciona para ustedes. <strong style="color:#b0b0b0">Esto tomará aproximadamente dos semanas.</strong></p>
+            <p style="margin:0 0 12px;font-size:14px;color:#8a8a9a;line-height:1.6">Si eligen quedarse, gracias. Lo hacemos por ustedes. Si necesitan alejarse, lo entendemos completamente — siempre estaremos aquí si eso es lo que eligen hacer ahora.</p>
+            <p style="margin:0;font-size:14px;color:#8a8a9a;line-height:1.6">CashClip está respaldado por redes reales que requieren verificación real. No podemos saltarnos ese proceso, y no lo haremos. Pero cuando esté listo, será sólido.</p>
+          </div>
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1e1e1e;text-align:center">
+            <p style="margin:0;font-size:13px;color:#888">— The CashClip Team / El Equipo de CashClip</p>
+            <p style="margin:8px 0 0;font-size:11px;color:#444">CashClip · support@absustaininvest.com</p>
+          </div>
+        </div>
+      </div>`,
+    replyTo: null,
+  });
+}
