@@ -2177,6 +2177,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users/:userId", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
+    try {
+      const userId = String(req.params["userId"] ?? "");
+      const u = await storage.getUser(userId);
+      if (!u) { res.status(404).json({ error: "User not found" }); return; }
+      const pendingMap = await storage.getPendingByUserIds([u.id]);
+      res.json({
+        id: u.id,
+        username: u.username,
+        email: u.email ?? null,
+        emailVerified: u.emailVerified ?? false,
+        role: u.role,
+        balance: u.balance,
+        totalEarned: u.totalEarned,
+        pending: pendingMap.get(u.id) ?? 0,
+        createdAt: u.createdAt,
+        profileComplete: u.profileComplete ?? false,
+        country: u.country ?? null,
+        zipCode: u.zipCode ?? null,
+        dateOfBirth: u.dateOfBirth ?? null,
+        gender: u.gender ?? null,
+        employmentStatus: u.employmentStatus ?? null,
+        householdIncome: u.householdIncome ?? null,
+        educationLevel: u.educationLevel ?? null,
+        ethnicity: u.ethnicity ?? null,
+        referredBy: u.referredBy ?? null,
+        isPublisher: u.isPublisher ?? false,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   app.delete("/api/admin/users/:userId", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
       const userId = String(req.params["userId"] ?? "");

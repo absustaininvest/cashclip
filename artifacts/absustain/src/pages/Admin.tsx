@@ -55,6 +55,7 @@ import {
   Ban,
   Sparkles,
   ArrowUpRight,
+  ChevronDown,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -6891,6 +6892,24 @@ interface WithdrawalRow {
   processedAt: string | null;
 }
 
+interface UserProfile {
+  id: string;
+  username: string;
+  email: string | null;
+  emailVerified: boolean;
+  role: string;
+  balance: string;
+  totalEarned: string;
+  pending: number;
+  createdAt: string;
+  profileComplete: boolean;
+  country: string | null;
+  zipCode: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  referredBy: string | null;
+}
+
 function WithdrawalsPanel({ token }: { token: string }) {
   const [rows, setRows] = useState<WithdrawalRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -6899,6 +6918,38 @@ function WithdrawalsPanel({ token }: { token: string }) {
   const [actingId, setActingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<Record<string, "withdrawal" | "profile">>({});
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile | null>>({});
+  const [profileLoading, setProfileLoading] = useState<Record<string, boolean>>({});
+
+  async function fetchUserProfile(userId: string) {
+    if (userProfiles[userId] !== undefined) return;
+    setProfileLoading((p) => ({ ...p, [userId]: true }));
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setUserProfiles((p) => ({ ...p, [userId]: res.ok ? data : null }));
+    } catch {
+      setUserProfiles((p) => ({ ...p, [userId]: null }));
+    } finally {
+      setProfileLoading((p) => ({ ...p, [userId]: false }));
+    }
+  }
+
+  function toggleExpand(w: WithdrawalRow) {
+    if (expandedId === w.id) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(w.id);
+      if (!detailTab[w.id]) setDetailTab((p) => ({ ...p, [w.id]: "withdrawal" }));
+    }
+  }
+
+  function switchTab(wId: string, userId: string, tab: "withdrawal" | "profile") {
+    setDetailTab((p) => ({ ...p, [wId]: tab }));
+    if (tab === "profile") fetchUserProfile(userId);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -7022,80 +7073,136 @@ function WithdrawalsPanel({ token }: { token: string }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((w) => (
-            <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-['Space_Grotesk'] font-bold text-gray-900">{w.username}</span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusBadge[w.status] ?? "bg-gray-100 text-gray-600"}`}>
-                      {w.status}
-                    </span>
+          {rows.map((w) => {
+            const isExpanded = expandedId === w.id;
+            const tab = detailTab[w.id] ?? "withdrawal";
+            const profile = userProfiles[w.userId];
+            return (
+              <div key={w.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Clickable header row */}
+                <button
+                  onClick={() => toggleExpand(w)}
+                  className="w-full flex items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-['Space_Grotesk'] font-bold text-gray-900">{w.username}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusBadge[w.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {w.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">{w.paypalEmail}</p>
+                      <p className="text-xs text-gray-300">{new Date(w.createdAt).toLocaleString()}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-400">{w.paypalEmail}</p>
-                  <p className="text-xs text-gray-300">{new Date(w.createdAt).toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-['Space_Grotesk'] font-bold text-2xl text-emerald-600">${w.totalPayout}</p>
-                  {parseFloat(w.bonusPercent) > 0 && (
-                    <p className="text-xs text-gray-400">${w.amount} + {w.bonusPercent}% bonus</p>
-                  )}
-                </div>
-              </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <p className="font-['Space_Grotesk'] font-bold text-xl text-emerald-600">${w.totalPayout}</p>
+                      {parseFloat(w.bonusPercent) > 0 && (
+                        <p className="text-xs text-gray-400">${w.amount} + {w.bonusPercent}% bonus</p>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                  </div>
+                </button>
 
-              {w.adminNote && (
-                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">Note: {w.adminNote}</p>
-              )}
-              {w.paypalBatchId && (
-                <p className="text-xs text-gray-300">Batch ID: {w.paypalBatchId}</p>
-              )}
-
-              {w.status === "pending" && (
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => handlePayout(w.id)}
-                    disabled={actingId === w.id}
-                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
-                  >
-                    <DollarSign className="w-3.5 h-3.5" />
-                    {actingId === w.id ? "Processing…" : "Pay via PayPal"}
-                  </button>
-                  {!showRejectInput[w.id] ? (
-                    <button
-                      onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: true }))}
-                      disabled={actingId === w.id}
-                      className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold disabled:opacity-50 transition-colors"
-                    >
-                      Reject
-                    </button>
-                  ) : (
-                    <div className="flex gap-2 flex-1 min-w-[200px]">
-                      <input
-                        type="text"
-                        placeholder="Reason (optional)"
-                        value={rejectNote[w.id] ?? ""}
-                        onChange={(e) => setRejectNote((p) => ({ ...p, [w.id]: e.target.value }))}
-                        className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100">
+                    {/* Tab switcher */}
+                    <div className="flex border-b border-gray-100">
                       <button
-                        onClick={() => handleReject(w.id)}
-                        disabled={actingId === w.id}
-                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50"
+                        onClick={() => switchTab(w.id, w.userId, "withdrawal")}
+                        className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${tab === "withdrawal" ? "text-gray-900 border-b-2 border-gray-900" : "text-gray-400 hover:text-gray-700"}`}
                       >
-                        Confirm
+                        Withdrawal
                       </button>
                       <button
-                        onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: false }))}
-                        className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm"
+                        onClick={() => switchTab(w.id, w.userId, "profile")}
+                        className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${tab === "profile" ? "text-gray-900 border-b-2 border-gray-900" : "text-gray-400 hover:text-gray-700"}`}
                       >
-                        Cancel
+                        User Profile
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+
+                    <div className="p-5 space-y-4">
+                      {tab === "withdrawal" ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div><p className="text-xs text-gray-400">Amount</p><p className="font-semibold">${w.amount}</p></div>
+                            <div><p className="text-xs text-gray-400">Total Payout</p><p className="font-semibold text-emerald-600">${w.totalPayout}</p></div>
+                            <div><p className="text-xs text-gray-400">PayPal Email</p><p className="font-medium break-all">{w.paypalEmail}</p></div>
+                            <div><p className="text-xs text-gray-400">Status</p><p className="font-medium capitalize">{w.status}</p></div>
+                            <div><p className="text-xs text-gray-400">Requested</p><p className="font-medium">{new Date(w.createdAt).toLocaleString()}</p></div>
+                            {w.processedAt && <div><p className="text-xs text-gray-400">Processed</p><p className="font-medium">{new Date(w.processedAt).toLocaleString()}</p></div>}
+                          </div>
+                          {w.adminNote && <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">Note: {w.adminNote}</p>}
+                          {w.paypalBatchId && <p className="text-xs text-gray-300 font-mono break-all">Batch: {w.paypalBatchId}</p>}
+
+                          {w.status === "pending" && (
+                            <div className="flex gap-2 flex-wrap pt-1">
+                              <button
+                                onClick={() => handlePayout(w.id)}
+                                disabled={actingId === w.id}
+                                className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+                              >
+                                <DollarSign className="w-3.5 h-3.5" />
+                                {actingId === w.id ? "Processing…" : "Pay via PayPal"}
+                              </button>
+                              {!showRejectInput[w.id] ? (
+                                <button
+                                  onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: true }))}
+                                  disabled={actingId === w.id}
+                                  className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold disabled:opacity-50 transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              ) : (
+                                <div className="flex gap-2 flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Reason (optional)"
+                                    value={rejectNote[w.id] ?? ""}
+                                    onChange={(e) => setRejectNote((p) => ({ ...p, [w.id]: e.target.value }))}
+                                    className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+                                  />
+                                  <button onClick={() => handleReject(w.id)} disabled={actingId === w.id} className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50">Confirm</button>
+                                  <button onClick={() => setShowRejectInput((p) => ({ ...p, [w.id]: false }))} className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm">Cancel</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {profileLoading[w.userId] ? (
+                            <p className="text-gray-400 text-sm py-4 text-center">Loading profile…</p>
+                          ) : profile === null ? (
+                            <p className="text-red-400 text-sm py-4 text-center">Could not load profile</p>
+                          ) : profile ? (
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div><p className="text-xs text-gray-400">Username</p><p className="font-semibold">{profile.username}</p></div>
+                              <div><p className="text-xs text-gray-400">Role</p><p className="font-medium capitalize">{profile.role}</p></div>
+                              <div><p className="text-xs text-gray-400">Email (login)</p><p className="font-medium break-all">{profile.email ?? "—"} {profile.emailVerified ? "✓" : "(unverified)"}</p></div>
+                              <div><p className="text-xs text-gray-400">PayPal (payout)</p><p className="font-medium break-all">{w.paypalEmail}</p></div>
+                              <div><p className="text-xs text-gray-400">Current Balance</p><p className="font-semibold text-emerald-600">${profile.balance}</p></div>
+                              <div><p className="text-xs text-gray-400">Total Earned</p><p className="font-semibold">${profile.totalEarned}</p></div>
+                              <div><p className="text-xs text-gray-400">Pending</p><p className="font-medium">${profile.pending}</p></div>
+                              <div><p className="text-xs text-gray-400">Country</p><p className="font-medium">{profile.country ?? "—"}</p></div>
+                              <div><p className="text-xs text-gray-400">Joined</p><p className="font-medium">{new Date(profile.createdAt).toLocaleDateString()}</p></div>
+                              <div><p className="text-xs text-gray-400">Profile Complete</p><p className="font-medium">{profile.profileComplete ? "Yes" : "No"}</p></div>
+                              {profile.referredBy && <div><p className="text-xs text-gray-400">Referred By</p><p className="font-medium">{profile.referredBy}</p></div>}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
