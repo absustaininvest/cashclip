@@ -1,4 +1,4 @@
-/**
+s/**
  * Unit tests for check-signing-md-sync-lib.ts
  *
  * Run with:  pnpm --filter @workspace/scripts run test
