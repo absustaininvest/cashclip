@@ -265,12 +265,6 @@ type = "unspecified"
 title = "CashClip Full Project — Build 29–39 (Jun 10 2026)"
 
 [[outputs]]
-id = "BjRR3S1uBLIOnTsJACzp3"
-uri = "file://exports/expo-artifacts/v29-files-all.tar.gz"
-type = "unspecified"
-title = "V29 files bundle (layout, RESTORE, app.json, MANIFEST, credentials notes, sentry.properties)"
-
-[[outputs]]
 id = "xobyrvey8IgxqDoxyToqs"
 uri = "file://artifacts/absustain/public/logos/partner-tapjoy-unity.png"
 type = "image"
