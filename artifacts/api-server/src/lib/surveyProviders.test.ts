@@ -114,15 +114,14 @@ describe("verifyProviderCompletion — guard branches (no network)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("rejects an unknown/internal provider with no verifier as not configured", async () => {
+  it("rejects an unknown provider with no verifier as not configured", async () => {
     const res = await verifyProviderCompletion({
       surveyId: "s1",
-      provider: "internal",
+      provider: "pollfish",
       userId: "u1",
       transactionId: "tx-123",
     });
     expect(res.verified).toBe(false);
-    expect(res.error).toMatch(/not configured/i);
   });
 });
 

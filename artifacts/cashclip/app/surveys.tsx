@@ -72,7 +72,6 @@ function ProviderBadge({ provider }: { provider: string }) {
     lucid: "#7B61FF",
     cpx: "#FF4F00",
     bitlabs: "#6C3FC5",
-    internal: Colors.primary,
   };
   const color = colors[provider] || Colors.primary;
   const names: Record<string, string> = {
@@ -81,7 +80,6 @@ function ProviderBadge({ provider }: { provider: string }) {
     lucid: "Lucid",
     cpx: "CPX Research",
     bitlabs: "BitLabs",
-    internal: "CashClip",
   };
   return (
     <View style={[styles.providerBadge, { borderColor: color + "40", backgroundColor: color + "12" }]}>

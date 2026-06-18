@@ -4,7 +4,7 @@ function md5hex(input: string): string {
   return crypto.createHash("md5").update(input).digest("hex");
 }
 
-export type SurveyProviderKey = "pollfish" | "cint" | "lucid" | "cpx" | "bitlabs" | "internal";
+export type SurveyProviderKey = "pollfish" | "cint" | "lucid" | "cpx" | "bitlabs";
 
 export interface ExternalSurvey {
   id: string;

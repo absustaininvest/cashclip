@@ -25,7 +25,6 @@ const PROVIDER_REWARD_RANGES: Record<SurveyProviderKey | string, { min: number; 
   lucid: { min: 0.80, max: 4.00 },
   cpx: { min: 0.20, max: 3.00 },
   bitlabs: { min: 0.20, max: 2.50 },
-  internal: { min: 0.15, max: 0.75 },
 };
 
 export function registerSurveyRoutes(app: Express): void {
