@@ -57,10 +57,6 @@ args = "api-server-typecheck"
 task = "workflow.run"
 args = "absustain-typecheck"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "OTA Production Push"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -128,17 +124,6 @@ args = "pnpm --filter @workspace/absustain run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
-
-[[workflows.workflow]]
-name = "OTA Production Push"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash artifacts/cashclip/scripts/eas-ota-production.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 3001
