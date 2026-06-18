@@ -391,6 +391,9 @@ export function registerSurveyRoutes(app: Express): void {
     res.status(200).json({ status: "received" });
   });
 
+  // §3.1 — CPX webhook: HMAC-SHA256 signature verified via CPX_WEBHOOK_SECRET before
+  // any reward is credited. Unsigned or tampered postbacks return 403. amount_local is
+  // intentionally ignored — it is attacker-controlled and not covered by the signature.
   app.get("/api/surveys/webhook/cpx", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
     const auth = verifyWebhook("cpx", req);
     if (!auth.ok) {
@@ -442,6 +445,9 @@ export function registerSurveyRoutes(app: Express): void {
     res.status(200).send("OK");
   });
 
+  // §3.1 — BitLabs webhook: HMAC-SHA256 signature verified via BITLABS_WEBHOOK_SECRET before
+  // any reward is credited. Only the signed query-string parameters are trusted; req.body is
+  // not covered by the BitLabs HMAC and must never override verified query params.
   app.get("/api/surveys/webhook/bitlabs", webhookRateLimiter, async (req: Request, res: Response): Promise<void> => {
     const auth = verifyWebhook("bitlabs", req);
     if (!auth.ok) {

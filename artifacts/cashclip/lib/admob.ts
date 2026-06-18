@@ -303,10 +303,11 @@ export function isRewardedAdPreloaded(): boolean {
   return isPreloadedAdValid();
 }
 
-// AdMob impression-level ad revenue (PAID event) reports the revenue of a single
-// impression in the account currency's main unit (e.g. 0.0042 = $0.0042). The
-// server stores revenue in micros, so multiply by 1e6. Returns undefined for any
-// missing/invalid value so we never report a bogus number.
+// §3.3 — AdMob impression-level ad revenue (PAID event) reports the revenue of a single
+// impression in the account currency's main unit (e.g. 0.0042 = $0.0042). The server
+// stores revenue in micros (×1,000,000). Returns undefined for any missing/invalid value
+// so we never send a bogus number to the DB. Captured on both showPreloadedAd and
+// loadAndShowOnDemand flows, as well as interstitials — forwarded via trackAdCompletion.
 function paidEventToMicros(event: { value?: number } | null | undefined): number | undefined {
   const value = event?.value;
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return undefined;

@@ -2437,6 +2437,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // §3.3 — Persists per-impression ad revenue from the app. revenueMicros comes from
+  // the AdMob PAID event captured client-side and is always sanitized via
+  // sanitizeRevenueMicros() before touching the DB. The admin revenue panel sums
+  // ad_events.revenue_micros for reconciliation against official AdMob earnings.
   app.post("/api/ad-events", authMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
       const { event, adUnitType, rewardAmount, rewardType, errorCode, errorMessage, durationMs, platform, revenueMicros } = req.body;

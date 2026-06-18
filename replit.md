@@ -4,6 +4,8 @@
 
 pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards app) and AB Sustainability Investments (corporate website).
 
+> **Server-side reference:** `docs/cashclip-server-manuscript.md` — Read before any server-side, OTA, or revenue planning.
+
 ## Secrets — Actual Names in Use
 
 | Secret Name | Purpose |
