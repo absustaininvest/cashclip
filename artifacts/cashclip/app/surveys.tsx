@@ -114,7 +114,7 @@ function ExternalSurveyCard({ survey, onStart }: { survey: ExternalSurvey; onSta
         </View>
         <ProviderBadge provider={survey.provider} />
         <View style={styles.surveyReward}>
-          <Text style={styles.surveyRewardText}>${survey.reward.toFixed(2)}</Text>
+     <Text style={styles.surveyRewardText}>${survey.reward.toFixed(2)}</Text>
         </View>
       </View>
     </Pressable>
