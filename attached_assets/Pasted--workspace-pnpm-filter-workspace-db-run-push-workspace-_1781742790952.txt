@@ -1,0 +1,121 @@
+~/workspace$ pnpm --filter @workspace/db run push
+
+> @workspace/db@0.0.0 push /home/runner/workspace/lib/db
+> drizzle-kit push --config ./drizzle.config.ts
+
+Reading config file '/home/runner/workspace/lib/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[✓] Pulling schema from database...
+[i] No changes detected
+~/workspace$ cd artifacts/cashclip && export EXPO_TOKEN="$EXPO_TOKLAST" && PATH="/tmp/fake-bin:$PATH" pnpm exec eas update --channel production --message "v1.1.0 build 48" --non-interactive
+Found eas-cli in your monorepo dependencies.
+It's recommended to use the "cli.version" field in eas.json to enforce the eas-cli version for your project.
+Learn more: https://github.com/expo/eas-cli#enforcing-eas-cli-version-for-your-project
+
+[expo-cli] Starting Metro Bundler
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% ( 27/171)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% (18/68)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% ( 88/303)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% ( 53/224)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (352/761)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% (220/584)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 28.6% ( 585/1293)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% ( 568/1275)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (1045/1522)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% ( 683/1332)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 60.3% (1294/1672)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 58.8% (1257/1639)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.5% (1671/1818)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.0% (1574/1771)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.6% (2081/2185)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.7% (2076/2181)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2232/2232)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2231/2231)
+[expo-cli] iOS Bundled 41203ms node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js (2232 modules)
+[expo-cli] iOS node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2232/2232)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2231/2231)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2231/2231)
+[expo-cli] Android Bundled 51555ms node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js (2231 modules)
+[expo-cli] Android node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2231/2231)
+[expo-cli] Creating asset map
+[expo-cli] 
+[expo-cli] › Assets (64):
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/100Thin/Outfit_100Thin.ttf (54.6 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/200ExtraLight/Outfit_200ExtraLight.ttf (54.9 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/300Light/Outfit_300Light.ttf (54.9 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/400Regular/Outfit_400Regular.ttf (54.9 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf (54.8 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf (55.5 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/700Bold/Outfit_700Bold.ttf (55.4 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/800ExtraBold/Outfit_800ExtraBold.ttf (55.3 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo-google-fonts+outfit@0.4.3/node_modules/@expo-google-fonts/outfit/900Black/Outfit_900Black.ttf (55.4 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.ttf (130 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.ttf (66.2 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.ttf (13.5 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf (55.6 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf (166 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.ttf (134 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.ttf (33.7 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf (203 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.ttf (209 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.ttf (68 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.ttf (424 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.ttf (314 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.ttf (57 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf (390 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf (1.31 MB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf (357 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.ttf (69.4 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.ttf (54.1 kB)
+[expo-cli] ../../node_modules/.pnpm/@expo+vector-icons@15.1.1_expo-font@14.0.12_expo@54.0.35_react-native@0.81.5_@babel+cor_e77cb8d2c5ebcdd004973413c2e800d6/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.ttf (25.8 kB)
+[expo-cli] ../../node_modules/.pnpm/@react-navigation+elements@2.9.15_@react-navigation+native@7.2.2_react-native@0.81.5_@b_5ddf09d770a2c92a7e30d15db26d068d/node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.png (653 B)
+[expo-cli] ../../node_modules/.pnpm/@react-navigation+elements@2.9.15_@react-navigation+native@7.2.2_react-native@0.81.5_@b_5ddf09d770a2c92a7e30d15db26d068d/node_modules/@react-navigation/elements/lib/module/assets/back-icon.png (8 variations | 359 B)
+[expo-cli] ../../node_modules/.pnpm/@react-navigation+elements@2.9.15_@react-navigation+native@7.2.2_react-native@0.81.5_@b_5ddf09d770a2c92a7e30d15db26d068d/node_modules/@react-navigation/elements/lib/module/assets/clear-icon.png (4 variations | 425 B)
+[expo-cli] ../../node_modules/.pnpm/@react-navigation+elements@2.9.15_@react-navigation+native@7.2.2_react-native@0.81.5_@b_5ddf09d770a2c92a7e30d15db26d068d/node_modules/@react-navigation/elements/lib/module/assets/close-icon.png (4 variations | 235 B)
+[expo-cli] ../../node_modules/.pnpm/@react-navigation+elements@2.9.15_@react-navigation+native@7.2.2_react-native@0.81.5_@b_5ddf09d770a2c92a7e30d15db26d068d/node_modules/@react-navigation/elements/lib/module/assets/search-icon.png (7 variations | 592 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/arrow_down.png (9.46 kB)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/error.png (469 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/file.png (138 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/forward.png (188 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/pkg.png (364 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/sitemap.png (465 B)
+[expo-cli] ../../node_modules/.pnpm/expo-router@6.0.24_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__c289c0218f446f5969794daa94e36b65/node_modules/expo-router/assets/unmatched.png (4.75 kB)
+[expo-cli] assets/images/chip/chip-celebrate.png (130 kB)
+[expo-cli] assets/images/chip/chip-sad.png (150 kB)
+[expo-cli] assets/images/chip/chip-sleep.png (111 kB)
+[expo-cli] assets/images/chip/chip-think.png (152 kB)
+[expo-cli] assets/images/chip/chip-wave.png (145 kB)
+[expo-cli] 
+[expo-cli] › ios bundles (2):
+[expo-cli] _expo/static/js/ios/entry-d5499f74fcd820bbc5a7c790ac6f2669.hbc (5.32 MB)
+[expo-cli] _expo/static/js/ios/entry-d5499f74fcd820bbc5a7c790ac6f2669.hbc.map (15.5 MB)
+[expo-cli] 
+[expo-cli] › android bundles (2):
+[expo-cli] _expo/static/js/android/entry-a2889ad2fd1c5576d735958d86b834b5.hbc (5.32 MB)
+[expo-cli] _expo/static/js/android/entry-a2889ad2fd1c5576d735958d86b834b5.hbc.map (15.5 MB)
+[expo-cli] 
+[expo-cli] › Files (2):
+[expo-cli] assetmap.json (45.2 kB)
+[expo-cli] metadata.json (7.68 kB)
+[expo-cli] 
+[expo-cli] Exported: dist
+✔ Exported bundle(s)
+✔ Uploaded assetmap.json 
+✔ Uploaded 2 app bundles
+✔ Uploading assets skipped - no new assets found
+ℹ 60 iOS assets, 60 Android assets (maximum: 2000 total per update). Learn more about asset limits: https://expo.fyi/eas-update-asset-limits
+✔ Computed project fingerprints
+✔ Published!
+Branch             production
+Runtime version    1.0.0
+Platform           android, ios
+Update group ID    56d312bd-942b-43d5-9f37-bbebd7da63e1
+Android update ID  019ed824-732a-7c89-903e-ab5612210a27
+iOS update ID      019ed824-732a-7b36-8c0e-da70159bdc53
+Message            v1.1.0 build 48
+Commit             d45c8bf6109e9a79b62be99c34da6a3133627932
+EAS Dashboard      https://expo.dev/accounts/absustainabilityinvestments-owner/projects/cashclip/updates/56d312bd-942b-43d5-9f37-bbebd7da63e1
+
+~/.../artifacts/cashclip$ 
