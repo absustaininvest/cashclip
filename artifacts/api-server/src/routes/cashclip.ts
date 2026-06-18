@@ -144,8 +144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // The app calls this on startup; if the server returns 426 the ForceUpdateGate
   // blocks the user until they update.
   app.get("/api/app/version", (_req, res) => {
-    const minVersion = process.env.MIN_APP_VERSION ?? "1.1.0";
-    const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.1.0";
+    const minVersion = process.env.MIN_APP_VERSION ?? "1.0.0";
+    const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.0.0";
     const maintenance = process.env.MAINTENANCE_MODE === "true";
     const maintenanceMessage = process.env.MAINTENANCE_MESSAGE ?? "We're upgrading our systems to serve you better. We'll be back shortly — thank you for your patience!";
     res.json({ minVersion, currentVersion, maintenance, maintenanceMessage });
@@ -658,7 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       typeof process.env.BUILD_TIME === "string" && process.env.BUILD_TIME
         ? process.env.BUILD_TIME
         : null;
-    const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.1.0";
+    const currentVersion = process.env.CURRENT_APP_VERSION ?? "1.0.0";
 
     res.json({
       checkedAt,

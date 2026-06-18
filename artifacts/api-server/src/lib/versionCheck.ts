@@ -41,7 +41,7 @@ const EXEMPT_EXACT = new Set(["/api", "/api/", "/api/about", "/api/privacy", "/a
 const WEBHOOK_PATTERN = /\/webhook\//;
 
 export function appVersionMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const minVersion: string = process.env.MIN_APP_VERSION ?? "1.1.0";
+  const minVersion: string = process.env.MIN_APP_VERSION ?? "1.0.0";
 
   // Webhooks are provider-to-server calls — no app version applies.
   if (WEBHOOK_PATTERN.test(req.path)) return next();

@@ -66,6 +66,9 @@ args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
 
 [[ports]]
+localPort = 3000
+
+[[ports]]
 localPort = 3001
 externalPort = 80
 
