@@ -62,7 +62,7 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 
 - **Framework**: Expo (SDK 54) with expo-router
 - **Auth**: JWT stored in AsyncStorage via custom `AuthContext`
-- **Build number**: iOS buildNumber 47, Android versionCode 44, version 1.1.0 (runtimeVersion 1.0.0)
+- **Build number**: iOS buildNumber 47, Android versionCode 44, version 1.1.0 (runtimeVersion 1.1.0)
 - **Ad mediation**: Google AdMob is the rewarded-video mediation ORCHESTRATOR (`react-native-google-mobile-ads`). Unity, ironSource, Pangle, and Chartboost are retained as DEMAND SOURCES, each wired as an AdMob mediation adapter (Android Gradle dep via `plugins/withAndroid*Adapter.js`, iOS pod via `app.json` `extraPods`) — NOT via LevelPlay. The `ironsource-mediation` (LevelPlay) RN SDK was removed Jun 16 2026. Rewarded rewards credit server-side only (AdMob SSV `GET /api/admob/ssv` + begin/complete fallback sharing the `rewarded_ad` cap).
 - **Bundle ID**: `app.replit.cashclip`
 - **EAS Build**: `scripts/eas-build-ios.sh` — reads `EXPO_TOKLAST` secret
