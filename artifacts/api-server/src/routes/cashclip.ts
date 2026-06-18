@@ -2336,6 +2336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/broadcast-email", adminMiddleware, async (req: AuthRequest, res): Promise<void> => {
     try {
+      const messageText: string | undefined = typeof req.body?.messageText === "string" && req.body.messageText.trim().length > 0
+        ? req.body.messageText.trim()
+        : undefined;
       let offset = 0;
       const limit = 200;
       let sent = 0;
@@ -2347,7 +2350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (users.length === 0) break;
         for (const user of users) {
           if (user.email && user.email.trim().length > 0) {
-            sendBroadcastEmail({ to: user.email.trim(), username: user.username });
+            sendBroadcastEmail({ to: user.email.trim(), username: user.username, messageText });
             sent++;
           } else {
             skipped++;

@@ -2332,13 +2332,24 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
   const [broadcastResult, setBroadcastResult] = useState<{ sent: number; skipped: number; total: number } | null>(null);
   const [broadcastError, setBroadcastError] = useState("");
   const [broadcastConfirm, setBroadcastConfirm] = useState(false);
+  const defaultBroadcastMessage = `We owe you honesty. We've been working hard on updates to improve your experience, but in doing so, we moved faster than we should have and created instability instead of progress.
+
+So we're going back to the foundation. We're rebuilding the right way — clean, verified, and built around what actually works for you. This will take approximately two weeks.
+
+If you choose to stay, thank you. We're doing this for you. If you need to step away, we completely understand — we will always be here if that's what you choose to do right now.
+
+CashClip is backed by real networks that require real verification. We can't skip that process, and we won't. But when it's done, it will be solid.
+
+— The CashClip Team`;
+  const [broadcastMessage, setBroadcastMessage] = useState(defaultBroadcastMessage);
   async function sendBroadcast() {
     setBroadcastLoading(true);
     setBroadcastError("");
     try {
       const res = await fetch("/api/admin/broadcast-email", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ messageText: broadcastMessage }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send");
@@ -3426,38 +3437,54 @@ export function CashClipUsersPanel({ token, onNavigateToPublishers }: { token: s
           </div>
           <div>
             <h3 className="font-['Space_Grotesk'] text-base font-bold text-gray-900">Send Message to All Users</h3>
-            <p className="text-gray-400 text-xs">Sends the community update email (English + Spanish) to every registered user with an email address</p>
+            <p className="text-gray-400 text-xs">Edit the message below, then send to every registered user with an email address</p>
           </div>
         </div>
         {broadcastResult ? (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4">
             <p className="text-green-700 text-sm font-semibold">Sent successfully</p>
             <p className="text-green-600 text-xs mt-1">{broadcastResult.sent} emails sent · {broadcastResult.skipped} skipped (no email on file) · {broadcastResult.total} total users</p>
-            <button onClick={() => setBroadcastResult(null)} className="mt-2 text-xs text-green-500 underline">Dismiss</button>
-          </div>
-        ) : broadcastConfirm ? (
-          <div className="space-y-3">
-            <p className="text-gray-500 text-sm">This will send the community update email to all registered users. This cannot be undone.</p>
-            {broadcastError && <p className="text-red-400 text-xs">{broadcastError}</p>}
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setBroadcastConfirm(false); setBroadcastError(""); }}
-                className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-500 text-sm hover:text-gray-900 transition-colors"
-              >Cancel</button>
-              <button
-                onClick={sendBroadcast}
-                disabled={broadcastLoading}
-                className="flex-1 py-2 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50"
-              >{broadcastLoading ? "Sending…" : "Confirm Send"}</button>
-            </div>
+            <button onClick={() => { setBroadcastResult(null); setBroadcastMessage(defaultBroadcastMessage); }} className="mt-2 text-xs text-green-500 underline">Dismiss</button>
           </div>
         ) : (
-          <button
-            onClick={() => setBroadcastConfirm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-200 rounded-xl text-blue-600 text-sm font-medium hover:bg-blue-200 transition-colors"
-          >
-            <Send className="w-4 h-4" /> Send to All Users
-          </button>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Message (English — editable)</label>
+              <textarea
+                value={broadcastMessage}
+                onChange={(e) => { setBroadcastMessage(e.target.value); setBroadcastConfirm(false); }}
+                rows={10}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-blue-300"
+                placeholder="Write your message here…"
+              />
+              <p className="text-xs text-gray-400 mt-1">The Spanish translation will be sent automatically alongside this message.</p>
+            </div>
+            {broadcastError && <p className="text-red-400 text-xs">{broadcastError}</p>}
+            {broadcastConfirm ? (
+              <div className="space-y-2">
+                <p className="text-gray-500 text-sm font-medium">Send this message to all users? This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setBroadcastConfirm(false); setBroadcastError(""); }}
+                    className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-500 text-sm hover:text-gray-900 transition-colors"
+                  >Cancel</button>
+                  <button
+                    onClick={sendBroadcast}
+                    disabled={broadcastLoading || !broadcastMessage.trim()}
+                    className="flex-1 py-2 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  >{broadcastLoading ? "Sending…" : "Confirm Send"}</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setBroadcastConfirm(true)}
+                disabled={!broadcastMessage.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-200 rounded-xl text-blue-600 text-sm font-medium hover:bg-blue-200 transition-colors disabled:opacity-40"
+              >
+                <Send className="w-4 h-4" /> Send to All Users
+              </button>
+            )}
+          </div>
         )}
       </div>
 
