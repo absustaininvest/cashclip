@@ -678,8 +678,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── In-memory ad fill state (client-reported) ────────────────────────────
-  // The CashClip app POSTs the rewarded-fill state whenever LevelPlay fires an
-  // onAdAvailable / onAdUnavailable event.  We keep only the most recent report
+  // The CashClip app POSTs the rewarded-fill state whenever AdMob fires an
+  // onAdLoaded / onAdFailedToLoad event.  We keep only the most recent report
   // (fill is a property of the ad network, not of individual users).
   const adFillState: {
     rewardedFillAvailable: boolean | null;
@@ -690,8 +690,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /**
    * POST /api/earn/ad-fill
    *
-   * The CashClip app calls this whenever the LevelPlay rewarded-fill state
-   * changes (onAdAvailable / onAdUnavailable).  Requires a valid user JWT.
+   * The CashClip app calls this whenever the AdMob rewarded-fill state
+   * changes (onAdLoaded / onAdFailedToLoad).  Requires a valid user JWT.
    * Body: { rewardedFillAvailable: boolean }
    */
   app.post("/api/earn/ad-fill", authMiddleware, adFillRateLimiter, (req: AuthRequest, res) => {
@@ -715,27 +715,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *
    * Returns the native-adapter presence state for the live app build.
    * Because native module presence can only be confirmed on-device, the server
-   * reflects operator-set env vars (AD_LP_NATIVE, AD_UNITY_NATIVE) that should
-   * be toggled to "true" after verifying a native build has the adapters
-   * compiled in.  Defaults to false (OTA / unknown) when not set.
+   * reflects the operator-set env var AD_ADMOB_NATIVE that should be toggled
+   * to "true" after verifying a native build has the AdMob SDK compiled in.
+   * Defaults to false (OTA / unknown) when not set.
    *
    * Also includes client-reported fill state from the most recent
    * POST /api/earn/ad-fill call, surfaced here for the admin hub.
    *
-   * Response shape: { lpNative, unityNative, adSystemActive, rewardedFillAvailable, fillReportedAt }
-   *   lpNative               — LevelPlay (IronSource) native module is in the live build
-   *   unityNative            — Unity Ads native module is in the live build
-   *   adSystemActive         — both native modules present AND IRONSOURCE_APP_KEY configured
+   * Response shape: { admobNative, adSystemActive, rewardedFillAvailable, fillReportedAt }
+   *   admobNative            — AdMob native SDK is confirmed in the live build (AD_ADMOB_NATIVE=true)
+   *   adSystemActive         — admobNative is true (AdMob is the sole orchestrator)
    *   rewardedFillAvailable  — most recent client-reported fill state (null = no report yet)
    *   fillReportedAt         — unix ms timestamp of last fill report (null = no report yet)
    */
   app.get("/api/admin/ad-status", adminMiddleware, (_req, res) => {
     const parseBool = (v: string | undefined): boolean =>
       v === "1" || v === "true" || v === "yes" || v === "on";
-    const lpNative = parseBool(process.env.AD_LP_NATIVE);
-    const unityNative = parseBool(process.env.AD_UNITY_NATIVE);
-    const ironsourceConfigured = Boolean(process.env.IRONSOURCE_APP_KEY);
-    const adSystemActive = lpNative && unityNative && ironsourceConfigured;
+    const admobNative = parseBool(process.env.AD_ADMOB_NATIVE);
+    const adSystemActive = admobNative;
 
     // Fall back to the DB-persisted value (loaded into the runtime-settings cache
     // at startup) when the in-memory state has not been set yet this process
@@ -752,8 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     res.json({
-      lpNative,
-      unityNative,
+      admobNative,
       adSystemActive,
       rewardedFillAvailable,
       fillReportedAt,

@@ -8,9 +8,7 @@ import {
   Dimensions,
   Platform,
   Modal,
-  ActivityIndicator,
   Alert,
-  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -35,19 +33,11 @@ import { useRouter, useFocusEffect } from "expo-router";
 import Colors from "@/constants/colors";
 import Chipley from "@/components/Chipley";
 import SponsoredSection from "@/components/SponsoredSection";
-import { adVideos, AD_CATEGORIES, AD_CATEGORY_EMOJI } from "@/lib/video-data";
 import { useLanguage } from "@/lib/LanguageContext";
-import { isAdMobReady, showRewardedAd, preloadRewardedAd, isRewardedAdPreloaded } from "@/lib/admob";
 import { useAuth } from "@/lib/AuthContext";
 import { useCelebration } from "@/lib/CelebrationContext";
-import {
-  trackAdImpression,
-  trackAdCompletion,
-  trackAdRewardEarned,
-} from "@/lib/ad-analytics";
 import type { Translations } from "@/lib/i18n";
 import {
-  recordAdWatch,
   getUserStats,
   performDailyCheckin,
   getDailyCheckinInfo,
@@ -62,8 +52,6 @@ import {
   claimMission,
   recordCheckin,
   fetchCheckinStatus,
-  beginAdView,
-  completeAdView,
   beginSpin,
   completeSpin,
   claimAllReady,
@@ -85,52 +73,6 @@ import {
 import { dollarsToPoints } from "@/lib/points";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const DAILY_GOAL = 20;
-
-// Module-level store so the earned-pts badge survives tab navigation
-// (component state resets on unmount; these do not).
-let _lastWatchedAdId: string | null = null;
-let _lastWatchedAdPts: number = 0;
-
-// Session ID generated once per JS-engine lifetime (= once per cold launch).
-// On a warm resume the same process is reused, so _sessionId is unchanged;
-// on a cold restart the module is re-evaluated and a new ID is minted.
-// Persisting the badge to AsyncStorage alongside this ID lets us detect
-// cold launches and silently discard stale badge values.
-const _sessionId: string =
-  Date.now().toString(36) + Math.random().toString(36).slice(2);
-const _AD_BADGE_KEY = "cashclip_earn_badge_session";
-
-async function _persistBadge(adId: string | null, pts: number): Promise<void> {
-  try {
-    const payload = JSON.stringify({ sid: _sessionId, adId, pts });
-    const { default: AS } = await import(
-      "@react-native-async-storage/async-storage"
-    );
-    await AS.setItem(_AD_BADGE_KEY, payload);
-  } catch {
-    // Non-critical — badge is still held in the module var for this session
-  }
-}
-
-async function _loadBadge(): Promise<{ adId: string | null; pts: number }> {
-  try {
-    const { default: AS } = await import(
-      "@react-native-async-storage/async-storage"
-    );
-    const raw = await AS.getItem(_AD_BADGE_KEY);
-    if (!raw) return { adId: null, pts: 0 };
-    const { sid, adId, pts } = JSON.parse(raw) as {
-      sid: string;
-      adId: string | null;
-      pts: number;
-    };
-    if (sid !== _sessionId) return { adId: null, pts: 0 };
-    return { adId, pts };
-  } catch {
-    return { adId: null, pts: 0 };
-  }
-}
 
 // Explain to the user why a server-rejected mission claim didn't credit, so a
 // failed claim is visible rather than silently swallowed.
@@ -167,204 +109,7 @@ const WHEEL_SEGMENTS = [
 // only shown until GET /api/earnings/checkin-status returns the live ladder.
 const DAY_REWARDS_FALLBACK = [100, 120, 140, 160, 180, 200, 240];
 
-function AdCard({
-  ad,
-  onWatch,
-  disabled,
-  adPreloaded,
-  readyLabel,
-  earnedPts,
-}: {
-  ad: (typeof adVideos)[0];
-  onWatch: (ad: (typeof adVideos)[0]) => void;
-  disabled?: boolean;
-  adPreloaded?: boolean;
-  readyLabel?: string;
-  earnedPts?: number;
-}) {
-  const scale = useSharedValue(1);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View style={animStyle}>
-      <Pressable
-        onPressIn={() => {
-          if (!disabled) scale.value = withSpring(0.97);
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1);
-        }}
-        onPress={() => !disabled && onWatch(ad)}
-        style={[styles.adCard, disabled && { opacity: 0.5 }]}
-        disabled={disabled}
-      >
-        <View style={[styles.adThumbnail, { backgroundColor: ad.color }]}>
-          <Feather name="play-circle" size={32} color="#fff" />
-          <View style={styles.adDuration}>
-            <Text style={styles.adDurationText}>{ad.duration}s</Text>
-          </View>
-        </View>
-        <View style={styles.adInfo}>
-          <Text style={styles.adBrand}>{ad.brand}</Text>
-          <Text style={styles.adDescription} numberOfLines={1}>
-            {ad.description}
-          </Text>
-          <View style={styles.adReward}>
-            <Ionicons name="star" size={13} color={Colors.primary} />
-            <Text style={styles.adRewardText}>🎉 Check Wallet!</Text>
-          </View>
-        </View>
-        <View style={styles.watchBtnContainer}>
-          {earnedPts != null ? (
-            <View style={styles.adEarnedBadge}>
-              <Feather name="check" size={12} color={Colors.primary} />
-              <Text style={styles.adEarnedText}>🎉 Check your Wallet!</Text>
-            </View>
-          ) : (
-            <>
-              {adPreloaded && (
-                <View style={styles.instantPlayBadge}>
-                  <View style={styles.instantPlayDot} />
-                  <Text style={styles.instantPlayText}>{readyLabel || "Ready"}</Text>
-                </View>
-              )}
-              <View style={[styles.watchBtn, adPreloaded && styles.watchBtnReady]}>
-                <Ionicons name="play" size={16} color={Colors.background} />
-              </View>
-            </>
-          )}
-        </View>
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-function WatchingModal({
-  visible,
-  ad,
-  onComplete,
-  onClose,
-  t,
-}: {
-  visible: boolean;
-  ad: (typeof adVideos)[0] | null;
-  onComplete: (reward: number) => void;
-  onClose: () => void;
-  t: Translations;
-}) {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [completed, setCompleted] = useState(false);
-  const progressAnim = useSharedValue(0);
-  const coinScale = useSharedValue(0);
-  const coinRotate = useSharedValue(0);
-
-  useEffect(() => {
-    if (visible && ad) {
-      setTimeLeft(ad.duration);
-      setCompleted(false);
-      progressAnim.value = 0;
-      progressAnim.value = withTiming(1, {
-        duration: ad.duration * 1000,
-        easing: Easing.linear,
-      });
-    }
-  }, [visible, ad]);
-
-  useEffect(() => {
-    if (!visible || !ad) return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setCompleted(true);
-          coinScale.value = withSpring(1, { damping: 8, stiffness: 120 });
-          coinRotate.value = withRepeat(
-            withTiming(360, { duration: 2000, easing: Easing.linear }),
-            -1,
-            false
-          );
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [visible, ad]);
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressAnim.value * 100}%`,
-  }));
-
-  const coinStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: coinScale.value },
-      { rotateY: `${coinRotate.value}deg` },
-    ],
-  }));
-
-  if (!ad) return null;
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View
-            style={[styles.watchingThumbnail, { backgroundColor: ad.color }]}
-          >
-            {!completed ? (
-              <>
-                <Feather
-                  name="monitor"
-                  size={48}
-                  color="rgba(255,255,255,0.9)"
-                />
-                <Text style={styles.watchingBrand}>{ad.brand}</Text>
-                <Text style={styles.watchingDesc}>{ad.description}</Text>
-              </>
-            ) : (
-              <>
-                <Animated.View style={coinStyle}>
-                  <Chipley pose="celebrate" size={92} />
-                </Animated.View>
-                <Text style={styles.rewardEarned}>{t.earn.rewardEarned}</Text>
-              </>
-            )}
-          </View>
-
-          <View style={styles.progressContainer}>
-            <Animated.View style={[styles.progressBar, progressStyle]} />
-          </View>
-
-          {!completed ? (
-            <View style={styles.watchingFooter}>
-              <Text style={styles.timeLeftText}>{timeLeft}{t.earn.sRemaining}</Text>
-              <ActivityIndicator color={Colors.primary} size="small" />
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => {
-                onComplete(ad.reward);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }}
-              style={styles.claimButton}
-            >
-              <LinearGradient
-                colors={[Colors.primary, Colors.primaryDark]}
-                style={styles.claimGradient}
-              >
-                <Text style={styles.claimText}>{t.earn.claimReward}</Text>
-              </LinearGradient>
-            </Pressable>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 function SpinRewardModal({
   visible,
@@ -725,13 +470,6 @@ export default function EarnScreen() {
   const { user } = useAuth();
   const { celebrate } = useCelebration();
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [watchingAd, setWatchingAd] = useState<(typeof adVideos)[0] | null>(
-    null
-  );
-  const [showModal, setShowModal] = useState(false);
-  // Server-issued challenge token for an in-progress fallback ad watch, so
-  // completeAdView() can prove the watch began on the server (anti-fraud).
-  const adChallengeRef = useRef<string | null>(null);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [checkinStreak, setCheckinStreak] = useState(0);
   const [dayRewards, setDayRewards] = useState<number[]>(DAY_REWARDS_FALLBACK);
@@ -752,8 +490,6 @@ export default function EarnScreen() {
   const [pendingState, setPendingState] = useState<PendingState | null>(null);
   const [nextSpinTime, setNextSpinTime] = useState<number | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
-  const [lastWatchedAdId, setLastWatchedAdId] = useState<string | null>(_lastWatchedAdId);
-  const [lastWatchedAdPts, setLastWatchedAdPts] = useState<number>(_lastWatchedAdPts);
   const [lastGameEarnedPts, setLastGameEarnedPts] = useState<number | null>(null);
   const [lastCheckinEarnedPts, setLastCheckinEarnedPts] = useState<number | null>(null);
   const pendingPtsBeforeGamesRef = useRef<number | null>(null);
@@ -802,27 +538,8 @@ export default function EarnScreen() {
 
   useEffect(() => {
     loadAll();
-    // Validate the persisted badge against the current session ID.  On a cold
-    // launch the stored session ID won't match _sessionId (new ID was minted),
-    // so the badge is treated as absent.  On a warm resume the IDs match and
-    // the badge is left as-is (module vars already restored it via useState).
-    _loadBadge().then(({ adId, pts }) => {
-      if (adId !== _lastWatchedAdId || pts !== _lastWatchedAdPts) {
-        _lastWatchedAdId = adId;
-        _lastWatchedAdPts = pts;
-        setLastWatchedAdId(adId);
-        setLastWatchedAdPts(pts);
-      }
-    });
   }, []);
 
-  // Warm a rewarded ad once we know who the user is. The SSV identity itself is
-  // attached centrally in AuthContext, so this preload already carries it.
-  useEffect(() => {
-    if (user?.id && isAdMobReady()) {
-      preloadRewardedAd();
-    }
-  }, [user?.id]);
 
   // Schedule (or clear) the streak-break reminder whenever the check-in state
   // is known. Uses the already-translated strings so the notification matches
@@ -963,108 +680,7 @@ export default function EarnScreen() {
     }, 4200);
   }, [spinAvailable, isSpinning, wheelRotation]);
 
-  const [adLoading, setAdLoading] = useState(false);
-  const [adError, setAdError] = useState<string | null>(null);
-  const [adPreloaded, setAdPreloaded] = useState(false);
-  const [selectedAdCategory, setSelectedAdCategory] = useState<string>("All");
 
-  useEffect(() => {
-    setAdPreloaded(isRewardedAdPreloaded());
-    const interval = setInterval(() => {
-      setAdPreloaded(isRewardedAdPreloaded());
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleWatchAd = useCallback(async (ad: (typeof adVideos)[0]) => {
-    if (adLoading) return;
-
-    _lastWatchedAdId = null;
-    _lastWatchedAdPts = 0;
-    setLastWatchedAdId(null);
-    setLastWatchedAdPts(0);
-    setLastCheckinEarnedPts(null);
-    _persistBadge(null, 0);
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    if (isAdMobReady()) {
-      setAdLoading(true);
-      setAdPreloaded(false);
-      // Get the server challenge BEFORE showing the ad so a completed watch can pay
-      // via the secure begin→complete path (Google's SSV callback isn't landing in
-      // production). The server decides the amount and shares the rewarded_ad cap.
-      const begin = await beginAdView();
-      try {
-        const result = await showRewardedAd();
-        setAdPreloaded(isRewardedAdPreloaded());
-        if (result.rewarded) {
-          await recordAdWatch();
-          await recordEarnAction("ad_view", "Video ad");
-          if (begin.ok) {
-            await completeAdView(begin.challengeToken, "Watched video");
-          }
-          _lastWatchedAdId = ad.id;
-          _lastWatchedAdPts = Math.round(ad.reward * 1000);
-          setLastWatchedAdId(ad.id);
-          setLastWatchedAdPts(Math.round(ad.reward * 1000));
-          _persistBadge(ad.id, Math.round(ad.reward * 1000));
-          await loadAll();
-          balancePulse.value = withSequence(
-            withSpring(1.1, { damping: 4 }),
-            withSpring(1, { damping: 8 })
-          );
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (result.timedOut) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          setAdError("The ad took too long to load. Please check your connection and try again.");
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          setAdError("No ads available right now. Please try again in a moment.");
-        }
-      } catch {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setAdError("Could not load the ad. Please try again.");
-      } finally {
-        setAdLoading(false);
-      }
-      return;
-    }
-
-    // AdMob native build pending — show the in-app ad modal directly.
-    // Kick off a server challenge before the modal opens so completeAdView()
-    // can issue a proper earn token when the user finishes watching.
-    setAdLoading(false);
-    const adBegin = await beginAdView();
-    if (adBegin.ok) adChallengeRef.current = adBegin.challengeToken;
-    setWatchingAd(ad);
-    setShowModal(true);
-  }, [adLoading, loadAll, t]);
-
-  const handleComplete = useCallback(async (reward: number) => {
-    trackAdImpression("rewarded");
-    trackAdCompletion("rewarded", watchingAd ? watchingAd.duration * 1000 : undefined);
-    trackAdRewardEarned("rewarded", reward, "rewarded");
-    await recordAdWatch();
-    const tok = adChallengeRef.current;
-    adChallengeRef.current = null;
-    const earned = await recordEarnAction("ad_view", "Video ad");
-    if (tok) await completeAdView(tok, "Watched video");
-    if (watchingAd) {
-      _lastWatchedAdId = watchingAd.id;
-      _lastWatchedAdPts = Math.round(watchingAd.reward * 1000);
-      setLastWatchedAdId(watchingAd.id);
-      setLastWatchedAdPts(Math.round(watchingAd.reward * 1000));
-      _persistBadge(watchingAd.id, Math.round(watchingAd.reward * 1000));
-    }
-    setShowModal(false);
-    setWatchingAd(null);
-    if (earned) await loadAll();
-    balancePulse.value = withSequence(
-      withSpring(1.1, { damping: 4 }),
-      withSpring(1, { damping: 8 })
-    );
-  }, [watchingAd, loadAll]);
 
   const handleClaimDaily = useCallback(
     async (id: string) => {
@@ -1168,7 +784,6 @@ export default function EarnScreen() {
 
   if (!fontsLoaded || !stats) return null;
 
-  const dailyProgress = Math.min(stats.dailyAdsWatched / DAILY_GOAL, 1);
   const webTopPad = Platform.OS === "web" ? 67 : 0;
   const webBottomPad = Platform.OS === "web" ? 34 : 0;
 
@@ -1595,106 +1210,11 @@ export default function EarnScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* Daily Goal */}
-        <View style={styles.dailyGoal}>
-          <View style={styles.goalHeader}>
-            <Text style={styles.goalTitle}>{t.earn.dailyAdGoal}</Text>
-            <Text style={styles.goalCount}>
-              {stats.dailyAdsWatched}/{DAILY_GOAL}
-            </Text>
-          </View>
-          <Text style={{ fontFamily: "Outfit_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
-            Watch ads to earn · up to 30 ads/day
-          </Text>
-          <View style={styles.goalBarBg}>
-            <LinearGradient
-              colors={[Colors.primary, Colors.accent]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.goalBarFill,
-                { width: `${dailyProgress * 100}%` },
-              ]}
-            />
-          </View>
-          {dailyProgress >= 1 && (
-            <View style={styles.goalComplete}>
-              <Ionicons
-                name="checkmark-circle"
-                size={16}
-                color={Colors.primary}
-              />
-              <Text style={styles.goalCompleteText}>
-                {t.earn.dailyGoalReached}
-              </Text>
-            </View>
-          )}
-        </View>
-
         {/* Sponsored Campaigns */}
         <SponsoredSection />
 
-        {/* Ads Section */}
-        <Text style={styles.adsSectionTitle}>{t.earn.availableAds}</Text>
-
-        {/* Category Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {[
-            { key: "All", emoji: "", label: t.earn.categoryAll },
-            ...AD_CATEGORIES.map((cat) => ({
-              key: cat,
-              emoji: AD_CATEGORY_EMOJI[cat],
-              label: t.earn.adCategoryLabel[cat],
-            })),
-          ].map((cat) => (
-            <Pressable
-              key={cat.key}
-              onPress={() => setSelectedAdCategory(cat.key)}
-              style={[styles.categoryChip, selectedAdCategory === cat.key && styles.categoryChipActive]}
-            >
-              <Text style={[styles.categoryChipText, selectedAdCategory === cat.key && styles.categoryChipTextActive]}>
-                {cat.emoji}{cat.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {(() => {
-          const filtered = selectedAdCategory === "All"
-            ? adVideos
-            : adVideos.filter((ad) => ad.category === selectedAdCategory);
-          return filtered.length > 0 ? (
-            filtered.map((ad, i) => (
-              <View key={ad.id} style={{ marginBottom: i < filtered.length - 1 ? 10 : 0 }}>
-                <AdCard
-                  ad={ad}
-                  onWatch={handleWatchAd}
-                  disabled={adLoading}
-                  adPreloaded={adPreloaded}
-                  readyLabel={t.earn.adReady}
-                  earnedPts={lastWatchedAdId === ad.id ? lastWatchedAdPts : undefined}
-                />
-              </View>
-            ))
-          ) : (
-            <Text style={styles.categoryEmptyText}>{t.earn.categoryEmpty}</Text>
-          );
-        })()}
         <View style={{ height: 48 }} />
       </ScrollView>
-
-      <WatchingModal
-        visible={showModal}
-        ad={watchingAd}
-        onComplete={handleComplete}
-        onClose={() => setShowModal(false)}
-        t={t}
-      />
 
       <SpinRewardModal
         visible={showSpinReward}
@@ -1728,29 +1248,6 @@ export default function EarnScreen() {
         t={t}
       />
 
-      <Modal visible={adLoading} transparent animationType="fade">
-        <View style={styles.adLoadingOverlay}>
-          <View style={styles.adLoadingBox}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.adLoadingText}>{t.earn.loadingAd}</Text>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={!!adError} transparent animationType="fade">
-        <View style={styles.adErrorOverlay}>
-          <View style={styles.adErrorCard}>
-            <Chipley pose="sad" size={88} />
-            <Text style={styles.adErrorText}>{adError}</Text>
-            <Pressable
-              onPress={() => setAdError(null)}
-              style={({ pressed }) => [styles.adErrorBtn, { opacity: pressed ? 0.8 : 1 }]}
-            >
-              <Text style={styles.adErrorBtnText}>Got it</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

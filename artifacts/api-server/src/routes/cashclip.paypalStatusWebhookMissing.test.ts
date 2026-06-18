@@ -24,12 +24,18 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 
 const ADMIN_ID = "admin-1";
-const JWT_SECRET = "test-jwt-secret-for-paypal-status-webhook-missing-padded-to-64x-aabb";
+const JWT_SECRET =
+  "test-jwt-secret-for-paypal-status-webhook-missing-padded-to-64x-aabb";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +44,8 @@ const mockIsPayPalWebhookConfigured = vi.fn();
 
 vi.mock("../paypal", () => ({
   isPayPalConfigured: (...args: unknown[]) => mockIsPayPalConfigured(...args),
-  isPayPalWebhookConfigured: (...args: unknown[]) => mockIsPayPalWebhookConfigured(...args),
+  isPayPalWebhookConfigured: (...args: unknown[]) =>
+    mockIsPayPalWebhookConfigured(...args),
   verifyPayPalWebhook: vi.fn(),
   sendPayPalPayout: vi.fn(),
   getPayPalApiBase: vi.fn().mockReturnValue("https://api-m.sandbox.paypal.com"),
@@ -62,7 +69,11 @@ vi.mock("../lib/dbRateLimit", () => ({
 }));
 
 vi.mock("../lib/secretsPassphrase", () => ({
-  secretsPassphraseMiddleware: (_req: Request, _res: Response, next: NextFunction) => next(),
+  secretsPassphraseMiddleware: (
+    _req: Request,
+    _res: Response,
+    next: NextFunction,
+  ) => next(),
 }));
 
 vi.mock("../surveys", () => ({ registerSurveyRoutes: vi.fn() }));
@@ -99,9 +110,13 @@ beforeAll(async () => {
   // the only way in.
   delete process.env["ADMIN_TOKEN"];
 
-  adminToken = jwt.sign({ userId: ADMIN_ID, role: "admin", tokenVersion: 0 }, JWT_SECRET, {
-    expiresIn: "1h",
-  });
+  adminToken = jwt.sign(
+    { userId: ADMIN_ID, role: "admin", tokenVersion: 0 },
+    JWT_SECRET,
+    {
+      expiresIn: "1h",
+    },
+  );
 
   vi.resetModules();
   const { registerRoutes } = await import("./cashclip");
@@ -113,7 +128,11 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   // adminMiddleware resolves the acting admin via storage.getUser.
-  mockGetUser.mockResolvedValue({ id: ADMIN_ID, role: "admin", tokenVersion: 0 });
+  mockGetUser.mockResolvedValue({
+    id: ADMIN_ID,
+    role: "admin",
+    tokenVersion: 0,
+  });
 });
 
 function asAdmin(req: request.Test): request.Test {
