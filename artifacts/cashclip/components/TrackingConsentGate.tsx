@@ -12,14 +12,15 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
 import { secureGet, secureSet } from "@/lib/secure-store";
+import { useLanguage } from "@/lib/LanguageContext";
 
-const DONE_KEY = "consent_done_v3";
+// Only the terms acceptance is persisted — the disclosure screen shows every launch.
+const TERMS_KEY = "terms_done_v1";
 
 type Step = "checking" | "disclosures" | "terms" | "done";
 
@@ -37,6 +38,9 @@ function openTrackingSettings() {
 
 export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked }: Props) {
   const [step, setStep] = useState<Step>("checking");
+  const { t } = useLanguage();
+  const c = t.consent;
+
   // Track whether consent was ever granted in this session so the AppState
   // listener only fires onConsentRevoked when there was something to revoke.
   const consentGrantedRef = useRef(false);
@@ -48,29 +52,13 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     setStep("done");
   }
 
-  // Called when a returning user's ATT is found to be denied/restricted on cold
-  // start (they revoked tracking via iOS Settings after previously consenting).
+  // Called when a user's ATT is found to be denied/restricted while the app
+  // is in the foreground (they revoked tracking via iOS Settings).
   // Renders children normally but fires onConsentRevoked so callers never
   // register the fill-change callback for a non-consented session.
   function revoke() {
     onConsentRevoked?.();
     setStep("done");
-  }
-
-  // Checks the current ATT status and resolves the gate for a returning user
-  // (DONE_KEY was present in storage). If ATT was revoked since the user last
-  // opened the app, call revoke(); otherwise call finish() as normal.
-  async function resolveReturningUser() {
-    try {
-      const status = await getATTStatus();
-      if (status === "denied" || status === "restricted") {
-        revoke();
-        return;
-      }
-    } catch {
-      // getATTStatus failure → treat as consented (fail-open)
-    }
-    finish();
   }
 
   // Detect iOS ATT revocation via iOS Settings → Privacy → Tracking.
@@ -101,99 +89,47 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   useEffect(() => {
     if (Platform.OS !== "ios") {
       // Android has no ATT dialog — always pass through immediately.
-      // No need to write DONE_KEY: the Platform.OS guard re-fires on every
-      // launch and skips directly to finish() without hitting SecureStore.
       finish();
       return;
     }
 
-    (async () => {
-      // ── Fast-path 1: key in SecureStore (Keychain) — survives reinstalls ───
-      // Written by any build that ships this version of the gate.
-      // Re-check ATT status: the user may have revoked tracking via iOS Settings
-      // since they last consented. If so, fire onConsentRevoked instead of
-      // onConsentDone so the fill callback is never registered.
-      const doneSecure = await secureGet(DONE_KEY);
-      if (doneSecure) { await resolveReturningUser(); return; }
-
-      // ── Fast-path 2: key in AsyncStorage — written by old builds (≤v39) ───
-      // Migrate it to SecureStore so future reinstalls also pass through.
-      const doneLegacyStorage = await AsyncStorage.getItem(DONE_KEY).catch(() => null);
-      if (doneLegacyStorage) {
-        await secureSet(DONE_KEY, "1").catch(() => {});
-        await resolveReturningUser();
-        return;
-      }
-
-      // ── Fast-path 3: even older legacy keys — migrate + skip ────────────
-      const prev1 = await AsyncStorage.getItem("consent_fully_done_v2").catch(() => null);
-      const prev2 = await AsyncStorage.getItem("tracking_consent_dismissed_v1").catch(() => null);
-      if (prev1 || prev2) {
-        await secureSet(DONE_KEY, "1").catch(() => {});
-        await resolveReturningUser();
-        return;
-      }
-
-      // Fire ATT dialog now if undetermined (iOS only shows it once ever).
-      // If already denied/restricted skip the dialog — iOS won't show it again.
-      const status = await getATTStatus();
-      if (status === "denied" || status === "restricted") {
-        // User previously denied system ATT prompt. iOS will never show it
-        // again. Mark consent done so we never show the gate again either.
-        await secureSet(DONE_KEY, "1").catch(() => {});
-        finish();
-        return;
-      }
-      if (status === "undetermined") {
-        await requestATT();
-        // Give iOS time to commit the ATT status before we read it back.
-        await new Promise<void>((r) => setTimeout(r, 600));
-      }
-
-      // Read back the final status after the ATT dialog (or skip).
-      // Treat authorized/granted AND denied/restricted the same: user has
-      // already made their ATT choice — write the key and move on.
-      // "unavailable" means the read timed out (3 s race in att.ts). The iOS
-      // dialog was already shown, so the user did see it. Treat as a pass-
-      // through — the real status will be readable on next launch. Falling
-      // through to Disclosures here would force a redundant screen the user
-      // didn't expect after already responding to the system prompt.
-      // build-29 silently passed through without writing any key on this path.
-      const statusAfter = await getATTStatus();
-      if (
-        statusAfter === "authorized" ||
-        statusAfter === "granted" ||
-        statusAfter === "denied" ||
-        statusAfter === "restricted" ||
-        statusAfter === "unavailable"
-      ) {
-        await secureSet(DONE_KEY, "1").catch(() => {});
-        finish();
-        return;
-      }
-
-      setStep("disclosures");
-    })();
+    // iOS: always show the disclosure screen on every cold launch.
+    // No storage key can skip it. The disclosure is shown unconditionally.
+    setStep("disclosures");
   }, []);
 
   async function acceptDisclosures() {
-    setStep("terms");
+    // Request ATT now (after the user has read the explanation).
+    // iOS only ever shows the system dialog when status is "undetermined".
+    const status = await getATTStatus();
+    if (status === "undetermined") {
+      await requestATT();
+      // Give iOS time to commit the ATT status before we read it back.
+      await new Promise<void>((r) => setTimeout(r, 600));
+    }
+
+    // If the user has already accepted the terms, skip straight to done.
+    const termsDone = await secureGet(TERMS_KEY);
+    if (termsDone) {
+      finish();
+    } else {
+      setStep("terms");
+    }
   }
 
   function declineDisclosures() {
     Alert.alert(
-      "This Will Reduce Your Earnings",
-      "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.",
+      c.declineTitle,
+      c.declineMessage,
       [
         {
-          text: "Open Tracking Settings",
+          text: c.openSettings,
           onPress: openTrackingSettings,
         },
         {
-          text: "Continue Without",
+          text: c.continueWithout,
           style: "cancel",
-          onPress: async () => {
-            await secureSet(DONE_KEY, "1").catch(() => {});
+          onPress: () => {
             finish();
           },
         },
@@ -202,7 +138,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   }
 
   async function acceptTerms() {
-    await secureSet(DONE_KEY, "1").catch(() => {});
+    await secureSet(TERMS_KEY, "1").catch(() => {});
     finish();
   }
 
@@ -222,64 +158,63 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
             <Ionicons name="shield-checkmark-outline" size={52} color={Colors.primary} />
           </View>
 
-          <Text style={styles.title}>Your Privacy & Earnings</Text>
-          <Text style={styles.subtitle}>
-            CashClip uses tracking to personalize your ads and match you with higher-paying
-            offers. Here's exactly what we access and why.
-          </Text>
+          <Text style={styles.title}>{c.title}</Text>
+          <Text style={styles.subtitle}>{c.subtitle}</Text>
 
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <Ionicons name="bar-chart-outline" size={20} color={Colors.primary} />
-              <Text style={styles.cardTitle}>App Tracking (IDFA)</Text>
+              <Text style={styles.cardTitle}>{c.card1Title}</Text>
             </View>
-            <Text style={styles.cardBody}>
-              CashClip uses Apple's Advertising Identifier to link your in-app activity
-              with ad networks. This lets advertisers show you relevant ads and measure
-              performance — which is how you earn cash. No name, email, or contact info
-              is shared with advertisers.
-            </Text>
+            <Text style={styles.cardBody}>{c.card1Body}</Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <Ionicons name="cash-outline" size={20} color={Colors.primary} />
-              <Text style={styles.cardTitle}>Ad Personalization</Text>
+              <Text style={styles.cardTitle}>{c.card2Title}</Text>
             </View>
-            <Text style={styles.cardBody}>
-              Allowing personalization matches you with the highest-paying surveys and
-              offers for your profile. Declining limits you to non-personalized content
-              and significantly reduces earning potential.
-            </Text>
+            <Text style={styles.cardBody}>{c.card2Body}</Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <Ionicons name="settings-outline" size={20} color={Colors.primary} />
-              <Text style={styles.cardTitle}>Your Control</Text>
+              <Text style={styles.cardTitle}>{c.card3Title}</Text>
             </View>
             <Text style={styles.cardBody}>
-              Change your preference anytime under{" "}
-              <Text style={styles.link} onPress={openTrackingSettings}>
-                Settings → Privacy & Security → Tracking
-              </Text>
-              {" "}or inside the app under Profile → Settings.
+              {c.card3Body.split("Settings → Privacy & Security → Tracking").length > 1 ? (
+                <>
+                  {c.card3Body.split("Settings → Privacy & Security → Tracking")[0]}
+                  <Text style={styles.link} onPress={openTrackingSettings}>
+                    Settings → Privacy & Security → Tracking
+                  </Text>
+                  {c.card3Body.split("Settings → Privacy & Security → Tracking")[1]}
+                </>
+              ) : c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento").length > 1 ? (
+                <>
+                  {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[0]}
+                  <Text style={styles.link} onPress={openTrackingSettings}>
+                    Ajustes → Privacidad y Seguridad → Seguimiento
+                  </Text>
+                  {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[1]}
+                </>
+              ) : (
+                c.card3Body
+              )}
             </Text>
           </View>
 
-          <Text style={styles.legal}>
-            By tapping "Continue" you agree to CashClip's Privacy Policy and
-            Terms of Service. Tracking is not required — you may decline and still use CashClip.
-          </Text>
+          <Text style={styles.legal}>{c.legal}</Text>
         </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.primaryBtn} onPress={acceptDisclosures} activeOpacity={0.85}>
             <Ionicons name="checkmark-circle-outline" size={20} color="#000" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryBtnText}>Continue</Text>
+            <Text style={styles.primaryBtnText}>{c.continueBtn}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={declineDisclosures} activeOpacity={0.7}>
-            <Text style={styles.secondaryBtnText}>Decline</Text>
+            <Text style={styles.secondaryBtnText}>{c.declineBtn}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -290,8 +225,8 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     return (
       <View style={styles.screen}>
         <View style={styles.termsHeader}>
-          <Text style={styles.termsTitle}>Terms & Privacy</Text>
-          <Text style={styles.termsSub}>Please review before entering CashClip</Text>
+          <Text style={styles.termsTitle}>{c.termsTitle}</Text>
+          <Text style={styles.termsSub}>{c.termsSub}</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.termsContent} showsVerticalScrollIndicator>
@@ -362,7 +297,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.primaryBtn} onPress={acceptTerms} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Accept & Enter CashClip</Text>
+            <Text style={styles.primaryBtnText}>{c.acceptBtn}</Text>
           </TouchableOpacity>
         </View>
       </View>

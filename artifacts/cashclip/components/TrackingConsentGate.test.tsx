@@ -6,8 +6,7 @@ import TestRenderer, { act } from "react-test-renderer";
 // React 19 requires this flag so act() flushes async effects in the node env.
 (global as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-// ── In-memory AsyncStorage (legacy / migration layer) ─────────────────────────
-// Represents the app container storage that iOS clears on full reinstall.
+// ── In-memory AsyncStorage (legacy layer — no longer read by TrackingConsentGate) ──
 const store = new Map<string, string>();
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
@@ -18,11 +17,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
-// ── In-memory expo-secure-store (Keychain on iOS — survives reinstalls) ───────
-// Mocking expo-secure-store directly (rather than @/lib/secure-store) means
-// the test exercises the real secure-store.ts code path, including its
-// Platform.OS branch.  Any accidental AsyncStorage fallback added inside
-// secure-store.ts would surface here as a false "key found" in Keychain.
+// ── In-memory expo-secure-store (Keychain on iOS) ─────────────────────────────
 const keychain = new Map<string, string>();
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async (k: string) => (keychain.has(k) ? keychain.get(k)! : null),
@@ -30,9 +25,8 @@ vi.mock("expo-secure-store", () => ({
   deleteItemAsync: async (k: string) => { keychain.delete(k); },
 }));
 
-// ── ATT mock — tests push statuses into attStatuses to control each call ──────
-// getATTStatus shifts one value per call.  Two values are needed for the
-// "undetermined → denied" path (initial check + post-dialog re-check).
+// ── ATT mock ──────────────────────────────────────────────────────────────────
+// getATTStatus shifts one value per call. requestATT records itself as called.
 const attStatuses: string[] = [];
 let requestATTCalled = false;
 
@@ -46,11 +40,38 @@ vi.mock("@/lib/admob", () => ({
   requestAdsConsent: vi.fn(async () => {}),
 }));
 
+// ── LanguageContext mock — always returns English consent strings ──────────────
+vi.mock("@/lib/LanguageContext", () => ({
+  useLanguage: () => ({
+    lang: "en",
+    t: {
+      consent: {
+        title: "Your Privacy & Earnings",
+        subtitle: "CashClip uses tracking to personalize your ads and match you with higher-paying offers. Here's exactly what we access and why.",
+        card1Title: "App Tracking (IDFA)",
+        card1Body: "CashClip uses Apple's Advertising Identifier to link your in-app activity with ad networks. This lets advertisers show you relevant ads and measure performance — which is how your earnings flow within the platform. No name, email, or contact information is shared with advertisers.",
+        card2Title: "Ad Personalization",
+        card2Body: "By allowing custom personalization, CashClip matches you with offers and surveys enhanced for your profile. Please note that this feature is available, but it is not required to join and it is completely optional.",
+        card3Title: "Your Control",
+        card3Body: "Change your preference anytime under Settings → Privacy & Security → Tracking or inside the app under Profile → Settings.",
+        legal: "By tapping \"Continue\" you agree to CashClip's Privacy Policy and Terms of Service. Tracking is not required — you may decline and still use CashClip.",
+        continueBtn: "Continue",
+        declineBtn: "Decline",
+        declineTitle: "This Will Reduce Your Earnings",
+        declineMessage: "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.",
+        openSettings: "Open Tracking Settings",
+        continueWithout: "Continue Without",
+        termsTitle: "Terms & Privacy",
+        termsSub: "Please review before entering CashClip",
+        acceptBtn: "Accept & Enter CashClip",
+      },
+      common: { back: "Back", ok: "OK" },
+    },
+    setLang: () => {},
+  }),
+}));
+
 // ── React Native stub (Platform.OS = "ios") ───────────────────────────────────
-// Platform.OS = "ios" means secure-store.ts takes the native branch:
-//   secureGet → ExpoSecureStore.getItemAsync (keychain map above)
-//   secureSet → ExpoSecureStore.setItemAsync (keychain map above)
-// There is no AsyncStorage fallback on this path.
 vi.mock("react-native", () => {
   const React = require("react");
   const passthrough = (name: string) =>
@@ -90,7 +111,7 @@ import { Platform, Alert } from "react-native";
 import { TrackingConsentGate } from "./TrackingConsentGate";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const DONE_KEY = "consent_done_v3";
+const TERMS_KEY = "terms_done_v1";
 
 // Sentinel child — visible in the tree only when step = "done".
 const CHILD = React.createElement("Text" as any, null, "CHILD");
@@ -114,14 +135,17 @@ function childrenVisible(root: TestRenderer.ReactTestInstance): boolean {
 
 /** True when the disclosures step is rendered. */
 function disclosuresVisible(root: TestRenderer.ReactTestInstance): boolean {
-  return allText(root).some((t) => t.includes("Your Privacy") || t.includes("Accept & Earn More"));
+  return allText(root).some((t) => t.includes("Your Privacy"));
+}
+
+/** True when the terms step is rendered. */
+function termsVisible(root: TestRenderer.ReactTestInstance): boolean {
+  return allText(root).some((t) => t.includes("Terms & Privacy") || t.includes("Terms of Service"));
 }
 
 /**
  * Drain the microtask queue enough times for the entire useEffect async chain
- * to complete:
- *   3× AsyncStorage.getItem + getATTStatus (mocked async) + SecureStore ops
- *   = ~6 async ticks; run 30 for safety margin.
+ * to complete.
  */
 async function flush(ticks = 30) {
   await act(async () => {
@@ -140,6 +164,21 @@ async function renderGate(onConsentDone?: () => void) {
   return tr;
 }
 
+/**
+ * Find the primary Continue button host and press it.
+ * The button contains the checkmark icon adjacent to the "Continue" label.
+ */
+async function pressContinue(tr: TestRenderer.ReactTestRenderer) {
+  const [checkmarkIcon] = tr.root.findAll(
+    (n) => (n.type as string) === "Icon" && n.props.name === "checkmark-circle-outline",
+  );
+  expect(checkmarkIcon, "Checkmark icon not found — disclosure step may not be rendered").toBeTruthy();
+  const primaryBtnHost = checkmarkIcon.parent!.parent!;
+  await act(async () => {
+    primaryBtnHost.props.onPress();
+  });
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 beforeEach(() => {
   store.clear();
@@ -150,288 +189,229 @@ beforeEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Prove secureGet reads from Keychain, not AsyncStorage
+// Core behavior: disclosure always shows on iOS cold launch
 // ─────────────────────────────────────────────────────────────────────────────
-describe("secure-store.ts — secureGet on native reads Keychain, not AsyncStorage", () => {
-  it("returns null when only AsyncStorage has the key (no Keychain fallback)", async () => {
-    // Populate AsyncStorage with the key but leave Keychain empty.
-    // If secureGet incorrectly fell back to AsyncStorage it would return "1"
-    // and skip the explicit migration path in the gate.
-    store.set(DONE_KEY, "1");
+describe("TrackingConsentGate — disclosure always shows on iOS cold launch", () => {
+  it("renders the disclosures step on first mount with empty storage", async () => {
+    const tr = await renderGate();
 
-    // Render the gate — secureGet(DONE_KEY) should return null (Keychain empty),
-    // so the gate must fall through to the AsyncStorage migration check.
-    await renderGate();
-
-    // Migration must have occurred: key should now be in Keychain.
-    expect(keychain.get(DONE_KEY)).toBe("1");
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("returns the value when only Keychain has the key (normal returning-user path)", async () => {
-    keychain.set(DONE_KEY, "1");
-    // AsyncStorage is empty — proves reading comes from Keychain only.
-
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(onDone).toHaveBeenCalledTimes(1);
-    expect(requestATTCalled).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ATT status = "denied" on startup
-// ─────────────────────────────────────────────────────────────────────────────
-describe('TrackingConsentGate — ATT status "denied" on startup', () => {
-  it("calls finish() immediately and renders children without showing disclosures", async () => {
-    attStatuses.push("denied");
-
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
-  });
-
-  it("writes the DONE_KEY to Keychain (SecureStore) so the gate survives reinstall", async () => {
-    attStatuses.push("denied");
-
-    await renderGate();
-
-    expect(keychain.get(DONE_KEY)).toBe("1");
-    // Must NOT be written to AsyncStorage (would be lost on reinstall).
-    expect(store.has(DONE_KEY)).toBe(false);
-  });
-
-  it("does not call requestATT() because iOS would never show the dialog again", async () => {
-    attStatuses.push("denied");
-
-    await renderGate();
-
-    expect(requestATTCalled).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ATT status = "restricted" on startup
-// ─────────────────────────────────────────────────────────────────────────────
-describe('TrackingConsentGate — ATT status "restricted" on startup', () => {
-  it("calls finish() immediately and renders children without showing disclosures", async () => {
-    attStatuses.push("restricted");
-
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
-  });
-
-  it("writes the DONE_KEY to Keychain (SecureStore) so the gate survives reinstall", async () => {
-    attStatuses.push("restricted");
-
-    await renderGate();
-
-    expect(keychain.get(DONE_KEY)).toBe("1");
-    expect(store.has(DONE_KEY)).toBe(false);
-  });
-
-  it("does not call requestATT() because iOS would never show the dialog again", async () => {
-    attStatuses.push("restricted");
-
-    await renderGate();
-
-    expect(requestATTCalled).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fast-path: DONE_KEY already present in Keychain (returning user)
-// ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — DONE_KEY already set in Keychain (returning user)", () => {
-  it("renders children immediately without showing any consent UI", async () => {
-    keychain.set(DONE_KEY, "1");
-
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not call requestATT() — no ATT dialog for returning users", async () => {
-    keychain.set(DONE_KEY, "1");
-
+  it("does NOT call requestATT on mount — ATT is deferred to the Continue tap", async () => {
     await renderGate();
 
     expect(requestATTCalled).toBe(false);
   });
 
-  it("leaves DONE_KEY intact in Keychain", async () => {
-    keychain.set(DONE_KEY, "1");
+  it("renders disclosures even when TERMS_KEY is already in Keychain (returning user sees disclosure again)", async () => {
+    keychain.set(TERMS_KEY, "1");
 
-    await renderGate();
+    const tr = await renderGate();
 
-    expect(keychain.get(DONE_KEY)).toBe("1");
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OTA upgrade scenario: DONE_KEY written by old build in AsyncStorage
-// After an OTA update the Keychain is empty; AsyncStorage still has the key.
-// The gate must detect it, promote it to Keychain, and never re-prompt.
-// ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — OTA upgrade: DONE_KEY from old build in AsyncStorage", () => {
-  it("passes through without re-prompting when only AsyncStorage has the key", async () => {
-    // Simulate old build: wrote consent_done_v3 to AsyncStorage (not Keychain).
-    store.set(DONE_KEY, "1");
-    // Keychain is empty — secureGet returns null here.
-
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("promotes the key to Keychain on first launch after the update", async () => {
-    store.set(DONE_KEY, "1");
+  it("renders disclosures even when old DONE_KEY (consent_done_v3) is in Keychain", async () => {
+    keychain.set("consent_done_v3", "1");
 
-    await renderGate();
+    const tr = await renderGate();
 
-    // After migration, Keychain must hold the key so reinstalls pass through.
-    expect(keychain.get(DONE_KEY)).toBe("1");
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("does not call requestATT() when the old AsyncStorage key is present", async () => {
-    store.set(DONE_KEY, "1");
+  it("renders disclosures even when old DONE_KEY is in AsyncStorage", async () => {
+    store.set("consent_done_v3", "1");
 
-    await renderGate();
+    const tr = await renderGate();
 
-    expect(requestATTCalled).toBe(false);
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("survives reinstall: subsequent launch with AsyncStorage cleared still skips the gate", async () => {
-    // Phase 1 — first launch after OTA update: migrate AsyncStorage → Keychain.
-    store.set(DONE_KEY, "1");
-    await renderGate();
-    expect(keychain.get(DONE_KEY)).toBe("1");
-
-    // Phase 2 — simulate reinstall: iOS clears AsyncStorage but Keychain persists.
-    store.clear();
-    vi.clearAllMocks();
-    attStatuses.length = 0;
-    requestATTCalled = false;
-    // keychain still has the key (Keychain survives reinstall on iOS).
-
-    const onDone = vi.fn();
-    const tr2 = await renderGate(onDone);
-
-    expect(childrenVisible(tr2.root)).toBe(true);
-    expect(disclosuresVisible(tr2.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
-    expect(requestATTCalled).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fast-path: legacy key consent_fully_done_v2 present → migrate + skip
-// ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — legacy key consent_fully_done_v2 present", () => {
-  it("renders children immediately without showing any consent UI", async () => {
+  it("renders disclosures even when legacy key consent_fully_done_v2 is in AsyncStorage", async () => {
     store.set("consent_fully_done_v2", "1");
 
+    const tr = await renderGate();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+
+  it("renders disclosures even when legacy key tracking_consent_dismissed_v1 is in AsyncStorage", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    const tr = await renderGate();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Disclosure card copy — updated owner-approved text
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — disclosure card body text (owner-approved copy)", () => {
+  it("IDFA card body contains the updated platform-earnings language", async () => {
+    const tr = await renderGate();
+
+    const texts = allText(tr.root).join(" ");
+    expect(texts).toContain("how your earnings flow within the platform");
+  });
+
+  it("Ad Personalization card body contains the 'completely optional' language", async () => {
+    const tr = await renderGate();
+
+    const texts = allText(tr.root).join(" ");
+    expect(texts).toContain("completely optional");
+  });
+
+  it("Your Control card body mentions both Settings paths", async () => {
+    const tr = await renderGate();
+
+    const texts = allText(tr.root).join(" ");
+    expect(texts).toContain("Settings → Privacy & Security → Tracking");
+    expect(texts).toContain("Profile → Settings");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TERMS_KEY gates the terms step — pressing Continue checks SecureStore
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — TERMS_KEY gates the terms step", () => {
+  it("skips the terms step and calls finish() when TERMS_KEY is already set", async () => {
+    keychain.set(TERMS_KEY, "1");
+    // ATT status: authorized (no dialog needed)
+    attStatuses.push("authorized");
+
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
 
+    // Disclosure shows
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(onDone).not.toHaveBeenCalled();
+
+    // Tap Continue
+    await pressContinue(tr);
+    await flush();
+
+    // Terms skipped — straight to done
     expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
+    expect(termsVisible(tr.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("migrates by writing DONE_KEY to Keychain so future reinstalls also skip the gate", async () => {
-    store.set("consent_fully_done_v2", "1");
+  it("shows the terms step when TERMS_KEY is absent", async () => {
+    // No TERMS_KEY in keychain
+    attStatuses.push("authorized");
 
-    await renderGate();
+    const tr = await renderGate();
 
-    expect(keychain.get(DONE_KEY)).toBe("1");
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    await pressContinue(tr);
+    await flush();
+
+    expect(termsVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("does not call requestATT() — no ATT dialog needed", async () => {
-    store.set("consent_fully_done_v2", "1");
+  it("writes TERMS_KEY to Keychain when the user accepts the terms", async () => {
+    attStatuses.push("authorized");
+
+    const tr = await renderGate();
+    await pressContinue(tr);
+    await flush();
+
+    expect(termsVisible(tr.root)).toBe(true);
+
+    // Find and press the accept button
+    const acceptNodes = tr.root.findAll(
+      (n) => (n.type as string) === "Text" && allText(n).join("").includes("Accept & Enter CashClip"),
+    );
+    expect(acceptNodes.length, "Accept & Enter CashClip button not found").toBeGreaterThan(0);
+    // Walk up to the TouchableOpacity host
+    const acceptBtnHost = acceptNodes[0].parent!.parent!;
+    await act(async () => {
+      acceptBtnHost.props.onPress();
+    });
+    await flush();
+
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+    expect(childrenVisible(tr.root)).toBe(true);
+  });
+
+  it("does NOT write TERMS_KEY to Keychain when the user declines (disclosure is shown each launch)", async () => {
+    const tr = await renderGate();
+
+    // Find the decline button and press it
+    const declineNodes = tr.root.findAll(
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
+    );
+    const declineBtnHost = declineNodes[0].parent!.parent!;
+    await act(async () => {
+      declineBtnHost.props.onPress();
+    });
+
+    // Alert fired; press "Continue Without"
+    const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
+    const cancelBtn = (alertCall[2] as Array<{ text: string; style?: string; onPress?: () => void }>)
+      .find((b) => b.style === "cancel");
+    expect(cancelBtn).toBeTruthy();
+
+    await act(async () => {
+      cancelBtn!.onPress?.();
+    });
+    await flush();
+
+    // TERMS_KEY must NOT be written — next launch will show disclosure again
+    expect(keychain.has(TERMS_KEY)).toBe(false);
+    // But children are rendered (finish was called)
+    expect(childrenVisible(tr.root)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATT request is deferred to the Continue tap
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — ATT request fires on Continue tap, not on mount", () => {
+  it("does not call requestATT on mount even when ATT is undetermined", async () => {
+    // ATT status will be "undetermined" when acceptDisclosures checks it
+    attStatuses.push("undetermined", "authorized");
 
     await renderGate();
 
     expect(requestATTCalled).toBe(false);
   });
-});
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fast-path: legacy key tracking_consent_dismissed_v1 present → migrate + skip
-// ─────────────────────────────────────────────────────────────────────────────
-describe("TrackingConsentGate — legacy key tracking_consent_dismissed_v1 present", () => {
-  it("renders children immediately without showing any consent UI", async () => {
-    store.set("tracking_consent_dismissed_v1", "1");
+  it("calls requestATT when the user taps Continue and ATT is undetermined", async () => {
+    attStatuses.push("undetermined", "authorized");
 
-    const onDone = vi.fn();
-    const tr = await renderGate(onDone);
-
-    expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
-    expect(onDone).toHaveBeenCalledTimes(1);
-  });
-
-  it("migrates by writing DONE_KEY to Keychain so future reinstalls also skip the gate", async () => {
-    store.set("tracking_consent_dismissed_v1", "1");
-
-    await renderGate();
-
-    expect(keychain.get(DONE_KEY)).toBe("1");
-  });
-
-  it("does not call requestATT() — no ATT dialog needed", async () => {
-    store.set("tracking_consent_dismissed_v1", "1");
-
-    await renderGate();
-
-    expect(requestATTCalled).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ATT status = "undetermined" → "denied" after requestATT()
-// ─────────────────────────────────────────────────────────────────────────────
-describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestATT()', () => {
-  it("calls requestATT(), then finish() — does not show disclosures", async () => {
-    // First getATTStatus call: "undetermined" → triggers requestATT().
-    // Second getATTStatus call (after the 600 ms settle delay): "denied" → finish().
-    attStatuses.push("undetermined", "denied");
-
-    const onDone = vi.fn();
-
-    // Use fake timers to skip the 600 ms ATT-settle delay without blocking.
     vi.useFakeTimers();
 
-    let tr!: TestRenderer.ReactTestRenderer;
+    const tr = await renderGate();
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    // Tap Continue — triggers acceptDisclosures
+    const [checkmarkIcon] = tr.root.findAll(
+      (n) => (n.type as string) === "Icon" && n.props.name === "checkmark-circle-outline",
+    );
+    const primaryBtnHost = checkmarkIcon.parent!.parent!;
+
     await act(async () => {
-      tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: onDone, children: CHILD }),
-      );
+      primaryBtnHost.props.onPress();
     });
 
-    // Drain microtasks up to the setTimeout pause (storage reads + first getATTStatus).
+    // Drain microtasks up to the 600 ms settle delay
     await act(async () => {
-      for (let i = 0; i < 15; i++) await Promise.resolve();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
     });
-
-    // Advance past the 600 ms ATT-settle delay.
+    // Advance past the 600 ms delay
     await act(async () => { vi.advanceTimersByTime(700); });
-
-    // Drain remaining microtasks (second getATTStatus + SecureStore write + finish).
+    // Drain remaining
     await act(async () => {
       for (let i = 0; i < 15; i++) await Promise.resolve();
     });
@@ -439,61 +419,84 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
     vi.useRealTimers();
 
     expect(requestATTCalled).toBe(true);
+  });
+
+  it("does NOT call requestATT when ATT is already authorized on Continue tap", async () => {
+    attStatuses.push("authorized");
+
+    const tr = await renderGate();
+    await pressContinue(tr);
+    await flush();
+
+    expect(requestATTCalled).toBe(false);
+  });
+
+  it("does NOT call requestATT when ATT is already denied on Continue tap", async () => {
+    attStatuses.push("denied");
+
+    const tr = await renderGate();
+    await pressContinue(tr);
+    await flush();
+
+    expect(requestATTCalled).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATT status = "denied" on startup — disclosure still shows
+// ─────────────────────────────────────────────────────────────────────────────
+describe('TrackingConsentGate — ATT "denied" does not skip the disclosure', () => {
+  it("renders the disclosures step even when ATT is already denied", async () => {
+    // ATT status will be checked in acceptDisclosures, not on mount
+    attStatuses.push("denied");
+
+    const tr = await renderGate();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+
+  it("does not call requestATT on mount when ATT is denied", async () => {
+    attStatuses.push("denied");
+    await renderGate();
+    expect(requestATTCalled).toBe(false);
+  });
+
+  it("calls finish() after Continue is tapped when ATT is denied (TERMS_KEY present)", async () => {
+    keychain.set(TERMS_KEY, "1");
+    attStatuses.push("denied");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(onDone).not.toHaveBeenCalled();
+
+    await pressContinue(tr);
+    await flush();
+
     expect(childrenVisible(tr.root)).toBe(true);
-    expect(disclosuresVisible(tr.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+});
 
-  it("writes the DONE_KEY to Keychain after the post-dialog denied status", async () => {
-    attStatuses.push("undetermined", "denied");
+// ─────────────────────────────────────────────────────────────────────────────
+// ATT status = "restricted" on startup — disclosure still shows
+// ─────────────────────────────────────────────────────────────────────────────
+describe('TrackingConsentGate — ATT "restricted" does not skip the disclosure', () => {
+  it("renders the disclosures step even when ATT is restricted", async () => {
+    attStatuses.push("restricted");
 
-    vi.useFakeTimers();
+    const tr = await renderGate();
 
-    let tr!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: undefined, children: CHILD }),
-      );
-    });
-
-    await act(async () => {
-      for (let i = 0; i < 15; i++) await Promise.resolve();
-    });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    await act(async () => {
-      for (let i = 0; i < 15; i++) await Promise.resolve();
-    });
-
-    vi.useRealTimers();
-
-    void tr;
-    expect(keychain.get(DONE_KEY)).toBe("1");
-    expect(store.has(DONE_KEY)).toBe(false);
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
   });
 
-  it("never reaches setStep('disclosures') when the post-dialog status is denied", async () => {
-    attStatuses.push("undetermined", "denied");
-
-    vi.useFakeTimers();
-
-    let tr!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { onConsentDone: undefined, children: CHILD }),
-      );
-    });
-
-    await act(async () => {
-      for (let i = 0; i < 15; i++) await Promise.resolve();
-    });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    await act(async () => {
-      for (let i = 0; i < 15; i++) await Promise.resolve();
-    });
-
-    vi.useRealTimers();
-
-    expect(disclosuresVisible(tr.root)).toBe(false);
+  it("does not call requestATT on mount when ATT is restricted", async () => {
+    attStatuses.push("restricted");
+    await renderGate();
+    expect(requestATTCalled).toBe(false);
   });
 });
 
@@ -505,32 +508,8 @@ describe('TrackingConsentGate — ATT "undetermined" → "denied" after requestA
 // If either changes without the other being updated, this test catches it.
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Disclosures step — button label must match legal disclaimer quoted name", () => {
-  /**
-   * Reach the disclosures step: both ATT reads return "undetermined" so the
-   * component falls through the post-dialog status check and calls
-   * setStep("disclosures").
-   */
-  async function renderDisclosures() {
-    attStatuses.push("undetermined", "undetermined");
-
-    vi.useFakeTimers();
-
-    let tr!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { children: CHILD }),
-      );
-    });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
-
-    vi.useRealTimers();
-    return tr;
-  }
-
   it("primary button label and quoted button name in legal disclaimer are identical", async () => {
-    const tr = await renderDisclosures();
+    const tr = await renderGate();
 
     // ── 1. Confirm the disclosures step actually rendered ────────────────────
     const texts = allText(tr.root);
@@ -541,25 +520,11 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
     ).toBeTruthy();
 
     // ── 2. Extract the button name quoted in the legal text ──────────────────
-    // Matches the first double-quoted word in: By tapping "<label>" you agree…
     const match = legalLine!.match(/By tapping "([^"]+)"/);
     expect(match, 'Could not extract a quoted button name from the legal disclaimer').toBeTruthy();
     const quotedLabel = match![1];
 
     // ── 3. Find the primary button label in the rendered tree ────────────────
-    // TestRenderer produces two fiber nodes per React component: one for the
-    // function component itself and one for the host element it returns.
-    //
-    // The primary button renders (simplified TestRenderer tree):
-    //   TouchableOpacity passthrough fn
-    //     "TouchableOpacity" host          ← grandparent of the "Icon" host
-    //       Ionicons fn
-    //         "Icon" host  (name="checkmark-circle-outline")  ← what we find
-    //       Text passthrough fn
-    //         "Text" host → "Continue"
-    //
-    // Walking up two levels from the "Icon" host reaches the "TouchableOpacity"
-    // host, whose subtree contains the primary button's Text.
     const [checkmarkIcon] = tr.root.findAll(
       (n) => (n.type as string) === "Icon" && n.props.name === "checkmark-circle-outline",
     );
@@ -568,8 +533,6 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
       'Checkmark icon not found — primary button may not be rendered on the disclosures step',
     ).toBeTruthy();
 
-    // parent  = Ionicons function component fiber
-    // parent.parent = "TouchableOpacity" host element — the direct button container
     const primaryBtnContainer = checkmarkIcon.parent!.parent!;
     const textHosts = primaryBtnContainer.findAll((n) => (n.type as string) === "Text");
     expect(
@@ -584,30 +547,20 @@ describe("Disclosures step — button label must match legal disclaimer quoted n
     expect(primaryBtnLabel).toBe(quotedLabel);
   });
 
-  it("catches a mismatch when the button label changes but the legal text does not", async () => {
-    // This test intentionally simulates a mismatch to prove the assertion fires.
-    // It does NOT render the real component — it directly exercises the comparison
-    // logic so the test suite itself is self-validating.
-
+  it("catches a mismatch when the button label changes but the legal text does not", () => {
     const legalText = 'By tapping "Continue" you agree to CashClip\'s Privacy Policy.';
-    const changedButtonLabel = "Accept & Continue"; // hypothetical rename
+    const changedButtonLabel = "Accept & Continue";
 
     const legalMatch = legalText.match(/By tapping "([^"]+)"/);
     expect(legalMatch).toBeTruthy();
-    const quotedLabel = legalMatch![1]; // "Continue"
+    const quotedLabel = legalMatch![1];
 
-    // The changed button label must NOT equal the stale quoted name.
     expect(changedButtonLabel).not.toBe(quotedLabel);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Decline Alert — "Continue Without" button label, title, and message must stay
-// in sync with the component.
-//
-// declineDisclosures() fires Alert.alert(title, message, buttons[]).
-// All three user-facing strings are pinned here as constants so any drift in
-// the component causes an immediate test failure.
+// Decline Alert — strings must stay in sync with the component.
 // ─────────────────────────────────────────────────────────────────────────────
 const DECLINE_CANCEL_LABEL = "Continue Without";
 const DECLINE_OPEN_SETTINGS_LABEL = "Open Tracking Settings";
@@ -616,227 +569,101 @@ const DECLINE_ALERT_MESSAGE =
   "Without tracking, ads and offers can't be personalized to you. You'll still earn, but less.\n\nYou can enable it anytime under Settings → Privacy & Security → Tracking.";
 
 describe('Decline Alert — "Continue Without" button label is consistent', () => {
-  /**
-   * Render the disclosures step (same path as the primary-button tests):
-   * both ATT reads return "undetermined" so the component falls through to
-   * setStep("disclosures").
-   */
-  async function renderDisclosuresForDecline() {
-    attStatuses.push("undetermined", "undetermined");
+  async function renderAndPressDecline() {
+    const tr = await renderGate();
 
-    vi.useFakeTimers();
+    expect(disclosuresVisible(tr.root)).toBe(true);
 
-    let tr!: TestRenderer.ReactTestRenderer;
+    const declineTextNode = tr.root.findAll(
+      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
+    )[0];
+    expect(
+      declineTextNode,
+      '"Decline" secondary button text node not found in the disclosures step',
+    ).toBeTruthy();
+
+    const declineBtnHost = declineTextNode.parent!.parent!;
+    expect(declineBtnHost.props.onPress != null).toBe(true);
+
     await act(async () => {
-      tr = TestRenderer.create(
-        React.createElement(TrackingConsentGate, { children: CHILD }),
-      );
+      declineBtnHost.props.onPress();
     });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
 
-    vi.useRealTimers();
     return tr;
   }
 
   it("cancel button label extracted from the live Alert call matches DECLINE_CANCEL_LABEL", async () => {
-    const tr = await renderDisclosuresForDecline();
+    await renderAndPressDecline();
 
-    // ── 1. Confirm the disclosures step actually rendered ────────────────────
-    expect(disclosuresVisible(tr.root)).toBe(true);
-
-    // ── 2. Find the "Decline" secondary button and press it ──────────────────
-    // Tree shape (passthrough stubs):
-    //   TouchableOpacity fn → "TouchableOpacity" host (has onPress)
-    //     Text fn → "Text" host → "Decline"
-    const declineTextNode = tr.root.findAll(
-      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
-    )[0];
-    expect(
-      declineTextNode,
-      '"Decline" secondary button text node not found in the disclosures step',
-    ).toBeTruthy();
-
-    // parent = Text passthrough fn; parent.parent = "TouchableOpacity" host
-    const declineBtnHost = declineTextNode.parent!.parent!;
-    expect(
-      declineBtnHost.props.onPress != null,
-      '"TouchableOpacity" host above the Decline text has no onPress',
-    ).toBe(true);
-
-    await act(async () => {
-      declineBtnHost.props.onPress();
-    });
-
-    // ── 3. Alert.alert must have been called exactly once ────────────────────
     expect(Alert.alert).toHaveBeenCalledTimes(1);
 
-    // ── 4. Extract the cancel button from the Alert call ─────────────────────
-    // Alert.alert(title, message, buttons[])
     const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
     const alertButtons: Array<{ text: string; style?: string }> = alertCall[2];
-    expect(
-      Array.isArray(alertButtons),
-      'Alert.alert was not called with a buttons array as the third argument',
-    ).toBe(true);
+    expect(Array.isArray(alertButtons)).toBe(true);
 
     const cancelBtn = alertButtons.find((b) => b.style === "cancel");
-    expect(
-      cancelBtn,
-      'No button with style="cancel" found in the decline Alert',
-    ).toBeTruthy();
+    expect(cancelBtn, 'No button with style="cancel" found in the decline Alert').toBeTruthy();
 
-    const extractedLabel = cancelBtn!.text;
-    expect(extractedLabel, 'Cancel button text is empty').toBeTruthy();
-
-    // ── 5. The extracted label must equal the shared constant ─────────────────
-    // DECLINE_CANCEL_LABEL is the single reference point for this button name.
-    // A rename in the component without updating that constant breaks this test.
-    expect(extractedLabel).toBe(DECLINE_CANCEL_LABEL);
+    expect(cancelBtn!.text).toBe(DECLINE_CANCEL_LABEL);
   });
 
   it("Alert title extracted from the live Alert call matches DECLINE_ALERT_TITLE", async () => {
-    const tr = await renderDisclosuresForDecline();
-
-    expect(disclosuresVisible(tr.root)).toBe(true);
-
-    const declineTextNode = tr.root.findAll(
-      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
-    )[0];
-    expect(declineTextNode, '"Decline" button not found').toBeTruthy();
-    const declineBtnHost = declineTextNode.parent!.parent!;
-
-    await act(async () => {
-      declineBtnHost.props.onPress();
-    });
+    await renderAndPressDecline();
 
     expect(Alert.alert).toHaveBeenCalledTimes(1);
-
     const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
-    const extractedTitle: string = alertCall[0];
-    expect(extractedTitle, "Alert title is empty").toBeTruthy();
-    expect(extractedTitle).toBe(DECLINE_ALERT_TITLE);
+    expect(alertCall[0]).toBe(DECLINE_ALERT_TITLE);
   });
 
   it("Alert message extracted from the live Alert call matches DECLINE_ALERT_MESSAGE", async () => {
-    const tr = await renderDisclosuresForDecline();
-
-    expect(disclosuresVisible(tr.root)).toBe(true);
-
-    const declineTextNode = tr.root.findAll(
-      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
-    )[0];
-    expect(declineTextNode, '"Decline" button not found').toBeTruthy();
-    const declineBtnHost = declineTextNode.parent!.parent!;
-
-    await act(async () => {
-      declineBtnHost.props.onPress();
-    });
+    await renderAndPressDecline();
 
     expect(Alert.alert).toHaveBeenCalledTimes(1);
-
     const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
-    const extractedMessage: string = alertCall[1];
-    expect(extractedMessage, "Alert message is empty").toBeTruthy();
-    expect(extractedMessage).toBe(DECLINE_ALERT_MESSAGE);
+    expect(alertCall[1]).toBe(DECLINE_ALERT_MESSAGE);
   });
 
   it("catches a mismatch when the Alert title is changed to something else", () => {
     const changedTitle = "Warning: Earnings Will Drop";
-
     expect(changedTitle).not.toBe(DECLINE_ALERT_TITLE);
   });
 
   it("catches a mismatch when the Alert message body is changed to something else", () => {
-    const changedMessage =
-      "Tracking is off. Your personalized ads will be limited.";
-
+    const changedMessage = "Tracking is off. Your personalized ads will be limited.";
     expect(changedMessage).not.toBe(DECLINE_ALERT_MESSAGE);
   });
 
   it("catches a mismatch when the Alert cancel button is renamed to something else", () => {
-    // Simulate what the Alert buttons array would look like after a rename.
-    // This exercises the same cancel-button extraction logic as the live test,
-    // proving the assertion fires when the component drifts from DECLINE_CANCEL_LABEL.
     const simulatedButtons: Array<{ text: string; style?: string }> = [
       { text: "Open Tracking Settings" },
-      { text: "Skip For Now", style: "cancel" }, // hypothetical rename
+      { text: "Skip For Now", style: "cancel" },
     ];
-
     const cancelBtn = simulatedButtons.find((b) => b.style === "cancel");
     expect(cancelBtn).toBeTruthy();
-
-    // The renamed label must NOT match the expected constant — proving the
-    // live-extraction assertion above would catch this drift.
     expect(cancelBtn!.text).not.toBe(DECLINE_CANCEL_LABEL);
   });
 
   it("open-settings button label extracted from the live Alert call matches DECLINE_OPEN_SETTINGS_LABEL", async () => {
-    const tr = await renderDisclosuresForDecline();
+    await renderAndPressDecline();
 
-    // ── 1. Confirm the disclosures step actually rendered ────────────────────
-    expect(disclosuresVisible(tr.root)).toBe(true);
-
-    // ── 2. Find the "Decline" button and press it ────────────────────────────
-    const declineTextNode = tr.root.findAll(
-      (n) => (n.type as string) === "Text" && allText(n).join("") === "Decline",
-    )[0];
-    expect(
-      declineTextNode,
-      '"Decline" secondary button text node not found in the disclosures step',
-    ).toBeTruthy();
-
-    const declineBtnHost = declineTextNode.parent!.parent!;
-    expect(
-      declineBtnHost.props.onPress != null,
-      '"TouchableOpacity" host above the Decline text has no onPress',
-    ).toBe(true);
-
-    await act(async () => {
-      declineBtnHost.props.onPress();
-    });
-
-    // ── 3. Alert.alert must have been called exactly once ────────────────────
     expect(Alert.alert).toHaveBeenCalledTimes(1);
 
-    // ── 4. Extract the non-cancel button from the Alert call ─────────────────
     const alertCall = (Alert.alert as ReturnType<typeof vi.fn>).mock.calls[0];
     const alertButtons: Array<{ text: string; style?: string }> = alertCall[2];
-    expect(
-      Array.isArray(alertButtons),
-      'Alert.alert was not called with a buttons array as the third argument',
-    ).toBe(true);
+    expect(Array.isArray(alertButtons)).toBe(true);
 
     const openSettingsBtn = alertButtons.find((b) => b.style !== "cancel");
-    expect(
-      openSettingsBtn,
-      'No non-cancel button found in the decline Alert — "Open Tracking Settings" button may be missing',
-    ).toBeTruthy();
-
-    const extractedLabel = openSettingsBtn!.text;
-    expect(extractedLabel, '"Open Tracking Settings" button text is empty').toBeTruthy();
-
-    // ── 5. The extracted label must equal the shared constant ─────────────────
-    // DECLINE_OPEN_SETTINGS_LABEL is the single reference point for this button name.
-    // A rename in the component without updating that constant breaks this test.
-    expect(extractedLabel).toBe(DECLINE_OPEN_SETTINGS_LABEL);
+    expect(openSettingsBtn, '"Open Tracking Settings" button missing').toBeTruthy();
+    expect(openSettingsBtn!.text).toBe(DECLINE_OPEN_SETTINGS_LABEL);
   });
 
   it("catches a mismatch when the open-settings button label is renamed to something else", () => {
-    // Simulate what the Alert buttons array would look like after a rename.
-    // This exercises the same non-cancel-button extraction logic as the live test,
-    // proving the assertion fires when the component drifts from DECLINE_OPEN_SETTINGS_LABEL.
     const simulatedButtons: Array<{ text: string; style?: string }> = [
-      { text: "Go To Settings" }, // hypothetical rename
+      { text: "Go To Settings" },
       { text: "Continue Without", style: "cancel" },
     ];
-
     const openSettingsBtn = simulatedButtons.find((b) => b.style !== "cancel");
     expect(openSettingsBtn).toBeTruthy();
-
-    // The renamed label must NOT match the expected constant — proving the
-    // live-extraction assertion above would catch this drift.
     expect(openSettingsBtn!.text).not.toBe(DECLINE_OPEN_SETTINGS_LABEL);
   });
 });
@@ -864,11 +691,11 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("does NOT write DONE_KEY — Android re-uses the Platform.OS guard on every launch instead", async () => {
+  it("does NOT write TERMS_KEY — Android re-uses the Platform.OS guard on every launch instead", async () => {
     await renderGate();
 
-    expect(keychain.has(DONE_KEY)).toBe(false);
-    expect(store.has(DONE_KEY)).toBe(false);
+    expect(keychain.has(TERMS_KEY)).toBe(false);
+    expect(store.has(TERMS_KEY)).toBe(false);
   });
 
   it("never calls requestATT() — Android has no ATT dialog", async () => {
@@ -877,10 +704,8 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
     expect(requestATTCalled).toBe(false);
   });
 
-  it("still calls finish() and renders children when DONE_KEY is already in Keychain (subsequent launch)", async () => {
-    // On Android, Platform.OS guard fires before any storage read.
-    // DONE_KEY presence is irrelevant but must not cause errors.
-    keychain.set(DONE_KEY, "1");
+  it("still calls finish() and renders children when TERMS_KEY is already in Keychain", async () => {
+    keychain.set(TERMS_KEY, "1");
 
     const onDone = vi.fn();
     const tr = await renderGate(onDone);
