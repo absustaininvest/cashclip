@@ -1,23 +1,43 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Git wrapper — sandbox blocks .git writes
-mkdir -p /tmp/fake-bin
-cat > /tmp/fake-bin/git << 'GITEOF'
-#!/bin/bash
-case "$1" in
-  add|commit|stash|checkout|reset|clean|push|pull|fetch|rm) exit 0 ;;
-  *) exec /usr/bin/git "$@" ;;
-esac
-GITEOF
-chmod +x /tmp/fake-bin/git
+# ── Safety guard ─────────────────────────────────────────────────────────────
+# Require EAS_OTA_CONFIRMED=1 to prevent accidental fires when Replit
+# auto-restarts this workflow. Set it in the workflow command to run.
+if [ "${EAS_OTA_CONFIRMED:-0}" != "1" ]; then
+  echo "================================================"
+  echo "  EAS OTA Update — WAITING FOR CONFIRMATION"
+  echo "================================================"
+  echo ""
+  echo "  This workflow requires EAS_OTA_CONFIRMED=1 to run."
+  echo "  Set it in the workflow command to proceed:"
+  echo "    EAS_OTA_CONFIRMED=1 EAS_OTA_MESSAGE='your message' bash artifacts/cashclip/scripts/eas-ota-production.sh"
+  echo ""
+  echo "  Sleeping indefinitely to prevent accidental publishes..."
+  sleep infinity
+fi
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+if [ -z "${EXPO_TOKEN:-}" ]; then
+  echo "ERROR: EXPO_TOKEN is not set."
+  exit 1
+fi
 
-export EXPO_TOKEN="$EXPO_TOKLAST"
-export PATH="/tmp/fake-bin:$PATH"
+MESSAGE="${EAS_OTA_MESSAGE:-OTA update}"
+CHANNEL="${EAS_OTA_CHANNEL:-production}"
 
-MSG="${1:-v1.1.0 build 48 fresh UI}"
+echo "================================================"
+echo "  CashClip EAS OTA Update — $(date)"
+echo "  Channel: $CHANNEL"
+echo "  Message: $MESSAGE"
+echo "================================================"
 
-echo "▶ Publishing OTA to channel=production runtime=1.0.0 ..."
-pnpm exec eas update --channel production --message "$MSG" --non-interactive
+cd artifacts/cashclip
+EXPO_TOKEN="$EXPO_TOKEN" eas update \
+  --channel "$CHANNEL" \
+  --message "$MESSAGE" \
+  --non-interactive
+
+echo ""
+echo "================================================"
+echo "  OTA update published successfully!"
+echo "================================================"
