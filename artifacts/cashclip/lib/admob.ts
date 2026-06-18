@@ -150,6 +150,16 @@ export function setAdMobUserId(userId: string | null): void {
   preloadInProgress = false;
   discardPreloadedAd();
   notifyFill(false);
+  // A real user ID just became available. If AdMob is already initialized, kick
+  // off a fresh preload immediately so an ad is ready when the user navigates to
+  // the Earn screen. Without this, the initial preload (fired at AdMob init time
+  // before auth settled) would be discarded above and never replaced — leaving
+  // every rewarded-ad request to load on-demand, and — critically — the brief
+  // window where the stale null-userId ad was cached would cause SSV callbacks
+  // to arrive at the server with no user_id and credit nothing.
+  if (normalized !== null && isAdMobReady()) {
+    preloadRewardedAd();
+  }
 }
 
 function shouldUseNonPersonalizedOnly(): boolean {
@@ -585,13 +595,18 @@ export async function showRewardedAd(adUnitId?: string): Promise<{ rewarded: boo
     return result;
   }
 
+  // The preloaded ad (if any) is stale — either null or userId mismatch. Discard
+  // it and kick off a fresh background preload immediately so the NEXT attempt
+  // has a properly-tagged ad waiting, rather than waiting until after this
+  // on-demand ad closes. preloadRewardedAd is guarded by preloadInProgress so
+  // this is a no-op if a preload is already underway.
   discardPreloadedAd();
+  preloadRewardedAd();
 
   try {
     return await loadAndShowOnDemand(adUnitId);
   } catch (e) {
     console.warn("Rewarded ad error:", e);
-    preloadRewardedAd();
     return { rewarded: false };
   }
 }

@@ -41,22 +41,6 @@ args = "Start application"
 task = "workflow.run"
 args = "Start Backend"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "absustain-seo-noindex"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "cashclip-test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "api-server-typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "absustain-typecheck"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -80,50 +64,6 @@ outputType = "console"
 task = "shell.exec"
 args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
-
-[[workflows.workflow]]
-name = "absustain-seo-noindex"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter absustain exec vitest run src/components/Seo.test.tsx"
-
-[[workflows.workflow]]
-name = "cashclip-test"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter cashclip exec vitest run"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "api-server-typecheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/api-server run typecheck"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "absustain-typecheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/absustain run typecheck"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [[ports]]
 localPort = 3001
