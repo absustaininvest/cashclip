@@ -21,7 +21,7 @@ EAS build ID: `e8a9b69e-6068-4ad7-a4f9-cea57da96c2d`
 
 **Submission — owner handled it himself (Jun 17 2026).** Owner confirmed he already submitted build 46 to the App Store directly and does NOT want/need an agent-run `eas submit` or a fresh build. Do not auto-run the submission. The exposed key concern is also resolved: DGVBV8VV95 was revoked by the owner, and the fresh Admin Team Key `4CZ93ZJV6B` is now in `APPLE_ASC_KEY_ID`/`APPLE_ASC_PRIVATE_KEY` (validated 200 on Apple apps/certificates/profiles/bundleIds — authenticates cleanly). The `eas-submit-ios.sh` + `asc-key-env.sh` wrappers materialize the .p8 from secrets if ever needed.
 
-**Why runtimeVersion 1.0.0:** all future builds target runtime 1.0.0.
+**runtimeVersion in app.json is now 1.1.0** (buildNumber 48, versionCode 46 — Jun 2026). The LIVE public build is still build 29 (runtime 1.0.0). OTA target remains runtime 1.0.0 / channel production until a 1.1.0 build ships and goes LIVE (i.e., is the public App Store baseline, not just TestFlight). When that happens, switch the OTA target to runtime 1.1.0 / channel production.
 
 **Jun 16 2026 — AdMob mediation swap (pending build):** app.json bumped to buildNumber "47" / versionCode 44 for the next native build, which reverts the orchestrator from LevelPlay back to AdMob (Unity/ironSource/Pangle/Chartboost retained as AdMob adapters). Not yet built/submitted. See `cashclip-ad-platform-admob-mediation.md`. Builds 40/46 do NOT contain this adapter set.
 

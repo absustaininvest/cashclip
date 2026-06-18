@@ -62,7 +62,7 @@ Mobile rewards app — users earn cash completing surveys, watching videos, play
 
 - **Framework**: Expo (SDK 54) with expo-router
 - **Auth**: JWT stored in AsyncStorage via custom `AuthContext`
-- **Build number**: iOS buildNumber 47, Android versionCode 44, version 1.1.0 (runtimeVersion 1.1.0)
+- **Build number**: iOS buildNumber 48, Android versionCode 46, version 1.1.0 (runtimeVersion 1.1.0)
 - **Ad mediation**: Google AdMob is the rewarded-video mediation ORCHESTRATOR (`react-native-google-mobile-ads`). Unity, ironSource, Pangle, and Chartboost are retained as DEMAND SOURCES, each wired as an AdMob mediation adapter (Android Gradle dep via `plugins/withAndroid*Adapter.js`, iOS pod via `app.json` `extraPods`) — NOT via LevelPlay. The `ironsource-mediation` (LevelPlay) RN SDK was removed Jun 16 2026. Rewarded rewards credit server-side only (AdMob SSV `GET /api/admob/ssv` + begin/complete fallback sharing the `rewarded_ad` cap).
 - **Bundle ID**: `app.replit.cashclip`
 - **EAS Build**: `scripts/eas-build-ios.sh` — reads `EXPO_TOKLAST` secret
@@ -107,7 +107,7 @@ Corporate website, React + Vite. Pages: Home, Ventures, About, Investors, Team, 
 - When entering credentials/secrets/tokens, capture and SAVE each one individually as its step completes — never open several secret boxes at once. Batching all boxes together caused values to get pasted into the wrong fields. One value → save → confirm → next.
 - Deliver app changes as small, frequent, self-contained over-the-air (OTA) update groups — never big bundled update packs. Native-level changes can't ride OTA and need a new App Store build.
 - **Standing delivery policy (default, no re-litigating each time):** always deliver server-side changes to production FIRST, then process the OTA, in that order — "as we go," keeping the right order. Do not block or delay this standard server→OTA flow by citing past build-failure caution notes; the build-durability fixes are what keep builds succeeding, so treat them as solved, not as reasons to hesitate.
-  - **OTA target:** runtime `1.0.0` / channel `production`, delivering the build-46 (1.0.0) codebase to the live build-29 (1.0.0) users. This is the standing target until a new successful native build replaces build 29 as the live baseline.
+  - **OTA target:** runtime `1.0.0` / channel `production`, delivering the build-46 (1.0.0) codebase to the live build-29 (1.0.0) users. This is the standing target until a new successful native build with runtimeVersion `1.1.0` ships and goes live in the App Store / Play Store — at that point the target switches to runtime `1.1.0` / channel `production`. (app.json already has runtimeVersion 1.1.0; the switchover happens when the LIVE baseline flips, not when the build is internally available.)
   - **Irreducible constraint (still true):** native-only changes cannot ride an OTA and still require a fresh EAS build — the "until another successful build is in place" clause covers exactly this.
 - **This is a live product handling real money.** Always tell the whole truth in any environment. When querying data, always label which environment it comes from (dev or production). Never present dev data as if it answers a question about what the owner sees in the admin panel or the app. When both environments are relevant, show both — clearly labeled.
 
