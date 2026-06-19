@@ -67,7 +67,7 @@ import {
 } from "../lib/sponsoredVisitMonitor";
 import { fetchInbox } from "../lib/inbox";
 import { generateInboxDraft, detectLang, detectIssue } from "../lib/inboxDraft.js";
-import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe, sql as drizzleSql, gte as drizzleGte } from "drizzle-orm";
+import { count as drizzleCount, eq as drizzleEq, and as drizzleAnd, ne as drizzleNe, sql as drizzleSql, gte as drizzleGte, like as drizzleLike, max as drizzleMax } from "drizzle-orm";
 
 
 // Default operator mailbox AdMob reporting alerts fall back to when neither a
@@ -328,6 +328,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         configured: cfg.configured,
         error: `AdMob report error: ${err instanceof Error ? err.message : String(err)}`,
       });
+    }
+  });
+
+  /**
+   * GET /api/admin/admob/ssv-health
+   *
+   * Rewarded-ad SSV credit health snapshot for the Integration Hub. Reads
+   * directly from earn_tokens — no external API call, no caching needed.
+   *
+   * Response fields:
+   *   ssvToday       — earn tokens with actionType="rewarded_ad" AND description
+   *                    contains "SSV verified" issued since UTC midnight today.
+   *   fallbackToday  — rewarded_ad tokens issued today WITHOUT "SSV verified"
+   *                    in the description (non-zero signals a regression).
+   *   totalToday     — ssvToday + fallbackToday.
+   *   lastSsvAt      — ISO timestamp of the most recent SSV token, or null.
+   *   staleAlert     — true when totalToday > 0 but no SSV token in the past 6h,
+   *                    meaning videos are being watched but SSV isn't crediting.
+   *   fetchedAt      — server timestamp for the client to show data freshness.
+   */
+  app.get("/api/admin/admob/ssv-health", adminMiddleware, async (_req, res) => {
+    try {
+      const SSV_STALE_MS = 6 * 60 * 60 * 1000; // 6 hours
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const [ssvRow, totalRow, lastRow] = await Promise.all([
+        // SSV-verified tokens today
+        db
+          .select({ n: drizzleCount() })
+          .from(earnTokens)
+          .where(drizzleAnd(
+            drizzleEq(earnTokens.actionType, "rewarded_ad"),
+            drizzleLike(earnTokens.description, "%SSV verified%"),
+            drizzleGte(earnTokens.earnedAt, todayStart),
+          )),
+        // All rewarded_ad tokens today (SSV + fallback)
+        db
+          .select({ n: drizzleCount() })
+          .from(earnTokens)
+          .where(drizzleAnd(
+            drizzleEq(earnTokens.actionType, "rewarded_ad"),
+            drizzleGte(earnTokens.earnedAt, todayStart),
+          )),
+        // Most recent SSV token ever (all-time, for the staleness check)
+        db
+          .select({ lastAt: drizzleMax(earnTokens.earnedAt) })
+          .from(earnTokens)
+          .where(drizzleAnd(
+            drizzleEq(earnTokens.actionType, "rewarded_ad"),
+            drizzleLike(earnTokens.description, "%SSV verified%"),
+          )),
+      ]);
+
+      const ssvToday = Number(ssvRow[0]?.n ?? 0);
+      const totalToday = Number(totalRow[0]?.n ?? 0);
+      const fallbackToday = totalToday - ssvToday;
+      const lastSsvAt = lastRow[0]?.lastAt ? new Date(lastRow[0].lastAt).toISOString() : null;
+
+      // Amber alert: videos were watched today but no SSV in the past 6h.
+      const lastSsvMs = lastSsvAt ? new Date(lastSsvAt).getTime() : 0;
+      const staleAlert = totalToday > 0 && (now.getTime() - lastSsvMs) > SSV_STALE_MS;
+
+      res.json({
+        ssvToday,
+        fallbackToday,
+        totalToday,
+        lastSsvAt,
+        staleAlert,
+        fetchedAt: now.toISOString(),
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load SSV health" });
     }
   });
 

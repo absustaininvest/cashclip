@@ -4739,12 +4739,20 @@ export function IntegrationHubPanel({
     rewardedFillAvailable: boolean | null;
     fillReportedAt: number | null;
   } | null>(null);
+  const [ssvHealth, setSsvHealth] = useState<{
+    ssvToday: number;
+    fallbackToday: number;
+    totalToday: number;
+    lastSsvAt: string | null;
+    staleAlert: boolean;
+    fetchedAt: string;
+  } | null>(null);
 
   const fetchHub = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [hubRes, alertsRes, alertEmailRes, economyRes, paypalRes, adStatusRes] = await Promise.all([
+      const [hubRes, alertsRes, alertEmailRes, economyRes, paypalRes, adStatusRes, ssvRes] = await Promise.all([
         fetch("/api/admin/integration-hub", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -4761,6 +4769,9 @@ export function IntegrationHubPanel({
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/ad-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/admob/ssv-health", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -4794,6 +4805,9 @@ export function IntegrationHubPanel({
       }
       if (adStatusRes.ok) {
         setAdStatus(await adStatusRes.json());
+      }
+      if (ssvRes.ok) {
+        setSsvHealth(await ssvRes.json());
       }
       setLastRefreshed(new Date());
     } catch (err: any) {
@@ -5176,6 +5190,110 @@ export function IntegrationHubPanel({
                 <p className="text-sm font-semibold text-gray-500">
                   {adStatus === null ? "—" : fillAgo ?? "Never"}
                 </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* SSV Credit Health card */}
+      {(() => {
+        const ssvToday = ssvHealth?.ssvToday ?? null;
+        const fallbackToday = ssvHealth?.fallbackToday ?? 0;
+        const totalToday = ssvHealth?.totalToday ?? 0;
+        const lastSsvAt = ssvHealth?.lastSsvAt ?? null;
+        const staleAlert = ssvHealth?.staleAlert ?? false;
+
+        const ssvPct = totalToday > 0 ? Math.round((ssvToday ?? 0) / totalToday * 100) : null;
+
+        const dotStatus: "green" | "amber" | "red" =
+          ssvHealth === null
+            ? "amber"
+            : staleAlert
+              ? "amber"
+              : fallbackToday > 0
+                ? "amber"
+                : "green";
+
+        const dotColor =
+          dotStatus === "green" ? "bg-[#00E676]" : dotStatus === "amber" ? "bg-amber-400" : "bg-red-400";
+        const pingColor =
+          dotStatus === "green" ? "bg-[#00E676]/60" : dotStatus === "amber" ? "bg-amber-400/60" : "";
+
+        const label =
+          ssvHealth === null
+            ? "Loading…"
+            : staleAlert
+              ? "SSV gap detected — videos watched but no SSV credit in 6h"
+              : fallbackToday > 0
+                ? `${fallbackToday} non-SSV token${fallbackToday !== 1 ? "s" : ""} today — possible regression`
+                : ssvToday === 0
+                  ? "No rewarded-ad tokens today"
+                  : "SSV credits healthy";
+
+        const textColor =
+          dotStatus === "green"
+            ? "text-emerald-600"
+            : dotStatus === "amber"
+              ? "text-amber-500"
+              : "text-red-400";
+
+        const lastSsvAgo = lastSsvAt
+          ? (() => {
+              const s = Math.floor((Date.now() - new Date(lastSsvAt).getTime()) / 1000);
+              if (s < 60) return `${s}s ago`;
+              if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+              if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+              return `${Math.floor(s / 86400)}d ago`;
+            })()
+          : null;
+
+        return (
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0 mt-1">
+                  {dotStatus !== "red" && (
+                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${pingColor}`} />
+                  )}
+                  <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                </span>
+                <div>
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                    Rewarded Ad Credit Health
+                  </p>
+                  <p className={`text-base font-bold ${textColor}`}>{label}</p>
+                  {staleAlert && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Check the AdMob rewarded-ad unit's custom data configuration and ensure <span className="font-mono">user_id</span> is being passed.
+                    </p>
+                  )}
+                  {!staleAlert && fallbackToday > 0 && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Non-SSV rewarded_ad tokens should not exist — they indicate the SSV callback is not crediting correctly.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-right space-y-1.5">
+                <div>
+                  <p className="text-gray-300 text-[10px]">SSV tokens today</p>
+                  <p className={`text-sm font-semibold ${ssvHealth === null ? "text-gray-400" : "text-gray-800"}`}>
+                    {ssvHealth === null ? "—" : String(ssvToday ?? 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-300 text-[10px]">SSV %</p>
+                  <p className={`text-sm font-semibold ${ssvPct === null ? "text-gray-400" : ssvPct === 100 ? "text-emerald-600" : "text-amber-500"}`}>
+                    {ssvHealth === null ? "—" : ssvPct === null ? "—" : `${ssvPct}%`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-300 text-[10px]">Last SSV issued</p>
+                  <p className={`text-sm font-semibold ${staleAlert ? "text-amber-500" : "text-gray-500"}`}>
+                    {ssvHealth === null ? "—" : lastSsvAgo ?? "Never"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
