@@ -669,6 +669,74 @@ describe('Decline Alert — "Continue Without" button label is consistent', () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ATT pre-authorized — full new-user path (no TERMS_KEY) with ATT already
+// granted (e.g. OS upgrade migrated the status before the app ever prompted).
+//
+// The code path under test:
+//   mount → setStep("disclosures")  [getATTStatus is NOT called on mount]
+//   Continue tap → acceptDisclosures() → getATTStatus() = "authorized"
+//     → requestATT() SKIPPED (status !== "undetermined")
+//     → secureGet(TERMS_KEY) = null → setStep("terms")
+//   Accept tap → secureSet(TERMS_KEY, "1") → finish() → children visible
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — ATT pre-authorized, no TERMS_KEY (new-user full path)", () => {
+  it("shows disclosures on mount without calling getATTStatus or requestATT", async () => {
+    attStatuses.push("authorized");
+
+    const tr = await renderGate();
+
+    expect(disclosuresVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+    // getATTStatus is only called inside acceptDisclosures(), never on mount.
+    const { getATTStatus } = await import("@/lib/att");
+    expect(getATTStatus).not.toHaveBeenCalled();
+    expect(requestATTCalled).toBe(false);
+  });
+
+  it("skips requestATT and advances to the terms step when ATT is pre-authorized and TERMS_KEY is absent", async () => {
+    attStatuses.push("authorized");
+
+    const tr = await renderGate();
+    expect(disclosuresVisible(tr.root)).toBe(true);
+
+    await pressContinue(tr);
+    await flush();
+
+    expect(requestATTCalled).toBe(false);
+    expect(termsVisible(tr.root)).toBe(true);
+    expect(childrenVisible(tr.root)).toBe(false);
+  });
+
+  it("writes TERMS_KEY and renders children after accepting terms on the pre-authorized path", async () => {
+    attStatuses.push("authorized");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    await pressContinue(tr);
+    await flush();
+
+    expect(termsVisible(tr.root)).toBe(true);
+
+    const acceptNodes = tr.root.findAll(
+      (n) => (n.type as string) === "Text" && allText(n).join("").includes("Accept & Enter CashClip"),
+    );
+    expect(acceptNodes.length, "Accept & Enter CashClip button not found in terms step").toBeGreaterThan(0);
+    const acceptBtnHost = acceptNodes[0].parent!.parent!;
+
+    await act(async () => {
+      acceptBtnHost.props.onPress();
+    });
+    await flush();
+
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(requestATTCalled).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Platform.OS = "android" — non-iOS fast-path
 // ─────────────────────────────────────────────────────────────────────────────
 describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', () => {
