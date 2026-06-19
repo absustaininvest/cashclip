@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import { sendAdmobReportAlert } from "./email";
+import { sendAdmobReportAlert, sendSsvCreditAlert } from "./email";
 import {
   getSetting,
   ADMOB_ALERT_EMAIL_KEY,
@@ -412,4 +412,160 @@ export function _resetAdmobAlertsForTests(): void {
   recentAlerts.length = 0;
   ssvMissingUserIdState.count = 0;
   ssvMissingUserIdState.lastSeenAt = null;
+}
+
+// ── SSV credit-health operator alerts ────────────────────────────────────────
+// Watches the ssv_credit_stale condition: rewarded videos were watched today
+// but no SSV credit has been received in the past 6h.  Gated on
+// AD_ADMOB_NATIVE=true so it never fires on staging or dev.
+//
+// Follows the same state-machine + cooldown pattern as evaluateAdmobAlerts so
+// a sustained outage alerts once per cooldown window and fires a single
+// "resolved" email when SSV credits resume.
+
+const DEFAULT_SSV_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+export type SsvAlertStatus = "firing" | "resolved";
+
+export interface SsvAlert {
+  id: string;
+  condition: "ssv_credit_stale";
+  status: SsvAlertStatus;
+  message: string;
+  firstSeenAt: string;
+  firedAt: string;
+  cooldownMs: number;
+  detail: Record<string, unknown>;
+}
+
+export interface SsvAlertInput {
+  /** True when videos were watched today but no SSV credit in the past 6h. */
+  staleAlert: boolean;
+  /** Total rewarded_ad tokens issued today (SSV + fallback). */
+  totalToday: number;
+  /** ISO timestamp of the most recent SSV token, or null. */
+  lastSsvAt: string | null;
+  /** Override for tests; defaults to Date.now(). */
+  now?: number;
+}
+
+const ssvAlertState: ConditionState = { active: false, firstSeenAt: 0, lastAlertAt: 0 };
+const recentSsvAlerts: SsvAlert[] = [];
+
+function fireSsvAlert(alert: SsvAlert, cfg: AdmobAlertConfig): void {
+  const log = alert.status === "resolved" ? logger.info.bind(logger) : logger.warn.bind(logger);
+  log(
+    { audit: "ssv_credit_alert", ...alert },
+    `ssv_credit_alert condition=${alert.condition} status=${alert.status}`,
+  );
+
+  // Use the same operator-alert email config as AdMob reporting alerts so the
+  // persisted admin UI recipient (getSetting(ADMOB_ALERT_EMAIL_KEY)) and the
+  // email-enabled toggle are both honoured here without separate wiring.
+  if (cfg.emailEnabled) {
+    try {
+      sendSsvCreditAlert({
+        status: alert.status,
+        message: alert.message,
+        firedAt: alert.firedAt,
+        detail: alert.detail,
+        to: cfg.emailRecipient,
+      });
+    } catch (err) {
+      logger.error({ condition: alert.condition, err }, "Failed to send SSV credit alert email");
+    }
+  }
+
+  recentSsvAlerts.push(alert);
+  if (recentSsvAlerts.length > MAX_ALERTS) {
+    recentSsvAlerts.splice(0, recentSsvAlerts.length - MAX_ALERTS);
+  }
+}
+
+/**
+ * Evaluate the SSV credit-health condition and fire/resolve operator alerts as
+ * needed.  Called from GET /api/admin/admob/ssv-health after the DB query
+ * that builds the staleAlert signal.
+ *
+ * Gated on AD_ADMOB_NATIVE=true — never fires on staging / dev.
+ * Returns the alerts actually emitted this evaluation (may be empty).
+ */
+export function evaluateSsvAlerts(input: SsvAlertInput): SsvAlert[] {
+  if (!envFlag("AD_ADMOB_NATIVE")) return [];
+
+  // Reuse the existing operator-alert config so the persisted admin UI settings
+  // (recipient, email-enabled toggle) are honoured for SSV alerts too.
+  const cfg = getAdmobAlertConfig();
+  const cooldownMs = Math.round(envNum("SSV_ALERT_COOLDOWN_MS", DEFAULT_SSV_ALERT_COOLDOWN_MS));
+  const now = input.now ?? Date.now();
+  const fired: SsvAlert[] = [];
+
+  const state = ssvAlertState;
+  let alert: SsvAlert | null = null;
+
+  if (input.staleAlert) {
+    if (!state.active) {
+      state.active = true;
+      state.firstSeenAt = now;
+      state.lastAlertAt = now;
+      alert = buildSsvAlert("firing", state.firstSeenAt, now, input, cooldownMs);
+    } else if (now - state.lastAlertAt >= cooldownMs) {
+      state.lastAlertAt = now;
+      alert = buildSsvAlert("firing", state.firstSeenAt, now, input, cooldownMs);
+    }
+  } else if (state.active) {
+    const firstSeenAt = state.firstSeenAt || now;
+    state.active = false;
+    state.firstSeenAt = 0;
+    state.lastAlertAt = 0;
+    alert = buildSsvAlert("resolved", firstSeenAt, now, input, cooldownMs);
+  }
+
+  if (alert) {
+    fireSsvAlert(alert, cfg);
+    fired.push(alert);
+  }
+
+  return fired;
+}
+
+function buildSsvAlert(
+  status: SsvAlertStatus,
+  firstSeenAt: number,
+  firedAt: number,
+  input: SsvAlertInput,
+  cooldownMs: number,
+): SsvAlert {
+  const message =
+    status === "resolved"
+      ? "AdMob SSV credits are flowing again — the SSV credit stale alert has cleared."
+      : `AdMob SSV is not crediting: ${input.totalToday} video${input.totalToday === 1 ? "" : "s"} watched today but no SSV credit received${input.lastSsvAt ? ` since ${input.lastSsvAt}` : " yet"}.`;
+
+  return {
+    id: `ssv_credit_stale::${firedAt}`,
+    condition: "ssv_credit_stale",
+    status,
+    message,
+    firstSeenAt: new Date(firstSeenAt).toISOString(),
+    firedAt: new Date(firedAt).toISOString(),
+    cooldownMs,
+    detail: {
+      totalToday: input.totalToday,
+      lastSsvAt: input.lastSsvAt,
+      staleAlert: input.staleAlert,
+    },
+  };
+}
+
+export function getRecentSsvAlerts(limit = 50): SsvAlert[] {
+  const n = Math.min(Math.max(limit, 1), MAX_ALERTS);
+  return recentSsvAlerts.slice(-n).reverse();
+}
+
+/** Test-only helper to reset SSV alert state. */
+export function _resetSsvAlertsForTests(): void {
+  ssvAlertState.active = false;
+  ssvAlertState.firstSeenAt = 0;
+  ssvAlertState.lastAlertAt = 0;
+  recentSsvAlerts.length = 0;
 }

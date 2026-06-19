@@ -769,6 +769,64 @@ export function sendAdmobReportAlert(alert: {
 }
 
 /**
+ * Alert the operator that AdMob SSV credits have stopped flowing.
+ *
+ * Fired by evaluateSsvAlerts (lib/admobAlerts.ts) via the same fire/resolve
+ * pattern as sendAdmobReportAlert. Fire-and-forget; never throws.
+ */
+export function sendSsvCreditAlert(alert: {
+  status: "firing" | "resolved";
+  message: string;
+  firedAt: string;
+  detail: Record<string, unknown>;
+  to?: string;
+}): void {
+  const to = alert.to?.trim() || process.env["ADMIN_ALERT_EMAIL"]?.trim() || ADMIN_EMAIL;
+  const isResolved = alert.status === "resolved";
+  const accent = isResolved ? "#00C853" : "#FB8C00";
+  const statusWord = isResolved ? "Resolved" : "Firing";
+  const headline = isResolved
+    ? "AdMob SSV Credits Restored"
+    : "AdMob SSV Credits Not Flowing";
+
+  const safeMessage = escapeHtml(alert.message);
+  const safeFiredAt = escapeHtml(alert.firedAt);
+
+  const detailRows = Object.entries(alert.detail)
+    .map(([k, v]) => {
+      const val = v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
+      return `<tr><td style="padding:6px 0;font-weight:600;color:#555;width:160px">${escapeHtml(k)}</td><td style="padding:6px 0;color:#333">${escapeHtml(val)}</td></tr>`;
+    })
+    .join("");
+  const detailText = Object.entries(alert.detail)
+    .map(([k, v]) => `  ${k}: ${v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+    .join("\n");
+
+  const subject = isResolved
+    ? "[CashClip] Resolved — AdMob SSV credits are flowing again"
+    : "[CashClip] Alert — AdMob SSV credits have stopped";
+
+  sendBestEffort({
+    to,
+    subject,
+    text: `AdMob SSV credit operator alert\n\nCondition: ssv_credit_stale\nStatus: ${alert.status}\nWhen: ${alert.firedAt}\n\n${alert.message}\n\nDetail:\n${detailText}\n\n— CashClip operations`,
+    // nosemgrep: javascript.lang.security.html-in-template-string — all interpolations use escapeHtml()
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+        <h2 style="color:#1a1a1a;border-bottom:2px solid ${accent};padding-bottom:12px">${headline} — ${statusWord}</h2>
+        <p style="color:#333;font-size:15px;line-height:1.6">${safeMessage}</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px">
+          <tr><td style="padding:6px 0;font-weight:600;color:#555;width:160px">Condition</td><td style="padding:6px 0;color:#333">ssv_credit_stale</td></tr>
+          <tr><td style="padding:6px 0;font-weight:600;color:#555">Status</td><td style="padding:6px 0;color:#333">${escapeHtml(statusWord)}</td></tr>
+          <tr><td style="padding:6px 0;font-weight:600;color:#555">When</td><td style="padding:6px 0;color:#333">${safeFiredAt}</td></tr>
+          ${detailRows}
+        </table>
+        <p style="margin-top:24px;font-size:12px;color:#999">CashClip operations · /sc-portal Integration Hub · cash-clip.app</p>
+      </div>`,
+  });
+}
+
+/**
  * Send an admin reply to an inbound support email.
  *
  * Unlike the notification helpers above (fire-and-forget), this throws on

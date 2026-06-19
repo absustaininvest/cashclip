@@ -50,6 +50,7 @@ import {
   getAdmobAlertConfig,
   isAdmobMirrorExpectedActive,
   getSsvMissingUserIdStats,
+  evaluateSsvAlerts,
 } from "../lib/admobAlerts";
 import {
   getSetting,
@@ -391,6 +392,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Amber alert: videos were watched today but no SSV in the past 6h.
       const lastSsvMs = lastSsvAt ? new Date(lastSsvAt).getTime() : 0;
       const staleAlert = totalToday > 0 && (now.getTime() - lastSsvMs) > SSV_STALE_MS;
+
+      // Fire/resolve operator email alert when SSV credits stop flowing.
+      // Gated on AD_ADMOB_NATIVE=true inside evaluateSsvAlerts — no-ops on staging.
+      evaluateSsvAlerts({ staleAlert, totalToday, lastSsvAt, now: now.getTime() });
 
       res.json({
         ssvToday,
