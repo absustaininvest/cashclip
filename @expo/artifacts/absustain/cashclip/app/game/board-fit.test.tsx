@@ -184,6 +184,21 @@ describe("Coin Catcher play area — items fall without leaving the screen", () 
     expect(COIN_CATCHER_CATCHER_WIDTH).toBe(80);
   });
 
+  it("COIN_CATCHER_CATCHER_WIDTH is narrower than the iPhone SE screen (320 pt)", () => {
+    // Guards against a future increase to CATCHER_WIDTH that would push the bar
+    // wider than the narrowest supported screen (320 pt iPhone SE 1st/2nd gen).
+    const NARROWEST_SCREEN = 320;
+    expect(COIN_CATCHER_CATCHER_WIDTH).toBeLessThan(NARROWEST_SCREEN);
+  });
+
+  it("catcher fits horizontally at its rightmost drag extreme on iPhone SE (320 pt)", () => {
+    // The catcher's left edge can reach at most (SCREEN_WIDTH - CATCHER_WIDTH).
+    // If that value goes negative the catcher overflows the right edge when
+    // dragged to its maximum position.
+    const NARROWEST_SCREEN = 320;
+    expect(NARROWEST_SCREEN - COIN_CATCHER_CATCHER_WIDTH).toBeGreaterThanOrEqual(0);
+  });
+
   it("play area height > ITEM_SIZE on iPhone SE (web insets 67/34)", () => {
     const h = coinCatcherPlayAreaHeight(568, 67, 34);
     expect(h).toBeGreaterThan(COIN_CATCHER_ITEM_SIZE);
