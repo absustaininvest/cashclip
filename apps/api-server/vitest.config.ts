@@ -18,5 +18,15 @@ export default defineConfig({
     // never has to walk up through pnpm's virtual-store directories to find it.
     // Without this, vite can mis-resolve the tsconfig from the pnpm virtual store
     // (node_modules/.pnpm/…) and emit a [TSCONFIG_ERROR].
+    exclude: [
+      // DB-integration tests require a live PostgreSQL connection and are not
+      // available in CI. Run them separately when a live DB is present.
+      "**/*.realDb.test.ts",
+      // Concurrent DB tests also require a live database connection.
+      "**/*.concurrent.test.ts",
+      // Default vitest excludes
+      "**/node_modules/**",
+      "**/dist/**",
+    ],
   },
 });
