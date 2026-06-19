@@ -21,8 +21,10 @@ export default function Ventures() {
         </p>
       </div>
 
-      <div className="space-y-32">
-        {/* Venture 1 — CashClip */}
+      {/* ── Ventures Layout ── */}
+      <div className="space-y-12">
+
+        {/* Venture 1 — CashClip (flagship, full-width hero row) */}
         <div className="flex flex-col md:flex-row gap-12 items-center" data-testid="venture-cashclip">
           <div className="flex-1 w-full relative">
             <div className="aspect-[4/3] rounded-3xl bg-gradient-to-br from-[#00E676]/20 to-[#06060E] border border-white/5 flex items-center justify-center relative overflow-hidden group">
@@ -90,120 +92,129 @@ export default function Ventures() {
           </div>
         </div>
 
-        {/* Venture 2 — Online Retail */}
-        <div className="flex flex-col md:flex-row-reverse gap-12 items-center" data-testid="venture-retail">
-          <div className="flex-1 w-full relative">
-            <div className="aspect-[4/3] rounded-3xl bg-gradient-to-bl from-yellow-500/10 to-[#06060E] border border-white/5 flex items-center justify-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors" />
-              <ShoppingBag className="w-24 h-24 text-yellow-500 opacity-60 group-hover:scale-110 transition-transform duration-500" />
-            </div>
-          </div>
-          <div className="flex-1 space-y-6">
-            <div className="card-status status-coming mb-0 inline-block">In Development</div>
-            <h2 className="font-['Space_Grotesk'] text-4xl font-bold text-white tracking-tight">Online Retail Division</h2>
-            <p className="text-white/50 text-lg leading-relaxed">
-              A comprehensive e-commerce strategy focusing on sustainable consumer goods. This venture integrates advanced supply chain logistics with a premium direct-to-consumer experience.
-            </p>
-            <ul className="space-y-4 py-4 border-y border-white/10">
-              <li className="flex justify-between items-center text-white/70">
-                <span>Sector</span>
-                <span className="font-semibold text-white">E-Commerce / Retail</span>
-              </li>
-              <li className="flex justify-between items-center text-white/70">
-                <span>Status</span>
-                <span className="font-semibold text-yellow-500">2026 Launch</span>
-              </li>
-            </ul>
-            <button disabled className="opacity-50 cursor-not-allowed bg-white/10 text-white py-3 px-6 rounded-full font-['Space_Grotesk'] font-bold text-sm">
-              Coming Soon
-            </button>
-          </div>
-        </div>
+        {/* Peer row — Solera + Online Retail as equal two-column grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-        {/* Venture 3 — Solera */}
-        <div className="flex flex-col md:flex-row gap-12 items-center" data-testid="venture-food">
-          <div className="flex-1 w-full relative">
-            <div className="aspect-[4/3] rounded-3xl bg-gradient-to-br from-[#1A0D08] via-[#0F0A07] to-[#06060E] border border-[#8B4A35]/20 flex items-center justify-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-[#8B4A35]/[0.03] group-hover:bg-[#8B4A35]/[0.06] transition-colors" />
-              <div className="absolute inset-0 flex items-center justify-center p-10">
-                <img
-                  src={`${import.meta.env.BASE_URL}solera-logo.jpeg`}
-                  alt="Solera Restaurant"
-                  className="w-full max-w-[300px] object-contain rounded-2xl opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                />
+          {/* Venture 3 — Solera */}
+          <div className="rounded-3xl border border-white/[0.07] bg-white/[0.015] overflow-hidden flex flex-col" data-testid="venture-food">
+            <div className="w-full relative">
+              <div className="aspect-[16/9] bg-gradient-to-br from-[#1A0D08] via-[#0F0A07] to-[#06060E] border-b border-[#8B4A35]/20 flex items-center justify-center relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[#8B4A35]/[0.03] group-hover:bg-[#8B4A35]/[0.06] transition-colors" />
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <img
+                    src={`${import.meta.env.BASE_URL}solera-logo.jpeg`}
+                    alt="Solera Restaurant"
+                    className="w-full max-w-[260px] object-contain rounded-2xl opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex-1 space-y-6">
-            <div className="card-status status-coming mb-0 inline-block">Concept Stage</div>
-            <h2 className="font-['Space_Grotesk'] text-4xl font-bold text-white tracking-tight">Solera</h2>
-            <p className="text-[#D4A540]/80 font-serif italic text-lg tracking-wide">Aged in Tradition. Served with Soul.</p>
-            <p className="text-white/50 text-lg leading-relaxed">
-              A modern restaurant concept rooted in hospitality and quality. Solera draws its name from the traditional aging method — blending the best of what came before with the innovation of what's next. Every detail is designed to deliver an experience that feels both timeless and fresh.
-            </p>
-            <ul className="space-y-4 py-4 border-y border-white/10">
-              <li className="flex justify-between items-center text-white/70">
-                <span>Sector</span>
-                <span className="font-semibold text-white">Hospitality / Food Service</span>
-              </li>
-              <li className="flex justify-between items-center text-white/70">
-                <span>Location</span>
-                <span className="font-semibold text-white">Lake Worth Beach, FL / Greater Palm Beach Area</span>
-              </li>
-              <li className="flex justify-between items-center text-white/70">
-                <span>Status</span>
-                <span className="font-semibold text-[#D4A540]">Relocating — New Venue Being Secured</span>
-              </li>
-              <li className="flex justify-between items-center text-white/70">
-                <span>Domain</span>
+            <div className="flex-1 flex flex-col p-7 space-y-5">
+              <div>
+                <div className="card-status status-coming mb-3 inline-block">Concept Stage</div>
+                <h2 className="font-['Space_Grotesk'] text-3xl font-bold text-white tracking-tight">Solera</h2>
+                <p className="text-[#D4A540]/80 font-serif italic text-base tracking-wide mt-1">Aged in Tradition. Served with Soul.</p>
+              </div>
+              <p className="text-white/50 text-base leading-relaxed">
+                A modern restaurant concept rooted in hospitality and quality. Solera draws its name from the traditional aging method — blending the best of what came before with the innovation of what's next.
+              </p>
+              <ul className="space-y-3 py-4 border-y border-white/10 text-sm">
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Sector</span>
+                  <span className="font-semibold text-white">Hospitality / Food Service</span>
+                </li>
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Location</span>
+                  <span className="font-semibold text-white text-right max-w-[55%]">Lake Worth Beach, FL / Greater Palm Beach Area</span>
+                </li>
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Status</span>
+                  <span className="font-semibold text-[#D4A540] text-right max-w-[55%]">Relocating — New Venue Being Secured</span>
+                </li>
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Domain</span>
+                  <a
+                    href="https://solera-restaurant.absustaininvest.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 font-semibold text-[#8B4A35] hover:text-[#A0522D] transition-colors text-xs"
+                  >
+                    solera-restaurant.absustaininvest.com
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </li>
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Inquiries</span>
+                  <a href="mailto:supportpr@absustaininvest.com" className="font-semibold text-[#8B4A35] hover:underline text-xs">
+                    supportpr@absustaininvest.com
+                  </a>
+                </li>
+              </ul>
+              {/* Signature dishes */}
+              <div className="rounded-2xl border border-[#8B4A35]/20 bg-[#8B4A35]/5 p-4 space-y-3">
+                <p className="text-[#D4A540] font-['Space_Grotesk'] font-bold text-xs tracking-widest uppercase">A Few of Our Favorites</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { name: "Cordon Bleu", icon: "🍗" },
+                    { name: "Coastal Cobb", icon: "🥗" },
+                    { name: "Lentil Soup", icon: "🍲" },
+                  ].map((dish) => (
+                    <div key={dish.name} className="text-center p-2.5 rounded-xl bg-[#8B4A35]/10 border border-[#8B4A35]/15">
+                      <div className="text-xl mb-1">{dish.icon}</div>
+                      <p className="text-white/80 text-xs font-semibold">{dish.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap mt-auto pt-1">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#D4A540]/30 bg-[#D4A540]/5 text-[#D4A540] text-xs font-medium">
+                  <UtensilsCrossed className="w-3.5 h-3.5" />
+                  Relocating — New Venue in Progress
+                </div>
                 <a
-                  href="https://solera-restaurant.absustaininvest.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 font-semibold text-[#8B4A35] hover:text-[#A0522D] transition-colors text-sm"
+                  href="/ventures/solera"
+                  className="flex items-center gap-2 border border-[#8B4A35]/40 hover:border-[#D4A540]/40 text-[#D4A540] py-2.5 px-5 rounded-full font-['Space_Grotesk'] font-bold text-sm transition-colors"
                 >
-                  solera-restaurant.absustaininvest.com
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  Full Story <ArrowUpRight className="w-4 h-4" />
                 </a>
-              </li>
-              <li className="flex justify-between items-center text-white/70">
-                <span>Partnership Inquiries</span>
-                <a href="mailto:supportpr@absustaininvest.com" className="font-semibold text-[#8B4A35] hover:underline text-sm">
-                  supportpr@absustaininvest.com
-                </a>
-              </li>
-            </ul>
-            {/* Signature dishes */}
-            <div className="rounded-2xl border border-[#8B4A35]/20 bg-[#8B4A35]/5 p-5 space-y-3">
-              <p className="text-[#D4A540] font-['Space_Grotesk'] font-bold text-xs tracking-widest uppercase">A Few of Our Favorites</p>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { name: "Cordon Bleu", icon: "🍗" },
-                  { name: "Coastal Cobb", icon: "🥗" },
-                  { name: "Lentil Soup", icon: "🍲" },
-                ].map((dish) => (
-                  <div key={dish.name} className="text-center p-3 rounded-xl bg-[#8B4A35]/10 border border-[#8B4A35]/15">
-                    <div className="text-2xl mb-1">{dish.icon}</div>
-                    <p className="text-white/80 text-xs font-semibold">{dish.name}</p>
-                  </div>
-                ))}
               </div>
             </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4A540]/30 bg-[#D4A540]/5 text-[#D4A540] text-sm font-medium">
-                <UtensilsCrossed className="w-4 h-4" />
-                Relocating — New Venue in Progress
-              </div>
-              <a
-                href="/ventures/solera"
-                className="flex items-center gap-2 border border-[#8B4A35]/40 hover:border-[#D4A540]/40 text-[#D4A540] py-3 px-6 rounded-full font-['Space_Grotesk'] font-bold text-sm transition-colors"
-              >
-                Full Story <ArrowUpRight className="w-4 h-4" />
-              </a>
-            </div>
-
           </div>
+
+          {/* Venture 2 — Online Retail */}
+          <div className="rounded-3xl border border-white/[0.07] bg-white/[0.015] overflow-hidden flex flex-col" data-testid="venture-retail">
+            <div className="w-full relative">
+              <div className="aspect-[16/9] bg-gradient-to-bl from-yellow-500/10 to-[#06060E] border-b border-white/5 flex items-center justify-center relative overflow-hidden group">
+                <div className="absolute inset-0 bg-yellow-500/5 group-hover:bg-yellow-500/10 transition-colors" />
+                <ShoppingBag className="w-20 h-20 text-yellow-500 opacity-60 group-hover:scale-110 transition-transform duration-500" />
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col p-7 space-y-5">
+              <div>
+                <div className="card-status status-coming mb-3 inline-block">In Development</div>
+                <h2 className="font-['Space_Grotesk'] text-3xl font-bold text-white tracking-tight">Online Retail Division</h2>
+              </div>
+              <p className="text-white/50 text-base leading-relaxed">
+                A comprehensive e-commerce strategy focusing on sustainable consumer goods. This venture integrates advanced supply chain logistics with a premium direct-to-consumer experience.
+              </p>
+              <ul className="space-y-3 py-4 border-y border-white/10 text-sm">
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Sector</span>
+                  <span className="font-semibold text-white">E-Commerce / Retail</span>
+                </li>
+                <li className="flex justify-between items-center text-white/70">
+                  <span>Status</span>
+                  <span className="font-semibold text-yellow-500">2026 Launch</span>
+                </li>
+              </ul>
+              <div className="mt-auto pt-1">
+                <button disabled className="opacity-50 cursor-not-allowed bg-white/10 text-white py-3 px-6 rounded-full font-['Space_Grotesk'] font-bold text-sm">
+                  Coming Soon
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
