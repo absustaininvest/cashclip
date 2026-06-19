@@ -21,7 +21,7 @@ const path = require("path");
 const workspaceRoot = path.resolve(__dirname, "..");
 const nmDir = path.join(
   workspaceRoot,
-  "@expo/artifacts/absustain/cashclip/node_modules"
+  "apps/cashclip/node_modules"
 );
 
 let fixed = 0;

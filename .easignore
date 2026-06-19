@@ -22,8 +22,8 @@ docs/
 # Pre-compiled build outputs (EAS compiles from source)
 dist/
 static-build/
-artifacts/api-server/dist/
-artifacts/absustain/dist/
+apps/api-server/dist/
+apps/absustain/dist/
 
 # App Store / Play Store marketing assets (not runtime code)
-artifacts/cashclip/store-assets/
+apps/cashclip/store-assets/

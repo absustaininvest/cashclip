@@ -81,7 +81,7 @@ if [ "${#POSITIONAL_ARGS[@]}" -ge 1 ]; then
 else
   # Auto-detect: prefer the primary cashclip artifact, fall back to cashclip-next
   CANDIDATES=(
-    "$WORKSPACE/@expo/artifacts/absustain/cashclip/plugins/withSslPinning.js"
+    "$WORKSPACE/apps/cashclip/plugins/withSslPinning.js"
     "$WORKSPACE/artifacts/cashclip/plugins/withSslPinning.js"
     "$WORKSPACE/artifacts/cashclip-next/plugins/withSslPinning.js"
   )

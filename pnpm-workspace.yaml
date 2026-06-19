@@ -54,12 +54,8 @@ minimumReleaseAgeExclude:
   - tmp
 
 packages:
-  - artifacts/*
-  - artifacts/cashclip-next
-  - "@expo/artifacts/absustain/cashclip"
-  - "@expo/artifacts/api-server"
-  - lib/*
-  - lib/integrations/*
+  - apps/*
+  - packages/*
   - scripts
 
 catalog:

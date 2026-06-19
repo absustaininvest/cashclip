@@ -124,23 +124,23 @@ isValidation = true
 name = "OTA Update (iOS)"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "OTA_PLATFORM=ios bash @expo/artifacts/absustain/cashclip/scripts/eas-ota-publish.sh"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "OTA_PLATFORM=ios bash apps/cashclip/scripts/eas-ota-publish.sh"
 
 [[workflows.workflow]]
 name = "OTA Update (Android)"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "OTA_PLATFORM=android bash @expo/artifacts/absustain/cashclip/scripts/eas-ota-publish.sh"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "OTA_PLATFORM=android bash apps/cashclip/scripts/eas-ota-publish.sh"
 
 [[ports]]
 localPort = 3000
@@ -171,7 +171,7 @@ externalPort = 3002
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "--enable-source-maps", "@expo/artifacts/api-server/dist/index.mjs"]
+run = ["node", "--enable-source-maps", "apps/api-server/dist/index.mjs"]
 build = ["pnpm", "run", "build"]
 
 [postMerge]
