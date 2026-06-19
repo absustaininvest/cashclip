@@ -985,6 +985,94 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Android build-upgrade scenario — stale pre-SecureStore consent keys
+//
+// Simulates a real device upgrading from an old build that wrote consent state
+// to AsyncStorage (before the SecureStore migration was introduced). On first
+// launch of the new build:
+//   1. All three legacy AsyncStorage keys are present (seeded by the old build).
+//   2. SecureStore (Keychain) is empty — the old build never wrote there.
+//   3. The gate mounts on Android (Platform.OS = "android").
+//   4. migrateLegacyConsent() must atomically promote the legacy keys to
+//      TERMS_KEY in SecureStore, then remove all three stale AsyncStorage keys.
+//   5. finish() is called → children render immediately (no ATT/disclosure UI).
+//
+// This is the "pre-dates SecureStore" path: no TERMS_KEY anywhere, legacy keys
+// only in AsyncStorage, new build encounters them for the first time.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — Android build-upgrade: stale pre-SecureStore consent keys", () => {
+  beforeEach(() => {
+    (Platform as any).OS = "android";
+    (Platform as any).select = (o: any) => o.android ?? o.default;
+  });
+
+  afterEach(() => {
+    (Platform as any).OS = "ios";
+    (Platform as any).select = (o: any) => o.ios ?? o.default;
+  });
+
+  it("removes all three legacy AsyncStorage keys on first launch of the upgraded build", async () => {
+    // Seed the state an old build would have left behind.
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+    // SecureStore is empty — old build never wrote TERMS_KEY there.
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("promotes the legacy consent to TERMS_KEY in SecureStore on the upgraded build (pre-SecureStore era)", async () => {
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+    // TERMS_KEY absent — this is a device that never ran the SecureStore-era build.
+
+    await renderGate();
+
+    // The migration must have written TERMS_KEY so the user is not re-prompted.
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+  });
+
+  it("passes through to children immediately after upgrade (no ATT/disclosure UI on Android)", async () => {
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    const onDone = vi.fn();
+    const tr = await renderGate(onDone);
+
+    // Children must be visible — Android skips the disclosure/terms UI entirely.
+    expect(childrenVisible(tr.root)).toBe(true);
+    expect(disclosuresVisible(tr.root)).toBe(false);
+    // finish() must have been called exactly once.
+    expect(onDone).toHaveBeenCalledTimes(1);
+    // No ATT request ever fires on Android.
+    expect(requestATTCalled).toBe(false);
+  });
+
+  it("leaves no stale keys behind when all three legacy keys were present", async () => {
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    // Confirm the exact set of keys that should NOT survive the upgrade.
+    const survivingLegacyKeys = [
+      "consent_done_v3",
+      "consent_fully_done_v2",
+      "tracking_consent_dismissed_v1",
+    ].filter((k) => store.has(k));
+
+    expect(survivingLegacyKeys).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ATT revocation listener — iOS AppState "active" guard
 //
 // The useEffect (lines 112–130 of TrackingConsentGate.tsx) attaches an
