@@ -268,3 +268,42 @@ describe("Profile screen — PayPal email plausibility gate on save", () => {
     ).toBe(false);
   });
 });
+
+// ── Profile screen — server-side error paths after the save request ────────────
+//
+// handleSavePaypal maps two specific server error codes onto distinct user-facing
+// messages. These tests exercise those post-request branches by making apiRequest
+// reject with an Error whose message contains the relevant code word.
+describe("Profile screen — PayPal save: server-side CONFLICT and ALREADY_SET errors", () => {
+  it("CONFLICT: shows 'already linked to another account' and does not call refreshUser", async () => {
+    apiRequestMock.mockRejectedValueOnce(
+      new Error("CONFLICT: email already linked to another account"),
+    );
+
+    const tr = await renderScreen();
+    await typeAndSave(tr, "user@gmail.com");
+
+    expect(
+      allText(tr.root).some((t) =>
+        t.includes("already linked to another account"),
+      ),
+    ).toBe(true);
+    // CONFLICT does not trigger a user refresh — only ALREADY_SET does.
+    expect(refreshUserMock).not.toHaveBeenCalled();
+  });
+
+  it("ALREADY_SET: shows 'already been set' and calls refreshUser to sync server state", async () => {
+    apiRequestMock.mockRejectedValueOnce(
+      new Error("ALREADY_SET: paypal email already set"),
+    );
+
+    const tr = await renderScreen();
+    await typeAndSave(tr, "user@gmail.com");
+
+    expect(
+      allText(tr.root).some((t) => t.includes("already been set")),
+    ).toBe(true);
+    // ALREADY_SET re-fetches the user so the UI can show the now-locked email.
+    expect(refreshUserMock).toHaveBeenCalledTimes(1);
+  });
+});
