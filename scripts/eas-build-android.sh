@@ -21,6 +21,20 @@ echo "================================================"
 echo "  CashClip EAS Android Build — $(date)"
 echo "================================================"
 
+# ── SSL-pin pre-flight ────────────────────────────────────────────────────────
+# Verify the live cash-clip.app SPKI hash still matches the PRIMARY pin baked
+# into plugins/withSslPinning.js.  A mismatch means the server key rotated and
+# shipping this build would lock all users out of the API.
+echo ""
+echo "── SSL pin pre-flight ──"
+if bash "$(dirname "$0")/verify-spki-hash.sh"; then
+  echo "  SSL pin OK — continuing build."
+else
+  echo ""
+  echo "  ✗ SSL pin check failed. Update plugins/withSslPinning.js before building."
+  exit 1
+fi
+
 if [ -z "${EXPO_TOKEN:-}" ]; then
   echo "ERROR: EXPO_TOKEN is not set. Add it as a Replit secret."
   exit 1

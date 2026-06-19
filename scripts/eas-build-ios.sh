@@ -21,6 +21,20 @@ echo "================================================"
 echo "  CashClip EAS iOS Build — $(date)"
 echo "================================================"
 
+# ── SSL-pin pre-flight ────────────────────────────────────────────────────────
+# Verify the live cash-clip.app SPKI hash still matches the PRIMARY pin baked
+# into plugins/withSslPinning.js.  A mismatch means the server key rotated and
+# shipping this build would lock all users out of the API.
+echo ""
+echo "── SSL pin pre-flight ──"
+if bash "$(dirname "$0")/verify-spki-hash.sh"; then
+  echo "  SSL pin OK — continuing build."
+else
+  echo ""
+  echo "  ✗ SSL pin check failed. Update plugins/withSslPinning.js before building."
+  exit 1
+fi
+
 EXPO_TOKEN="${EXPO_TOKEN:-${EXPO_TOKLAST:-}}"
 if [ -z "$EXPO_TOKEN" ]; then
   echo "WARNING: EXPO_TOKEN/EXPO_TOKLAST not found in shell environment — EAS CLI will attempt its own auth."

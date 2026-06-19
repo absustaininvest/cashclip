@@ -17,11 +17,15 @@ const path = require('path');
  *   PRIMARY  — the current server public key hash
  *   BACKUP   — a pre-generated key held in reserve; deploy it before rekeying
  *
+ * Pre-build check (run before every EAS build):
+ *   bash scripts/verify-spki-hash.sh
+ *   → exits non-zero if the live server key no longer matches PRIMARY.
+ *
  * Rotation procedure (if you ever need to rekey cash-clip.app):
  *   1. Generate a new private key on the server
- *   2. Extract its SPKI hash (see scripts/extract-spki-hash.sh)
- *   3. Set PRIMARY = current BACKUP hash, BACKUP = new hash
- *   4. Ship an app update — users update before you swap the cert
+ *   2. Run scripts/verify-spki-hash.sh — it prints the live SPKI hash
+ *   3. Set PRIMARY = current BACKUP hash, BACKUP = new hash from step 2
+ *   4. Ship a new native app build — users must update before cert swap
  *   5. Swap the cert on the server
  *   6. Generate another fresh backup for the next rotation
  */
