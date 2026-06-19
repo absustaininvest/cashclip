@@ -899,4 +899,81 @@ describe('TrackingConsentGate — Platform.OS = "android" (non-iOS fast-path)', 
     expect(disclosuresVisible(tr.root)).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+
+  // ── Stale-key cleanup on Android ──────────────────────────────────────────
+
+  it("removes consent_done_v3 from AsyncStorage on Android", async () => {
+    store.set("consent_done_v3", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+  });
+
+  it("removes consent_fully_done_v2 from AsyncStorage on Android", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+  });
+
+  it("removes tracking_consent_dismissed_v1 from AsyncStorage on Android", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("removes all three legacy keys when multiple are present on Android", async () => {
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("promotes a legacy key to TERMS_KEY in SecureStore on Android when TERMS_KEY is absent", async () => {
+    store.set("consent_done_v3", "1");
+
+    await renderGate();
+
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+  });
+
+  it("does not overwrite existing TERMS_KEY in SecureStore during Android migration", async () => {
+    store.set("consent_done_v3", "1");
+    keychain.set(TERMS_KEY, "already");
+
+    await renderGate();
+
+    expect(keychain.get(TERMS_KEY)).toBe("already");
+    expect(store.has("consent_done_v3")).toBe(false);
+  });
+
+  it("retains legacy keys on Android when SecureStore write fails (retry possible next launch)", async () => {
+    store.set("consent_done_v3", "1");
+    keychain.set(KEYCHAIN_WRITE_FAIL_SENTINEL, "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(true);
+    expect(keychain.has(TERMS_KEY)).toBe(false);
+  });
+
+  it("cleans up legacy keys on Android when TERMS_KEY already exists even with write errors", async () => {
+    store.set("consent_done_v3", "1");
+    keychain.set(TERMS_KEY, "1");
+    keychain.set(KEYCHAIN_WRITE_FAIL_SENTINEL, "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+  });
 });
