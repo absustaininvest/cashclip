@@ -42,4 +42,7 @@ pnpm exec eas update \
   --non-interactive
 EXIT=$?
 echo "OTA_PUBLISH_EXIT=${EXIT}"
+if [ ${EXIT} -eq 0 ]; then
+  echo "OTA_PUBLISH_MESSAGE: ${MESSAGE}"
+fi
 exit ${EXIT}
