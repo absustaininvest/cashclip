@@ -55,6 +55,7 @@ minimumReleaseAgeExclude:
 
 packages:
   - artifacts/*
+  - artifacts/cashclip-next
   - lib/*
   - lib/integrations/*
   - scripts
