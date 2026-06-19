@@ -73,7 +73,8 @@ export function getAdUnitId(type: "rewarded" | "interstitial" | "banner" | "nati
 
 export const isAdMobAvailable =
   Platform.OS !== "web" &&
-  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
+  Constants.expoConfig?.runtimeVersion !== "1.0.0";
 
 /**
  * Returns a short human-readable reason string when the AdMob ad system is
@@ -81,10 +82,14 @@ export const isAdMobAvailable =
  * that gates `isAdMobAvailable` so the diagnosis always matches the gate.
  *
  * Example values:
- *   "Expo Go / web"  — running in Expo Go or a browser (no native AdMob SDK)
+ *   "Expo Go / web"              — running in Expo Go or a browser (no native AdMob SDK)
+ *   "runtime 1.0.0 — gated for maintenance"  — stuck on runtime 1.0.0, ads disabled
  */
 export function getAdUnavailabilityReason(): string | null {
   if (isAdMobAvailable) return null;
+  if (Constants.expoConfig?.runtimeVersion === "1.0.0") {
+    return "runtime 1.0.0 — gated for maintenance";
+  }
   if (
     Platform.OS === "web" ||
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient

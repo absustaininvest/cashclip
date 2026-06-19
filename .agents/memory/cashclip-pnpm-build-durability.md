@@ -15,6 +15,11 @@ The chronic "CashClip build keeps failing" was actually TWO independent bugs at 
 **Why:** a security override pinning `@babel/core` split `@babel/generator` into two versions so pnpm stopped auto-hoisting it; the bare require became unresolvable → HTTP 500 bundle / failed deploy.
 **How to apply:** do NOT use `nodeLinker: hoisted` (full flat) — it relocates `@expo/metro-config` to root while `expo` stays inside the workspace package, breaking `expo/package.json` resolution ("Cannot find module 'expo/package.json'"). publicHoistPattern is the minimal-blast-radius fix; root provides ONE @babel version, other consumers still resolve their own from .pnpm.
 
+## 3. metro.config.js workspaceRoot must match the actual pnpm workspace root
+**Rule:** `workspaceRoot` in `metro.config.js` must point to the directory that owns `node_modules/.pnpm/` (the pnpm virtual store). If cashclip is a member of the ROOT pnpm workspace (`/home/runner/workspace`), `workspaceRoot` must be `path.resolve(projectRoot, "../../../..")` (4 levels up), NOT `"../.."`(`@expo/artifacts`).
+**Why:** pnpm symlinks inside `cashclip/node_modules/` point 5 levels up (`../../../../../`) to the root workspace store when cashclip is a root workspace member. When Metro follows those symlinks and computes entry-point relative paths, it uses the pnpm workspace root as the "from" base — so `workspaceRoot` must also be that same root or Metro fails with "Unable to resolve module … from /home/runner/workspace/."
+**How to apply:** if the cashclip pnpm virtual store disappears (symptom: `eas update` fails at Metro bundler with "Cannot find module" for react-native/metro/expo-router), add `@expo/artifacts/absustain/cashclip` to root `pnpm-workspace.yaml` packages list, run `pnpm install --ignore-scripts`, then update `metro.config.js` `workspaceRoot` to `"../../../.."`. Also update the `REACT_PATH`/`REACT_DOM_PATH` singleton pins — they now come from the root store (same path, since `workspaceRoot` moved there).
+
 ## Verify before any build
 - `node -e` eval of app.config.js → EXUpdatesInterface path uses the CURRENT expo hash and the dir exists.
 - local iOS Metro bundle returns HTTP 200.
