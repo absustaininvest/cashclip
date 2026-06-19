@@ -13,6 +13,18 @@ else
   echo "post-merge: DATABASE_URL not set — skipping dev schema push"
 fi
 
+# Repair symlinks in @expo/artifacts/api-server/node_modules
+#
+# pnpm generates node_modules symlinks with relative paths computed from the
+# package directory depth. Because @expo/artifacts/api-server is 3 levels deep
+# under an @-prefixed directory, pnpm's --force (or warm-cache) installs
+# consistently produce symlinks that are one level too shallow — they resolve
+# to @expo/node_modules/.pnpm/... which doesn't exist.
+# A clean remove + reinstall (without --force) regenerates the correct relative
+# paths. The pnpm store is already warm at this point so the reinstall is fast.
+rm -rf "@expo/artifacts/api-server/node_modules"
+pnpm install --ignore-scripts
+
 # Repair symlinks in @expo/artifacts/absustain/cashclip/node_modules
 #
 # pnpm generates node_modules symlinks with relative paths computed from the
