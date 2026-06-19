@@ -1032,6 +1032,80 @@ describe("TrackingConsentGate — ATT revocation listener fires correctly on iOS
     expect(onRevoked).toHaveBeenCalledTimes(1);
   });
 
+  it("fires onConsentRevoked when AppState becomes active, consent was granted, and ATT is now restricted", async () => {
+    // Same flow as the "denied" test above — only the ATT status differs.
+    // The listener branch is: status === "denied" || status === "restricted"
+    // so "restricted" must also trigger revocation.
+    keychain.set(TERMS_KEY, "1");
+    attStatuses.push("authorized"); // for acceptDisclosures
+    attStatuses.push("restricted"); // returned by the AppState listener's getATTStatus() call
+
+    const onRevoked = vi.fn();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { onConsentRevoked: onRevoked, children: CHILD }),
+      );
+    });
+    await flush();
+
+    // Tap Continue — calls finish() which sets consentGrantedRef.current = true
+    await pressContinue(tr);
+    await flush();
+
+    expect(childrenVisible(tr.root)).toBe(true);
+
+    const addEventListenerMock = AppState.addEventListener as ReturnType<typeof vi.fn>;
+    expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
+    const listenerCb: (state: string) => Promise<void> = addEventListenerMock.mock.calls[0][1];
+
+    // Simulate the user returning from iOS Settings after restricting tracking
+    await act(async () => {
+      await listenerCb("active");
+    });
+    await flush();
+
+    expect(onRevoked).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT fire onConsentRevoked when AppState transitions to a non-active state (e.g. 'background')", async () => {
+    // The listener guard: if (nextState !== "active") return;
+    // A "background" transition must bail out before calling getATTStatus or onConsentRevoked,
+    // regardless of whether consent was previously granted.
+    keychain.set(TERMS_KEY, "1");
+    attStatuses.push("authorized"); // for acceptDisclosures
+    // No second status pushed — getATTStatus must NOT be called by the listener
+
+    const onRevoked = vi.fn();
+
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(
+        React.createElement(TrackingConsentGate, { onConsentRevoked: onRevoked, children: CHILD }),
+      );
+    });
+    await flush();
+
+    await pressContinue(tr);
+    await flush();
+
+    expect(childrenVisible(tr.root)).toBe(true);
+
+    const addEventListenerMock = AppState.addEventListener as ReturnType<typeof vi.fn>;
+    expect(addEventListenerMock).toHaveBeenCalledWith("change", expect.any(Function));
+    const listenerCb: (state: string) => Promise<void> = addEventListenerMock.mock.calls[0][1];
+
+    // Simulate the app going to background (not returning to foreground)
+    await act(async () => {
+      await listenerCb("background");
+    });
+    await flush();
+
+    // The listener must have bailed at the nextState !== "active" guard
+    expect(onRevoked).not.toHaveBeenCalled();
+  });
+
   it("does NOT fire onConsentRevoked when AppState becomes active but consent was never granted", async () => {
     // Gate stays on disclosures step — finish() has not been called,
     // so consentGrantedRef.current remains false.
