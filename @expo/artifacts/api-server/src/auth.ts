@@ -408,7 +408,15 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.post("/api/auth/resend-verification", async (req: Request, res: Response): Promise<void> => {
+    const ALWAYS_OK = { message: "If the account exists and is unverified, a new email has been sent." };
     try {
+      const ip = getClientIp(req);
+      const { allowed: ipAllowed } = await recordLoginAttempt(`resend-verify:ip:${ip}`, 5, 15 * 60 * 1000);
+      if (!ipAllowed) {
+        res.status(429).json({ error: "Too many attempts. Please try again later." });
+        return;
+      }
+
       const { username } = req.body;
       if (!username || typeof username !== "string") {
         res.status(400).json({ error: "Username is required" });
@@ -416,20 +424,29 @@ export function registerAuthRoutes(app: Express) {
       }
       const user = await storage.getUserByUsername(username.toLowerCase().trim());
       if (!user || user.emailVerified) {
-        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+        res.status(200).json(ALWAYS_OK);
         return;
       }
+
+      // Per-account rate limit: max 3 emails per 10 min — silently swallowed to
+      // avoid confirming that the account exists.
+      const { allowed: userAllowed } = await recordLoginAttempt(`resend-verify:uid:${user.id}`, 3, 10 * 60 * 1000);
+      if (!userAllowed) {
+        res.status(200).json(ALWAYS_OK);
+        return;
+      }
+
       const verifyToken = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await storage.setEmailVerificationToken(user.id, verifyToken, expiresAt);
       const domain = process.env["EXPO_PUBLIC_DOMAIN"] ?? "cash-clip.app";
       const verifyUrl = `https://${domain}/api/auth/verify-email?token=${verifyToken}`;
       if (!user.email) {
-        res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+        res.status(200).json(ALWAYS_OK);
         return;
       }
       sendEmailVerification({ to: user.email, username: user.username, verifyUrl });
-      res.status(200).json({ message: "If the account exists and is unverified, a new email has been sent." });
+      res.status(200).json(ALWAYS_OK);
     } catch (err) {
       logger.error({ err }, "resend-verification error");
       res.status(500).json({ error: "Failed to resend verification email" });
