@@ -1,6 +1,6 @@
 /**
- * Tests for POST /api/earn/ad-fill — the client-reported LevelPlay fill state
- * endpoint.
+ * Tests for POST /api/earn/ad-fill — the client-reported AdMob rewarded-ad
+ * fill state endpoint.
  *
  * Goals:
  *   1. Unauthenticated requests → 401 (auth gate is real).

@@ -23,7 +23,7 @@ export const ADMOB_ALERT_EMAIL_ENABLED_KEY = "admob_alert_email_enabled";
 // Cosmetic on-screen display multiplier: how many points equal $1 in the UI.
 // Does NOT affect real cash owed. Owner can update via PUT /api/admin/economy/display-rate.
 export const DISPLAY_POINTS_PER_DOLLAR_KEY = "display_points_per_dollar";
-// LevelPlay rewarded-fill state — persisted so the admin hub shows the last
+// AdMob rewarded-fill state — persisted so the admin hub shows the last
 // known fill status immediately after an API restart, before any user reports.
 export const AD_FILL_AVAILABLE_KEY = "ad_fill_available";
 export const AD_FILL_REPORTED_AT_KEY = "ad_fill_reported_at";
