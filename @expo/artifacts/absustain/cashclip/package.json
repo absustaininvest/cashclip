@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/check-dir-tsconfigs.mjs && node scripts/test-metro-resolve.js && vitest run",
     "test:metro": "node scripts/test-metro-resolve.js",
-    "preeas:build:development": "pnpm --filter @workspace/scripts run check-signing-md-sync",
+    "preeas:build:development": "pnpm --filter @workspace/scripts run check-signing-md-sync && pnpm --filter @workspace/cashclip run check:versions",
     "eas:build:development": "eas build --profile development --platform all",
     "eas:build:dev": "eas build --profile development --platform all",
     "preeas:build:preview": "pnpm --filter @workspace/scripts run check-build-number && pnpm --filter @workspace/scripts run check-version && pnpm --filter @workspace/cashclip run check:versions",
