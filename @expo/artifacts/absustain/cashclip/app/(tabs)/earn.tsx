@@ -71,8 +71,31 @@ import {
   cancelStreakReminder,
 } from "@/lib/streak-notifications";
 import { dollarsToPoints } from "@/lib/points";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// ── Game-earned badge persistence ─────────────────────────────────────────────
+// The badge is session-scoped: it must clear on a cold launch so a stale "+N
+// pts earned" label from a previous session never reappears.  We generate a
+// module-level session ID once per process; any stored badge that carries a
+// different ID is treated as cold-launch stale and discarded.
+export const _AD_BADGE_KEY = "earn_game_badge_v1";
+export const _sessionId: string = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/** Read the stored badge for this session.  Returns null on cold launch (stale
+ *  session ID) or when no badge has been stored yet. */
+export async function _loadBadge(): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(_AD_BADGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { sessionId: string; pts: number };
+    if (parsed.sessionId !== _sessionId) return null;
+    return typeof parsed.pts === "number" ? parsed.pts : null;
+  } catch {
+    return null;
+  }
+}
 
 // Explain to the user why a server-rejected mission claim didn't credit, so a
 // failed claim is visible rather than silently swallowed.
@@ -538,6 +561,12 @@ export default function EarnScreen() {
 
   useEffect(() => {
     loadAll();
+    // Hydrate the game-earned badge from storage on mount. The badge is only
+    // restored when the stored session ID matches this process's _sessionId —
+    // a mismatch means we are on a cold launch and the badge is stale.
+    _loadBadge().then((pts) => {
+      if (pts != null) setLastGameEarnedPts(pts);
+    }).catch(() => {});
   }, []);
 
 
@@ -577,6 +606,9 @@ export default function EarnScreen() {
     const diff = total - pendingPtsBeforeGamesRef.current;
     if (diff > 0) {
       setLastGameEarnedPts(diff);
+      // Persist so a warm-resume (focus return, not cold launch) can re-show
+      // the badge.  Uses this session's ID so a cold relaunch always clears it.
+      AsyncStorage.setItem(_AD_BADGE_KEY, JSON.stringify({ sessionId: _sessionId, pts: diff })).catch(() => {});
     }
     checkGameEarnedRef.current = false;
     pendingPtsBeforeGamesRef.current = null;
@@ -1125,6 +1157,7 @@ export default function EarnScreen() {
             checkGameEarnedRef.current = true;
             setLastGameEarnedPts(null);
             setLastCheckinEarnedPts(null);
+            AsyncStorage.removeItem(_AD_BADGE_KEY).catch(() => {});
             router.push("/games");
           }}
           style={({ pressed }) => [styles.sectionCard, { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
