@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  TETRIS_COLS,
   TETRIS_ROWS,
   TETRIS_OVERHEAD,
   TETRIS_MIN_CELL,
@@ -97,6 +98,13 @@ describe("Tetris CELL_SIZE_BY_HEIGHT — board fits without scrolling", () => {
       expect(sizes[i]).toBeGreaterThanOrEqual(sizes[i - 1]);
     }
   });
+
+  it("chrome constants match expected source values (sanity-check)", () => {
+    expect(TETRIS_OVERHEAD).toBe(290);
+    expect(TETRIS_MIN_CELL).toBe(12);
+    expect(TETRIS_ROWS).toBe(20);
+    expect(TETRIS_COLS).toBe(10);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,7 +155,10 @@ describe("Block Blitz CELL_SIZE_BY_HEIGHT — board + tray fit without scrolling
     }
   });
 
-  it("BLOCK_GRID_SIZE constant is 8 (sanity-check against source)", () => {
+  it("chrome constants match expected source values (sanity-check)", () => {
+    expect(BLOCK_OVERHEAD).toBe(260);
+    expect(BLOCK_MIN_CELL).toBe(22);
+    expect(BLOCK_HEIGHT_DIVISOR).toBe(10);
     expect(BLOCK_GRID_SIZE).toBe(8);
   });
 });
