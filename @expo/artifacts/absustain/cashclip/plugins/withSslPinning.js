@@ -29,8 +29,8 @@ const path = require('path');
 const PROD_DOMAIN = 'cash-clip.app';
 
 const PINS = {
-  PRIMARY: 'RyRf6jEPjlQbkYznK5pQeUf9OUTTKH6/9rD4ECjlhrk=',
-  BACKUP:  '0kwFaWzW7ABjAjbQYOrNtpwK1IOeiFGsmigU9bzQEN0=',
+  PRIMARY: 'EoR24eooqAOcjFxiKpGR5R/HR00ueyZwz5TEolB1C1s=',
+  BACKUP:  'RyRf6jEPjlQbkYznK5pQeUf9OUTTKH6/9rD4ECjlhrk=',
 };
 
 function isProductionBuild() {

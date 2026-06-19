@@ -472,7 +472,8 @@
       "./plugins/withAndroidUnityAdapter",
       "./plugins/withAndroidIronSourceAdapter",
       "./plugins/withAndroidPangleAdapter",
-      "./plugins/withChartboostPodSource"
+      "./plugins/withChartboostPodSource",
+      "./plugins/withSslPinning"
     ],
     "experiments": {
       "typedRoutes": true,
