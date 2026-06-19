@@ -4754,6 +4754,8 @@ export function IntegrationHubPanel({
     lastSsvAt: string | null;
     staleAlert: boolean;
     fetchedAt: string;
+    platformBreakdown24h?: { platform: string; count: number }[];
+    platformBreakdown7d?: { platform: string; count: number }[];
   } | null>(null);
 
   const fetchHub = useCallback(async () => {
@@ -5347,6 +5349,80 @@ export function IntegrationHubPanel({
                 </div>
               </div>
             </div>
+            {/* iOS vs Android platform breakdown */}
+            {(() => {
+              const bd24h = ssvHealth?.platformBreakdown24h ?? [];
+              const bd7d  = ssvHealth?.platformBreakdown7d  ?? [];
+              const PLATFORMS = ["ios", "android", "unknown"] as const;
+              const getCount = (rows: { platform: string; count: number }[], p: string) =>
+                rows.find((r) => r.platform === p)?.count ?? 0;
+              const total24h = bd24h.reduce((s, r) => s + r.count, 0);
+              const total7d  = bd7d.reduce((s, r) => s + r.count, 0);
+              const platformLabel: Record<string, string> = { ios: "iOS", android: "Android", unknown: "Unknown" };
+              const platformColor: Record<string, string> = { ios: "text-blue-600", android: "text-emerald-600", unknown: "text-gray-400" };
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                    iOS vs Android — SSV rewarded-ad tokens
+                  </p>
+                  {ssvHealth === null ? (
+                    <p className="text-gray-400 text-xs">Loading…</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr>
+                            <th className="text-left text-gray-400 font-semibold pb-1.5 pr-4">Platform</th>
+                            <th className="text-right text-gray-400 font-semibold pb-1.5 pr-4">Last 24h</th>
+                            <th className="text-right text-gray-400 font-semibold pb-1.5">Last 7 days</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {PLATFORMS.map((p) => {
+                            const c24 = getCount(bd24h, p);
+                            const c7d = getCount(bd7d, p);
+                            const pct24 = total24h > 0 ? Math.round(c24 / total24h * 100) : null;
+                            const pct7d  = total7d  > 0 ? Math.round(c7d  / total7d  * 100) : null;
+                            return (
+                              <tr key={p}>
+                                <td className={`py-1.5 pr-4 font-semibold ${platformColor[p]}`}>
+                                  {platformLabel[p]}
+                                </td>
+                                <td className="py-1.5 pr-4 text-right tabular-nums text-gray-700">
+                                  {c24.toLocaleString()}
+                                  {pct24 !== null && (
+                                    <span className="text-gray-400 ml-1">({pct24}%)</span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 text-right tabular-nums text-gray-700">
+                                  {c7d.toLocaleString()}
+                                  {pct7d !== null && (
+                                    <span className="text-gray-400 ml-1">({pct7d}%)</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        {(total24h > 0 || total7d > 0) && (
+                          <tfoot>
+                            <tr className="border-t border-gray-200">
+                              <td className="pt-1.5 pr-4 font-semibold text-gray-500">Total</td>
+                              <td className="pt-1.5 pr-4 text-right tabular-nums font-semibold text-gray-700">
+                                {total24h.toLocaleString()}
+                              </td>
+                              <td className="pt-1.5 text-right tabular-nums font-semibold text-gray-700">
+                                {total7d.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}

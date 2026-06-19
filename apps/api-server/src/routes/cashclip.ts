@@ -357,7 +357,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const todayStart = new Date(now);
       todayStart.setUTCHours(0, 0, 0, 0);
 
-      const [ssvRow, totalRow, lastRow] = await Promise.all([
+      const trailing24hStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const sevenDaysStart   = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [ssvRow, totalRow, lastRow, platform24hRows, platform7dRows] = await Promise.all([
         // SSV-verified tokens today
         db
           .select({ n: drizzleCount() })
@@ -383,6 +386,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             drizzleEq(earnTokens.actionType, "rewarded_ad"),
             drizzleLike(earnTokens.description, "%SSV verified%"),
           )),
+        // Per-platform breakdown — trailing 24 h (SSV-only rewarded_ad tokens)
+        db
+          .select({ platform: earnTokens.platform, n: drizzleCount() })
+          .from(earnTokens)
+          .where(drizzleAnd(
+            drizzleEq(earnTokens.actionType, "rewarded_ad"),
+            drizzleLike(earnTokens.description, "%SSV verified%"),
+            drizzleGte(earnTokens.earnedAt, trailing24hStart),
+          ))
+          .groupBy(earnTokens.platform),
+        // Per-platform breakdown — trailing 7 days (SSV-only rewarded_ad tokens)
+        db
+          .select({ platform: earnTokens.platform, n: drizzleCount() })
+          .from(earnTokens)
+          .where(drizzleAnd(
+            drizzleEq(earnTokens.actionType, "rewarded_ad"),
+            drizzleLike(earnTokens.description, "%SSV verified%"),
+            drizzleGte(earnTokens.earnedAt, sevenDaysStart),
+          ))
+          .groupBy(earnTokens.platform),
       ]);
 
       const ssvToday = Number(ssvRow[0]?.n ?? 0);
@@ -394,6 +417,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastSsvMs = lastSsvAt ? new Date(lastSsvAt).getTime() : 0;
       const staleAlert = totalToday > 0 && (now.getTime() - lastSsvMs) > SSV_STALE_MS;
 
+      // Normalise platform rows: only 'ios' and 'android' are first-class values;
+      // null, 'web', and any other string all collapse to 'unknown' so the three
+      // UI rows always reconcile with the totals.
+      type PlatformRow = { platform: string; count: number };
+      const KNOWN_PLATFORMS = new Set(["ios", "android"]);
+      const normalizePlatformRows = (rows: { platform: string | null; n: unknown }[]): PlatformRow[] => {
+        const acc = new Map<string, number>();
+        for (const r of rows) {
+          const key = r.platform !== null && KNOWN_PLATFORMS.has(r.platform) ? r.platform : "unknown";
+          acc.set(key, (acc.get(key) ?? 0) + Number(r.n));
+        }
+        return Array.from(acc.entries()).map(([platform, count]) => ({ platform, count }));
+      };
+
+      const platformBreakdown24h = normalizePlatformRows(platform24hRows);
+      const platformBreakdown7d  = normalizePlatformRows(platform7dRows);
+
       // Fire/resolve operator email alert when SSV credits stop flowing.
       // Gated on AD_ADMOB_NATIVE=true inside evaluateSsvAlerts — no-ops on staging.
       evaluateSsvAlerts({ staleAlert, totalToday, lastSsvAt, now: now.getTime() });
@@ -404,6 +444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalToday,
         lastSsvAt,
         staleAlert,
+        platformBreakdown24h,
+        platformBreakdown7d,
         fetchedAt: now.toISOString(),
       });
     } catch (err) {

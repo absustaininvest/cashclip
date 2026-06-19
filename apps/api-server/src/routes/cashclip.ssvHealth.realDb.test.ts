@@ -101,13 +101,14 @@ async function seedToken(opts: {
   actionType: string;
   description: string;
   earnedAt?: Date;
+  platform?: string | null;
 }): Promise<void> {
   const earnedAt = opts.earnedAt ?? new Date();
   await admin.query(
     `INSERT INTO earn_tokens
-       (user_id, points, action_type, description, earned_at, claimable_at, status)
-     VALUES ($1, 10, $2, $3, $4, $4, 'pending')`,
-    [ADMIN_ID, opts.actionType, opts.description, earnedAt],
+       (user_id, points, action_type, description, earned_at, claimable_at, status, platform)
+     VALUES ($1, 10, $2, $3, $4, $4, 'pending', $5)`,
+    [ADMIN_ID, opts.actionType, opts.description, earnedAt, opts.platform ?? null],
   );
 }
 
@@ -189,7 +190,8 @@ beforeAll(async () => {
       claimed_at timestamptz,
       status text NOT NULL DEFAULT 'pending',
       transaction_id varchar UNIQUE,
-      usd_per_point_snapshot numeric(12,8)
+      usd_per_point_snapshot numeric(12,8),
+      platform text
     );
   `);
 
@@ -359,5 +361,100 @@ describe("GET /api/admin/admob/ssv-health (real DB)", () => {
     const ts = new Date(res.body.fetchedAt as string).getTime();
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
+  });
+
+  it("returns empty platformBreakdown arrays when the table is empty", async () => {
+    const res = await asAdmin(request(app).get("/api/admin/admob/ssv-health"));
+    expect(res.status).toBe(200);
+    expect(res.body.platformBreakdown24h).toEqual([]);
+    expect(res.body.platformBreakdown7d).toEqual([]);
+  });
+
+  it("platform breakdown splits ios and android correctly for trailing windows", async () => {
+    const now = Date.now();
+    // 1 iOS token 12 h ago — inside both 24h and 7d windows
+    await seedToken({
+      actionType: "rewarded_ad",
+      description: "SSV verified",
+      platform: "ios",
+      earnedAt: new Date(now - 12 * 60 * 60 * 1000),
+    });
+    // 2 Android tokens 2 h ago — inside both windows
+    await seedToken({
+      actionType: "rewarded_ad",
+      description: "SSV verified",
+      platform: "android",
+      earnedAt: new Date(now - 2 * 60 * 60 * 1000),
+    });
+    await seedToken({
+      actionType: "rewarded_ad",
+      description: "SSV verified",
+      platform: "android",
+      earnedAt: new Date(now - 60 * 1000),
+    });
+    // 1 Android token 5 days ago — inside 7d window only
+    await seedToken({
+      actionType: "rewarded_ad",
+      description: "SSV verified",
+      platform: "android",
+      earnedAt: new Date(now - 5 * 24 * 60 * 60 * 1000),
+    });
+
+    const res = await asAdmin(request(app).get("/api/admin/admob/ssv-health"));
+    expect(res.status).toBe(200);
+
+    const bd24h = res.body.platformBreakdown24h as { platform: string; count: number }[];
+    const bd7d  = res.body.platformBreakdown7d  as { platform: string; count: number }[];
+
+    const get = (rows: { platform: string; count: number }[], p: string) =>
+      rows.find((r) => r.platform === p)?.count ?? 0;
+
+    // 24h: 1 iOS + 2 Android
+    expect(get(bd24h, "ios")).toBe(1);
+    expect(get(bd24h, "android")).toBe(2);
+    expect(get(bd24h, "unknown")).toBe(0);
+
+    // 7d: 1 iOS + 3 Android (includes the 5-day-old token)
+    expect(get(bd7d, "ios")).toBe(1);
+    expect(get(bd7d, "android")).toBe(3);
+    expect(get(bd7d, "unknown")).toBe(0);
+  });
+
+  it("collapses null and non-standard platforms (web) to 'unknown' in the breakdown", async () => {
+    // null platform
+    await seedToken({ actionType: "rewarded_ad", description: "SSV verified", platform: null });
+    // 'web' platform (valid for AdMob browser builds but should collapse to unknown)
+    await seedToken({ actionType: "rewarded_ad", description: "SSV verified", platform: "web" });
+    // 'ios' should stay as-is
+    await seedToken({ actionType: "rewarded_ad", description: "SSV verified", platform: "ios" });
+
+    const res = await asAdmin(request(app).get("/api/admin/admob/ssv-health"));
+    expect(res.status).toBe(200);
+
+    const bd24h = res.body.platformBreakdown24h as { platform: string; count: number }[];
+    const get = (rows: { platform: string; count: number }[], p: string) =>
+      rows.find((r) => r.platform === p)?.count ?? 0;
+
+    expect(get(bd24h, "ios")).toBe(1);
+    expect(get(bd24h, "android")).toBe(0);
+    // null + web both collapse to unknown → 2
+    expect(get(bd24h, "unknown")).toBe(2);
+    // 'web' must not appear as its own key
+    expect(bd24h.some((r) => r.platform === "web")).toBe(false);
+  });
+
+  it("tokens older than 7 days are excluded from both breakdown windows", async () => {
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await seedToken({
+      actionType: "rewarded_ad",
+      description: "SSV verified",
+      platform: "ios",
+      earnedAt: eightDaysAgo,
+    });
+
+    const res = await asAdmin(request(app).get("/api/admin/admob/ssv-health"));
+    expect(res.status).toBe(200);
+    expect(res.body.platformBreakdown24h).toEqual([]);
+    expect(res.body.platformBreakdown7d).toEqual([]);
   });
 });
