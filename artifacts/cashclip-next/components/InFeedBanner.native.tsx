@@ -1,8 +1,14 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { BannerAd, BannerAdSize } from "react-native-google-mobile-ads";
+import {
+  BannerAd as _BannerAd,
+  BannerAdSize,
+  type BannerAdProps,
+} from "react-native-google-mobile-ads";
 import { isAdMobAvailable, getAdUnitId } from "@/lib/admob";
 import Colors from "@/constants/colors";
+
+const BannerAd = _BannerAd as unknown as React.ComponentType<BannerAdProps>;
 
 // Unit ID is wired from lib/admob.ts so dev builds use Google's test banner ID
 // and production builds use the real recovered banner unit
