@@ -808,7 +808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *   rewardedFillAvailable  — most recent client-reported fill state (null = no report yet)
    *   fillReportedAt         — unix ms timestamp of last fill report (null = no report yet)
    */
-  app.get("/api/admin/ad-status", adminMiddleware, (_req, res) => {
+  app.get("/api/admin/ad-status", adminMiddleware, async (_req, res) => {
     const parseBool = (v: string | undefined): boolean =>
       v === "1" || v === "true" || v === "yes" || v === "on";
     const admobNative = parseBool(process.env.AD_ADMOB_NATIVE);
@@ -828,11 +828,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    // Pull a 7-day revenue summary from the persisted AdMob snapshots so the
+    // Integration Hub can show earnings at a glance without requiring a separate
+    // fetch. Falls back to a noData shape when no snapshots have synced yet —
+    // never fabricates a $0 number that would read as "earned nothing".
+    let revenue7d: {
+      earningsUsd: number;
+      impressions: number;
+      currency: string;
+      lastSyncedAt: string | null;
+      noData: boolean;
+      configured: boolean;
+    };
+    try {
+      const cfg = getAdMobConfigState();
+      const summary = await storage.getAdmobSnapshotSummary(7);
+      const hasData = summary.rowCount > 0;
+      revenue7d = {
+        earningsUsd: hasData ? summary.totals.earnings : 0,
+        impressions: hasData ? summary.totals.impressions : 0,
+        currency: summary.currency,
+        lastSyncedAt: summary.lastSyncedAt,
+        noData: !hasData,
+        configured: cfg.configured,
+      };
+    } catch {
+      revenue7d = {
+        earningsUsd: 0,
+        impressions: 0,
+        currency: "USD",
+        lastSyncedAt: null,
+        noData: true,
+        configured: false,
+      };
+    }
+
     res.json({
       admobNative,
       adSystemActive,
       rewardedFillAvailable,
       fillReportedAt,
+      revenue7d,
     });
   });
 

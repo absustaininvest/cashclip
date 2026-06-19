@@ -4738,6 +4738,14 @@ export function IntegrationHubPanel({
     adSystemActive: boolean;
     rewardedFillAvailable: boolean | null;
     fillReportedAt: number | null;
+    revenue7d?: {
+      earningsUsd: number;
+      impressions: number;
+      currency: string;
+      lastSyncedAt: string | null;
+      noData: boolean;
+      configured: boolean;
+    };
   } | null>(null);
   const [ssvHealth, setSsvHealth] = useState<{
     ssvToday: number;
@@ -5110,6 +5118,7 @@ export function IntegrationHubPanel({
         const adSystemActive = adStatus?.adSystemActive ?? false;
         const fillAvailable = adStatus?.rewardedFillAvailable ?? null;
         const fillAt = adStatus?.fillReportedAt ?? null;
+        const rev7d = adStatus?.revenue7d ?? null;
 
         const dotStatus: "green" | "amber" | "red" =
           adStatus === null
@@ -5189,6 +5198,50 @@ export function IntegrationHubPanel({
                 <p className="text-gray-300 text-[10px] mt-1.5">Last reported</p>
                 <p className="text-sm font-semibold text-gray-500">
                   {adStatus === null ? "—" : fillAgo ?? "Never"}
+                </p>
+              </div>
+            </div>
+            {/* Revenue summary row */}
+            <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-0.5">
+                  Last 7-day revenue
+                </p>
+                {adStatus === null ? (
+                  <p className="text-sm font-semibold text-gray-400">Loading…</p>
+                ) : rev7d === null || rev7d.noData ? (
+                  <p className="text-sm font-semibold text-gray-400">
+                    {rev7d !== null && !rev7d.configured ? "AdMob reporting not configured" : "No data synced yet"}
+                  </p>
+                ) : (
+                  <p className="text-sm font-bold text-emerald-600">
+                    ${rev7d.earningsUsd.toFixed(2)}{" "}
+                    <span className="text-gray-400 text-xs font-normal">{rev7d.currency}</span>
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-gray-300 text-[10px]">Impressions (7d)</p>
+                <p className="text-sm font-semibold text-gray-500">
+                  {adStatus === null
+                    ? "—"
+                    : rev7d === null || rev7d.noData
+                      ? "—"
+                      : rev7d.impressions.toLocaleString()}
+                </p>
+                <p className="text-gray-300 text-[10px] mt-1.5">Data synced</p>
+                <p className="text-sm font-semibold text-gray-500">
+                  {adStatus === null
+                    ? "—"
+                    : rev7d?.lastSyncedAt
+                      ? (() => {
+                          const s = Math.floor((Date.now() - new Date(rev7d.lastSyncedAt).getTime()) / 1000);
+                          if (s < 60) return `${s}s ago`;
+                          if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+                          if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+                          return `${Math.floor(s / 86400)}d ago`;
+                        })()
+                      : "Never"}
                 </p>
               </div>
             </div>
