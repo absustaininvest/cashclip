@@ -233,7 +233,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const summary = await storage.getAdmobSnapshotSummary(days);
-      const reconciliation = await storage.getAdmobReconciliation(days);
+      const [reconciliation, platformSummary] = await Promise.all([
+        storage.getAdmobReconciliation(days),
+        storage.getAdmobPlatformSummary(days),
+      ]);
       const hasData = summary.rowCount > 0;
 
       // No persisted data AND keys not set => honest "not configured".
@@ -278,6 +281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totals: null,
           daily: [],
           byFormat: [],
+          byPlatform: [],
           lastSyncedAt: null,
           reconciliation: null,
           fetchedAt: new Date().toISOString(),
@@ -314,6 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         daily: summary.daily,
         byFormat: summary.byFormat,
+        byPlatform: platformSummary.byPlatform,
         lastSyncedAt,
         stale,
         reconciliation,

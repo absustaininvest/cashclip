@@ -6550,6 +6550,7 @@ interface AdMobRevenueData {
   } | null;
   daily?: AdMobDailyRow[];
   byFormat?: AdMobFormatBreakdown[];
+  byPlatform?: Array<{ platform: string; impressions: number; revenueMicros: number }>;
   lastSyncedAt?: string | null;
   stale?: boolean;
   noData?: boolean;
@@ -6703,6 +6704,9 @@ function RevenuePanel({
   const configured = data?.configured !== false;
   const showData = !!data?.ok && !!totals;
   const byFormat = data?.byFormat ?? [];
+  const byPlatform = (data?.byPlatform ?? [])
+    .filter((p) => p.platform !== "unknown" || p.impressions > 0)
+    .sort((a, b) => b.impressions - a.impressions);
   const recon = data?.reconciliation;
   const isStale = !!data?.ok && data?.stale === true && data?.noData !== true;
   const lastSynced = data?.lastSyncedAt ? new Date(data.lastSyncedAt) : null;
@@ -6935,6 +6939,58 @@ function RevenuePanel({
                         <span>{fmtNum(f.impressions)} impressions</span>
                         <span>eCPM {fmtMoney(f.ecpm)}</span>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {byPlatform.length > 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
+              <p className="text-gray-500 text-sm font-semibold mb-1">
+                Platform split · iOS vs Android
+              </p>
+              <p className="text-gray-400 text-xs mb-4">
+                App-reported impressions for the selected period
+              </p>
+              <div className="space-y-3">
+                {byPlatform.map((p) => {
+                  const totalImpressions = byPlatform.reduce((s, x) => s + x.impressions, 0);
+                  const pct = totalImpressions > 0 ? Math.round((p.impressions / totalImpressions) * 100) : 0;
+                  const label =
+                    p.platform === "ios"
+                      ? "iOS"
+                      : p.platform === "android"
+                        ? "Android"
+                        : p.platform.charAt(0).toUpperCase() + p.platform.slice(1);
+                  const barColor =
+                    p.platform === "ios"
+                      ? "#3B82F6"
+                      : p.platform === "android"
+                        ? "#00E676"
+                        : "#6B7280";
+                  const revenueUsd = p.revenueMicros / 1_000_000;
+                  return (
+                    <div key={p.platform}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-gray-700 font-medium">{label}</span>
+                        <span className="text-gray-900 tabular-nums">
+                          {fmtNum(p.impressions)} impressions{" "}
+                          <span className="text-gray-400 text-xs">({pct}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${pct}%`, backgroundColor: barColor }}
+                        />
+                      </div>
+                      {p.revenueMicros > 0 && (
+                        <p className="text-gray-400 text-xs mt-1">
+                          {fmtMoney(revenueUsd)} app-reported revenue
+                        </p>
+                      )}
                     </div>
                   );
                 })}

@@ -1922,6 +1922,44 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  /**
+   * Returns a per-platform breakdown of ad events and app-reported revenue
+   * micros from `ad_events` for the given trailing day window. Consistent with
+   * `getAdmobReconciliation` (same table, same row scope) so the splits add up
+   * to the same total used in the reconciliation card. Platform values are
+   * whatever the client sets — typically "ios" or "android"; rows without a
+   * platform are grouped as "unknown".
+   */
+  async getAdmobPlatformSummary(days: number): Promise<{
+    byPlatform: Array<{ platform: string; impressions: number; revenueMicros: number }>;
+  }> {
+    const safeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+    const from = new Date(Date.now() - (safeDays - 1) * 24 * 60 * 60 * 1000);
+    from.setUTCHours(0, 0, 0, 0);
+
+    // Count impression events only (not rewards, failures, etc.) so the
+    // per-platform denominator matches the impression metric shown elsewhere.
+    // Revenue micros are summed from the same impression rows so the split
+    // stays consistent with the reconciliation total.
+    const rows = await db
+      .select({
+        platform: sql<string>`coalesce(${adEvents.platform}, 'unknown')`,
+        impressions: sql<string>`count(*)::bigint`,
+        revenueMicros: sql<string>`coalesce(sum(${adEvents.revenueMicros}), 0)`,
+      })
+      .from(adEvents)
+      .where(and(gte(adEvents.createdAt, from), eq(adEvents.event, "impression")))
+      .groupBy(sql`coalesce(${adEvents.platform}, 'unknown')`);
+
+    return {
+      byPlatform: rows.map((r) => ({
+        platform: r.platform,
+        impressions: Number(r.impressions),
+        revenueMicros: Number(r.revenueMicros),
+      })),
+    };
+  }
+
   async getAdAnalyticsSummary(from?: Date, to?: Date): Promise<{
     totalImpressions: number;
     totalCompletions: number;
