@@ -81,6 +81,22 @@ vi.mock("../offerwalls", () => ({ registerOfferwallRoutes: vi.fn() }));
 vi.mock("./earnings", () => ({ registerEarningsRoutes: vi.fn() }));
 vi.mock("./ventures", () => ({ default: express.Router() }));
 
+// Override adminMiddleware so tests that use only x-console-token can reach
+// the route handler.  The real adminMiddleware requires a Bearer JWT (the
+// console-token standalone path was removed); these tests exercise payout and
+// email logic, not auth, so we stub the gate and let the tests run.
+vi.mock("../auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../auth")>();
+  return {
+    ...actual,
+    adminMiddleware: async (req: any, _res: any, next: any) => {
+      req.userId = "admin-test-user";
+      req.userRole = "admin";
+      next();
+    },
+  };
+});
+
 vi.mock("../lib/email", () => ({
   sendWithdrawalRequestedAdmin: vi.fn().mockResolvedValue(undefined),
   sendWithdrawalRequestedUser: vi.fn().mockResolvedValue(undefined),

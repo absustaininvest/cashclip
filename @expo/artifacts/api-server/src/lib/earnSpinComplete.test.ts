@@ -35,6 +35,7 @@ vi.mock("../auth", () => ({
     req.userId = "user-1";
     next();
   },
+  adminMiddleware: (_req: any, _res: any, next: any) => next(),
 }));
 
 // ── Mock the DB: the happy path runs a transaction that issues an earn token ──

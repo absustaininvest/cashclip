@@ -47,6 +47,7 @@ vi.mock("../auth", () => ({
     req.userId = USER_ID;
     next();
   },
+  adminMiddleware: (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
 // The complete route's transaction is reached only when consume succeeds.
