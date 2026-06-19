@@ -20,7 +20,9 @@ export default defineConfig({
     // (node_modules/.pnpm/…) and emit a [TSCONFIG_ERROR].
     exclude: [
       // DB-integration tests require a live PostgreSQL connection and are not
-      // available in CI. Run them separately when a live DB is present.
+      // available in CI. Run them separately when a live DB is present via:
+      //   pnpm run test:db
+      // or directly with: vitest run --config vitest.config.db.ts
       "**/*.realDb.test.ts",
       // Concurrent DB tests also require a live database connection.
       "**/*.concurrent.test.ts",

@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node scripts/check-dir-tsconfigs.mjs && vitest run"
+    "test": "node scripts/check-dir-tsconfigs.mjs && vitest run",
+    "test:db": "vitest run --config vitest.config.db.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
