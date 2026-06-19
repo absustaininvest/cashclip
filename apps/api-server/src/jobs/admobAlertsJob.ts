@@ -2,12 +2,17 @@ import { logger } from "../lib/logger";
 import { withAdvisoryLock } from "../lib/advisoryLock";
 import { storage } from "../storage";
 import { getAdMobConfigState } from "../lib/admobReporting";
-import { evaluateAdmobAlerts } from "../lib/admobAlerts";
+import { evaluateAdmobAlerts, evaluateSsvAlerts } from "../lib/admobAlerts";
 
 // Evaluate the AdMob staleness / revenue-divergence operator alerts on a cadence
 // so they fire even when no admin is watching the hub. The admin revenue route
 // (GET /api/admin/admob/revenue) also evaluates them, but only on a page load —
 // if nobody opens the hub, a stale sync or a divergence could sit unnoticed.
+//
+// Also evaluates the SSV credit-health alert (ssv_credit_stale) so an overnight
+// drop in rewarded-ad SSV credits is caught before any operator opens the hub.
+// The HTTP route GET /api/admin/admob/ssv-health still evaluates on admin page
+// loads; this job ensures it also fires on a schedule.
 //
 // Read-only: it reads the already-persisted snapshot summary + reconciliation
 // and feeds them to evaluateAdmobAlerts (which is itself in-memory de-duped and
@@ -33,6 +38,16 @@ async function evaluate(): Promise<void> {
         configured: cfg.configured,
         lastSyncedAt,
         reconciliation: hasData ? reconciliation : null,
+      });
+
+      // SSV credit-health: fire when videos were watched today but SSV hasn't
+      // credited in the past 6h. evaluateSsvAlerts is gated on AD_ADMOB_NATIVE
+      // so it's a no-op on staging / dev environments.
+      const ssvStats = await storage.getSsvHealthStats();
+      evaluateSsvAlerts({
+        staleAlert: ssvStats.staleAlert,
+        totalToday: ssvStats.totalToday,
+        lastSsvAt: ssvStats.lastSsvAt,
       });
     });
     if (!ran) {

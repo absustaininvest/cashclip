@@ -1728,6 +1728,67 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
+   * Query the SSV credit-health counters needed by the scheduled SSV alert job.
+   * Returns the same values the admin `/api/admin/admob/ssv-health` route computes
+   * so the job can call `evaluateSsvAlerts` without hitting the HTTP layer.
+   *
+   * `staleAlert` is true when videos were watched today but no SSV credit has
+   * arrived in the past 6 hours — the fingerprint of an SSV crediting outage.
+   */
+  async getSsvHealthStats(): Promise<{
+    ssvToday: number;
+    fallbackToday: number;
+    totalToday: number;
+    lastSsvAt: string | null;
+    staleAlert: boolean;
+  }> {
+    const SSV_STALE_MS = 6 * 60 * 60 * 1000;
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const [ssvRow, totalRow, lastRow] = await Promise.all([
+      db
+        .select({ n: sql<string>`count(*)` })
+        .from(earnTokens)
+        .where(
+          and(
+            eq(earnTokens.actionType, "rewarded_ad"),
+            sql`${earnTokens.description} like '%SSV verified%'`,
+            gte(earnTokens.earnedAt, todayStart),
+          ),
+        ),
+      db
+        .select({ n: sql<string>`count(*)` })
+        .from(earnTokens)
+        .where(
+          and(
+            eq(earnTokens.actionType, "rewarded_ad"),
+            gte(earnTokens.earnedAt, todayStart),
+          ),
+        ),
+      db
+        .select({ lastAt: sql<Date | null>`max(${earnTokens.earnedAt})` })
+        .from(earnTokens)
+        .where(
+          and(
+            eq(earnTokens.actionType, "rewarded_ad"),
+            sql`${earnTokens.description} like '%SSV verified%'`,
+          ),
+        ),
+    ]);
+
+    const ssvToday = Number(ssvRow[0]?.n ?? 0);
+    const totalToday = Number(totalRow[0]?.n ?? 0);
+    const fallbackToday = totalToday - ssvToday;
+    const lastSsvAt = lastRow[0]?.lastAt ? new Date(lastRow[0].lastAt).toISOString() : null;
+    const lastSsvMs = lastSsvAt ? new Date(lastSsvAt).getTime() : 0;
+    const staleAlert = totalToday > 0 && now.getTime() - lastSsvMs > SSV_STALE_MS;
+
+    return { ssvToday, fallbackToday, totalToday, lastSsvAt, staleAlert };
+  }
+
+  /**
    * Read AdMob earnings from the persisted store for the last `days` UTC days
    * (inclusive of today). Returns roll-up totals, a per-format breakdown, the
    * daily series, currency, and the last-synced timestamp. Never fabricates —

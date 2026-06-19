@@ -47,6 +47,7 @@ import {
 import {
   evaluateAdmobAlerts,
   getRecentAdmobAlerts,
+  getRecentSsvAlerts,
   getAdmobAlertConfig,
   isAdmobMirrorExpectedActive,
   getSsvMissingUserIdStats,
@@ -2899,12 +2900,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         alerts: getRecentAlerts(alertLimit),
         rejections: getRecentRejections(rejectionLimit),
         admobAlerts: getRecentAdmobAlerts(alertLimit),
+        ssvAlerts: getRecentSsvAlerts(alertLimit),
         ssvMissingUserId: getSsvMissingUserIdStats(),
       });
     } catch (err) {
       req.log?.error({ err }, "Failed to get webhook alerts");
       res.status(500).json({ error: "Failed to load webhook alerts" });
     }
+  });
+
+  /**
+   * GET /api/admin/admob/recent-alerts
+   *
+   * Returns all in-memory AdMob operator alerts (reporting staleness,
+   * revenue divergence, and SSV credit-health) newest-first so the admin
+   * Integration Hub and any monitoring tool can poll a single endpoint.
+   *
+   * Query params:
+   *   limit          — max admob / ssv alerts each (1–100, default 50)
+   */
+  app.get("/api/admin/admob/recent-alerts", adminMiddleware, (req: AuthRequest, res) => {
+    const alertLimit = Math.min(parseInt(String(req.query.limit || "50"), 10) || 50, 100);
+    res.json({
+      admobAlerts: getRecentAdmobAlerts(alertLimit),
+      ssvAlerts: getRecentSsvAlerts(alertLimit),
+    });
   });
 
   app.get("/api/admin/webhook-audit", adminMiddleware, async (req: AuthRequest, res) => {
