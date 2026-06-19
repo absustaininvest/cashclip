@@ -25,13 +25,13 @@ import { recordGamePlay, canPlayGame, formatPoints } from "@/lib/storage";
 import { useGameEarn } from "@/lib/use-game-earn";
 import {
   COIN_CATCHER_CATCHER_HEIGHT as CATCHER_HEIGHT,
+  COIN_CATCHER_CATCHER_WIDTH as CATCHER_WIDTH,
   COIN_CATCHER_ITEM_SIZE as ITEM_SIZE,
   COIN_CATCHER_TOP_CHROME,
   COIN_CATCHER_BOTTOM_CHROME,
 } from "./layout-sizing";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CATCHER_WIDTH = 80;
 const GAME_DURATION = 30;
 const SPAWN_INTERVAL = 800;
 const FALL_SPEED = 3;

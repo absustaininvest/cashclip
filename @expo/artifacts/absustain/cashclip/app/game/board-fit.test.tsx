@@ -14,6 +14,7 @@ import {
   COIN_CATCHER_TOP_CHROME,
   COIN_CATCHER_CATCHER_HEIGHT,
   COIN_CATCHER_BOTTOM_CHROME,
+  COIN_CATCHER_CATCHER_WIDTH,
   COIN_CATCHER_ITEM_SIZE,
   coinCatcherPlayAreaHeight,
   TAP_FRENZY_AREA_TOP,
@@ -166,6 +167,10 @@ describe("Coin Catcher play area — items fall without leaving the screen", () 
     expect(COIN_CATCHER_CATCHER_HEIGHT).toBe(40);
     expect(COIN_CATCHER_BOTTOM_CHROME).toBe(COIN_CATCHER_CATCHER_HEIGHT + 20);
     expect(COIN_CATCHER_BOTTOM_CHROME).toBe(60);
+  });
+
+  it("COIN_CATCHER_CATCHER_WIDTH constant is 80 (sanity-check against source)", () => {
+    expect(COIN_CATCHER_CATCHER_WIDTH).toBe(80);
   });
 
   it("play area height > ITEM_SIZE on iPhone SE (web insets 67/34)", () => {

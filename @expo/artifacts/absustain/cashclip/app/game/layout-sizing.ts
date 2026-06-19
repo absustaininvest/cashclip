@@ -42,6 +42,8 @@ export const COIN_CATCHER_CATCHER_HEIGHT = 40;
 export const COIN_CATCHER_BOTTOM_CHROME = COIN_CATCHER_CATCHER_HEIGHT + 20;
 /** Diameter of a falling coin/bomb item */
 export const COIN_CATCHER_ITEM_SIZE = 36;
+/** Width of the draggable catcher bar */
+export const COIN_CATCHER_CATCHER_WIDTH = 80;
 
 /**
  * Height of the Coin Catcher play area (the vertical span items fall through).
