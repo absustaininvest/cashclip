@@ -122,6 +122,9 @@ export const rewardSessions = pgTable(
     txnUnique: uniqueIndex("reward_sessions_txn_unique")
       .on(t.source, t.provider, t.providerTransactionId)
       .where(sql`provider_transaction_id IS NOT NULL`),
+    pendingUnique: uniqueIndex("reward_sessions_pending_unique")
+      .on(t.userId, t.source, t.externalId)
+      .where(sql`status = 'pending'`),
   })
 );
 

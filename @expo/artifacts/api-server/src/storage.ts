@@ -1281,6 +1281,137 @@ export class DatabaseStorage implements IStorage {
     return s;
   }
 
+  // Find-and-update an existing pending session for (userId, source, externalId),
+  // refreshing its expectedReward to the current listed price and resetting the
+  // TTL. If no valid pending session exists, insert a fresh one using
+  // newSessionToken. Returning the session either way means the caller always
+  // works with the single canonical token for this item, preventing the
+  // reward-inflation attack where multiple sessions for the same item accumulate
+  // at different cached price points and the attacker picks the highest one.
+  async upsertPendingRewardSession(args: {
+    newSessionToken: string;
+    userId: string;
+    source: "survey" | "offerwall";
+    provider: string;
+    externalId: string;
+    expectedReward: number;
+    expiresAt: Date;
+  }): Promise<RewardSession> {
+    return await db.transaction(async (tx: DbTx) => {
+      const now = new Date();
+      const rewardStr = args.expectedReward.toFixed(2);
+
+      // Lock any existing pending non-expired session for this (user, source,
+      // externalId) tuple so concurrent start calls serialize here and don't
+      // each insert their own session.
+      const [existing] = await tx
+        .select()
+        .from(rewardSessions)
+        .where(
+          and(
+            eq(rewardSessions.userId, args.userId),
+            eq(rewardSessions.source, args.source),
+            eq(rewardSessions.externalId, args.externalId),
+            eq(rewardSessions.status, "pending"),
+            gte(rewardSessions.expiresAt, now),
+          ),
+        )
+        .limit(1)
+        .for("update");
+
+      if (existing) {
+        // Refresh the reward to the current listed price and extend the TTL.
+        // This prevents the attacker from holding a stale high-value session
+        // while the provider has since lowered the payout.
+        const [updated] = await tx
+          .update(rewardSessions)
+          .set({ expectedReward: rewardStr, expiresAt: args.expiresAt })
+          .where(eq(rewardSessions.sessionToken, existing.sessionToken))
+          .returning();
+
+        // Move any other pending sessions for this item to 'expired' so they
+        // are no longer claimable and no longer match the pendingUnique index.
+        // Leaving status='pending' but just setting expiresAt=now would still
+        // hold the unique index slot and block future inserts.
+        await tx
+          .update(rewardSessions)
+          .set({ status: "expired", expiresAt: now })
+          .where(
+            and(
+              eq(rewardSessions.userId, args.userId),
+              eq(rewardSessions.source, args.source),
+              eq(rewardSessions.externalId, args.externalId),
+              eq(rewardSessions.status, "pending"),
+              ne(rewardSessions.sessionToken, existing.sessionToken),
+            ),
+          );
+
+        return updated;
+      }
+
+      // Move any orphaned pending sessions for this item to 'expired' before
+      // inserting the canonical new one. Status must change so the pendingUnique
+      // index slot is freed — expiresAt-only would leave them status='pending'.
+      await tx
+        .update(rewardSessions)
+        .set({ status: "expired", expiresAt: now })
+        .where(
+          and(
+            eq(rewardSessions.userId, args.userId),
+            eq(rewardSessions.source, args.source),
+            eq(rewardSessions.externalId, args.externalId),
+            eq(rewardSessions.status, "pending"),
+          ),
+        );
+
+      try {
+        const [inserted] = await tx
+          .insert(rewardSessions)
+          .values({
+            sessionToken: args.newSessionToken,
+            userId: args.userId,
+            source: args.source,
+            provider: args.provider,
+            externalId: args.externalId,
+            expectedReward: rewardStr,
+            expiresAt: args.expiresAt,
+            status: "pending",
+          })
+          .returning();
+        return inserted;
+      } catch (insertErr: unknown) {
+        // A concurrent /start on the same item may have raced past our SELECT
+        // and inserted first, violating pendingUnique. Re-read the winner and
+        // update it to the current price so the caller gets the canonical token.
+        const code = (insertErr as { code?: string } | null)?.code;
+        if (code === "23505") {
+          const [winner] = await tx
+            .select()
+            .from(rewardSessions)
+            .where(
+              and(
+                eq(rewardSessions.userId, args.userId),
+                eq(rewardSessions.source, args.source),
+                eq(rewardSessions.externalId, args.externalId),
+                eq(rewardSessions.status, "pending"),
+                gte(rewardSessions.expiresAt, now),
+              ),
+            )
+            .limit(1);
+          if (winner) {
+            const [refreshed] = await tx
+              .update(rewardSessions)
+              .set({ expectedReward: rewardStr, expiresAt: args.expiresAt })
+              .where(eq(rewardSessions.sessionToken, winner.sessionToken))
+              .returning();
+            return refreshed;
+          }
+        }
+        throw insertErr;
+      }
+    });
+  }
+
   async getRewardSession(sessionToken: string): Promise<RewardSession | undefined> {
     const [s] = await db
       .select()

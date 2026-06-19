@@ -100,11 +100,11 @@ export function registerOfferwallRoutes(app: Express): void {
       }
 
       const reward = issued.expectedReward;
-      const sessionToken = generateSessionToken("offsess");
+      const newSessionToken = generateSessionToken("offsess");
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-      await storage.createRewardSession({
-        sessionToken,
+      const session = await storage.upsertPendingRewardSession({
+        newSessionToken,
         userId: req.userId!,
         source: "offerwall",
         provider,
@@ -112,6 +112,7 @@ export function registerOfferwallRoutes(app: Express): void {
         expectedReward: reward,
         expiresAt,
       });
+      const sessionToken = session.sessionToken;
 
       res.json({
         sessionToken,
@@ -182,11 +183,20 @@ export function registerOfferwallRoutes(app: Express): void {
       }
 
       const providerBounds = PROVIDER_REWARD_BOUNDS[session.provider] ?? { min: 0.10, max: 25.00 };
-      const rawFinal =
-        Number.isFinite(verifyResult.reward) && verifyResult.reward > 0
-          ? verifyResult.reward
-          : parseFloat(session.expectedReward);
-      const finalReward = Math.max(providerBounds.min, Math.min(providerBounds.max, rawFinal));
+
+      // Require a provider-authoritative payout. If the verifier did not return
+      // one (reward <= 0), do NOT fall back to any cached amount — that would
+      // trust stale server-side data and is the root of the reward-inflation
+      // vulnerability. Fail closed: the user must claim via the provider's
+      // signed webhook, or an admin will reconcile any verified-but-uncredited
+      // completion from the unsettled queue.
+      if (!Number.isFinite(verifyResult.reward) || verifyResult.reward <= 0) {
+        res.status(409).json({
+          error: "Offer completion verified but the provider did not return an authoritative reward amount. Your completion has been recorded; credit will be applied after reconciliation.",
+          retryable: false,
+        }); return;
+      }
+      const finalReward = Math.max(providerBounds.min, Math.min(providerBounds.max, verifyResult.reward));
 
       const outcome = await storage.completeRewardSessionAndCredit({
         sessionToken,
@@ -230,9 +240,16 @@ export function registerOfferwallRoutes(app: Express): void {
       if (!session) {
         return false;
       }
-      const rawReward = rewardValue ?? parseFloat(session.expectedReward);
+      // Require a provider-authoritative payout amount. If the webhook does not
+      // carry one (rewardValue is undefined), do not fall back to the cached
+      // session.expectedReward — that amount may be stale if the provider
+      // changed the payout after the session was created. Route to unsettled
+      // reconciliation instead so the completion is not silently lost.
+      if (rewardValue === undefined || !Number.isFinite(rewardValue)) {
+        return false;
+      }
       const bounds = PROVIDER_REWARD_BOUNDS[provider] || { min: 0.10, max: 25.00 };
-      const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rawReward));
+      const clampedReward = Math.max(bounds.min, Math.min(bounds.max, rewardValue));
       const result = await storage.completeRewardSessionAndCredit({
         sessionToken: session.sessionToken,
         userId,
