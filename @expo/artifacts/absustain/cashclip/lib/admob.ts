@@ -171,7 +171,7 @@ function shouldUseNonPersonalizedOnly(): boolean {
 function buildAdRequestConfig() {
   return {
     requestNonPersonalizedAdsOnly: shouldUseNonPersonalizedOnly(),
-    ...(ssvUserId ? { serverSideVerificationOptions: { userId: ssvUserId } } : {}),
+    ...(ssvUserId ? { serverSideVerificationOptions: { userId: ssvUserId, customData: Platform.OS } } : {}),
     keywords: [
       "rewards",
       "cashback",

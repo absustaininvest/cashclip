@@ -1285,7 +1285,12 @@ export function registerEarningsRoutes(app: Express): void {
     const ctx = { path: "admob/ssv" };
     try {
       const q = req.query as Record<string, string | undefined>;
-      const { user_id, reward_item, reward_amount, timestamp, transaction_id, signature, key_id } = q;
+      const { user_id, reward_item, reward_amount, timestamp, transaction_id, signature, key_id, custom_data } = q;
+
+      // Platform tag set by the client via serverSideVerificationOptions.customData.
+      // Accepted values: 'ios', 'android', 'web'. Anything else is stored as null.
+      const VALID_PLATFORMS = new Set(["ios", "android", "web"]);
+      const platform = (custom_data && VALID_PLATFORMS.has(custom_data)) ? custom_data : null;
 
       // ── 1. Required parameters (signature envelope) ─────────────────────
       // user_id is intentionally checked separately (after signature) so we can
@@ -1394,6 +1399,7 @@ export function registerEarningsRoutes(app: Express): void {
           status:        "pending",
           transactionId: transaction_id ?? null,
           usdPerPointSnapshot: snapshot,
+          platform,
         });
 
         return true;

@@ -635,6 +635,10 @@ export const earnTokens = pgTable("earn_tokens", {
   // before variable rates existed; treated as the legacy floor (0.001 $/pt)
   // at conversion time.
   usdPerPointSnapshot: numeric("usd_per_point_snapshot", { precision: 12, scale: 8 }),
+  // Client platform that triggered this earn event. Populated for AdMob SSV
+  // tokens via the custom_data SSV param; null for non-SSV tokens and legacy
+  // rows. Values: 'ios' | 'android' | 'web' | null.
+  platform: text("platform"),
 }, (t) => ({
   userIdx: index("earn_tokens_user_idx").on(t.userId),
   userStatusIdx: index("earn_tokens_user_status_idx").on(t.userId, t.status),

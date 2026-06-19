@@ -27,13 +27,14 @@ Before running any queries, verify:
 
 ---
 
-## Step 2 — Daily rewarded_ad volume, filtered for Android activity
+## Step 2 — Daily rewarded_ad volume by platform
 
 After 48h from Play Store production rollout, run against the production DB:
 
 ```sql
 SELECT
   date_trunc('day', earned_at) AS day,
+  COALESCE(platform, 'unknown') AS platform,
   status,
   COUNT(*) AS count,
   MIN(earned_at) AS first_seen,
@@ -41,12 +42,16 @@ SELECT
 FROM earn_tokens
 WHERE action_type = 'rewarded_ad'
   AND earned_at >= NOW() - INTERVAL '7 days'
-GROUP BY 1, 2
-ORDER BY 1 DESC, 2;
+GROUP BY 1, 2, 3
+ORDER BY 1 DESC, 2, 3;
 ```
 
-**Expected:** Volume rises noticeably from the Android launch date onward.  
-**Note:** The earn_tokens table does not store a platform column — Android tokens are indistinguishable from iOS by SQL alone. A meaningful volume increase in the 24–48h window after launch is the signal.
+**Expected:**
+- Rows with `platform = 'ios'` appear throughout (established iOS baseline).
+- Rows with `platform = 'android'` begin appearing from the Android launch date onward.
+- `platform = 'unknown'` covers legacy tokens issued before the platform column was added (Jun 19 2026); no new unknowns should appear after that date.
+
+**Note:** The `platform` column is set from the AdMob SSV `custom_data` param, which the client populates via `serverSideVerificationOptions.customData = Platform.OS`. Tokens issued via the begin/complete fallback path do not carry a platform tag (they remain `null`/unknown).
 
 ---
 
