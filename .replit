@@ -53,6 +53,14 @@ args = "libs-typecheck"
 task = "workflow.run"
 args = "scripts-typecheck"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "OTA Update (iOS)"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "OTA Update (Android)"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -109,6 +117,28 @@ args = "pnpm --filter @workspace/scripts run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "OTA Update (iOS)"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "OTA_PLATFORM=ios bash @expo/artifacts/absustain/cashclip/scripts/eas-ota-publish.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "OTA Update (Android)"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "OTA_PLATFORM=android bash @expo/artifacts/absustain/cashclip/scripts/eas-ota-publish.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 3000
