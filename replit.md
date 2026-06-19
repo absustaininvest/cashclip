@@ -45,6 +45,7 @@ pnpm workspace monorepo using TypeScript. Two products: CashClip (mobile rewards
 | `PAYPAL_SECRET` | PayPal Payouts API secret — pairs with `PAYPAL_CLIENT_ID`. Also accepted as `PAYPAL_CLIENT_SECRET`. Required for user withdrawals. |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook ID — from developer.paypal.com → Webhooks. Register URL: `https://api.cash-clip.app/api/paypal/webhook`. Required for payout status callbacks. |
 | `PAYPAL_MODE` | Set to `live` for production payouts; omit or set to `sandbox` for testing. All four PayPal secrets must be in the **production** deployment secrets and the API re-published before any payout can succeed. |
+| `AD_ADMOB_NATIVE` | Feature flag — set to `true` in the **production** environment to confirm the AdMob SDK is compiled into the live native build. Read by `GET /api/admin/ad-status`; controls the "AdMob SDK" confirmed/not-confirmed status in the Integration Hub at `/sc-portal`. Non-sensitive; stored as a production env var (not a secret). |
 
 ## Apps / Artifacts
 
