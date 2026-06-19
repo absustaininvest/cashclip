@@ -20,6 +20,12 @@ The chronic "CashClip build keeps failing" was actually TWO independent bugs at 
 **Why:** pnpm symlinks inside `cashclip/node_modules/` point 5 levels up (`../../../../../`) to the root workspace store when cashclip is a root workspace member. When Metro follows those symlinks and computes entry-point relative paths, it uses the pnpm workspace root as the "from" base — so `workspaceRoot` must also be that same root or Metro fails with "Unable to resolve module … from /home/runner/workspace/."
 **How to apply:** if the cashclip pnpm virtual store disappears (symptom: `eas update` fails at Metro bundler with "Cannot find module" for react-native/metro/expo-router), add `@expo/artifacts/absustain/cashclip` to root `pnpm-workspace.yaml` packages list, run `pnpm install --ignore-scripts`, then update `metro.config.js` `workspaceRoot` to `"../../../.."`. Also update the `REACT_PATH`/`REACT_DOM_PATH` singleton pins — they now come from the root store (same path, since `workspaceRoot` moved there).
 
+## 4. OTA publish: two cashclip directories, each with a different Metro/expo-config issue
+**Context:** Two cashclip dirs exist: `@expo/artifacts/absustain/cashclip` (active) and `artifacts/cashclip-next` (clean copy, same EAS projectId).
+- `@expo/artifacts/absustain/cashclip`: `expo config` fails silently (exit 1, no output) because its local node_modules has broken symlinks — expo-updates is not resolvable from `__dirname`. **Fix:** make `resolveExpoUpdatesInterfacePodPath` in app.config.js return `null` instead of throwing; `withDynamicExtraPods` then omits the EXUpdatesInterface pod entry rather than crashing. Native EAS builds install expo-updates locally so they always get the resolved path.
+- `artifacts/cashclip-next`: expo config works, but Metro bundling fails with "Unable to resolve module assert from @ide/backoff" (expo-notifications transitive dep). **Fix:** add `assert` to the `resolveRequest` handler in metro.config.js, pinned to `node_modules/.pnpm/assert@2.1.0/node_modules/assert/build/assert.js`.
+**How to apply:** For future OTAs, `artifacts/cashclip-next` is the reliable publish source after the assert fix. If publishing from `@expo/artifacts/absustain/cashclip` is needed, ensure app.config.js uses the null-returning pattern above.
+
 ## Verify before any build
 - `node -e` eval of app.config.js → EXUpdatesInterface path uses the CURRENT expo hash and the dir exists.
 - local iOS Metro bundle returns HTTP 200.

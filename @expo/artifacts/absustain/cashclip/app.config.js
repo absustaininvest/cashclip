@@ -13,6 +13,11 @@ const prodProjectId = "aac2a3d9-56b6-49ab-b254-9b80e98bab2f";
 // patch bump renames that folder, so a static path silently breaks `pod install`
 // on the next EAS build. require.resolve always points at wherever pnpm actually
 // placed the package, so this stays correct across version bumps.
+//
+// Returns null when expo-updates isn't resolvable from this directory (e.g.
+// during `expo config` for OTA publishing in a workspace where expo-updates is
+// hoisted to the root). Native builds always have expo-updates available locally
+// and will get the resolved path; OTA bundles don't need the pod path at all.
 function resolveExpoUpdatesInterfacePodPath() {
   const projectRoot = __dirname;
   let interfacePkgJson;
@@ -23,13 +28,10 @@ function resolveExpoUpdatesInterfacePodPath() {
     interfacePkgJson = require.resolve("expo-updates-interface/package.json", {
       paths: [path.dirname(expoUpdatesPkgJson), projectRoot],
     });
-  } catch (err) {
-    throw new Error(
-      "[app.config] Could not resolve expo-updates-interface for the " +
-        "EXUpdatesInterface pod. Ensure expo-updates is installed. " +
-        "Original error: " +
-        err.message,
-    );
+  } catch (_err) {
+    // Not available in this resolution context (e.g. OTA publish env).
+    // Native builds will always have expo-updates installed locally.
+    return null;
   }
 
   const interfaceIosDir = path.join(path.dirname(interfacePkgJson), "ios");
@@ -56,14 +58,15 @@ function withDynamicExtraPods(plugins) {
 
     // EXUpdatesInterface is injected here (with a freshly-resolved path) rather
     // than stored in app.json, so the brittle pnpm virtual-store path is never
-    // hardcoded anywhere. Drop any stale copy and prepend the resolved one.
+    // hardcoded anywhere. Drop any stale copy and prepend the resolved one
+    // (skip entirely if resolution failed — OTA bundles don't need pod paths).
     const otherPods = existingPods.filter(
       (pod) => !(pod && pod.name === "EXUpdatesInterface"),
     );
-    const extraPods = [
-      { name: "EXUpdatesInterface", path: resolveExpoUpdatesInterfacePodPath() },
-      ...otherPods,
-    ];
+    const resolvedPath = resolveExpoUpdatesInterfacePodPath();
+    const extraPods = resolvedPath
+      ? [{ name: "EXUpdatesInterface", path: resolvedPath }, ...otherPods]
+      : otherPods;
 
     return [name, { ...options, ios: { ...options.ios, extraPods } }];
   });
