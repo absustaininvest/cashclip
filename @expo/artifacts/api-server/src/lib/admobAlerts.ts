@@ -314,6 +314,51 @@ export function evaluateAdmobAlerts(input: AdmobAlertInput): AdmobAlert[] {
     }
   }
 
+  // ── Revenue divergence (post-cutover only) ──────────────────────────────
+  // Before the PAID-capable build is live, app-reported revenue is $0 by
+  // design and divergence is suppressed. After the cutover flag is set, a
+  // drop back to $0 — or any sustained divergence beyond the threshold while
+  // official earnings are above the noise floor — is a genuine regression and
+  // must page the operator through the same fire/resolve path as stale_sync.
+  if (isAdmobMirrorExpectedActive() && input.reconciliation != null) {
+    const { officialEarnings, appReportedEarnings, differencePct } = input.reconciliation;
+    const aboveFloor = officialEarnings >= cfg.minEarningsUsd;
+    const diverged =
+      aboveFloor && differencePct != null && Math.abs(differencePct) > cfg.divergencePct;
+    const a = transition(
+      "revenue_divergence",
+      diverged,
+      now,
+      cfg,
+      (status, firstSeenAt, firedAt) => ({
+        id: `revenue_divergence::${firedAt}`,
+        condition: "revenue_divergence",
+        status,
+        message:
+          status === "resolved"
+            ? "AdMob revenue divergence has cleared — app-reported and official earnings are back in range."
+            : appReportedEarnings === 0 && officialEarnings > 0
+              ? `AdMob revenue mirror shows $0 app-reported while official is $${officialEarnings.toFixed(2)} — onPaidEvent may be broken.`
+              : `AdMob revenue divergence: app-reported $${appReportedEarnings.toFixed(2)} vs official $${officialEarnings.toFixed(2)} (${(differencePct ?? 0).toFixed(1)}%, threshold ${cfg.divergencePct}%).`,
+        firstSeenAt: new Date(firstSeenAt).toISOString(),
+        firedAt: new Date(firedAt).toISOString(),
+        cooldownMs: cfg.cooldownMs,
+        threshold: cfg.divergencePct,
+        detail: {
+          officialEarnings,
+          appReportedEarnings,
+          differencePct,
+          divergencePct: cfg.divergencePct,
+          minEarningsUsd: cfg.minEarningsUsd,
+        },
+      }),
+    );
+    if (a) {
+      fireAlert(a, cfg);
+      fired.push(a);
+    }
+  }
+
   return fired;
 }
 

@@ -7,15 +7,15 @@
  *   - De-dup / rate-limit: a sustained stale_sync condition re-alerts at most
  *     once per cooldown.
  *   - Resolve: a single `resolved` event is emitted when stale_sync clears.
- *
- * revenue_divergence is intentionally disabled and never fires; those cases
- * are not tested here.
+ *   - revenue_divergence is suppressed pre-cutover (ADMOB_MIRROR_EXPECTED_ACTIVE
+ *     unset/false) and fires post-cutover when divergence exceeds the threshold,
+ *     including the $0 app-reported / positive-official case.
  *
  * Pure in-memory; no DB. The notification POST path is disabled (no
  * ADMIN_ALERT_WEBHOOK_URL) so nothing leaves the process.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   evaluateAdmobAlerts,
   getRecentAdmobAlerts,
@@ -101,8 +101,12 @@ describe("admobAlerts", () => {
     });
   });
 
-  describe("revenue_divergence — permanently disabled", () => {
-    it("never fires even when divergence far exceeds the threshold", () => {
+  describe("revenue_divergence — pre-cutover suppression", () => {
+    beforeEach(() => {
+      delete process.env.ADMOB_MIRROR_EXPECTED_ACTIVE;
+    });
+
+    it("never fires even when divergence far exceeds the threshold (flag unset)", () => {
       const now = Date.now();
       const fired = evaluateAdmobAlerts({
         configured: true,
@@ -118,17 +122,167 @@ describe("admobAlerts", () => {
       expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
     });
 
-    it("never fires even when divergence is at the configured threshold", () => {
+    it("never fires even when app-reported is $0 and official is positive (flag unset)", () => {
       const now = Date.now();
       const fired = evaluateAdmobAlerts({
         configured: true,
         lastSyncedAt: new Date(now),
         reconciliation: recon({
           officialEarnings: 100,
-          appReportedEarnings: 50,
-          differenceAbs: 50,
-          differencePct: 50,
+          appReportedEarnings: 0,
+          differenceAbs: 100,
+          differencePct: 100,
         }),
+        now,
+      });
+      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
+    });
+
+    it("never fires when flag is explicitly false", () => {
+      process.env.ADMOB_MIRROR_EXPECTED_ACTIVE = "false";
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: recon({
+          officialEarnings: 100,
+          appReportedEarnings: 0,
+          differenceAbs: 100,
+          differencePct: 100,
+        }),
+        now,
+      });
+      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
+    });
+  });
+
+  describe("revenue_divergence — post-cutover firing", () => {
+    beforeEach(() => {
+      process.env.ADMOB_MIRROR_EXPECTED_ACTIVE = "1";
+    });
+    afterEach(() => {
+      delete process.env.ADMOB_MIRROR_EXPECTED_ACTIVE;
+    });
+
+    it("fires when app-reported is $0 and official earnings exceed the noise floor", () => {
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: recon({
+          officialEarnings: 10,
+          appReportedEarnings: 0,
+          differenceAbs: 10,
+          differencePct: 100,
+        }),
+        now,
+      });
+      const alert = fired.find((a) => a.condition === "revenue_divergence");
+      expect(alert).toBeTruthy();
+      expect(alert!.status).toBe("firing");
+      expect(alert!.message).toMatch(/\$0 app-reported/i);
+      expect(alert!.detail.appReportedEarnings).toBe(0);
+      expect(alert!.detail.officialEarnings).toBe(10);
+    });
+
+    it("fires when divergence exceeds the threshold (non-zero but below official)", () => {
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: recon({
+          officialEarnings: 100,
+          appReportedEarnings: 60,
+          differenceAbs: 40,
+          differencePct: 40,
+        }),
+        now,
+      });
+      const alert = fired.find((a) => a.condition === "revenue_divergence");
+      expect(alert).toBeTruthy();
+      expect(alert!.status).toBe("firing");
+      expect(alert!.message).toMatch(/divergence/i);
+      expect(alert!.threshold).toBe(25);
+    });
+
+    it("does not fire when divergence is within the threshold", () => {
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: recon({
+          officialEarnings: 100,
+          appReportedEarnings: 90,
+          differenceAbs: 10,
+          differencePct: 10,
+        }),
+        now,
+      });
+      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
+    });
+
+    it("does not fire when official earnings are below the noise floor", () => {
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: recon({
+          officialEarnings: 0.5,
+          appReportedEarnings: 0,
+          differenceAbs: 0.5,
+          differencePct: 100,
+        }),
+        now,
+      });
+      expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
+    });
+
+    it("does not re-fire inside the cooldown window", () => {
+      const t0 = Date.now();
+      const first = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t0),
+        reconciliation: recon({ officialEarnings: 10, appReportedEarnings: 0, differenceAbs: 10, differencePct: 100 }),
+        now: t0,
+      });
+      expect(first.filter((a) => a.condition === "revenue_divergence").length).toBe(1);
+
+      const second = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t0),
+        reconciliation: recon({ officialEarnings: 10, appReportedEarnings: 0, differenceAbs: 10, differencePct: 100 }),
+        now: t0 + HOUR,
+      });
+      expect(second.some((a) => a.condition === "revenue_divergence")).toBe(false);
+    });
+
+    it("resolves when divergence clears after cutover", () => {
+      const t0 = Date.now();
+      evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t0),
+        reconciliation: recon({ officialEarnings: 10, appReportedEarnings: 0, differenceAbs: 10, differencePct: 100 }),
+        now: t0,
+      });
+      const t1 = t0 + HOUR;
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(t1),
+        reconciliation: recon({ officialEarnings: 10, appReportedEarnings: 10, differenceAbs: 0, differencePct: 0 }),
+        now: t1,
+      });
+      const resolved = fired.find((a) => a.condition === "revenue_divergence");
+      expect(resolved).toBeTruthy();
+      expect(resolved!.status).toBe("resolved");
+      expect(resolved!.message).toMatch(/cleared/i);
+    });
+
+    it("does not fire when reconciliation is null", () => {
+      const now = Date.now();
+      const fired = evaluateAdmobAlerts({
+        configured: true,
+        lastSyncedAt: new Date(now),
+        reconciliation: null,
         now,
       });
       expect(fired.some((a) => a.condition === "revenue_divergence")).toBe(false);
