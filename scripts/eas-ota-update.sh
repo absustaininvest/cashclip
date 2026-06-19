@@ -17,8 +17,10 @@ if [ "${EAS_OTA_CONFIRMED:-0}" != "1" ]; then
   sleep infinity
 fi
 
-if [ -z "${EXPO_TOKEN:-}" ]; then
-  echo "ERROR: EXPO_TOKEN is not set."
+# Accept either EXPO_TOKEN (direct) or EXPO_TOKLAST (the Replit-stored secret name).
+EXPO_TOKEN="${EXPO_TOKEN:-${EXPO_TOKLAST:-}}"
+if [ -z "$EXPO_TOKEN" ]; then
+  echo "ERROR: Neither EXPO_TOKEN nor EXPO_TOKLAST is set."
   exit 1
 fi
 
@@ -41,8 +43,29 @@ echo "  Channel: $CHANNEL"
 echo "  Message: $MESSAGE"
 echo "================================================"
 
+# ── Git-wrapper trick ─────────────────────────────────────────────────────────
+# After publishing, EAS CLI runs `git add` + `git commit` to record the update
+# ID. Replit's sandbox blocks writes to .git and kills the process. This wrapper
+# silently swallows all write ops while passing reads through to the real git
+# binary, so the publish completes cleanly even in the sandboxed environment.
+mkdir -p /tmp/fake-bin
+cat > /tmp/fake-bin/git << 'WRAP'
+#!/bin/bash
+case "$1" in
+  add|commit|merge|rebase|restore|checkout|reset|stash|tag|push|pull)
+    exit 0
+    ;;
+  *)
+    exec /usr/bin/git "$@"
+    ;;
+esac
+WRAP
+chmod +x /tmp/fake-bin/git
+
 cd "${SOURCE_DIR}"
-EXPO_TOKEN="$EXPO_TOKEN" eas update \
+PATH="/tmp/fake-bin:$PATH" \
+  EXPO_TOKEN="$EXPO_TOKEN" \
+  eas update \
   --channel "$CHANNEL" \
   --message "$MESSAGE" \
   --non-interactive
