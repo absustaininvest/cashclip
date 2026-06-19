@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createVerify } from "node:crypto";
 import { authMiddleware, adminMiddleware, type AuthRequest } from "../auth";
-import { db, earnTokens, users, earningsLedger } from "@workspace/db";
+import { db, earnTokens, users, earningsLedger, adEvents } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, count, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { runSpinChallengeSweep } from "../lib/spinChallengeSweep";
@@ -375,6 +375,17 @@ export function registerEarningsRoutes(app: Express): void {
     message: { error: "Too many mission claims — try again later" },
   });
 
+  // 120 paid-event reports per hour per user — generous enough for ad bursting
+  // (rewarded_ad daily cap is 30) while still preventing runaway writes.
+  const paidEventLimit = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => (req as AuthRequest).userId ?? "anon",
+    message: { error: "Too many revenue events — slow down" },
+  });
+
   // ── POST /api/earnings/record ───────────────────────────────────────────────
   // Records a single earn action.
   // Server sets the point amount — the client sends only the action type.
@@ -742,6 +753,64 @@ export function registerEarningsRoutes(app: Express): void {
   };
   app.post("/api/earn/ad/begin", authMiddleware, adRewardGone);
   app.post("/api/earn/ad/complete", authMiddleware, adRewardGone);
+
+  // ── POST /api/earn/ad/paid-event ────────────────────────────────────────────
+  // Persists per-impression ad revenue from the client's AdMob PAID event so
+  // computeRevenueUsd() in pointsEconomy.ts accumulates real revenue rows and
+  // its $0.012/reward proxy fallback becomes dormant once data flows.
+  //
+  // This is ANALYTICS-ONLY — it writes to ad_events, never to earn_tokens or
+  // earningsLedger. It cannot credit or alter any balance. The batch analytics
+  // path (POST /api/ad-events/batch) carries completion counts; this endpoint
+  // carries revenueMicros only, keeping the two paths disjoint to avoid
+  // double-counting in the SUM(revenue_micros) query.
+  //
+  // Security: authenticated (JWT); rate-limited; revenueMicros clamped server-
+  // side to ≤$1M per impression; adUnitType restricted to an allowlist.
+  app.post(
+    "/api/earn/ad/paid-event",
+    authMiddleware,
+    paidEventLimit,
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
+        const { revenueMicros: raw, adUnitType: rawType } = req.body as {
+          revenueMicros?: unknown;
+          adUnitType?: unknown;
+        };
+
+        if (raw == null) {
+          res.status(400).json({ error: "revenueMicros is required" });
+          return;
+        }
+        const n = typeof raw === "number" ? raw : Number(raw);
+        if (!Number.isFinite(n) || n < 0) {
+          res.status(400).json({ error: "revenueMicros must be a non-negative finite number" });
+          return;
+        }
+        // Cap at $1,000,000 per impression — any higher value is clearly bad data
+        const micros = Math.min(Math.round(n), 1_000_000_000_000);
+
+        const ALLOWED_UNIT_TYPES = ["rewarded", "interstitial", "banner"] as const;
+        type AllowedUnitType = (typeof ALLOWED_UNIT_TYPES)[number];
+        const adUnitType: AllowedUnitType =
+          typeof rawType === "string" && (ALLOWED_UNIT_TYPES as readonly string[]).includes(rawType)
+            ? (rawType as AllowedUnitType)
+            : "rewarded";
+
+        await db.insert(adEvents).values({
+          userId: req.userId!,
+          event: "completion",
+          adUnitType,
+          revenueMicros: String(micros),
+        });
+
+        res.status(204).end();
+      } catch (err) {
+        logger.warn({ err }, "ad paid-event: insert failed");
+        res.status(500).json({ error: "Failed to record revenue event" });
+      }
+    },
+  );
 
   // ── POST /api/earnings/claim ────────────────────────────────────────────────
   // Claims all earn tokens past their 3-hour window.
@@ -1335,6 +1404,25 @@ export function registerEarningsRoutes(app: Express): void {
           { userId: user_id, rewardItem: reward_item, rewardAmount: reward_amount, transactionId: transaction_id },
           "AdMob SSV: earn token issued",
         );
+        // Record a server-verified reward_earned event in ad_events so that
+        // computeRevenueUsd() has an authoritative reward count for the proxy
+        // fallback. This is best-effort analytics — a failure must never block
+        // or rollback the earn_token credit above, so it runs outside the
+        // transaction. revenueMicros is null here because the SSV callback
+        // does not carry per-impression revenue; the real revenue path arrives
+        // separately via the client-side AdMob PAID event → ad-analytics batch
+        // → ad_events.revenueMicros (which flips computeRevenueUsd() off the
+        // proxy once any non-null row exists in the window).
+        db.insert(adEvents).values({
+          userId:      user_id,
+          event:       "reward_earned",
+          adUnitType:  "rewarded",
+          rewardAmount: reward_amount ? String(reward_amount) : null,
+          rewardType:  reward_item ?? null,
+          revenueMicros: null,
+        }).catch((err) => {
+          logger.warn({ err, userId: user_id }, "AdMob SSV: ad_events insert failed (non-fatal)");
+        });
       }
 
       res.status(200).send("OK");

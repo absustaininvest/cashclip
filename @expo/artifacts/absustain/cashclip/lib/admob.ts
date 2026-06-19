@@ -8,6 +8,8 @@ import {
   trackAdRewardEarned,
   trackAdLoadFailed,
 } from "./ad-analytics";
+import { secureGet } from "./secure-store";
+import { getApiUrl } from "./query-client";
 
 // Google AdMob is the mediation ORCHESTRATOR. Unity Ads, ironSource, Pangle, and
 // Chartboost are retained as DEMAND SOURCES — each wired as an AdMob mediation
@@ -324,6 +326,29 @@ function paidEventToMicros(event: { value?: number } | null | undefined): number
   return Math.round(value * 1_000_000);
 }
 
+// Immediately persists per-impression revenue to the server so computeRevenueUsd()
+// in pointsEconomy.ts accumulates real ad-revenue rows as soon as each impression
+// closes, rather than waiting for the 30-second analytics batch flush.
+// Fire-and-forget: never blocks the user; the batch still carries the completion
+// event for count analytics (without revenueMicros to avoid double-counting).
+async function reportPaidRevenue(revenueMicros: number, adUnitType: string): Promise<void> {
+  try {
+    const token = await secureGet("cashclip_auth_token");
+    if (!token) return;
+    const base = getApiUrl();
+    const url = base.endsWith("/")
+      ? `${base}api/earn/ad/paid-event`
+      : `${base}/api/earn/ad/paid-event`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ revenueMicros, adUnitType }),
+    });
+  } catch {
+    // Revenue reporting is best-effort; never surface errors to the user
+  }
+}
+
 export function preloadRewardedAd(adUnitId?: string): void {
   if (!isAdMobAvailable || !adMobInitialized) return;
   if (preloadInProgress || isPreloadedAdValid()) return;
@@ -445,7 +470,11 @@ function showPreloadedAd(): Promise<PreloadedAdResult> {
       AdEventType.CLOSED,
       () => {
         const durationMs = Date.now() - showTime;
-        trackAdCompletion("rewarded", durationMs, paidMicros);
+        // Revenue goes to the server immediately (not via batch) so each
+        // impression is recorded as soon as the ad closes. The batch call
+        // omits paidMicros to avoid double-counting in computeRevenueUsd().
+        if (paidMicros != null) reportPaidRevenue(paidMicros, "rewarded");
+        trackAdCompletion("rewarded", durationMs);
         if (earned) {
           trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
         }
@@ -538,7 +567,8 @@ function loadAndShowOnDemand(adUnitId?: string): Promise<{ rewarded: boolean; ty
         settled = true;
         clearTimeout(timeoutId);
         const durationMs = Date.now() - loadStartTime;
-        trackAdCompletion("rewarded", durationMs, paidMicros);
+        if (paidMicros != null) reportPaidRevenue(paidMicros, "rewarded");
+        trackAdCompletion("rewarded", durationMs);
         if (earned) {
           trackAdRewardEarned("rewarded", rewardAmount, rewardType || "rewarded");
         }
@@ -687,7 +717,8 @@ export async function showInterstitialAd(adUnitId?: string): Promise<boolean> {
         settled = true;
         clearTimeout(timeoutId);
         const durationMs = Date.now() - loadStartTime;
-        trackAdCompletion("interstitial", durationMs, paidMicros);
+        if (paidMicros != null) reportPaidRevenue(paidMicros, "interstitial");
+        trackAdCompletion("interstitial", durationMs);
         cleanup();
         resolve(true);
       });

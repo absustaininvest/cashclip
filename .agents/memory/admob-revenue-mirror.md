@@ -48,6 +48,14 @@ Diverging" / $0 app-reported stays correct/by-design until a fresh EAS build
 **Admin relabel companion:** `reconMirrorInactive = appReported===0 && official>0`
 flips the badge to neutral "Official only" and explains the $0 is by design.
 
+**SSV → ad_events (added):** The SSV handler (`GET /api/admob/ssv`) now also
+inserts a `reward_earned` row into `ad_events` (best-effort, outside the earn_token
+transaction, `.catch()` guarded) after each verified reward. `revenueMicros=null`
+because SSV carries no per-impression revenue — real revenue arrives via the client
+PAID event → batch. This gives `computeRevenueUsd()`'s proxy mode a server-verified
+reward count rather than relying solely on client-side analytics that may not flush.
+`adEvents` must be imported in `earnings.ts` for this to compile.
+
 **Cutover gate (closed):** the relabel is now gated on a server-driven cutover
 signal so it can't mask a genuine future regression to $0. Set the env flag
 `ADMOB_MIRROR_EXPECTED_ACTIVE` truthy on the **production** deployment once the
