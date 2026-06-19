@@ -244,6 +244,9 @@ if (fs.existsSync(absustainStaticDir)) {
 }
 
 if (landingHtml) {
+  app.get("/", (_req, res) => {
+    res.type("html").send(landingHtml);
+  });
   app.get("/api", (_req, res) => {
     res.type("html").send(landingHtml);
   });
@@ -313,5 +316,15 @@ app.get("/app-ads.txt", (_req, res) => {
 
 app.use("/api", router);
 registerRoutes(app);
+
+// Catch-all: any path on the cash-clip.app domain that hasn't been handled
+// above (e.g. /foobar) should return the landing page rather than a 404.
+// The absustain middleware already exits early for absustaininvest.com hosts,
+// so this only fires for cash-clip.app traffic that fell through everything else.
+if (landingHtml) {
+  app.use((_req, res) => {
+    res.type("html").send(landingHtml);
+  });
+}
 
 export default app;
