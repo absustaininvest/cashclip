@@ -20,6 +20,8 @@ import {
   evaluateAdmobAlerts,
   getRecentAdmobAlerts,
   isAdmobMirrorExpectedActive,
+  recordSsvMissingUserId,
+  getSsvMissingUserIdStats,
   _resetAdmobAlertsForTests,
   type AdmobReconciliationInput,
 } from "./admobAlerts";
@@ -187,6 +189,47 @@ describe("admobAlerts", () => {
       const resolved = fired.find((a) => a.condition === "stale_sync");
       expect(resolved).toBeTruthy();
       expect(resolved!.status).toBe("resolved");
+    });
+  });
+
+  describe("ssvMissingUserId counter", () => {
+    it("starts at zero with no lastSeenAt", () => {
+      const stats = getSsvMissingUserIdStats();
+      expect(stats.count).toBe(0);
+      expect(stats.lastSeenAt).toBeNull();
+    });
+
+    it("increments count on each call to recordSsvMissingUserId", () => {
+      recordSsvMissingUserId();
+      expect(getSsvMissingUserIdStats().count).toBe(1);
+      recordSsvMissingUserId();
+      expect(getSsvMissingUserIdStats().count).toBe(2);
+    });
+
+    it("records a lastSeenAt timestamp after the first call", () => {
+      const before = new Date().toISOString();
+      recordSsvMissingUserId();
+      const after = new Date().toISOString();
+      const { lastSeenAt } = getSsvMissingUserIdStats();
+      expect(lastSeenAt).not.toBeNull();
+      expect(lastSeenAt! >= before).toBe(true);
+      expect(lastSeenAt! <= after).toBe(true);
+    });
+
+    it("returns a snapshot (mutation does not affect the stored state)", () => {
+      recordSsvMissingUserId();
+      const snap = getSsvMissingUserIdStats();
+      snap.count = 999;
+      expect(getSsvMissingUserIdStats().count).toBe(1);
+    });
+
+    it("_resetAdmobAlertsForTests resets the counter back to zero", () => {
+      recordSsvMissingUserId();
+      recordSsvMissingUserId();
+      _resetAdmobAlertsForTests();
+      const stats = getSsvMissingUserIdStats();
+      expect(stats.count).toBe(0);
+      expect(stats.lastSeenAt).toBeNull();
     });
   });
 

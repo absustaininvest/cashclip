@@ -22,6 +22,7 @@ import {
   DISPLAY_POINTS_PER_DOLLAR_KEY,
 } from "../lib/runtimeSettings";
 import { withAdvisoryLock } from "../lib/advisoryLock";
+import { recordSsvMissingUserId } from "../lib/admobAlerts";
 
 // ── CONVERSION & LIMITS ───────────────────────────────────────────────────────
 // Point→cash value is now server-authoritative and floats with ad ARPU; see
@@ -1217,8 +1218,11 @@ export function registerEarningsRoutes(app: Express): void {
       const q = req.query as Record<string, string | undefined>;
       const { user_id, reward_item, reward_amount, timestamp, transaction_id, signature, key_id } = q;
 
-      // ── 1. Required parameters ──────────────────────────────────────────
-      if (!user_id || !timestamp || !signature || !key_id) {
+      // ── 1. Required parameters (signature envelope) ─────────────────────
+      // user_id is intentionally checked separately (after signature) so we can
+      // distinguish a regression where Google's callback drops user_id from random
+      // junk that lacks the whole envelope.
+      if (!timestamp || !signature || !key_id) {
         logger.warn({ ...ctx, query: q }, "AdMob SSV: missing required params");
         res.status(200).send("OK"); return;
       }
@@ -1235,7 +1239,18 @@ export function registerEarningsRoutes(app: Express): void {
       const sigValid = await verifySSVSignature(rawQuery, signature, parseInt(key_id, 10));
 
       if (!sigValid) {
-        logger.warn({ ...ctx, keyId: key_id, userId: user_id }, "AdMob SSV: invalid signature — rejected");
+        logger.warn({ ...ctx, keyId: key_id }, "AdMob SSV: invalid signature — rejected");
+        res.status(200).send("OK"); return;
+      }
+
+      // ── 3a. user_id presence (post-signature) ───────────────────────────
+      // This check intentionally runs AFTER signature+timestamp pass so its
+      // counter only increments for genuine Google callbacks — noise from bots or
+      // scanners that lack a valid envelope never reaches this path.  A non-zero
+      // count here means the AdMob rewarded-ad unit lost its user_id configuration
+      // on the client, which would silently block all SSV rewards.
+      if (!user_id) {
+        recordSsvMissingUserId();
         res.status(200).send("OK"); return;
       }
 

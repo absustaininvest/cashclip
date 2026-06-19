@@ -49,6 +49,7 @@ import {
   getRecentAdmobAlerts,
   getAdmobAlertConfig,
   isAdmobMirrorExpectedActive,
+  getSsvMissingUserIdStats,
 } from "../lib/admobAlerts";
 import {
   getSetting,
@@ -2783,6 +2784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         alerts: getRecentAlerts(alertLimit),
         rejections: getRecentRejections(rejectionLimit),
         admobAlerts: getRecentAdmobAlerts(alertLimit),
+        ssvMissingUserId: getSsvMissingUserIdStats(),
       });
     } catch (err) {
       req.log?.error({ err }, "Failed to get webhook alerts");

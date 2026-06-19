@@ -322,8 +322,49 @@ export function getRecentAdmobAlerts(limit = 50): AdmobAlert[] {
   return recentAlerts.slice(-n).reverse();
 }
 
+// ── SSV missing-user-id counter ─────────────────────────────────────────────
+// Tracks how many AdMob SSV callbacks passed signature + timestamp checks but
+// carried no user_id — the fingerprint of the "SSV not receiving user_id"
+// regression.  In-memory per replica (same as the alert store above): sufficient
+// for surfacing a real-time regression in the admin hub without a DB write on
+// every Google callback.
+interface SsvMissingUserIdState {
+  /** Total count since the process started (or last reset). */
+  count: number;
+  /** ISO-8601 timestamp of the most recent occurrence. */
+  lastSeenAt: string | null;
+}
+
+const ssvMissingUserIdState: SsvMissingUserIdState = { count: 0, lastSeenAt: null };
+
+/**
+ * Called by the SSV handler each time a Google-signed callback arrives with a
+ * missing or empty user_id.  Increments the in-memory counter and records the
+ * timestamp so the admin Integration Hub can surface both.
+ */
+export function recordSsvMissingUserId(): void {
+  ssvMissingUserIdState.count += 1;
+  ssvMissingUserIdState.lastSeenAt = new Date().toISOString();
+  logger.warn(
+    {
+      audit: "admob_ssv_missing_user_id",
+      missingUserId: true,
+      count: ssvMissingUserIdState.count,
+      lastSeenAt: ssvMissingUserIdState.lastSeenAt,
+    },
+    "AdMob SSV: signed callback arrived with no user_id — possible client preload regression",
+  );
+}
+
+/** Returns a snapshot of the SSV missing-user-id counter for the admin hub. */
+export function getSsvMissingUserIdStats(): SsvMissingUserIdState {
+  return { ...ssvMissingUserIdState };
+}
+
 /** Test-only helper to clear in-memory state. */
 export function _resetAdmobAlertsForTests(): void {
   states.clear();
   recentAlerts.length = 0;
+  ssvMissingUserIdState.count = 0;
+  ssvMissingUserIdState.lastSeenAt = null;
 }
