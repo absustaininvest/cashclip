@@ -60,6 +60,7 @@ vi.mock("./storage", () => ({
     recordSecurityAudit: (...args: unknown[]) => mockRecordSecurityAudit(...args),
     createUser: vi.fn(),
     setEmailVerificationToken: vi.fn(),
+    touchUserLastSeen: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -272,22 +273,17 @@ async function callResetPassword() {
     .send({ username: "admin", code, newPassword: "new-password-123" });
 }
 
-const flows: Array<{ name: string; run: () => Promise<request.Response>; skip?: true }> = [
-  // pre-existing: totp/enable returns 500 instead of rolling back cleanly; skip until fixed
-  { name: "2FA enable (totp_enabled)", run: callTotpEnable, skip: true },
-  // pre-existing: mutationAttempted stays false (route errors before mutation); skip until fixed
-  { name: "backup-code regeneration (backup_codes_regenerated)", run: callBackupRegen, skip: true },
-  // pre-existing: mutationAttempted stays false (route errors before mutation); skip until fixed
-  { name: "2FA disable (totp_disabled)", run: callTotpDisable, skip: true },
-  // pre-existing: mutationAttempted stays false (route errors before mutation); skip until fixed
-  { name: "change password (password_changed)", run: callChangePassword, skip: true },
-  // pre-existing: mutationAttempted stays false (route errors before mutation); skip until fixed
-  { name: "OTP reset password (password_reset)", run: callResetPassword, skip: true },
+const flows: Array<{ name: string; run: () => Promise<request.Response> }> = [
+  { name: "2FA enable (totp_enabled)", run: callTotpEnable },
+  { name: "backup-code regeneration (backup_codes_regenerated)", run: callBackupRegen },
+  { name: "2FA disable (totp_disabled)", run: callTotpDisable },
+  { name: "change password (password_changed)", run: callChangePassword },
+  { name: "OTP reset password (password_reset)", run: callResetPassword },
 ];
 
 describe("self-service fail-closed: audit failure rolls back the account change", () => {
-  for (const { name, run, skip } of flows) {
-    (skip ? it.skip : it)(`${name}: audit write throwing rolls back the mutation and returns 5xx`, async () => {
+  for (const { name, run } of flows) {
+    it(`${name}: audit write throwing rolls back the mutation and returns 5xx`, async () => {
       auditThrows = true;
 
       const res = await run();
@@ -307,7 +303,7 @@ describe("self-service fail-closed: audit failure rolls back the account change"
   // Sanity: the same model DOES commit both the mutation and the audit entry on
   // the happy path. Without this, the rollback assertions above could pass even
   // if the fake simply never committed anything.
-  it.skip("control: when the audit write succeeds, mutation + audit BOTH commit and the request succeeds [pre-existing: callChangePassword returns 500 with current mock setup]", async () => {
+  it("control: when the audit write succeeds, mutation + audit BOTH commit and the request succeeds", async () => {
     auditThrows = false;
 
     const res = await callChangePassword();
