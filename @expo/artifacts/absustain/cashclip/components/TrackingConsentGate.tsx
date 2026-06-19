@@ -12,15 +12,58 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
+import * as ExpoSecureStore from "expo-secure-store";
 import { secureGet, secureSet } from "@/lib/secure-store";
 import { useLanguage } from "@/lib/LanguageContext";
 
 // Only the terms acceptance is persisted — the disclosure screen shows every launch.
 const TERMS_KEY = "terms_done_v1";
+
+// Legacy AsyncStorage keys from previous consent implementations.
+// These are promoted to SecureStore (TERMS_KEY) if present, then removed.
+const LEGACY_AS_KEYS = [
+  "consent_done_v3",
+  "consent_fully_done_v2",
+  "tracking_consent_dismissed_v1",
+] as const;
+
+/**
+ * One-time migration: read stale consent keys from AsyncStorage, promote to
+ * SecureStore if terms have not been accepted yet, then delete the old keys.
+ *
+ * Deletion is gated on a successful SecureStore write: if the write fails the
+ * legacy keys remain in AsyncStorage so the migration can be retried on the
+ * next launch. When TERMS_KEY is already set no write is needed, so deletion
+ * always proceeds in that case.
+ *
+ * Non-fatal — a failure here does not block the consent flow.
+ */
+async function migrateLegacyConsent(): Promise<void> {
+  try {
+    const values = await Promise.all(
+      LEGACY_AS_KEYS.map((k) => AsyncStorage.getItem(k)),
+    );
+    const anyFound = values.some((v) => v !== null);
+    if (anyFound) {
+      const alreadySet = await secureGet(TERMS_KEY);
+      if (!alreadySet) {
+        // Call ExpoSecureStore directly so a keychain write failure throws and
+        // propagates to the outer catch — gating the multiRemove below.
+        // (secureSet swallows keychain errors on native via .catch, which would
+        // let multiRemove run even when the promotion write failed.)
+        await ExpoSecureStore.setItemAsync(TERMS_KEY, "1");
+      }
+      await AsyncStorage.multiRemove([...LEGACY_AS_KEYS]);
+    }
+  } catch {
+    // Migration failure is non-fatal; legacy keys remain for retry next launch.
+  }
+}
 
 type Step = "checking" | "disclosures" | "terms" | "done";
 
@@ -89,13 +132,14 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   useEffect(() => {
     if (Platform.OS !== "ios") {
       // Android has no ATT dialog — always pass through immediately.
-      finish();
+      // Run migration first so stale keys are cleaned up on Android too.
+      migrateLegacyConsent().finally(() => finish());
       return;
     }
 
     // iOS: always show the disclosure screen on every cold launch.
-    // No storage key can skip it. The disclosure is shown unconditionally.
-    setStep("disclosures");
+    // No storage key can skip it. Run migration, then show disclosures.
+    migrateLegacyConsent().finally(() => setStep("disclosures"));
   }, []);
 
   async function acceptDisclosures() {

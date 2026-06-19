@@ -19,9 +19,20 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 
 // ── In-memory expo-secure-store (Keychain on iOS) ─────────────────────────────
 const keychain = new Map<string, string>();
+// Sentinel stored inside `keychain` itself — the only Map guaranteed to be the
+// same object reference in both the vi.mock() factory closure and the test
+// body (hoisted factories may not share module-scope primitives or plain
+// objects declared after the mock call).
+const KEYCHAIN_WRITE_FAIL_SENTINEL = "__force_write_error__";
 vi.mock("expo-secure-store", () => ({
-  getItemAsync: async (k: string) => (keychain.has(k) ? keychain.get(k)! : null),
-  setItemAsync: async (k: string, v: string) => { keychain.set(k, v); },
+  getItemAsync: async (k: string) => {
+    if (k === KEYCHAIN_WRITE_FAIL_SENTINEL) return null;
+    return keychain.has(k) ? keychain.get(k)! : null;
+  },
+  setItemAsync: async (k: string, v: string) => {
+    if (keychain.has(KEYCHAIN_WRITE_FAIL_SENTINEL)) throw new Error("keychain unavailable");
+    keychain.set(k, v);
+  },
   deleteItemAsync: async (k: string) => { keychain.delete(k); },
 }));
 
@@ -733,6 +744,112 @@ describe("TrackingConsentGate — ATT pre-authorized, no TERMS_KEY (new-user ful
     expect(childrenVisible(tr.root)).toBe(true);
     expect(requestATTCalled).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy AsyncStorage key cleanup (migration)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("TrackingConsentGate — legacy AsyncStorage key cleanup on mount", () => {
+  it("removes consent_done_v3 from AsyncStorage after mount", async () => {
+    store.set("consent_done_v3", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+  });
+
+  it("removes consent_fully_done_v2 from AsyncStorage after mount", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+  });
+
+  it("removes tracking_consent_dismissed_v1 from AsyncStorage after mount", async () => {
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("removes all three legacy keys when multiple are present", async () => {
+    store.set("consent_done_v3", "1");
+    store.set("consent_fully_done_v2", "1");
+    store.set("tracking_consent_dismissed_v1", "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("promotes consent_done_v3 to TERMS_KEY in SecureStore when TERMS_KEY is absent", async () => {
+    store.set("consent_done_v3", "1");
+
+    await renderGate();
+
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+  });
+
+  it("promotes any legacy key to TERMS_KEY in SecureStore when TERMS_KEY is absent", async () => {
+    store.set("consent_fully_done_v2", "1");
+
+    await renderGate();
+
+    expect(keychain.get(TERMS_KEY)).toBe("1");
+  });
+
+  it("does not overwrite existing TERMS_KEY in SecureStore during migration", async () => {
+    store.set("consent_done_v3", "1");
+    keychain.set(TERMS_KEY, "already");
+
+    await renderGate();
+
+    expect(keychain.get(TERMS_KEY)).toBe("already");
+    expect(store.has("consent_done_v3")).toBe(false);
+  });
+
+  it("does not write TERMS_KEY when no legacy keys are present", async () => {
+    await renderGate();
+
+    expect(keychain.has(TERMS_KEY)).toBe(false);
+  });
+
+  it("leaves storage clean when no legacy keys are present (no-op migration)", async () => {
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(store.has("consent_fully_done_v2")).toBe(false);
+    expect(store.has("tracking_consent_dismissed_v1")).toBe(false);
+  });
+
+  it("retains legacy keys when SecureStore write fails (retry possible next launch)", async () => {
+    store.set("consent_done_v3", "1");
+    // Sentinel inside keychain — guaranteed same Map reference as the factory closure.
+    keychain.set(KEYCHAIN_WRITE_FAIL_SENTINEL, "1");
+
+    await renderGate();
+
+    // Deletion was gated on a successful write — key must still be present.
+    expect(store.has("consent_done_v3")).toBe(true);
+    expect(keychain.has(TERMS_KEY)).toBe(false);
+  });
+
+  it("cleans up legacy keys when TERMS_KEY already exists even with write errors (no write path taken)", async () => {
+    store.set("consent_done_v3", "1");
+    keychain.set(TERMS_KEY, "1");
+    // Keychain writes would fail, but TERMS_KEY is already set so no write
+    // is attempted — deletion must still proceed.
+    keychain.set(KEYCHAIN_WRITE_FAIL_SENTINEL, "1");
+
+    await renderGate();
+
+    expect(store.has("consent_done_v3")).toBe(false);
+    expect(keychain.get(TERMS_KEY)).toBe("1");
   });
 });
 
