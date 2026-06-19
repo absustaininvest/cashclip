@@ -1,0 +1,101 @@
+CashClip — Named Structure (Rule 4: every entity named once, one job) AB Sustainability Investments LLC
+(Holding company — D-U-N-S certified)
+absustaininvest.com · @ABSustainInvest  CashClip  (the product)
+Brand: CashClip (one word) · Domain: cash-clip.app        FUNDED EARNINGS
+✓ backed by real revenue AdMob — WORKING
+Rewarded video ads. Funded revenue source (live). CPX Research — WORKING
+Partner Surveys. Credentials in hand. Current funded survey source. BitLabs — NOT serving
+Webhook-verification bug in OLD backend closed the account. Re-applied; fix webhook to restore. PAYOUTS PayPal
+User payouts — manually controlled INFRASTRUCTURE Firebase
+Backend (separate repl) Source project
+@ABSustainInvest/CashClip NAMED URLs cash-clip.app
+Product landing / web api.cash-clip.app
+Backend / API endpoint cash-clip.replit.app
+Default Replit web deploy absustaininvest.com
+Holding company site CONTACTS jorge.ballen@cash-clip.app
+Business support@cash-clip.app
+Support / in-app CashClip — Standardized Build Order (JustPlay-style funded rewards app) THE LAW: revenue is verified BEFORE any coin is credited.
+This is what CashClip broke — and what JustPlay enforces. 1 · REVENUE RAILS
+Funded ad mediation + survey/offer partners with server-to-server callbacks.
+✅ Wired: AdMob, CPX, BitLabs — server is the source of truth.  2 · ECONOMY LEDGER
+Reward rate set from REAL AdMob revenue; balance can't go negative; double-pay blocked.
+✅ Designed correctly in schema — verify server implementation.  3 · IDENTITY & ANTI-FRAUD
+Device fingerprinting, Sybil caps, bot-detection nonces, webhook signature audit, 2FA.
+✅ Strong design in schema — verify server implementation.  4 · EARNING SURFACES
+Rewarded video, offerwall, surveys, games — each plugged into the ledger.
+✅ Present in the app.  5 · CASH-OUT
+PayPal / gift cards, minimum thresholds, pays ONLY funded balance.
+⚠️ PayPal is manual today (good safety brake).  6 · RETENTION LOOPS
+Daily check-in, streaks, referrals, push notifications.
+✅ Present in the app.  7 · COMPLIANCE & STORE
+Privacy, ATT disclosures, App Store rules for incentivized ads/surveys.
+⚠️ Verify before submitting Track A.  8 · SHIP
+TestFlight → App Store binary; OTA only for JS patches afterward.
+◻️ Track A target — set version/build number first (Rule 5). ✅ ALREADY BUILT RIGHT
+Reward rate = real AdMob revenue.
+Balance can't go negative.
+Double-pay blocked.
+Webhooks signature-audited.
+Serious anti-fraud.
+The funded-only law is implemented. ⚠️ THE ONE GAP
+The backend server source (api-server) didn't come in the export.
+We have: app + DB schema + API contract.
+Missing: the running server logic.
+Live backend (api.cash-clip.app) still serves users. Track A — Ship Runbook (new 1.2.0 / build 49, from the COMPLETE source project) 0 · THE INVARIANT (never change)
+Keep bundle id app.replit.cashclip + App Store app id 6759931285.
+Same identity = UPDATE to your existing app (rescues 1.0.0 users). Change either = a NEW app (strands them). 1 · Open the COMPLETE source project (@ABSustainInvest/CashClip) — app + backend + build scripts. 2 · Set the two numbers: version 1.2.0, iOS build 49 (auto-increment is OFF — set by hand). 3 · Sanity pass: install, typecheck, expo-doctor; confirm earning surfaces are funded-only (no fake built-ins). 4 · Confirm build secrets present (AdMob, CPX, BitLabs, PayPal, API base). Missing/mismatched keys = #1 'works in dev, broken live'. 5 · EAS build (production iOS) → binary in Expo cloud (needs Expo token + Apple credentials). 6 · EAS submit → upload build 49 to App Store Connect / TestFlight. 7 · Submit 1.2.0 for review (multi-week). Track B keeps 1.0.0 users served; payouts stay manual + funded-only. 8 · Approved → 1.0.0 users get 1.2.0 as an update. Stuck users rescued. 📌 CLEAN REFERENCE = THIS EXPORT
+Built-in surveys are REMOVED here (the fix that stuck).
+The older source project still has them.
+When we build: port THIS app code in, don't build the old one as-is. 🔑 THE SMOKING GUN (why it felt like a ghost)
+
+Every device reports the SAME store version: 29 (1.0.0).
+But the code INSIDE differs:
+• iPad + some phones = CLEAN — surveys 'via CPX Research' only, no Built-in tab
+• Other phone = still the FAKE 'Built-in' surveys (MarketPulse / AdVantage / TechInsight)
+
+CAUSE: OTA swaps the JavaScript per-device, independent of the build number. Some pulled the clean bundle, some didn't.
+
+MEANING: the clean code IS live & real — but OTA delivery is INCONSISTENT and can't reach everyone (old users, runtime mismatch). This is the month-long loop.
+
+FIX: ship new binary 1.2.0 / build 49 to Apple. Clean code BAKED IN → every updater gets it, no OTA lottery. Same bundle id + app id = an update that reaches existing users.
+
+(Store listing screenshots still show built-ins — promo images; refreshed at 1.2.0 submission.) 📍 WHERE WE STAND + THE APPLE WAIT
+
+STATUS:
+✅ Analysis done — clean code verified; root cause = OTA divergence
+✅ Decisions done — target 1.2.0 / build 49, build from source project, identity locked
+⏳ Only the BUILD remains — happens in @ABSustainInvest/CashClip (must be opened there). I can't reach it from here.
+
+DURING APPLE REVIEW (usually a few days; budget up to ~1 week):
+• Clean devices stay clean — nothing changes for them
+• Dirty (built-in) devices: protected by PAYOUT CONTROL — payouts are manual & funded-only, so fake 'Built-in' balances are simply never paid. No money lost.
+• The new binary is the permanent cutover — every updater becomes clean, ends the split for good 🛟 PROTECT THE RATING (reviews won't sink it)
+
+Bad reviews are a SYMPTOM — users not paid + fake surveys. Fix the cause, then:
+
+NOW (during the wait):
+• Reply publicly to each bad review in App Store Connect — calm, name the fix, invite them back
+• Reach unhappy users via support@cash-clip.app; resolve + ask them to revise
+• (Optional) ONE clean OTA to stop built-ins on reachable devices = fewer new angry reviews
+
+AT 1.2.0 LAUNCH:
+• RESET the summary star rating (App Store Connect allows this on a new version) → clean slate
+• Prompt HAPPY users for a review right after a real cashout (Apple's native prompt)
+• ❌ NEVER give coins for reviews — App Store violation, can get the app pulled ⚡ TWO SPEEDS — you don't have to win the Apple race to stop the bleeding
+
+FAST (days, NO Apple):
+The clean bundle is ALREADY published & running on real store devices (the iPad proves it). Stuck phones are just BEHIND on an OTA they're already entitled to. Converge everyone reachable onto that ONE proven-clean bundle (confirm prod channel serves clean at 100% rollout). JS only, hours.
+→ NOT the old loop: one known-good bundle, not new experiments.
+
+DURABLE (its own timeline):
+New binary 1.2.0/49 — for new installs, never-relaunch/old-runtime stragglers, native changes + BitLabs backend fix. Needed, but NOT required to stop the bleeding.
+
+Limit: a few very old / never-relaunched devices only the binary can reach. ⚠️ WHAT 'GREEN' MEANS (read first): GREEN = built correctly in the CLEAN CODE we will ship. It does NOT mean your LIVE version-29 users have it — they DON'T, until it's delivered. The gap between 'right in the code' and 'reaching real users' IS the whole problem. ⚠️ CHANNEL = 1.1.0 (user recalls) — may kill the fast path
+Live users are 1.0.0 / build 29. OTA can't cross the 1.0.0 → 1.1.0 version line, so the fast OTA path may NOT reach the version-29 users — only the new binary would.
+
+PARADOX to resolve: the iPad is 1.0.0/29 yet runs clean — something clean DID reach a 1.0.0 device.
+
+VERIFY IN SOURCE PROJECT FIRST:
+1) runtimeVersion build 29 was compiled with
+2) what runtime/branch the channel serves
+No fast-path promise until confirmed.
