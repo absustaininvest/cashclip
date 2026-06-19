@@ -23,6 +23,7 @@ APPLE_ASC_KEY_ID = "4CZ93ZJV6B"
 
 [userenv.production]
 AD_ADMOB_NATIVE = "true"
+ADMOB_MIRROR_EXPECTED_ACTIVE = "true"
 
 [userenv.development]
 
