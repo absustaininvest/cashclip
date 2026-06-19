@@ -152,14 +152,19 @@ beforeAll(async () => {
   delete process.env["JWT_ACCESS_SECRET_PREV"];
   delete process.env["ADMIN_TOKEN"];
 
-  const dbMod = await import("@workspace/db");
-  pool = dbMod.pool;
   // Pin every pooled connection to our throwaway schema so the real routes'
   // unqualified queries (users, earn_tokens, …) resolve there, never to the
   // live app tables in `public`.
-  pool.on("connect", (c) => {
-    c.query(`SET search_path TO ${SCHEMA}, pg_catalog`);
-  });
+  // We inject the search_path into DATABASE_URL as a server option so
+  // PostgreSQL applies it at protocol level on every new connection — no
+  // extra query needed and no deprecated pool.on("connect") fire-and-forget.
+  const baseUrl = process.env["DATABASE_URL"] ?? "";
+  const sep = baseUrl.includes("?") ? "&" : "?";
+  process.env["DATABASE_URL"] =
+    `${baseUrl}${sep}options=-c%20search_path%3D${SCHEMA}%2Cpg_catalog`;
+
+  const dbMod = await import("@workspace/db");
+  pool = dbMod.pool;
 
   admin = (await pool.connect()) as unknown as SqlClient;
   await admin.query(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA}`);
