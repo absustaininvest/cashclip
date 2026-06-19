@@ -9,10 +9,26 @@
 #
 # Usage
 # ─────
-#   bash scripts/verify-spki-hash.sh [path/to/withSslPinning.js]
+#   bash scripts/verify-spki-hash.sh [--allow-network-failure] [path/to/withSslPinning.js]
 #
-#   With no argument the script looks for the plugin in the standard locations
-#   relative to the workspace root (auto-detects which cashclip copy to use).
+#   --allow-network-failure
+#       When set, a network error (host unreachable, TLS handshake timeout,
+#       empty certificate response) exits 0 with a clear WARNING instead of
+#       blocking the build.  Use ONLY in CI environments where the production
+#       domain is intentionally unreachable (e.g. sandboxed build workers).
+#       A CONFIRMED HASH MISMATCH always exits 1 regardless of this flag —
+#       the flag cannot be used to bypass a detected pin rotation.
+#
+#   With no path argument the script looks for the plugin in the standard
+#   locations relative to the workspace root (auto-detects which cashclip
+#   copy to use).
+#
+# Exit codes
+# ──────────
+#   0  — Pin matches the live server (or network failure with --allow-network-failure)
+#   1  — Hash mismatch: live SPKI ≠ PRIMARY pin  (hard fail — never skippable)
+#   2  — Network failure: could not reach cash-clip.app (without --allow-network-failure)
+#   3  — Configuration error: missing plugin file, unparseable pin, etc.
 #
 # Run this BEFORE every EAS build (iOS and Android).  Add it to your pre-build
 # checklist or wire it as the first command in the EAS build scripts.
@@ -41,13 +57,27 @@
 set -euo pipefail
 
 DOMAIN="cash-clip.app"
+ALLOW_NETWORK_FAILURE=0
+
+# ── Parse flags ───────────────────────────────────────────────────────────────
+POSITIONAL_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --allow-network-failure)
+      ALLOW_NETWORK_FAILURE=1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$arg")
+      ;;
+  esac
+done
 
 # ── Locate the plugin file ────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [ $# -ge 1 ]; then
-  PLUGIN_FILE="$1"
+if [ "${#POSITIONAL_ARGS[@]}" -ge 1 ]; then
+  PLUGIN_FILE="${POSITIONAL_ARGS[0]}"
 else
   # Auto-detect: prefer the primary cashclip artifact, fall back to cashclip-next
   CANDIDATES=(
@@ -65,13 +95,13 @@ else
   if [ -z "$PLUGIN_FILE" ]; then
     echo "ERROR: Could not find withSslPinning.js in any known location."
     echo "       Pass the path as an argument: $0 path/to/withSslPinning.js"
-    exit 1
+    exit 3
   fi
 fi
 
 if [ ! -f "$PLUGIN_FILE" ]; then
   echo "ERROR: Plugin file not found: $PLUGIN_FILE"
-  exit 1
+  exit 3
 fi
 
 echo "Plugin: $PLUGIN_FILE"
@@ -82,7 +112,7 @@ PINNED_HASH="$(grep -E "PRIMARY\s*:" "$PLUGIN_FILE" | grep -oP "(?<=')[^']+" | h
 if [ -z "$PINNED_HASH" ]; then
   echo "ERROR: Could not extract PRIMARY pin from $PLUGIN_FILE"
   echo "       Expected a line like:  PRIMARY: 'abc123...=',"
-  exit 1
+  exit 3
 fi
 
 echo "Pinned PRIMARY: $PINNED_HASH"
@@ -99,12 +129,34 @@ LIVE_HASH="$(
   | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
   | base64
-)"
+)" || true
 
 if [ -z "$LIVE_HASH" ]; then
-  echo "ERROR: Failed to retrieve the certificate from $DOMAIN."
-  echo "       Check your network connection and confirm the domain is reachable."
-  exit 1
+  echo ""
+  echo "⚠  NETWORK FAILURE: Could not retrieve the TLS certificate from $DOMAIN."
+  echo "   Possible causes: host unreachable, DNS resolution failure,"
+  echo "   TLS handshake timeout, or empty certificate response."
+  echo ""
+  if [ "$ALLOW_NETWORK_FAILURE" = "1" ]; then
+    echo "   --allow-network-failure is set — skipping the pin check."
+    echo "   WARNING: The pin has NOT been verified against the live server."
+    echo "   Do not use this flag outside of isolated CI environments where"
+    echo "   $DOMAIN is intentionally unreachable."
+    echo ""
+    exit 0
+  else
+    echo "   Build blocked.  To bypass in a sandboxed CI environment where the"
+    echo "   domain is intentionally unreachable, pass --allow-network-failure:"
+    echo ""
+    echo "     bash scripts/verify-spki-hash.sh --allow-network-failure"
+    echo ""
+    echo "   Or set SSL_ALLOW_NETWORK_FAILURE=1 in the EAS build environment"
+    echo "   and re-run the build script — it will forward the flag automatically."
+    echo ""
+    echo "   IMPORTANT: --allow-network-failure does NOT bypass a hash mismatch."
+    echo "   A confirmed mismatch always blocks the build."
+    exit 2
+  fi
 fi
 
 echo "Live SPKI hash: $LIVE_HASH"
@@ -134,5 +186,7 @@ else
   fi
   echo ""
   echo "   DO NOT proceed with the EAS build until the pins are updated."
+  echo "   NOTE: --allow-network-failure does NOT bypass a hash mismatch."
+  echo "         This failure cannot be skipped."
   exit 1
 fi

@@ -25,13 +25,45 @@ echo "================================================"
 # Verify the live cash-clip.app SPKI hash still matches the PRIMARY pin baked
 # into plugins/withSslPinning.js.  A mismatch means the server key rotated and
 # shipping this build would lock all users out of the API.
+#
+# Exit-code semantics from verify-spki-hash.sh:
+#   0  — Pin matches (or network failure with --allow-network-failure)
+#   1  — Hash MISMATCH — hard fail, build blocked, cannot be skipped
+#   2  — Network unreachable — soft fail unless --allow-network-failure is set
+#   3  — Configuration error (missing plugin file, unparseable pin, etc.)
+#
+# To allow a build in a sandboxed CI environment where cash-clip.app is
+# intentionally unreachable, set SSL_ALLOW_NETWORK_FAILURE=1 in the build
+# environment (Replit secret or EAS env var).  This forwards --allow-network-failure
+# to the check script, which exits 0 with a WARNING instead of blocking.
+# A confirmed hash mismatch (exit 1) is ALWAYS a hard failure — the flag
+# cannot bypass it.
 echo ""
 echo "── SSL pin pre-flight ──"
-if bash "$(dirname "$0")/verify-spki-hash.sh"; then
+SPKI_FLAGS=()
+if [ "${SSL_ALLOW_NETWORK_FAILURE:-0}" = "1" ]; then
+  SPKI_FLAGS+=("--allow-network-failure")
+  echo "  SSL_ALLOW_NETWORK_FAILURE=1 — network failures will warn but not block."
+fi
+SPKI_EXIT=0
+bash "$(dirname "$0")/verify-spki-hash.sh" "${SPKI_FLAGS[@]}" || SPKI_EXIT=$?
+if [ "$SPKI_EXIT" = "0" ]; then
   echo "  SSL pin OK — continuing build."
+elif [ "$SPKI_EXIT" = "1" ]; then
+  echo ""
+  echo "  ✗ SSL pin MISMATCH. Update plugins/withSslPinning.js before building."
+  echo "    This failure cannot be bypassed."
+  exit 1
+elif [ "$SPKI_EXIT" = "2" ]; then
+  echo ""
+  echo "  ✗ SSL pin check could not reach cash-clip.app (network failure)."
+  echo "    Set SSL_ALLOW_NETWORK_FAILURE=1 to skip in sandboxed CI environments."
+  echo "    A real hash mismatch would still block the build even with that flag."
+  exit 1
 else
   echo ""
-  echo "  ✗ SSL pin check failed. Update plugins/withSslPinning.js before building."
+  echo "  ✗ SSL pin check failed (configuration error, exit $SPKI_EXIT)."
+  echo "    Check that plugins/withSslPinning.js exists and contains a PRIMARY pin."
   exit 1
 fi
 
