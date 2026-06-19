@@ -11,7 +11,7 @@ if [ "${EAS_OTA_CONFIRMED:-0}" != "1" ]; then
   echo ""
   echo "  This workflow requires EAS_OTA_CONFIRMED=1 to run."
   echo "  Set it in the workflow command to proceed:"
-  echo "    EAS_OTA_CONFIRMED=1 EAS_OTA_MESSAGE='your message' bash artifacts/cashclip/scripts/eas-ota-production.sh"
+  echo "    EAS_OTA_CONFIRMED=1 EAS_OTA_MESSAGE='your message' bash apps/cashclip/scripts/eas-ota-production.sh"
   echo ""
   echo "  Sleeping indefinitely to prevent accidental publishes..."
   sleep infinity
@@ -43,7 +43,7 @@ GITEOF
 chmod +x /tmp/fake-bin/git
 export PATH="/tmp/fake-bin:$PATH"
 
-cd artifacts/cashclip
+cd apps/cashclip
 EXPO_TOKEN="$EXPO_TOKEN" pnpm exec eas update \
   --channel "$CHANNEL" \
   --message "$MESSAGE" \
