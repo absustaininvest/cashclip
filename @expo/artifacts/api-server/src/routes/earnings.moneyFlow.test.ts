@@ -39,7 +39,10 @@ const SCHEMA = `earn_test_${randomBytes(6).toString("hex")}`;
 // matching user for whatever id the JWT carries so every minted token is valid.
 const mockGetUser = vi.fn(async (id: string) => ({ id, role: "user", tokenVersion: 0 }));
 vi.mock("../storage", () => ({
-  storage: { getUser: (...a: unknown[]) => mockGetUser(a[0] as string) },
+  storage: {
+    getUser: (...a: unknown[]) => mockGetUser(a[0] as string),
+    touchUserLastSeen: () => Promise.resolve(),
+  },
 }));
 
 vi.mock("../lib/logger", () => ({
@@ -209,7 +212,8 @@ beforeAll(async () => {
       token text PRIMARY KEY,
       user_id varchar NOT NULL,
       issued_at timestamptz NOT NULL,
-      expires_at timestamptz NOT NULL
+      expires_at timestamptz NOT NULL,
+      points integer
     );
   `);
 
