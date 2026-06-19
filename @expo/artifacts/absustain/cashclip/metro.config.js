@@ -37,6 +37,14 @@ const REACT_DOM_PATH = path.resolve(
   "node_modules/.pnpm/react-dom@19.1.0_react@19.1.0/node_modules/react-dom"
 );
 
+// assert is a Node.js built-in polyfilled in the browser/RN context.
+// pnpm strict isolation means Metro can't find it from virtual-store paths,
+// so pin it explicitly to the workspace-level copy.
+const ASSERT_PATH = path.resolve(
+  workspaceRoot,
+  "node_modules/.pnpm/assert@2.1.0/node_modules/assert/build/assert.js"
+);
+
 const originalResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "react") {
@@ -47,6 +55,9 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       filePath: path.join(REACT_DOM_PATH, "index.js"),
       type: "sourceFile",
     };
+  }
+  if (moduleName === "assert") {
+    return { filePath: ASSERT_PATH, type: "sourceFile" };
   }
   if (originalResolveRequest) {
     return originalResolveRequest(context, moduleName, platform);
