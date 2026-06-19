@@ -256,7 +256,7 @@ describe("POST /api/paypal/webhook (SUCCEEDED → paid) — status-update email 
     resource: { payout_item: { sender_item_id: "w-status-1" } },
   };
 
-  it.skip("uses the account email when user.email is present [pre-existing: PayPal SUCCEEDED webhook returns 500, likely missing storage mock]", async () => {
+  it("uses the account email when user.email is present", async () => {
     arrangePaid();
     mockGetUser.mockResolvedValue({ id: WITHDRAWAL_USER_ID, email: ACCOUNT_EMAIL });
 
@@ -266,7 +266,7 @@ describe("POST /api/paypal/webhook (SUCCEEDED → paid) — status-update email 
     expect(await lastStatusToEmail()).toBe(ACCOUNT_EMAIL);
   });
 
-  it.skip("falls back to the PayPal email when user.email is null [pre-existing: PayPal SUCCEEDED webhook returns 500, likely missing storage mock]", async () => {
+  it("falls back to the PayPal email when user.email is null", async () => {
     arrangePaid();
     mockGetUser.mockResolvedValue({ id: WITHDRAWAL_USER_ID, email: null });
 
