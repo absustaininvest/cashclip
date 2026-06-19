@@ -190,12 +190,15 @@ beforeAll(async () => {
       checkin_streak integer NOT NULL DEFAULT 0,
       last_checkin_at timestamptz,
       token_version integer NOT NULL DEFAULT 0,
+      last_seen_at timestamptz,
       is_publisher boolean NOT NULL DEFAULT false,
       publisher_granted_at timestamp,
       ad_credits numeric(12,2) NOT NULL DEFAULT '0',
       totp_secret text,
       totp_enabled boolean NOT NULL DEFAULT false,
-      totp_backup_codes text[]
+      totp_backup_codes text[],
+      paypal_email text UNIQUE,
+      paypal_email_set_at timestamp
     );
     CREATE TABLE withdrawals (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -255,7 +258,7 @@ beforeEach(async () => {
 });
 
 describe("POST /api/admin/referrals/backfill (real DB)", () => {
-  it.skip("dry run reports the candidate count and credits nobody [pre-existing: real-DB query fails 500]", async () => {
+  it("dry run reports the candidate count and credits nobody", async () => {
     const carol = await seedUser({ username: "carol" });
     const alice = await seedUser({ username: "alice", referredBy: "carol" });
     await seedWithdrawal(alice, "alice", QUALIFY);
@@ -279,7 +282,7 @@ describe("POST /api/admin/referrals/backfill (real DB)", () => {
     expect(await referralLedger(dave)).toHaveLength(0);
   });
 
-  it.skip("finds only qualifying candidates and credits each referrer exactly once [pre-existing: real-DB query fails 500]", async () => {
+  it("finds only qualifying candidates and credits each referrer exactly once", async () => {
     const carol = await seedUser({ username: "carol" });
     const dave = await seedUser({ username: "dave" });
 
@@ -344,7 +347,7 @@ describe("POST /api/admin/referrals/backfill (real DB)", () => {
     expect(parseFloat((await userRow(organic)).balance)).toBe(0);
   });
 
-  it.skip("is idempotent — re-running credits nobody a second time [pre-existing: real-DB query fails 500]", async () => {
+  it("is idempotent — re-running credits nobody a second time", async () => {
     const carol = await seedUser({ username: "carol" });
     const alice = await seedUser({ username: "alice", referredBy: "carol" });
     await seedWithdrawal(alice, "alice", QUALIFY);

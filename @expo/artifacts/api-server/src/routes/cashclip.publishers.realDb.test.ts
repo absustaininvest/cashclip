@@ -202,7 +202,9 @@ beforeAll(async () => {
       ad_credits numeric(12,2) NOT NULL DEFAULT '0',
       totp_secret text,
       totp_enabled boolean NOT NULL DEFAULT false,
-      totp_backup_codes text[]
+      totp_backup_codes text[],
+      paypal_email text UNIQUE,
+      paypal_email_set_at timestamp
     );
     CREATE TABLE campaigns (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -256,7 +258,7 @@ describe("GET /api/admin/publishers (real DB)", () => {
     expect(res.status).toBe(401);
   });
 
-  it.skip("rolls up ad credits, campaign count, and summed budget/spent/clicks per publisher [pre-existing: real-DB schema mismatch returns 500]", async () => {
+  it("rolls up ad credits, campaign count, and summed budget/spent/clicks per publisher", async () => {
     const pub = await seedUser({
       username: "acmeads",
       email: "acme@example.com",
@@ -286,7 +288,7 @@ describe("GET /api/admin/publishers (real DB)", () => {
     expect(parseFloat(row.totalSpent)).toBeCloseTo(50, 2);
   });
 
-  it.skip("includes a publisher with zero campaigns (LEFT JOIN), with zeroed rollups [pre-existing: real-DB schema mismatch returns 500]", async () => {
+  it("includes a publisher with zero campaigns (LEFT JOIN), with zeroed rollups", async () => {
     const pub = await seedUser({
       username: "lonely",
       email: "lonely@example.com",
@@ -308,7 +310,7 @@ describe("GET /api/admin/publishers (real DB)", () => {
     expect(parseFloat(row.adCredits)).toBeCloseTo(5, 2);
   });
 
-  it.skip("excludes non-publishers even when they own campaigns [pre-existing: real-DB schema mismatch returns 500]", async () => {
+  it("excludes non-publishers even when they own campaigns", async () => {
     const pub = await seedUser({
       username: "realpub",
       isPublisher: true,
@@ -328,7 +330,7 @@ describe("GET /api/admin/publishers (real DB)", () => {
     expect(usernames).not.toContain("regularjoe");
   });
 
-  it.skip("orders publishers by most-recently granted first [pre-existing: real-DB schema mismatch returns 500]", async () => {
+  it("orders publishers by most-recently granted first", async () => {
     await seedUser({
       username: "older",
       isPublisher: true,
