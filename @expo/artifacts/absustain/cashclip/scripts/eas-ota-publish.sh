@@ -3,6 +3,9 @@
 # the 120s bash limit and background jobs get reaped). Uses the git-wrapper PATH
 # trick so the EAS CLI's post-publish `git add/commit` writes don't get killed by
 # the sandbox's .git write guard.
+#
+# OTA_PLATFORM  – target platform: ios | android | all  (default: ios)
+# OTA_MESSAGE   – override the EAS update message         (optional)
 
 mkdir -p /tmp/fake-bin
 cat > /tmp/fake-bin/git << 'WRAP'
@@ -28,10 +31,14 @@ if [ -z "$EXPO_TOKEN" ]; then
   exit 1
 fi
 
-echo "OTA_PUBLISH_START $(date -u +%FT%TZ)"
+PLATFORM="${OTA_PLATFORM:-ios}"
+MESSAGE="${OTA_MESSAGE:-OTA update (${PLATFORM})}"
+
+echo "OTA_PUBLISH_START $(date -u +%FT%TZ) platform=${PLATFORM}"
 pnpm exec eas update \
   --branch production \
-  --message "Honest AdMob per-impression revenue capture (rewarded+interstitial PAID event -> server) + correct Android banner ad unit ID" \
+  --platform "${PLATFORM}" \
+  --message "${MESSAGE}" \
   --non-interactive
 EXIT=$?
 echo "OTA_PUBLISH_EXIT=${EXIT}"
