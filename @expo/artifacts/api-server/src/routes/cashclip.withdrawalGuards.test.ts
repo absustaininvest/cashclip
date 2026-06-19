@@ -24,6 +24,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 
 const USER_ID = "user-withdrawal-guard-test";
+const ADMIN_ID = "admin-withdrawal-guard-test";
 const JWT_SECRET = "test-jwt-secret-for-withdrawal-guard-tests-padded-to-64xxxxxx";
 const TEST_ADMIN_TOKEN = "test-admin-console-token-for-withdrawal-email-tests";
 
@@ -99,6 +100,7 @@ vi.mock("../lib/logger", () => ({
 
 let app: Express;
 let userToken: string;
+let adminToken: string;
 
 // References to the mocked email functions — captured after vi.resetModules() + dynamic import
 // so they point to the same instances that cashclip.ts received.
@@ -147,6 +149,10 @@ beforeAll(async () => {
     expiresIn: "1h",
   });
 
+  adminToken = jwt.sign({ userId: ADMIN_ID, role: "admin", tokenVersion: 0 }, JWT_SECRET, {
+    expiresIn: "1h",
+  });
+
   vi.resetModules();
   const { registerRoutes } = await import("./cashclip");
   app = express();
@@ -181,7 +187,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // Default: eligible user; happy-path atomic result (overridden per test).
-  mockGetUser.mockResolvedValue(eligibleUser());
+  // adminMiddleware calls storage.getUser with the admin's userId from the JWT,
+  // so the implementation must return an admin record for ADMIN_ID and the
+  // regular eligible user for all other IDs.
+  mockGetUser.mockImplementation(async (id: string) => {
+    if (id === ADMIN_ID) return { id: ADMIN_ID, role: "admin", tokenVersion: 0 };
+    return eligibleUser();
+  });
   mockGetUserWithdrawals.mockResolvedValue([]);
   mockCreateWithdrawalAtomic.mockResolvedValue({
     ok: true,
@@ -578,7 +590,7 @@ describe("POST /api/admin/withdrawals/:id/payout — sendPayPalAmbiguousAlert on
   function adminRequest() {
     return request(app)
       .post(`/api/admin/withdrawals/${WITHDRAWAL_ID}/payout`)
-      .set("x-console-token", TEST_ADMIN_TOKEN);
+      .set("Authorization", `Bearer ${adminToken}`);
   }
 
   function pendingWithdrawal(overrides: Record<string, unknown> = {}) {
@@ -854,7 +866,7 @@ describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation"
 
       const res = await request(app)
         .post("/api/admin/withdrawals/wd-email-guard/payout")
-        .set("x-console-token", TEST_ADMIN_TOKEN);
+        .set("Authorization", `Bearer ${adminToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/invalid/i);
@@ -879,7 +891,7 @@ describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation"
 
       const res = await request(app)
         .post("/api/admin/withdrawals/wd-email-guard/payout")
-        .set("x-console-token", TEST_ADMIN_TOKEN);
+        .set("Authorization", `Bearer ${adminToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBeDefined();
@@ -898,7 +910,7 @@ describe("POST /api/admin/withdrawals/:id/payout — stored email re-validation"
 
     const res = await request(app)
       .post("/api/admin/withdrawals/wd-email-guard/payout")
-      .set("x-console-token", TEST_ADMIN_TOKEN);
+      .set("Authorization", `Bearer ${adminToken}`);
 
     expect(mockSendPayPalPayout).toHaveBeenCalledTimes(1);
     expect(mockSendPayPalPayout).toHaveBeenCalledWith(

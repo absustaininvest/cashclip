@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import path from "node:path";
 
 export default defineConfig({
   test: {
@@ -10,5 +11,12 @@ export default defineConfig({
     // timeouts so individual files don't need ad-hoc per-hook timeouts.
     hookTimeout: 30000,
     testTimeout: 30000,
+    // Explicitly resolve the local tsconfig so the oxc/esbuild transformer
+    // never has to walk up through pnpm's virtual-store directories to find it.
+    // Without this, vite can mis-resolve the tsconfig from the pnpm virtual store
+    // (node_modules/.pnpm/…) and emit a [TSCONFIG_ERROR].
+    typecheck: {
+      tsconfigPath: path.resolve(__dirname, "tsconfig.json"),
+    },
   },
 });

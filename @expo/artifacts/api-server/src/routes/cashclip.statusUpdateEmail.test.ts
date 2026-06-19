@@ -19,8 +19,12 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
+import jwt from "jsonwebtoken";
 
 const TEST_ADMIN_TOKEN = "test-admin-console-token-for-status-update-email-tests";
+const ADMIN_ID = "admin-status-email-test";
+const JWT_SECRET = "test-jwt-secret-for-status-email-tests-padded-to-64xxxxxxxx";
+const ADMIN_USER = { id: ADMIN_ID, role: "admin", tokenVersion: 0 } as const;
 
 const mockGetUser = vi.fn();
 const mockGetWithdrawalById = vi.fn();
@@ -33,6 +37,7 @@ vi.mock("../storage", () => ({
     getWithdrawalById: (...args: unknown[]) => mockGetWithdrawalById(...args),
     updateWithdrawalStatusIfStatus: (...args: unknown[]) => mockUpdateWithdrawalStatusIfStatus(...args),
     creditUser: (...args: unknown[]) => mockCreditUser(...args),
+    qualifyReferral: vi.fn().mockResolvedValue({ credited: false }),
   },
 }));
 
@@ -85,6 +90,7 @@ vi.mock("../lib/logger", () => ({
 }));
 
 let app: Express;
+let adminToken: string;
 let mockSendWithdrawalStatusUpdate: ReturnType<typeof vi.fn>;
 
 const WITHDRAWAL_USER_ID = "user-status-email-test";
@@ -115,8 +121,12 @@ async function lastStatusToEmail(): Promise<string> {
 
 beforeAll(async () => {
   process.env["DATABASE_URL"] ??= "postgres://test:test@127.0.0.1:5432/test";
-  process.env["JWT_ACCESS_SECRET"] = "test-jwt-secret-for-status-email-tests-padded-to-64xxxxxxxx";
+  process.env["JWT_ACCESS_SECRET"] = JWT_SECRET;
   process.env["ADMIN_TOKEN"] = TEST_ADMIN_TOKEN;
+
+  adminToken = jwt.sign({ userId: ADMIN_ID, role: "admin", tokenVersion: 0 }, JWT_SECRET, {
+    expiresIn: "1h",
+  });
 
   vi.resetModules();
   const { registerRoutes } = await import("./cashclip");
@@ -153,11 +163,14 @@ describe("PATCH /api/admin/withdrawals/:id (rejected) — status-update email re
 
   it("uses the account email when user.email is present", async () => {
     arrangeReject();
-    mockGetUser.mockResolvedValue({ id: WITHDRAWAL_USER_ID, email: ACCOUNT_EMAIL });
+    mockGetUser.mockImplementation(async (id: string) => {
+      if (id === ADMIN_ID) return ADMIN_USER;
+      return { id: WITHDRAWAL_USER_ID, email: ACCOUNT_EMAIL };
+    });
 
     const res = await request(app)
       .patch("/api/admin/withdrawals/w-status-1")
-      .set("x-console-token", TEST_ADMIN_TOKEN)
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ status: "rejected", adminNote: "test" });
 
     expect(res.status).toBe(200);
@@ -166,11 +179,14 @@ describe("PATCH /api/admin/withdrawals/:id (rejected) — status-update email re
 
   it("falls back to the PayPal email when user.email is null", async () => {
     arrangeReject();
-    mockGetUser.mockResolvedValue({ id: WITHDRAWAL_USER_ID, email: null });
+    mockGetUser.mockImplementation(async (id: string) => {
+      if (id === ADMIN_ID) return ADMIN_USER;
+      return { id: WITHDRAWAL_USER_ID, email: null };
+    });
 
     const res = await request(app)
       .patch("/api/admin/withdrawals/w-status-1")
-      .set("x-console-token", TEST_ADMIN_TOKEN)
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ status: "rejected" });
 
     expect(res.status).toBe(200);
@@ -179,11 +195,14 @@ describe("PATCH /api/admin/withdrawals/:id (rejected) — status-update email re
 
   it("falls back to the PayPal email when user.email is an empty string", async () => {
     arrangeReject();
-    mockGetUser.mockResolvedValue({ id: WITHDRAWAL_USER_ID, email: "" });
+    mockGetUser.mockImplementation(async (id: string) => {
+      if (id === ADMIN_ID) return ADMIN_USER;
+      return { id: WITHDRAWAL_USER_ID, email: "" };
+    });
 
     const res = await request(app)
       .patch("/api/admin/withdrawals/w-status-1")
-      .set("x-console-token", TEST_ADMIN_TOKEN)
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ status: "rejected" });
 
     expect(res.status).toBe(200);
@@ -192,11 +211,16 @@ describe("PATCH /api/admin/withdrawals/:id (rejected) — status-update email re
 
   it("falls back to the PayPal email when the user lookup fails", async () => {
     arrangeReject();
-    mockGetUser.mockRejectedValue(new Error("db down"));
+    // Admin middleware succeeds; withdrawal-user lookup throws (resolveStatusUpdateToEmail
+    // catches that and falls back to paypalEmail, which is the tested behaviour).
+    mockGetUser.mockImplementation(async (id: string) => {
+      if (id === ADMIN_ID) return ADMIN_USER;
+      throw new Error("db down");
+    });
 
     const res = await request(app)
       .patch("/api/admin/withdrawals/w-status-1")
-      .set("x-console-token", TEST_ADMIN_TOKEN)
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ status: "rejected" });
 
     expect(res.status).toBe(200);
