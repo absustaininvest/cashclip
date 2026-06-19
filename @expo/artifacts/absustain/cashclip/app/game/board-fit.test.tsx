@@ -11,8 +11,13 @@ import {
   computeTetrisCellSize,
   blockCellSizeByHeight,
   computeBlockCellSize,
+  COIN_CATCHER_TOP_CHROME,
+  COIN_CATCHER_CATCHER_HEIGHT,
+  COIN_CATCHER_BOTTOM_CHROME,
   COIN_CATCHER_ITEM_SIZE,
   coinCatcherPlayAreaHeight,
+  TAP_FRENZY_AREA_TOP,
+  TAP_FRENZY_AREA_BOTTOM,
   TAP_FRENZY_COIN_SIZE,
   tapFrenzyPlayAreaHeight,
   MEMORY_COLUMNS,
@@ -156,6 +161,13 @@ describe("Coin Catcher play area — items fall without leaving the screen", () 
   // If the play area height collapses to ≤ 0 the catcher sits above or at the
   // spawn point, making the game unplayable.
 
+  it("chrome constants match expected source values (sanity-check)", () => {
+    expect(COIN_CATCHER_TOP_CHROME).toBe(60);
+    expect(COIN_CATCHER_CATCHER_HEIGHT).toBe(40);
+    expect(COIN_CATCHER_BOTTOM_CHROME).toBe(COIN_CATCHER_CATCHER_HEIGHT + 20);
+    expect(COIN_CATCHER_BOTTOM_CHROME).toBe(60);
+  });
+
   it("play area height > ITEM_SIZE on iPhone SE (web insets 67/34)", () => {
     const h = coinCatcherPlayAreaHeight(568, 67, 34);
     expect(h).toBeGreaterThan(COIN_CATCHER_ITEM_SIZE);
@@ -195,6 +207,12 @@ describe("Tap Frenzy spawn area — at least one coin fits vertically", () => {
   // Coins spawn at a random y within [0, playAreaHeight - COIN_SIZE].
   // If playAreaHeight < COIN_SIZE the y-range collapses and coins are never
   // placed inside the visible bounds.
+
+  it("chrome constants match expected source values (sanity-check)", () => {
+    expect(TAP_FRENZY_AREA_TOP).toBe(120);
+    expect(TAP_FRENZY_AREA_BOTTOM).toBe(100);
+    expect(TAP_FRENZY_COIN_SIZE).toBe(64);
+  });
 
   it("play area height ≥ COIN_SIZE on iPhone SE (web insets 67/34)", () => {
     const h = tapFrenzyPlayAreaHeight(568, 67, 34);
