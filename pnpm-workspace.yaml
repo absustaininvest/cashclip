@@ -162,23 +162,23 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
   # Security overrides — pinned to safe patch ranges to avoid surprise major bumps
-  picomatch: "~4.0.4"          # GHSA-c2c7-rcm5-vvqj, GHSA-3v7f-55p6-f55p (ReDoS + method injection)
-  path-to-regexp: "~8.4.2"    # GHSA-j3q9-mxjg-w52f, GHSA-27v5-c462-wpq7 (DoS via optional groups)
-  lodash: "~4.18.1"           # GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh (code injection via _.template)
-  postcss: "~8.5.13"          # GHSA-qx2v-qp2m-jg93 (parse vulnerability)
+  picomatch: "~4.0.4" # GHSA-c2c7-rcm5-vvqj, GHSA-3v7f-55p6-f55p (ReDoS + method injection)
+  path-to-regexp: "~8.4.2" # GHSA-j3q9-mxjg-w52f, GHSA-27v5-c462-wpq7 (DoS via optional groups)
+  lodash: "~4.18.1" # GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh (code injection via _.template)
+  postcss: "~8.5.13" # GHSA-qx2v-qp2m-jg93 (parse vulnerability)
 
-  yaml: "~2.8.4"              # GHSA-48c2-rrv3-qjmp
-  uuid: "~14.0.0"              # GHSA-w5hq-g745-h8pq (missing buffer bounds check, patched >=14.0.0)
+  yaml: "~2.8.4" # GHSA-48c2-rrv3-qjmp
+  uuid: "~14.0.0" # GHSA-w5hq-g745-h8pq (missing buffer bounds check, patched >=14.0.0)
 
   # Transitive dependency security patches — none require a major version bump
-  "@xmldom/xmldom": "~0.8.13"  # GHSA-crh6-fp67-6883 (DoS), GHSA-5fg8-2547-mr8q (tampering)
-  node-forge: "~1.4.0"         # GHSA-x4jg-mjrx-434g (crypto bypass), GHSA-2r2c-g63r-vccr (DoS), GHSA-cfm4-qjh2-4765 (injection)
-  minimatch: "~5.1.8"          # GHSA-f8q6-p94x-37v3 (ReDoS)
-  tar: "~7.5.11"               # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal)
-  ajv: "~8.18.0"               # GHSA-v6b9-6x5j-xhj3 (input DoS)
-  ip-address: "~10.1.1"        # GHSA-m6vp-8q9j-whx4 (validation bypass)
-  fast-uri: "~3.1.2"           # GHSA-p5x6-c79v-8259 (URI injection)
-  diff: "~8.0.4"               # GHSA-73rr-hh4g-fpgx (ReDoS in 7.0.0, fixed in 8.x)
+  "@xmldom/xmldom": "~0.8.13" # GHSA-crh6-fp67-6883 (DoS), GHSA-5fg8-2547-mr8q (tampering)
+  node-forge: "~1.4.0" # GHSA-x4jg-mjrx-434g (crypto bypass), GHSA-2r2c-g63r-vccr (DoS), GHSA-cfm4-qjh2-4765 (injection)
+  minimatch: "~5.1.8" # GHSA-f8q6-p94x-37v3 (ReDoS)
+  tar: "~7.5.11" # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal)
+  ajv: "~8.18.0" # GHSA-v6b9-6x5j-xhj3 (input DoS)
+  ip-address: "~10.1.1" # GHSA-m6vp-8q9j-whx4 (validation bypass)
+  fast-uri: "~3.1.2" # GHSA-p5x6-c79v-8259 (URI injection)
+  diff: "~8.0.4" # GHSA-73rr-hh4g-fpgx (ReDoS in 7.0.0, fixed in 8.x)
   # GHSA-jxxr-4gwj-5jf2: brace-expansion@5.0.5 ReDoS — override forces >=5.0.6.
   # Audited 2026-05-19: no brace-expansion@5.x snapshot present in lockfile (v5 not
   # a live transitive dep); override is a forward safety pin. v1/v2 unaffected.
@@ -187,3 +187,7 @@ overrides:
   # Audited 2026-05-19: pnpm-lock.yaml resolves ws@8.20.1 only; no 8.19.x snapshot present.
   ws: "~8.20.1"
   # (tmp security override is in package.json pnpm.overrides — see GHSA-ph9p-34f9-6g65)
+
+allowBuilds:
+  dtrace-provider: set this to true or false
+  esbuild: set this to true or false
