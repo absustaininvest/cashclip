@@ -240,15 +240,6 @@ export interface IStorage {
     paypalBatchId?: string,
   ): Promise<Withdrawal | undefined>;
 
-  createRewardSession(args: {
-    sessionToken: string;
-    userId: string;
-    source: "survey" | "offerwall";
-    provider: string;
-    externalId: string;
-    expectedReward: number;
-    expiresAt: Date;
-  }): Promise<RewardSession>;
   getRewardSession(sessionToken: string): Promise<RewardSession | undefined>;
   findCompletedRewardSession(
     userId: string,
@@ -1254,51 +1245,6 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(withdrawals.id, id), inArray(withdrawals.status, fromStatuses)))
       .returning();
     return updated;
-  }
-
-  async createRewardSession(args: {
-    sessionToken: string;
-    userId: string;
-    source: "survey" | "offerwall";
-    provider: string;
-    externalId: string;
-    expectedReward: number;
-    expiresAt: Date;
-  }): Promise<RewardSession> {
-    // ON CONFLICT DO NOTHING guards against duplicate (user_id, source, external_id)
-    // pending rows now that the reward_sessions_pending_unique partial index exists.
-    // Prefer upsertPendingRewardSession for new call sites — it handles dedup
-    // atomically and refreshes the canonical session's price and TTL.
-    const [s] = await db
-      .insert(rewardSessions)
-      .values({
-        sessionToken: args.sessionToken,
-        userId: args.userId,
-        source: args.source,
-        provider: args.provider,
-        externalId: args.externalId,
-        expectedReward: args.expectedReward.toFixed(2),
-        expiresAt: args.expiresAt,
-        status: "pending",
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (!s) {
-      const [existing] = await db
-        .select()
-        .from(rewardSessions)
-        .where(
-          and(
-            eq(rewardSessions.userId, args.userId),
-            eq(rewardSessions.source, args.source),
-            eq(rewardSessions.externalId, args.externalId),
-            eq(rewardSessions.status, "pending"),
-          ),
-        )
-        .limit(1);
-      return existing;
-    }
-    return s;
   }
 
   // Find-and-update an existing pending session for (userId, source, externalId),

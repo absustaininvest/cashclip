@@ -25,7 +25,6 @@ const storageMocks = vi.hoisted(() => ({
   // the admin webhook-audit handler.
   updateUserBalance: vi.fn(),
   createEarningsLedgerEntry: vi.fn(),
-  createRewardSession: vi.fn(),
   getRewardSession: vi.fn(),
   createWithdrawal: vi.fn(),
   getWithdrawals: vi.fn(),
