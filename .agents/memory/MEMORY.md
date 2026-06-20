@@ -1,3 +1,4 @@
+- [CashClip consent flow state](cashclip-consent-flow-state.md) — TERMS_KEY in AsyncStorage; ATT re-enable detection added; stale test deleted; OTA pending; NSUserTrackingUsageDescription fix is native-only.
 - [ATT consent status string mismatch](cashclip-att-consent-status-mismatch.md) — expo-tracking-transparency returns "authorized" not "granted"; resolveATTGranted must accept both or LevelPlay gets consented=false silently.
 - [React 19 test-renderer remount trap](react19-testrenderer-remount.md) — react-test-renderer@19 remounts inside act(); use two TestRenderer.create() calls (shared storage) to prove second-loadData deduplication instead of onRefresh trigger.
 - [App Store review replies + Apple defense](appstore-review-replies.md) — owner-approved tone & exact templates for public review replies and the Apple "Report a Concern" note; reuse verbatim, don't re-derive.
