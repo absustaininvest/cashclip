@@ -30,6 +30,13 @@ export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="${EXPO_TOKLAST}"
 export CI=1
 
+# EXPO_PUBLIC_* vars are inlined by Metro at bundle time.
+# They must be set here — EAS build profile env vars do NOT apply to eas update.
+export EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN:-cash-clip.app}"
+export EXPO_PUBLIC_ENV="production"
+export EXPO_PUBLIC_SENTRY_DSN="${EXPO_PUBLIC_SENTRY_DSN}"
+export EXPO_PUBLIC_VEXO_API_KEY="${EXPO_PUBLIC_VEXO_API_KEY}"
+
 if [ -z "$EXPO_TOKEN" ]; then
   echo "OTA_PUBLISH_FATAL: EXPO_TOKLAST not set in workflow env"
   exit 1
