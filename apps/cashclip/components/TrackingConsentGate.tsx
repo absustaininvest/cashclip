@@ -87,6 +87,10 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   // AppState event racing the button would otherwise queue multiple ATT dialogs.
   const processingRef = useRef(false);
 
+  // Tracks the last known ATT status so the "done" listener can detect when
+  // the user goes to Settings and toggles tracking ON after previously denying.
+  const lastAttStatusRef = useRef<string>("unavailable");
+
   function finish() {
     requestAdsConsent().catch(() => {});
     consentGrantedRef.current = true;
@@ -126,6 +130,27 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
       didOpenSettingsRef.current = false;
       getATTStatus().then((status) => {
         if (status === "authorized" || status === "denied" || status === "restricted") {
+          acceptDisclosures();
+        }
+      }).catch(() => {});
+    });
+    return () => sub.remove();
+  }, [step]);
+
+  // When already inside the app (step "done"), detect the user coming back from
+  // iOS Settings with tracking toggled ON. Compare against the last known ATT
+  // status — if it changed to "authorized", re-run acceptDisclosures() to
+  // reinitialize AdMob with personalized ads (and show terms if not yet done).
+  useEffect(() => {
+    if (Platform.OS !== "ios" || step !== "done") return;
+    // Seed the last known status when this effect mounts.
+    getATTStatus().then((s) => { lastAttStatusRef.current = s; }).catch(() => {});
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (next !== "active") return;
+      getATTStatus().then((status) => {
+        const prev = lastAttStatusRef.current;
+        lastAttStatusRef.current = status;
+        if (status === "authorized" && prev !== "authorized") {
           acceptDisclosures();
         }
       }).catch(() => {});
