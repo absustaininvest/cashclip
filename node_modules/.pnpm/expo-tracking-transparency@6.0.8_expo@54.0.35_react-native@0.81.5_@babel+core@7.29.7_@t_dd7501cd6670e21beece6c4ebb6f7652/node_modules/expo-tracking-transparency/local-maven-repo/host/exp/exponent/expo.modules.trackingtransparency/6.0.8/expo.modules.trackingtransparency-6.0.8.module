@@ -1,0 +1,94 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "host.exp.exponent",
+    "module": "expo.modules.trackingtransparency",
+    "version": "6.0.8",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14.3"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "expo.modules.trackingtransparency-6.0.8.aar",
+          "url": "expo.modules.trackingtransparency-6.0.8.aar",
+          "size": 5278,
+          "sha512": "6dd18259db6c6870f49a5f71f824434594b88cd24cb846e3dd8552ffb767f8bc1924e164b9ee07e91c3637cd4a275377bb73c6e6e1fdd5656800ffaef10f3f93",
+          "sha256": "74d77b2abf2bd3c9d44bb9ca7467327504a2ea52f9f23c07d50c64dc1073e997",
+          "sha1": "abf21846ab9a91182d38d9e842266c400b09df34",
+          "md5": "04fc19b5b25136e3dffcae744cd40804"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib-jdk7",
+          "version": {
+            "requires": "2.1.20"
+          }
+        },
+        {
+          "group": "com.google.android.gms",
+          "module": "play-services-ads-identifier",
+          "version": {
+            "requires": "18.0.1"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "expo.modules.trackingtransparency-6.0.8.aar",
+          "url": "expo.modules.trackingtransparency-6.0.8.aar",
+          "size": 5278,
+          "sha512": "6dd18259db6c6870f49a5f71f824434594b88cd24cb846e3dd8552ffb767f8bc1924e164b9ee07e91c3637cd4a275377bb73c6e6e1fdd5656800ffaef10f3f93",
+          "sha256": "74d77b2abf2bd3c9d44bb9ca7467327504a2ea52f9f23c07d50c64dc1073e997",
+          "sha1": "abf21846ab9a91182d38d9e842266c400b09df34",
+          "md5": "04fc19b5b25136e3dffcae744cd40804"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "expo.modules.trackingtransparency-6.0.8-sources.jar",
+          "url": "expo.modules.trackingtransparency-6.0.8-sources.jar",
+          "size": 1527,
+          "sha512": "2b8d8df0dc986ab40eca5b63b176fb124e4502d4364a762dc8fd1e5e6e3f5f95a52aa65fa86fab569728a7930e01bb669fd84a7d4663459a706cfbf625ec15dc",
+          "sha256": "d582e53714ce1fc975c9f6f62ba8e90378f43ab6aec4ab343b6d32ce8ec9bfeb",
+          "sha1": "f4794b39e224db180f25580e83a919152730b71c",
+          "md5": "3360f231e1e1b368637b34220d600056"
+        }
+      ]
+    }
+  ]
+}

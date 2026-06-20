@@ -177,23 +177,23 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
   # Security overrides — pinned to safe patch ranges to avoid surprise major bumps
-  picomatch: "~4.0.4"          # GHSA-c2c7-rcm5-vvqj, GHSA-3v7f-55p6-f55p (ReDoS + method injection)
-  path-to-regexp: "~8.4.2"    # GHSA-j3q9-mxjg-w52f, GHSA-27v5-c462-wpq7 (DoS via optional groups)
-  lodash: "~4.18.1"           # GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh (code injection via _.template)
-  postcss: "~8.5.13"          # GHSA-qx2v-qp2m-jg93 (parse vulnerability)
+  picomatch: "~4.0.4" # GHSA-c2c7-rcm5-vvqj, GHSA-3v7f-55p6-f55p (ReDoS + method injection)
+  path-to-regexp: "~8.4.2" # GHSA-j3q9-mxjg-w52f, GHSA-27v5-c462-wpq7 (DoS via optional groups)
+  lodash: "~4.18.1" # GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh (code injection via _.template)
+  postcss: "~8.5.13" # GHSA-qx2v-qp2m-jg93 (parse vulnerability)
 
-  yaml: "~2.8.4"              # GHSA-48c2-rrv3-qjmp
-  uuid: "~14.0.0"              # GHSA-w5hq-g745-h8pq (missing buffer bounds check, patched >=14.0.0)
+  yaml: "~2.8.4" # GHSA-48c2-rrv3-qjmp
+  uuid: "~14.0.0" # GHSA-w5hq-g745-h8pq (missing buffer bounds check, patched >=14.0.0)
 
   # Transitive dependency security patches — none require a major version bump
-  "@xmldom/xmldom": "~0.8.13"  # GHSA-crh6-fp67-6883 (DoS), GHSA-5fg8-2547-mr8q (tampering)
-  node-forge: "~1.4.0"         # GHSA-x4jg-mjrx-434g (crypto bypass), GHSA-2r2c-g63r-vccr (DoS), GHSA-cfm4-qjh2-4765 (injection)
-  minimatch: "~5.1.8"          # GHSA-f8q6-p94x-37v3 (ReDoS)
-  tar: "~7.5.16"               # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal), GHSA-vmf3-w455-68vh (PAX smuggling, fix >=7.5.16)
-  ajv: "~8.18.0"               # GHSA-v6b9-6x5j-xhj3 (input DoS)
-  ip-address: "~10.1.1"        # GHSA-m6vp-8q9j-whx4 (validation bypass)
-  fast-uri: "~3.1.2"           # GHSA-p5x6-c79v-8259 (URI injection)
-  diff: "~8.0.4"               # GHSA-73rr-hh4g-fpgx (ReDoS in 7.0.0, fixed in 8.x)
+  "@xmldom/xmldom": "~0.8.13" # GHSA-crh6-fp67-6883 (DoS), GHSA-5fg8-2547-mr8q (tampering)
+  node-forge: "~1.4.0" # GHSA-x4jg-mjrx-434g (crypto bypass), GHSA-2r2c-g63r-vccr (DoS), GHSA-cfm4-qjh2-4765 (injection)
+  minimatch: "~5.1.8" # GHSA-f8q6-p94x-37v3 (ReDoS)
+  tar: "~7.5.16" # GHSA-3xgq-45jj-v275, GHSA-mg98-7p99-jxhp (path traversal), GHSA-vmf3-w455-68vh (PAX smuggling, fix >=7.5.16)
+  ajv: "~8.18.0" # GHSA-v6b9-6x5j-xhj3 (input DoS)
+  ip-address: "~10.1.1" # GHSA-m6vp-8q9j-whx4 (validation bypass)
+  fast-uri: "~3.1.2" # GHSA-p5x6-c79v-8259 (URI injection)
+  diff: "~8.0.4" # GHSA-73rr-hh4g-fpgx (ReDoS in 7.0.0, fixed in 8.x)
   # GHSA-jxxr-4gwj-5jf2: brace-expansion@5.0.5 ReDoS — override forces >=5.0.6.
   # Audited 2026-05-19: no brace-expansion@5.x snapshot present in lockfile (v5 not
   # a live transitive dep); override is a forward safety pin. v1/v2 unaffected.
@@ -202,7 +202,8 @@ overrides:
   # Global override forces all ws resolutions to >=8.21.0 which includes the DoS fix.
   # Previously ~8.20.1 (GHSA-58qx-3vcg-4xpx information disclosure fix); bumped Jun 2026.
   ws: ">=8.21.0"
-  # GHSA-7c78-jf6q-g5cm: tmp path traversal via type confusion — fix >=0.2.7 (in package.json overrides).
+  # GHSA-7c78-jf6q-g5cm: tmp path traversal via type confusion — fix >=0.2.7.
+  tmp: "~0.2.7"
   # GHSA-hmw2-7cc7-3qxx: form-data CRLF injection in multipart field names/filenames.
   form-data: ">=4.0.6"
   # GHSA-6v5v-wf23-fmfq: markdown-it quadratic complexity DoS in smartquotes rule.
@@ -212,4 +213,19 @@ overrides:
   js-yaml: ">=4.2.0"
   # GHSA-4x5r-pxfx-6jf8: @babel/core arbitrary file read via sourceMappingURL comment.
   "@babel/core": ">=7.29.6"
-  # (tmp security override is in package.json pnpm.overrides — see GHSA-7c78-jf6q-g5cm)
+  # GHSA-rvg8-pwq2-xj7q: qs prototype pollution — fix >=6.15.2.
+  qs: ">=6.15.2"
+  # GHSA-g4rg-993r-mgx6: shell-quote arbitrary command injection — fix >=1.8.4.
+  shell-quote: ">=1.8.4"
+  # GHSA-qhjq-vv38-8vr7: joi DoS via regex backtracking — fix >=18.2.1.
+  joi: ">=18.2.1"
+  # GHSA-p7fq-rfr3-5c5c: nodemailer ReDoS in MIME address parser — fix >=9.0.1.
+  nodemailer: ">=9.0.1"
+  # GHSA-3h5q-q39x-f9x9 / GHSA-2jv5-9r88-3w3p: undici header injection — fix >=6.27.0 / >=7.27.1.
+  "undici@6": ">=6.27.0 <7"
+  "undici@7": ">=7.27.1 <8"
+
+allowBuilds:
+  '@sentry/cli': set this to true or false
+  dtrace-provider: set this to true or false
+  esbuild: set this to true or false
