@@ -28,6 +28,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="${EXPO_TOKLAST}"
+export CI=1
 
 if [ -z "$EXPO_TOKEN" ]; then
   echo "OTA_PUBLISH_FATAL: EXPO_TOKLAST not set in workflow env"
@@ -46,8 +47,7 @@ echo "Exporting bundle for platform=${PLATFORM} into ${DIST_DIR}/ …"
 rm -rf "${DIST_DIR}"
 pnpm exec expo export \
   --platform "${PLATFORM}" \
-  --output-dir "${DIST_DIR}" \
-  --non-interactive
+  --output-dir "${DIST_DIR}"
 EXPORT_EXIT=$?
 if [ ${EXPORT_EXIT} -ne 0 ]; then
   echo "OTA_PUBLISH_EXIT=${EXPORT_EXIT}"
