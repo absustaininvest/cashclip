@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Platform,
   ScrollView,
-  Linking,
   ActivityIndicator,
   Alert,
   AppState,
@@ -18,12 +17,15 @@ import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
 import { useLanguage } from "@/lib/LanguageContext";
+import * as Linking from "expo-linking";
 
-// Only the terms acceptance is persisted — the disclosure screen shows every launch.
+// Only terms acceptance is persisted — the disclosure screen shows every launch.
+// Lives in AsyncStorage (wiped on app deletion) so every fresh install triggers
+// the full consent flow regardless of any Keychain state.
 const TERMS_KEY = "terms_done_v1";
 
 // Legacy AsyncStorage keys from previous consent implementations.
-// These are promoted to SecureStore (TERMS_KEY) if present, then removed.
+// Promoted to TERMS_KEY if found, then deleted.
 const LEGACY_AS_KEYS = [
   "consent_done_v3",
   "consent_fully_done_v2",
@@ -31,24 +33,16 @@ const LEGACY_AS_KEYS = [
 ] as const;
 
 /**
- * One-time migration: read stale consent keys from AsyncStorage and promote to
- * TERMS_KEY (also AsyncStorage) if not already set, then delete the old keys.
- *
- * Deletion is gated on a successful TERMS_KEY write so the migration retries
- * on the next launch if the write fails. When TERMS_KEY is already set no
- * write is needed and deletion always proceeds.
- *
- * Non-fatal — a failure here does not block the consent flow.
- * TERMS_KEY lives in AsyncStorage (wiped on app deletion) so every fresh
- * install triggers the full terms flow regardless of Keychain state.
+ * One-time migration: promote any legacy consent key to TERMS_KEY then delete
+ * the old keys. Deletion is gated on a successful TERMS_KEY write so the
+ * migration retries on the next launch if the write fails. Non-fatal.
  */
 async function migrateLegacyConsent(): Promise<void> {
   try {
     const values = await Promise.all(
       LEGACY_AS_KEYS.map((k) => AsyncStorage.getItem(k)),
     );
-    const anyFound = values.some((v) => v !== null);
-    if (anyFound) {
+    if (values.some((v) => v !== null)) {
       const alreadySet = await AsyncStorage.getItem(TERMS_KEY);
       if (!alreadySet) {
         await AsyncStorage.setItem(TERMS_KEY, "1");
@@ -56,8 +50,14 @@ async function migrateLegacyConsent(): Promise<void> {
       await AsyncStorage.multiRemove([...LEGACY_AS_KEYS]);
     }
   } catch {
-    // Migration failure is non-fatal; legacy keys remain for retry next launch.
+    // Non-fatal — legacy keys remain for retry next launch.
   }
+}
+
+function openTrackingSettings() {
+  Linking.openURL("App-Prefs:Privacy&path=TRACKING_USAGE").catch(() =>
+    Linking.openURL("app-settings:").catch(() => {})
+  );
 }
 
 type Step = "checking" | "disclosures" | "terms" | "done";
@@ -68,31 +68,23 @@ interface Props {
   onConsentRevoked?: () => void;
 }
 
-function openTrackingSettings() {
-  Linking.openURL("App-Prefs:Privacy&path=TRACKING_USAGE").catch(() =>
-    Linking.openURL("app-settings:").catch(() => {})
-  );
-}
-
 export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked }: Props) {
   const [step, setStep] = useState<Step>("checking");
   const [disclosuresBusy, setDisclosuresBusy] = useState(false);
   const { t } = useLanguage();
   const c = t.consent;
 
-  // Track whether consent was ever granted in this session so the AppState
-  // listener only fires onConsentRevoked when there was something to revoke.
+  // True once consent is granted — guards the revocation AppState listener so
+  // it only fires onConsentRevoked when there was something to revoke.
   const consentGrantedRef = useRef(false);
 
-  // Set to true when the user taps "Open Settings" from the disclosure screen.
-  // Guards the AppState "return from settings" listener so it only auto-proceeds
-  // when the user intentionally navigated to iOS Settings — not on any random
-  // foreground event while the disclosure screen is still visible.
+  // Set to true when the user taps any "Open Settings" link on the disclosures
+  // screen. Guards the return-from-settings AppState listener so it only
+  // auto-proceeds when the user intentionally navigated to iOS Settings.
   const didOpenSettingsRef = useRef(false);
 
-  // Guards acceptDisclosures() against concurrent calls — rapid taps or an
-  // AppState event racing the button tap would otherwise queue multiple ATT
-  // dialog requests, making the dialog appear to fire repeatedly.
+  // Prevents concurrent calls to acceptDisclosures() — rapid taps or an
+  // AppState event racing the button would otherwise queue multiple ATT dialogs.
   const processingRef = useRef(false);
 
   function finish() {
@@ -102,76 +94,51 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     setStep("done");
   }
 
-  // Called when a user's ATT is found to be denied/restricted while the app
-  // is in the foreground (they revoked tracking via iOS Settings).
-  // Renders children normally but fires onConsentRevoked so callers never
-  // register the fill-change callback for a non-consented session.
-  function revoke() {
-    onConsentRevoked?.();
-    setStep("done");
+  function goToSettings() {
+    didOpenSettingsRef.current = true;
+    openTrackingSettings();
   }
 
-  // Detect iOS ATT revocation via iOS Settings → Privacy → Tracking.
-  // When the user returns the app to the foreground after revoking tracking,
-  // AppState fires "active". If ATT is now denied/restricted and we had
-  // previously granted consent, call onConsentRevoked so callers can tear
-  // down any tracking-dependent callbacks (e.g. ad-fill change handler).
+  // Detect ATT revocation: user went to iOS Settings and toggled tracking OFF
+  // after already granting consent. Fire onConsentRevoked so callers can tear
+  // down tracking-dependent callbacks (e.g. ad-fill handler).
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState !== "active") return;
-        if (!consentGrantedRef.current) return;
-        getATTStatus().then((status) => {
-          if (status === "denied" || status === "restricted") {
-            consentGrantedRef.current = false;
-            onConsentRevoked?.();
-          }
-        }).catch(() => {});
-      },
-    );
-
-    return () => subscription.remove();
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (next !== "active" || !consentGrantedRef.current) return;
+      getATTStatus().then((status) => {
+        if (status === "denied" || status === "restricted") {
+          consentGrantedRef.current = false;
+          onConsentRevoked?.();
+        }
+      }).catch(() => {});
+    });
+    return () => sub.remove();
   }, [onConsentRevoked]);
 
-  // When the user is on the disclosures screen and taps "Open Settings" to
-  // enable tracking, iOS brings the app back to the foreground via AppState
-  // "active". Detect this: if ATT is now determined (authorized OR denied),
-  // auto-proceed exactly as if they tapped the Continue button. This clears
-  // the path cleanly so the user never has to tap again after toggling.
-  // Only runs on iOS while the disclosure screen is visible.
+  // Detect return from Settings while on the disclosures screen: if the user
+  // toggled tracking ON (or made any ATT decision), auto-proceed so they never
+  // have to tap again after coming back from Settings.
   useEffect(() => {
     if (Platform.OS !== "ios" || step !== "disclosures") return;
-
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState !== "active") return;
-        if (!didOpenSettingsRef.current) return;
-        didOpenSettingsRef.current = false;
-        getATTStatus().then((status) => {
-          if (status === "authorized" || status === "denied" || status === "restricted") {
-            acceptDisclosures();
-          }
-        }).catch(() => {});
-      },
-    );
-
-    return () => subscription.remove();
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (next !== "active" || !didOpenSettingsRef.current) return;
+      didOpenSettingsRef.current = false;
+      getATTStatus().then((status) => {
+        if (status === "authorized" || status === "denied" || status === "restricted") {
+          acceptDisclosures();
+        }
+      }).catch(() => {});
+    });
+    return () => sub.remove();
   }, [step]);
 
+  // Initial gate: Android skips straight through (no ATT); iOS shows disclosures.
   useEffect(() => {
     if (Platform.OS !== "ios") {
-      // Android has no ATT dialog — always pass through immediately.
-      // Run migration first so stale keys are cleaned up on Android too.
       migrateLegacyConsent().finally(() => finish());
       return;
     }
-
-    // iOS: always show the disclosure screen on every cold launch.
-    // No storage key can skip it. Run migration, then show disclosures.
     migrateLegacyConsent().finally(() => setStep("disclosures"));
   }, []);
 
@@ -180,16 +147,12 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     processingRef.current = true;
     setDisclosuresBusy(true);
     try {
-      // Request ATT now (after the user has read the explanation).
-      // iOS only ever shows the system dialog when status is "undetermined".
       const status = await getATTStatus();
       if (status === "undetermined") {
         await requestATT();
-        // Give iOS time to commit the ATT status before we read it back.
+        // Give iOS a moment to commit the ATT decision before reading it back.
         await new Promise<void>((r) => setTimeout(r, 600));
       }
-
-      // If the user has already accepted the terms, skip straight to done.
       const termsDone = await AsyncStorage.getItem(TERMS_KEY);
       if (termsDone) {
         finish();
@@ -203,26 +166,10 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   }
 
   function declineDisclosures() {
-    Alert.alert(
-      c.declineTitle,
-      c.declineMessage,
-      [
-        {
-          text: c.openSettings,
-          onPress: () => {
-            didOpenSettingsRef.current = true;
-            openTrackingSettings();
-          },
-        },
-        {
-          text: c.continueWithout,
-          style: "cancel",
-          onPress: () => {
-            finish();
-          },
-        },
-      ]
-    );
+    Alert.alert(c.declineTitle, c.declineMessage, [
+      { text: c.openSettings, onPress: goToSettings },
+      { text: c.continueWithout, style: "cancel", onPress: finish },
+    ]);
   }
 
   async function acceptTerms() {
@@ -270,27 +217,11 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               <Ionicons name="settings-outline" size={20} color={Colors.primary} />
               <Text style={styles.cardTitle}>{c.card3Title}</Text>
             </View>
-            <Text style={styles.cardBody}>
-              {c.card3Body.split("Settings → Privacy & Security → Tracking").length > 1 ? (
-                <>
-                  {c.card3Body.split("Settings → Privacy & Security → Tracking")[0]}
-                  <Text style={styles.link} onPress={() => { didOpenSettingsRef.current = true; openTrackingSettings(); }}>
-                    Settings → Privacy & Security → Tracking
-                  </Text>
-                  {c.card3Body.split("Settings → Privacy & Security → Tracking")[1]}
-                </>
-              ) : c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento").length > 1 ? (
-                <>
-                  {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[0]}
-                  <Text style={styles.link} onPress={() => { didOpenSettingsRef.current = true; openTrackingSettings(); }}>
-                    Ajustes → Privacidad y Seguridad → Seguimiento
-                  </Text>
-                  {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[1]}
-                </>
-              ) : (
-                c.card3Body
-              )}
-            </Text>
+            <Text style={styles.cardBody}>{c.card3Body}</Text>
+            <TouchableOpacity style={styles.settingsLink} onPress={goToSettings} activeOpacity={0.7}>
+              <Ionicons name="open-outline" size={14} color={Colors.primary} />
+              <Text style={styles.settingsLinkText}>{c.openSettings}</Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.legal}>{c.legal}</Text>
@@ -298,7 +229,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.primaryBtn, disclosuresBusy && { opacity: 0.6 }]}
+            style={[styles.primaryBtn, disclosuresBusy && styles.primaryBtnDisabled]}
             onPress={acceptDisclosures}
             activeOpacity={0.85}
             disabled={disclosuresBusy}
@@ -461,9 +392,16 @@ const styles = StyleSheet.create({
     color: "#3A3A4A",
     lineHeight: 20,
   },
-  link: {
-    color: Colors.primary,
+  settingsLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+  },
+  settingsLinkText: {
+    fontSize: 13,
     fontFamily: "Outfit_600SemiBold",
+    color: Colors.primary,
   },
   legal: {
     fontSize: 12,
@@ -488,6 +426,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+  },
+  primaryBtnDisabled: {
+    opacity: 0.6,
   },
   primaryBtnText: {
     fontSize: 17,
