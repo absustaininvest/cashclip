@@ -724,3 +724,57 @@ describe("Wallet withdrawal modal — saved PayPal email validation gates confir
     }
   });
 });
+
+// ── Tier labels in the withdrawal modal ───────────────────────────────────────
+//
+// With balance ≥ $7 all three tiers are returned by getWithdrawalTiers().
+// The proxy translation mock returns each key name as a string, so
+// t.wallet.tierMinimum === "tierMinimum", t.wallet.tierPopular === "tierPopular",
+// t.wallet.tierBestValue === "tierBestValue". We open the modal and verify:
+// 1. All three label strings appear in the rendered tree.
+// 2. No "+N%" bonus percentage text appears anywhere in the modal.
+describe("Wallet withdrawal modal — tier labels and no-bonus copy", () => {
+  async function renderAndOpenModal(): Promise<TestRenderer.ReactTestRenderer> {
+    // Balance $7 unlocks all three tiers ($3, $5, $7).
+    fetchServerBalanceMock.mockResolvedValue({ balance: 7, totalEarned: 10 });
+    fetchReferralStatsMock.mockResolvedValue(null);
+    let tr!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tr = TestRenderer.create(React.createElement(WalletScreen));
+    });
+    await flush();
+
+    // Open the withdrawal modal.
+    const btn = tr.root.find((n) => n.props.testID === "open-withdraw-modal");
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    await flush();
+    return tr;
+  }
+
+  it("shows the Minimum label for the $3 tier", async () => {
+    const tr = await renderAndOpenModal();
+    // The proxy mock returns the i18n key name as the string value.
+    expect(allText(tr.root).some((t) => t === "tierMinimum")).toBe(true);
+  });
+
+  it("shows the Popular label for the $5 tier", async () => {
+    const tr = await renderAndOpenModal();
+    expect(allText(tr.root).some((t) => t === "tierPopular")).toBe(true);
+  });
+
+  it("shows the Best Value label for the $7 tier", async () => {
+    const tr = await renderAndOpenModal();
+    expect(allText(tr.root).some((t) => t === "tierBestValue")).toBe(true);
+  });
+
+  it("does NOT show any bonus percentage text in the modal", async () => {
+    const tr = await renderAndOpenModal();
+    const texts = allText(tr.root);
+    // Bonus percentages look like "+3%", "+5%" etc. None should appear since
+    // all current tiers carry bonusPercent: 0.
+    const hasBonusPct = texts.some((txt) => /\+\d+%/.test(txt));
+    expect(hasBonusPct).toBe(false);
+  });
+});

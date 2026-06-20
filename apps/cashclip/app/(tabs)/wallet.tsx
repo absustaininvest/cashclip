@@ -123,11 +123,8 @@ function TransactionItem({ item, t }: { item: Transaction; t: Translations }) {
 
 const TIER_TAG_KEYS: Record<string, keyof Translations["wallet"]> = {
   Minimum: "tierMinimum",
-  Smart: "tierSmart",
   Popular: "tierPopular",
   "Best Value": "tierBestValue",
-  VIP: "tierVIP",
-  Elite: "tierElite",
 };
 
 function TierCard({
@@ -141,7 +138,6 @@ function TierCard({
   onSelect: () => void;
   t: Translations;
 }) {
-  const isPopular = tier.tag === "Popular" || tier.tag === "Best Value";
   const translatedTag = t.wallet[TIER_TAG_KEYS[tier.tag] || "tierMinimum"] as string;
   return (
     <Pressable
@@ -155,15 +151,20 @@ function TierCard({
         { opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
       ]}
     >
-      {isPopular && (
+      {tier.tag === "Popular" && (
         <View style={styles.tierPopularBadge}>
           <Ionicons name="star" size={10} color="#000" />
           <Text style={styles.tierPopularText}>{translatedTag}</Text>
         </View>
       )}
-      {!isPopular && tier.tag !== "Minimum" && (
+      {tier.tag === "Best Value" && (
         <View style={[styles.tierPopularBadge, { backgroundColor: "rgba(0,230,118,0.15)" }]}>
           <Text style={[styles.tierPopularText, { color: Colors.primary }]}>{translatedTag}</Text>
+        </View>
+      )}
+      {tier.tag === "Minimum" && (
+        <View style={[styles.tierPopularBadge, { backgroundColor: "rgba(255,255,255,0.07)" }]}>
+          <Text style={[styles.tierPopularText, { color: Colors.textMuted }]}>{translatedTag}</Text>
         </View>
       )}
 
@@ -171,19 +172,16 @@ function TierCard({
         ${tier.amount.toFixed(2)}
       </Text>
 
-      {tier.bonusPercent > 0 ? (
-        <View style={styles.tierBonusRow}>
-          <Feather name="trending-up" size={12} color={Colors.accent} />
-          <Text style={styles.tierBonusText}>+{tier.bonusPercent}% {t.wallet.bonus}</Text>
-        </View>
-      ) : (
-        <Text style={styles.tierNoBonusText}>{t.wallet.noBonusLabel}</Text>
-      )}
-
       {tier.bonusPercent > 0 && (
-        <Text style={styles.tierPayoutText}>
-          {t.wallet.youGet} ${tier.totalPayout.toFixed(2)}
-        </Text>
+        <>
+          <View style={styles.tierBonusRow}>
+            <Feather name="trending-up" size={12} color={Colors.accent} />
+            <Text style={styles.tierBonusText}>+{tier.bonusPercent}% {t.wallet.bonus}</Text>
+          </View>
+          <Text style={styles.tierPayoutText}>
+            {t.wallet.youGet} ${tier.totalPayout.toFixed(2)}
+          </Text>
+        </>
       )}
 
       <View style={[styles.tierRadio, selected && styles.tierRadioSelected]}>

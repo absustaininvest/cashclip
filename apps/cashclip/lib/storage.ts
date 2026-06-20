@@ -218,7 +218,7 @@ export interface WithdrawalTier {
 export function getWithdrawalTiers(balance: number): WithdrawalTier[] {
   const tiers = [
     { amount: 3, bonusPercent: 0, label: "$3.00", tag: "Minimum" },
-    { amount: 5, bonusPercent: 0, label: "$5.00", tag: "Standard" },
+    { amount: 5, bonusPercent: 0, label: "$5.00", tag: "Popular" },
     { amount: 7, bonusPercent: 0, label: "$7.00", tag: "Best Value" },
   ];
   return tiers

@@ -23,6 +23,12 @@ chmod +x /tmp/fake-bin/git
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Remove any stale dist/ from a prior run so each platform gets a clean export.
+# Two workflows sharing a dist/ directory can result in one platform's metadata
+# appearing in the other's upload step if they run concurrently or sequentially
+# without clearing first.
+rm -rf dist
+
 export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="${EXPO_TOKLAST}"
 
