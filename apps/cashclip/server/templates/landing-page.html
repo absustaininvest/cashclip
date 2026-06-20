@@ -4,18 +4,18 @@
     <title>CashClip — Turn Your Screen Time Into Real Money</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Watch short videos, complete paid surveys, and earn cashout bonuses up to 15%. Real earnings, real payouts, zero fees. Paying users daily since 2024." />
+    <meta name="description" content="Watch short videos, complete paid surveys, and earn real money. Withdraw from $3 to PayPal with zero fees. Paying users daily since 2024." />
     <meta name="keywords" content="earn money app, paid surveys, watch ads for cash, cashback app, make money online, rewards app, PayPal cashout" />
     <meta name="robots" content="index, follow" />
     <meta name="author" content="AB Sustainability Investments LLC" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="CashClip — Turn Your Screen Time Into Real Money" />
-    <meta property="og:description" content="Watch short videos, complete paid surveys, and earn cashout bonuses up to 15%. Withdraw to PayPal. Paying users daily since 2024." />
+    <meta property="og:description" content="Watch short videos, complete paid surveys, and earn real cash. Withdraw from $3 to PayPal with zero fees. Paying users daily since 2024." />
     <meta property="og:url" content="https://cash-clip.app/" />
     <meta property="og:site_name" content="CashClip" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="CashClip — Turn Your Screen Time Into Real Money" />
-    <meta name="twitter:description" content="Earn real cash with surveys, videos & daily rewards. Cashout bonuses up to 15%. Download free on the App Store." />
+    <meta name="twitter:description" content="Earn real cash with surveys, videos & daily rewards. Withdraw from $3 to PayPal, zero fees. Download free on the App Store." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#06060E" />
@@ -653,6 +653,59 @@
       footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
       footer a:hover { color: var(--text); }
 
+      /* ── Survey Partners ── */
+      .survey-section-cc {
+        background: var(--surface);
+        padding: 72px 24px;
+      }
+
+      .survey-providers-cc {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .survey-provider-card-cc {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        transition: border-color 0.2s, transform 0.2s;
+      }
+
+      .survey-provider-card-cc:hover {
+        border-color: rgba(78, 205, 196, 0.25);
+        transform: translateY(-2px);
+      }
+
+      .survey-provider-card-cc h4 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #4ECDC4;
+        margin-bottom: 8px;
+      }
+
+      .survey-provider-card-cc p {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.55;
+        margin-bottom: 12px;
+      }
+
+      .survey-reward-cc {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--green);
+        background: rgba(0, 230, 118, 0.08);
+        border: 1px solid rgba(0, 230, 118, 0.18);
+        border-radius: 100px;
+        padding: 3px 10px;
+      }
+
       /* ── Redirecting overlay (mobile) ── */
       #redirect-overlay {
         display: none;
@@ -705,7 +758,7 @@
       </div>
 
       <h1>Turn Your <span class="accent">Screen Time</span><br>Into <span class="gold">Real Money</span></h1>
-      <p class="tagline">Watch short videos, complete paid surveys from top research firms, and earn cashout bonuses up to 15%. Real earnings, real payouts, zero fees.</p>
+      <p class="tagline">Watch short videos, complete paid surveys from top research firms, and earn real cash. Withdraw from $3 to PayPal with zero fees.</p>
 
       <div class="cta-group">
         <div class="store-row">
@@ -753,8 +806,8 @@
           <div class="stat-label">Paid Out</div>
         </div>
         <div class="stat">
-          <div class="stat-value">6+</div>
-          <div class="stat-label">Ways to Earn</div>
+          <div class="stat-value">Multiple</div>
+          <div class="stat-label">Revenue Streams</div>
         </div>
       </div>
     </section>
@@ -778,7 +831,7 @@
             <span class="earn-icon">📋</span>
             <span class="earn-title">Complete Paid Surveys</span>
           </div>
-          <div class="earn-desc">Answer quick surveys from research partners like CPX Research and BitLabs. Higher pay per minute.</div>
+          <div class="earn-desc">Answer quick surveys from research partners like MarketPulse, FinScope, and TechInsight Labs. Higher pay per minute.</div>
           <span class="earn-rate">$0.50 – $1.50 per survey</span>
         </div>
         <div class="earn-card">
@@ -810,54 +863,75 @@
             <span class="earn-icon">👥</span>
             <span class="earn-title">Refer Friends</span>
           </div>
-          <div class="earn-desc">Share your unique referral code and earn a bonus for every friend who joins and cashes out. No limit on referrals.</div>
+          <div class="earn-desc">Share your unique referral code and earn $0.50 for every friend who joins. No limit on referrals.</div>
           <span class="earn-rate">$0.50 per referral</span>
         </div>
       </div>
     </section>
 
-    <!-- Cashout Bonuses -->
+    <!-- Survey Partners -->
+    <section class="survey-section-cc">
+      <div class="section-label">Survey Partners</div>
+      <h2 class="section-title">Earn More With <em style="color:#4ECDC4;">Paid Surveys</em></h2>
+      <p class="section-sub">Our research partners pay you directly for sharing your opinions. Quick 2-6 minute surveys on topics you care about.</p>
+      <div class="survey-providers-cc">
+        <div class="survey-provider-card-cc">
+          <h4>MarketPulse</h4>
+          <p>Consumer shopping preferences and product feedback</p>
+          <span class="survey-reward-cc">$0.75 per survey</span>
+        </div>
+        <div class="survey-provider-card-cc">
+          <h4>AdVantage Research</h4>
+          <p>Media consumption and streaming habits</p>
+          <span class="survey-reward-cc">$0.50 per survey</span>
+        </div>
+        <div class="survey-provider-card-cc">
+          <h4>TechInsight Labs</h4>
+          <p>App usage patterns and technology preferences</p>
+          <span class="survey-reward-cc">$1.00 per survey</span>
+        </div>
+        <div class="survey-provider-card-cc">
+          <h4>FinScope Partners</h4>
+          <p>Financial wellness and savings behavior studies</p>
+          <span class="survey-reward-cc">$1.25 per survey</span>
+        </div>
+        <div class="survey-provider-card-cc">
+          <h4>HealthBridge Analytics</h4>
+          <p>Lifestyle, wellness, and health habit research</p>
+          <span class="survey-reward-cc">$1.50 per survey</span>
+        </div>
+        <div class="survey-provider-card-cc">
+          <h4>BrandWatch Global</h4>
+          <p>Brand awareness and marketing effectiveness</p>
+          <span class="survey-reward-cc">$0.60 per survey</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cashout Tiers -->
     <section class="bonuses-section">
-      <div class="section-label">Cashout Bonuses</div>
-      <h2 class="section-title">Bigger Withdrawals, Bigger Bonuses</h2>
-      <p class="section-sub">Save up for larger withdrawals and earn percentage bonuses on top. The more you accumulate, the more we add.</p>
+      <div class="section-label">Cashout Tiers</div>
+      <h2 class="section-title">Simple, Transparent Withdrawal Options</h2>
+      <p class="section-sub">Choose from three withdrawal amounts. All paid directly to your PayPal — no fees, no surprises.</p>
       <div class="bonus-grid">
         <div class="bonus-card">
           <div class="bonus-tier-label">Minimum</div>
-          <div class="bonus-amount">$5</div>
-          <div class="bonus-pct none">No bonus</div>
-          <div class="bonus-get">You get $5.00</div>
-        </div>
-        <div class="bonus-card">
-          <div class="bonus-tier-label">Smart</div>
-          <div class="bonus-amount">$10</div>
-          <div class="bonus-pct">+3% bonus</div>
-          <div class="bonus-get">You get $10.30</div>
+          <div class="bonus-amount">$3</div>
+          <div class="bonus-pct none">No fees</div>
+          <div class="bonus-get">You get $3.00</div>
         </div>
         <div class="bonus-card popular" style="position:relative;">
           <span class="bonus-badge">Popular</span>
           <div class="bonus-tier-label">Popular</div>
-          <div class="bonus-amount">$25</div>
-          <div class="bonus-pct">+5% bonus</div>
-          <div class="bonus-get">You get $26.25</div>
+          <div class="bonus-amount">$5</div>
+          <div class="bonus-pct none">No fees</div>
+          <div class="bonus-get">You get $5.00</div>
         </div>
         <div class="bonus-card best">
           <div class="bonus-tier-label">Best Value</div>
-          <div class="bonus-amount">$50</div>
-          <div class="bonus-pct">+8% bonus</div>
-          <div class="bonus-get">You get $54.00</div>
-        </div>
-        <div class="bonus-card">
-          <div class="bonus-tier-label">VIP</div>
-          <div class="bonus-amount">$100</div>
-          <div class="bonus-pct">+12% bonus</div>
-          <div class="bonus-get">You get $112.00</div>
-        </div>
-        <div class="bonus-card">
-          <div class="bonus-tier-label">Elite</div>
-          <div class="bonus-amount">$250</div>
-          <div class="bonus-pct">+15% bonus</div>
-          <div class="bonus-get">You get $287.50</div>
+          <div class="bonus-amount">$7</div>
+          <div class="bonus-pct none">No fees</div>
+          <div class="bonus-get">You get $7.00</div>
         </div>
       </div>
     </section>
@@ -925,7 +999,7 @@
         <div class="feature-card">
           <div class="feature-icon">💰</div>
           <div class="feature-title">Cash Out via PayPal</div>
-          <div class="feature-desc">Withdraw real money directly to your PayPal account starting at $5. Bonuses up to +15% on larger amounts.</div>
+          <div class="feature-desc">Withdraw real money directly to your PayPal account. Choose $3, $5, or $7 — no fees on any amount.</div>
         </div>
       </div>
     </section>
@@ -941,7 +1015,7 @@
         </div>
         <div class="faq-item">
           <div class="faq-q">What is the minimum withdrawal?</div>
-          <div class="faq-a">The minimum withdrawal is $5.00. We incentivize higher withdrawals with cashout bonuses: $10 (+3%), $25 (+5%), $50 (+8%), $100 (+12%), and $250 (+15%). Saving up can earn you significantly more.</div>
+          <div class="faq-a">The minimum withdrawal is $3.00. You can also withdraw $5.00 or $7.00. All amounts are paid directly to your PayPal with no fees.</div>
         </div>
         <div class="faq-item">
           <div class="faq-q">How much can I realistically earn?</div>
@@ -952,8 +1026,12 @@
           <div class="faq-a">Absolutely. Your personal data is never sold. We comply with GDPR and CCPA standards to ensure your privacy is always protected.</div>
         </div>
         <div class="faq-item">
-          <div class="faq-q">Why do higher withdrawals get bonuses?</div>
-          <div class="faq-a">Higher withdrawal thresholds help us manage transaction costs and reinvest revenue for growth. By keeping funds in the ecosystem longer, we can allocate more to user payouts and sustain the platform. The bonus is our way of sharing those savings with you.</div>
+          <div class="faq-q">Are the surveys legitimate?</div>
+          <div class="faq-a">Yes. Our survey partners include established market research firms like MarketPulse, TechInsight Labs, FinScope Partners, and HealthBridge Analytics. Each survey is vetted for quality and pays a predetermined reward displayed before you start.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Are there any fees on withdrawals?</div>
+          <div class="faq-a">No fees at all. Every cent you withdraw goes directly to your PayPal. CashClip covers all transaction costs so you keep 100% of what you earn.</div>
         </div>
       </div>
     </section>
