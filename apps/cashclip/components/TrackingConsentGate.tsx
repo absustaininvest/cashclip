@@ -17,8 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { requestAdsConsent } from "@/lib/admob";
 import { getATTStatus, requestATT } from "@/lib/att";
-import * as ExpoSecureStore from "expo-secure-store";
-import { secureGet, secureSet } from "@/lib/secure-store";
 import { useLanguage } from "@/lib/LanguageContext";
 
 // Only the terms acceptance is persisted — the disclosure screen shows every launch.
@@ -33,15 +31,16 @@ const LEGACY_AS_KEYS = [
 ] as const;
 
 /**
- * One-time migration: read stale consent keys from AsyncStorage, promote to
- * SecureStore if terms have not been accepted yet, then delete the old keys.
+ * One-time migration: read stale consent keys from AsyncStorage and promote to
+ * TERMS_KEY (also AsyncStorage) if not already set, then delete the old keys.
  *
- * Deletion is gated on a successful SecureStore write: if the write fails the
- * legacy keys remain in AsyncStorage so the migration can be retried on the
- * next launch. When TERMS_KEY is already set no write is needed, so deletion
- * always proceeds in that case.
+ * Deletion is gated on a successful TERMS_KEY write so the migration retries
+ * on the next launch if the write fails. When TERMS_KEY is already set no
+ * write is needed and deletion always proceeds.
  *
  * Non-fatal — a failure here does not block the consent flow.
+ * TERMS_KEY lives in AsyncStorage (wiped on app deletion) so every fresh
+ * install triggers the full terms flow regardless of Keychain state.
  */
 async function migrateLegacyConsent(): Promise<void> {
   try {
@@ -50,13 +49,9 @@ async function migrateLegacyConsent(): Promise<void> {
     );
     const anyFound = values.some((v) => v !== null);
     if (anyFound) {
-      const alreadySet = await secureGet(TERMS_KEY);
+      const alreadySet = await AsyncStorage.getItem(TERMS_KEY);
       if (!alreadySet) {
-        // Call ExpoSecureStore directly so a keychain write failure throws and
-        // propagates to the outer catch — gating the multiRemove below.
-        // (secureSet swallows keychain errors on native via .catch, which would
-        // let multiRemove run even when the promotion write failed.)
-        await ExpoSecureStore.setItemAsync(TERMS_KEY, "1");
+        await AsyncStorage.setItem(TERMS_KEY, "1");
       }
       await AsyncStorage.multiRemove([...LEGACY_AS_KEYS]);
     }
@@ -153,7 +148,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     }
 
     // If the user has already accepted the terms, skip straight to done.
-    const termsDone = await secureGet(TERMS_KEY);
+    const termsDone = await AsyncStorage.getItem(TERMS_KEY);
     if (termsDone) {
       finish();
     } else {
@@ -182,7 +177,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   }
 
   async function acceptTerms() {
-    await secureSet(TERMS_KEY, "1").catch(() => {});
+    await AsyncStorage.setItem(TERMS_KEY, "1").catch(() => {});
     finish();
   }
 
