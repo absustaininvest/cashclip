@@ -1,0 +1,86 @@
+name: EAS OTA Update - Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollout_phase:
+        description: "Rollout phase"
+        required: true
+        default: "canary"
+        type: choice
+        options:
+          - canary
+          - ramp
+          - full
+      message:
+        description: "Update message for users"
+        required: false
+        default: "Critical OTA fix for runtime 1.0.0 / v29"
+      force_agent_restart:
+        description: "Trigger remote restart fallback for stuck agents"
+        required: true
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - "artifacts/cashclip/**"
+      - "scripts/eas-ota-update.sh"
+      - ".github/workflows/eas-ota-update.yml"
+
+jobs:
+  publish-ota-update:
+    name: Publish OTA Update to Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Publish OTA Update to Production
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_OTA_CONFIRMED: "1"
+          EAS_OTA_CHANNEL: production
+          EAS_OTA_TARGET_RUNTIME: "1.0.0"
+          EAS_OTA_TARGET_VERSION: "29"
+          EAS_OTA_ROLLOUT_PHASE: ${{ github.event.inputs.rollout_phase || 'full' }}
+          EAS_OTA_MESSAGE: ${{ github.event.inputs.message || format('OTA hotfix for runtime 1.0.0/v29 ({0})', github.sha) }}
+          EAS_OTA_FORCE_AGENT_RESTART: ${{ github.event.inputs.force_agent_restart && '1' || '0' }}
+          EAS_OTA_AGENT_RESTART_URL: ${{ secrets.OTA_AGENT_RESTART_URL }}
+          EAS_OTA_MONITOR_URL: ${{ secrets.OTA_MONITOR_URL }}
+          EAS_OTA_SUCCESS_THRESHOLD: "95"
+        run: bash scripts/eas-ota-update.sh
+
+      - name: Update Deployment Status
+        if: success()
+        run: |
+          echo "✅ OTA Update Published Successfully"
+          echo "Target: runtime=1.0.0 and version=29"
+          echo "Rollout phase: ${{ github.event.inputs.rollout_phase || 'full' }}"
+          echo "Success threshold: 95%"
+          echo "Commit: ${{ github.sha }}"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ OTA Update Failed"
+          echo "Attempting fallback restart for stuck agents"
+          echo "Validate EXPO_TOKEN, OTA_MONITOR_URL, and OTA_AGENT_RESTART_URL secrets"
+          exit 1
