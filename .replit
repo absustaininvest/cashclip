@@ -57,14 +57,6 @@ args = "scripts-typecheck"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "OTA Update (iOS)"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "OTA Update (Android)"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "api-server-typecheck"
 
 [[workflows.workflow.tasks]]
@@ -127,28 +119,6 @@ args = "pnpm --filter @workspace/scripts run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
-
-[[workflows.workflow]]
-name = "OTA Update (iOS)"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "OTA_PLATFORM=ios bash apps/cashclip/scripts/eas-ota-publish.sh"
-
-[[workflows.workflow]]
-name = "OTA Update (Android)"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "OTA_PLATFORM=android bash apps/cashclip/scripts/eas-ota-publish.sh"
 
 [[workflows.workflow]]
 name = "api-server-typecheck"
