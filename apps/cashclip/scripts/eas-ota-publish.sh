@@ -7,8 +7,8 @@
 # OTA_PLATFORM  – target platform: ios | android | all  (default: ios)
 # OTA_MESSAGE   – override the EAS update message         (optional)
 #
-# Each platform writes to its own dist-<platform>/ directory so iOS and Android
-# workflows can run simultaneously without racing over the same dist/ folder.
+# A per-workspace flock serialises concurrent iOS + Android workflow runs so
+# they never write to dist/ at the same time.
 
 mkdir -p /tmp/fake-bin
 cat > /tmp/fake-bin/git << 'WRAP'
@@ -37,32 +37,31 @@ fi
 
 PLATFORM="${OTA_PLATFORM:-ios}"
 MESSAGE="${OTA_MESSAGE:-OTA update (${PLATFORM})}"
-DIST_DIR="dist-${PLATFORM}"
 
 echo "OTA_PUBLISH_START $(date -u +%FT%TZ) platform=${PLATFORM}"
 
-# Export to a platform-specific directory so concurrent iOS + Android workflows
-# never collide. --clear wipes any stale artefacts from prior runs in this dir.
-echo "Exporting bundle for platform=${PLATFORM} into ${DIST_DIR}/ …"
-rm -rf "${DIST_DIR}"
-pnpm exec expo export \
-  --platform "${PLATFORM}" \
-  --output-dir "${DIST_DIR}"
-EXPORT_EXIT=$?
-if [ ${EXPORT_EXIT} -ne 0 ]; then
-  echo "OTA_PUBLISH_EXIT=${EXPORT_EXIT}"
-  echo "OTA_PUBLISH_FATAL: expo export failed (exit ${EXPORT_EXIT})"
-  exit ${EXPORT_EXIT}
+# Serialise concurrent iOS + Android workflow runs via a workspace-level lock.
+# If the other platform is already bundling, wait (up to 10 min) then proceed.
+LOCK_FILE="/tmp/eas-ota-workspace-lock"
+exec 9>"${LOCK_FILE}"
+if ! flock -w 600 9; then
+  echo "OTA_PUBLISH_FATAL: timed out waiting for lock (another OTA still running after 10 min)"
+  exit 1
 fi
 
+# Clean any stale dist/ from prior runs inside this serialised section.
+rm -rf dist
+
 pnpm exec eas update \
-  --branch production \
+  --channel production \
   --platform "${PLATFORM}" \
   --message "${MESSAGE}" \
-  --input-dir "${DIST_DIR}" \
-  --skip-bundler \
   --non-interactive
 EXIT=$?
+
+# Release lock
+flock -u 9
+
 echo "OTA_PUBLISH_EXIT=${EXIT}"
 if [ ${EXIT} -eq 0 ]; then
   echo "OTA_PUBLISH_MESSAGE: ${MESSAGE}"
