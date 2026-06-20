@@ -76,12 +76,24 @@ function openTrackingSettings() {
 
 export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked }: Props) {
   const [step, setStep] = useState<Step>("checking");
+  const [disclosuresBusy, setDisclosuresBusy] = useState(false);
   const { t } = useLanguage();
   const c = t.consent;
 
   // Track whether consent was ever granted in this session so the AppState
   // listener only fires onConsentRevoked when there was something to revoke.
   const consentGrantedRef = useRef(false);
+
+  // Set to true when the user taps "Open Settings" from the disclosure screen.
+  // Guards the AppState "return from settings" listener so it only auto-proceeds
+  // when the user intentionally navigated to iOS Settings — not on any random
+  // foreground event while the disclosure screen is still visible.
+  const didOpenSettingsRef = useRef(false);
+
+  // Guards acceptDisclosures() against concurrent calls — rapid taps or an
+  // AppState event racing the button tap would otherwise queue multiple ATT
+  // dialog requests, making the dialog appear to fire repeatedly.
+  const processingRef = useRef(false);
 
   function finish() {
     requestAdsConsent().catch(() => {});
@@ -124,6 +136,32 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
     return () => subscription.remove();
   }, [onConsentRevoked]);
 
+  // When the user is on the disclosures screen and taps "Open Settings" to
+  // enable tracking, iOS brings the app back to the foreground via AppState
+  // "active". Detect this: if ATT is now determined (authorized OR denied),
+  // auto-proceed exactly as if they tapped the Continue button. This clears
+  // the path cleanly so the user never has to tap again after toggling.
+  // Only runs on iOS while the disclosure screen is visible.
+  useEffect(() => {
+    if (Platform.OS !== "ios" || step !== "disclosures") return;
+
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState !== "active") return;
+        if (!didOpenSettingsRef.current) return;
+        didOpenSettingsRef.current = false;
+        getATTStatus().then((status) => {
+          if (status === "authorized" || status === "denied" || status === "restricted") {
+            acceptDisclosures();
+          }
+        }).catch(() => {});
+      },
+    );
+
+    return () => subscription.remove();
+  }, [step]);
+
   useEffect(() => {
     if (Platform.OS !== "ios") {
       // Android has no ATT dialog — always pass through immediately.
@@ -138,21 +176,29 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   }, []);
 
   async function acceptDisclosures() {
-    // Request ATT now (after the user has read the explanation).
-    // iOS only ever shows the system dialog when status is "undetermined".
-    const status = await getATTStatus();
-    if (status === "undetermined") {
-      await requestATT();
-      // Give iOS time to commit the ATT status before we read it back.
-      await new Promise<void>((r) => setTimeout(r, 600));
-    }
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setDisclosuresBusy(true);
+    try {
+      // Request ATT now (after the user has read the explanation).
+      // iOS only ever shows the system dialog when status is "undetermined".
+      const status = await getATTStatus();
+      if (status === "undetermined") {
+        await requestATT();
+        // Give iOS time to commit the ATT status before we read it back.
+        await new Promise<void>((r) => setTimeout(r, 600));
+      }
 
-    // If the user has already accepted the terms, skip straight to done.
-    const termsDone = await AsyncStorage.getItem(TERMS_KEY);
-    if (termsDone) {
-      finish();
-    } else {
-      setStep("terms");
+      // If the user has already accepted the terms, skip straight to done.
+      const termsDone = await AsyncStorage.getItem(TERMS_KEY);
+      if (termsDone) {
+        finish();
+      } else {
+        setStep("terms");
+      }
+    } finally {
+      processingRef.current = false;
+      setDisclosuresBusy(false);
     }
   }
 
@@ -163,7 +209,10 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
       [
         {
           text: c.openSettings,
-          onPress: openTrackingSettings,
+          onPress: () => {
+            didOpenSettingsRef.current = true;
+            openTrackingSettings();
+          },
         },
         {
           text: c.continueWithout,
@@ -225,7 +274,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               {c.card3Body.split("Settings → Privacy & Security → Tracking").length > 1 ? (
                 <>
                   {c.card3Body.split("Settings → Privacy & Security → Tracking")[0]}
-                  <Text style={styles.link} onPress={openTrackingSettings}>
+                  <Text style={styles.link} onPress={() => { didOpenSettingsRef.current = true; openTrackingSettings(); }}>
                     Settings → Privacy & Security → Tracking
                   </Text>
                   {c.card3Body.split("Settings → Privacy & Security → Tracking")[1]}
@@ -233,7 +282,7 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
               ) : c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento").length > 1 ? (
                 <>
                   {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[0]}
-                  <Text style={styles.link} onPress={openTrackingSettings}>
+                  <Text style={styles.link} onPress={() => { didOpenSettingsRef.current = true; openTrackingSettings(); }}>
                     Ajustes → Privacidad y Seguridad → Seguimiento
                   </Text>
                   {c.card3Body.split("Ajustes → Privacidad y Seguridad → Seguimiento")[1]}
@@ -248,8 +297,16 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={acceptDisclosures} activeOpacity={0.85}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#000" style={{ marginRight: 8 }} />
+          <TouchableOpacity
+            style={[styles.primaryBtn, disclosuresBusy && { opacity: 0.6 }]}
+            onPress={acceptDisclosures}
+            activeOpacity={0.85}
+            disabled={disclosuresBusy}
+          >
+            {disclosuresBusy
+              ? <ActivityIndicator size="small" color="#000" style={{ marginRight: 8 }} />
+              : <Ionicons name="checkmark-circle-outline" size={20} color="#000" style={{ marginRight: 8 }} />
+            }
             <Text style={styles.primaryBtnText}>{c.continueBtn}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={declineDisclosures} activeOpacity={0.7}>
