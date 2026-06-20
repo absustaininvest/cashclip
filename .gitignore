@@ -14,3 +14,6 @@ DistCert_*.zip
 # Keystore files (Android signing)
 *.jks
 *.keystore
+
+# Dependencies — never commit installed packages
+node_modules/
