@@ -61,6 +61,7 @@ rm -rf dist
 
 pnpm exec eas update \
   --channel production \
+  --environment production \
   --platform "${PLATFORM}" \
   --message "${MESSAGE}" \
   --non-interactive
