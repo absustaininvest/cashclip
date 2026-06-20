@@ -6,6 +6,9 @@
 #
 # OTA_PLATFORM  – target platform: ios | android | all  (default: ios)
 # OTA_MESSAGE   – override the EAS update message         (optional)
+#
+# Each platform writes to its own dist-<platform>/ directory so iOS and Android
+# workflows can run simultaneously without racing over the same dist/ folder.
 
 mkdir -p /tmp/fake-bin
 cat > /tmp/fake-bin/git << 'WRAP'
@@ -23,12 +26,6 @@ chmod +x /tmp/fake-bin/git
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Remove any stale dist/ from a prior run so each platform gets a clean export.
-# Two workflows sharing a dist/ directory can result in one platform's metadata
-# appearing in the other's upload step if they run concurrently or sequentially
-# without clearing first.
-rm -rf dist
-
 export PATH="/tmp/fake-bin:$PATH"
 export EXPO_TOKEN="${EXPO_TOKLAST}"
 
@@ -39,12 +36,31 @@ fi
 
 PLATFORM="${OTA_PLATFORM:-ios}"
 MESSAGE="${OTA_MESSAGE:-OTA update (${PLATFORM})}"
+DIST_DIR="dist-${PLATFORM}"
 
 echo "OTA_PUBLISH_START $(date -u +%FT%TZ) platform=${PLATFORM}"
+
+# Export to a platform-specific directory so concurrent iOS + Android workflows
+# never collide. --clear wipes any stale artefacts from prior runs in this dir.
+echo "Exporting bundle for platform=${PLATFORM} into ${DIST_DIR}/ …"
+rm -rf "${DIST_DIR}"
+pnpm exec expo export \
+  --platform "${PLATFORM}" \
+  --output-dir "${DIST_DIR}" \
+  --non-interactive
+EXPORT_EXIT=$?
+if [ ${EXPORT_EXIT} -ne 0 ]; then
+  echo "OTA_PUBLISH_EXIT=${EXPORT_EXIT}"
+  echo "OTA_PUBLISH_FATAL: expo export failed (exit ${EXPORT_EXIT})"
+  exit ${EXPORT_EXIT}
+fi
+
 pnpm exec eas update \
   --branch production \
   --platform "${PLATFORM}" \
   --message "${MESSAGE}" \
+  --input-dir "${DIST_DIR}" \
+  --skip-bundler \
   --non-interactive
 EXIT=$?
 echo "OTA_PUBLISH_EXIT=${EXIT}"
