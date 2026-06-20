@@ -1265,6 +1265,10 @@ export class DatabaseStorage implements IStorage {
     expectedReward: number;
     expiresAt: Date;
   }): Promise<RewardSession> {
+    // ON CONFLICT DO NOTHING guards against duplicate (user_id, source, external_id)
+    // pending rows now that the reward_sessions_pending_unique partial index exists.
+    // Prefer upsertPendingRewardSession for new call sites — it handles dedup
+    // atomically and refreshes the canonical session's price and TTL.
     const [s] = await db
       .insert(rewardSessions)
       .values({
@@ -1277,7 +1281,23 @@ export class DatabaseStorage implements IStorage {
         expiresAt: args.expiresAt,
         status: "pending",
       })
+      .onConflictDoNothing()
       .returning();
+    if (!s) {
+      const [existing] = await db
+        .select()
+        .from(rewardSessions)
+        .where(
+          and(
+            eq(rewardSessions.userId, args.userId),
+            eq(rewardSessions.source, args.source),
+            eq(rewardSessions.externalId, args.externalId),
+            eq(rewardSessions.status, "pending"),
+          ),
+        )
+        .limit(1);
+      return existing;
+    }
     return s;
   }
 
