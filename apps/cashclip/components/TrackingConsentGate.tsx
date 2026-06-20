@@ -89,7 +89,6 @@ export function TrackingConsentGate({ children, onConsentDone, onConsentRevoked 
   const consentGrantedRef = useRef(false);
 
   function finish() {
-    requestAdsConsent().catch(() => {});
     consentGrantedRef.current = true;
     onConsentDone?.();
     setStep("done");

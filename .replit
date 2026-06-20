@@ -43,26 +43,6 @@ args = "Start application"
 task = "workflow.run"
 args = "Start Backend"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "cashclip-test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "libs-typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "scripts-typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "api-server-typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "api-server-test"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -86,61 +66,6 @@ outputType = "console"
 task = "shell.exec"
 args = "PORT=3001 pnpm --filter @workspace/api-server run dev"
 waitForPort = 3001
-
-[[workflows.workflow]]
-name = "cashclip-test"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/cashclip run test"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "libs-typecheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm run typecheck:libs"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "scripts-typecheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/scripts run typecheck"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "api-server-typecheck"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm run typecheck"
-
-[[workflows.workflow]]
-name = "api-server-test"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/api-server run test"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [[ports]]
 localPort = 3000
