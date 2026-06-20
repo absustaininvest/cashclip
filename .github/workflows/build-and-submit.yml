@@ -1,0 +1,107 @@
+name: Build IPA and Submit to App Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build for'
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
+          - all
+      profile:
+        description: 'Build profile'
+        required: true
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+      submit:
+        description: 'Submit to App Store after build?'
+        required: true
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+        default: 'yes'
+
+jobs:
+  build:
+    name: Build with EAS
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      build-id: ${{ steps.build.outputs.build-id }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.0.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build with EAS
+        id: build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          cd artifacts/cashclip
+          echo "Building IPA for ${{ github.event.inputs.platform }} with profile ${{ github.event.inputs.profile }}..."
+          npx eas@latest build \
+            --platform ${{ github.event.inputs.platform }} \
+            --profile ${{ github.event.inputs.profile }} \
+            --wait
+          echo "build-id=$(date +%s)" >> $GITHUB_OUTPUT
+
+  submit:
+    name: Submit to App Stores
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event.inputs.submit == 'yes' && github.event.inputs.profile == 'production'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.0.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Submit to App Stores
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          cd artifacts/cashclip
+          echo "Submitting build to App Stores..."
+          npx eas@latest submit \
+            --platform ${{ github.event.inputs.platform }} \
+            --latest
+
+      - name: Submission Complete
+        run: |
+          echo "✅ Submitted to App Stores"
+          echo "Platform: ${{ github.event.inputs.platform }}"
+          echo "Build: ${{ needs.build.outputs.build-id }}"
