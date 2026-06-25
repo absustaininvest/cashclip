@@ -1,8 +1,9 @@
 name: Setup Branch Protection
 
 # Run this workflow manually from the Actions tab after merging.
-# It uses GITHUB_TOKEN with administration:write to add the three required CI checks
-# to the required status checks for the main branch without disturbing any existing rules.
+# It uses a PAT (GH_ADMIN_TOKEN repo secret) with admin:repo access to
+# add three required CI checks to the main branch protection rule without
+# disturbing any existing settings.
 #
 # Required checks added / ensured:
 #   • Validate apps/cashclip/app.json
@@ -11,19 +12,15 @@ name: Setup Branch Protection
 #
 # HOW TO RUN
 # ----------
-# 1. Push / merge this file to main.
-# 2. Go to Actions → "Setup Branch Protection" → "Run workflow" → Run.
-# 3. Confirm in Settings → Branches → main that all three checks appear under
-#    "Require status checks to pass before merging".
-#
-# PERMISSIONS NOTE
-# ----------------
-# GITHUB_TOKEN is granted administration:write below, which is enough for
-# personal repos and most org repos.  If the run fails with a 403, the org
-# has restricted GITHUB_TOKEN admin access; add a repo secret GH_ADMIN_TOKEN
-# (a PAT with the "repo" scope / admin:read+write access) and change
-# `github-token: ${{ secrets.GITHUB_TOKEN }}` to
-# `github-token: ${{ secrets.GH_ADMIN_TOKEN }}`.
+# 1. Ensure the repo secret GH_ADMIN_TOKEN is set to a PAT that has the
+#    "repo" scope (full repository access including administration).
+#    Note: GITHUB_TOKEN cannot update branch protection on its own because
+#    GitHub Actions does not expose an `administration` permissions key —
+#    using GITHUB_TOKEN alone will result in a 403.
+# 2. Push / merge this file to main.
+# 3. Go to Actions → "Setup Branch Protection" → "Run workflow" → Run.
+# 4. Confirm in Settings → Branches → main that all three checks appear
+#    under "Require status checks to pass before merging".
 
 on:
   workflow_dispatch:
@@ -33,19 +30,28 @@ jobs:
     name: Add required status checks (validate, test, typecheck) on main
     runs-on: ubuntu-latest
     steps:
+      - name: Verify GH_ADMIN_TOKEN is present
+        run: |
+          if [ -z "${{ secrets.GH_ADMIN_TOKEN }}" ]; then
+            echo "::error::GH_ADMIN_TOKEN repo secret is not set. Add a PAT with the 'repo' scope as a repo secret named GH_ADMIN_TOKEN, then re-run this workflow."
+            exit 1
+          fi
+          echo "GH_ADMIN_TOKEN is present."
+
       - name: Configure branch protection for main
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GH_ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
             const branch = 'main';
 
-            // ── 1. Fetch existing rule (tolerate 404/403 = no rule yet) ────
-            // 404 = no protection rule exists yet.
-            // 403 = private repo on free plan; the GET is gated but the PUT
-            //       still works when called with a PAT that has admin scope.
+            // ── 1. Fetch existing rule (tolerate 404/403) ────────────────────
+            // 404 = no protection rule exists yet → create from scratch.
+            // 403 = plan limit on GET (e.g. private repo on GitHub Free);
+            //       the PAT can still write the rule, so we proceed with
+            //       defaults and the PUT will succeed once the repo is public.
             let current = null;
             try {
               const { data } = await github.rest.repos.getBranchProtection({
@@ -56,7 +62,7 @@ jobs:
               if (e.status === 404) {
                 core.info('No existing branch protection rule — creating from scratch.');
               } else if (e.status === 403) {
-                core.info('GET branch protection returned 403 (private repo / plan limit) — proceeding to upsert from scratch.');
+                core.info('GET branch protection returned 403 — proceeding to upsert from scratch.');
               } else {
                 throw e;
               }
@@ -131,58 +137,38 @@ jobs:
             }
 
             // ── 5. Apply ─────────────────────────────────────────────────────
-            try {
-              await github.rest.repos.updateBranchProtection({
-                owner,
-                repo,
-                branch,
-                required_status_checks,
-                enforce_admins:    current?.enforce_admins?.enabled    ?? false,
-                required_pull_request_reviews,
-                restrictions,
-                required_linear_history:
-                  current?.required_linear_history?.enabled ?? false,
-                allow_force_pushes:
-                  current?.allow_force_pushes?.enabled ?? false,
-                allow_deletions:
-                  current?.allow_deletions?.enabled    ?? false,
-                block_creations:
-                  current?.block_creations?.enabled    ?? false,
-                required_conversation_resolution:
-                  current?.required_conversation_resolution?.enabled ?? false,
-                lock_branch:
-                  current?.lock_branch?.enabled        ?? false,
-                allow_fork_syncing:
-                  current?.allow_fork_syncing?.enabled ?? false,
-              });
-            } catch (e) {
-              if (e.status === 403) {
-                core.error(
-                  'Branch protection update failed with 403 Forbidden. ' +
-                  'GITHUB_TOKEN does not have administration:write access on this repository ' +
-                  '(common in org repos that restrict token permissions). ' +
-                  'Fix: create a Personal Access Token (PAT) with the "repo" scope and ' +
-                  'full repository administration access, add it as a repo secret named ' +
-                  'GH_ADMIN_TOKEN, then re-run this workflow. The workflow will ' +
-                  'automatically prefer GH_ADMIN_TOKEN over GITHUB_TOKEN when both are present.'
-                );
-                process.exit(1);
-              }
-              throw e;
-            }
+            await github.rest.repos.updateBranchProtection({
+              owner,
+              repo,
+              branch,
+              required_status_checks,
+              enforce_admins:    current?.enforce_admins?.enabled    ?? false,
+              required_pull_request_reviews,
+              restrictions,
+              required_linear_history:
+                current?.required_linear_history?.enabled ?? false,
+              allow_force_pushes:
+                current?.allow_force_pushes?.enabled ?? false,
+              allow_deletions:
+                current?.allow_deletions?.enabled    ?? false,
+              block_creations:
+                current?.block_creations?.enabled    ?? false,
+              required_conversation_resolution:
+                current?.required_conversation_resolution?.enabled ?? false,
+              lock_branch:
+                current?.lock_branch?.enabled        ?? false,
+              allow_fork_syncing:
+                current?.allow_fork_syncing?.enabled ?? false,
+            });
 
             // ── 6. Report ─────────────────────────────────────────────────────
-            core.info(
-              `✅  Branch protection updated on ${branch}.`
-            );
-            core.info(
-              `Required checks now: ${mergedChecks.map(c => c.context).join(', ')}`
-            );
+            core.info(`✅  Branch protection updated on ${branch}.`);
+            core.info(`Required checks now: ${mergedChecks.map(c => c.context).join(', ')}`);
 
       - name: Smoke-test — verify required checks were actually applied
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GH_ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
@@ -210,15 +196,8 @@ jobs:
             if (missing.length > 0) {
               core.error(
                 `Smoke-test FAILED — the following required checks are missing from ` +
-                `the branch protection rule for '${branch}' even though the update ` +
-                `reported success:\n` +
-                missing.map(n => `  • ${n}`).join('\n') + '\n\n' +
-                `To diagnose: open GitHub → Settings → Branches → ${branch} and inspect ` +
-                `"Require status checks to pass before merging". If none of the required ` +
-                `checks appear, the API call may have silently dropped them (e.g. the ` +
-                `token lacked administration:write, the checks array was malformed, or ` +
-                `a concurrent update overwrote the rule). Re-run the workflow or add the ` +
-                `checks manually.`
+                `the branch protection rule for '${branch}':\n` +
+                missing.map(n => `  • ${n}`).join('\n')
               );
               process.exit(1);
             }
