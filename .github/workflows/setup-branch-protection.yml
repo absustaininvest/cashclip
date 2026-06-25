@@ -28,9 +28,6 @@ name: Setup Branch Protection
 on:
   workflow_dispatch:
 
-permissions:
-  administration: write
-
 jobs:
   protect-main:
     name: Add required status checks (validate, test, typecheck) on main
