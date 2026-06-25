@@ -1,6 +1,0 @@
-import * as Sentry from '@sentry/react-native';
-
-Sentry.init({
-  dsn: 'https://933cff0d6bf574585ba0164cfb8e27a1@o4511563928174592.ingest.us.sentry.io/4511564130091008',
-  tracesSampleRate: 1.0,
-});

@@ -1,7 +1,0 @@
-# Large Expo build binaries — backed up locally / downloaded by owner, not tracked in git
-expo20-llc/
-absustaininvest/
-
-# V39 prep: large source archives + sensitive signing credentials — local-only, NOT tracked in git
-V39-prep/*.tar.gz
-V39-prep/credentials/

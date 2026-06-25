@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /sc-portal
-
-Sitemap: https://absustaininvest.com/sitemap.xml
