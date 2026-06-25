@@ -1,0 +1,31 @@
+name: Check app.json / eas.json
+
+on:
+  push:
+    paths:
+      - 'apps/cashclip/app.json'
+      - 'apps/cashclip/eas.json'
+      - 'scripts/build-number.json'
+      - 'scripts/check-app-json.js'
+  pull_request:
+    paths:
+      - 'apps/cashclip/app.json'
+      - 'apps/cashclip/eas.json'
+      - 'scripts/build-number.json'
+      - 'scripts/check-app-json.js'
+
+jobs:
+  check-app-json:
+    name: Validate app.json & eas.json consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run check:app-json
+        run: node scripts/check-app-json.js

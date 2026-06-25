@@ -1,0 +1,221 @@
+name: Setup Branch Protection
+
+# Run this workflow manually from the Actions tab after merging.
+# It uses GITHUB_TOKEN with administration:write to add the three required CI checks
+# to the required status checks for the main branch without disturbing any existing rules.
+#
+# Required checks added / ensured:
+#   • Validate apps/cashclip/app.json
+#   • CashClip tests (game routing, metro, tsconfigs)
+#   • Typecheck (all packages)
+#
+# HOW TO RUN
+# ----------
+# 1. Push / merge this file to main.
+# 2. Go to Actions → "Setup Branch Protection" → "Run workflow" → Run.
+# 3. Confirm in Settings → Branches → main that all three checks appear under
+#    "Require status checks to pass before merging".
+#
+# PERMISSIONS NOTE
+# ----------------
+# GITHUB_TOKEN is granted administration:write below, which is enough for
+# personal repos and most org repos.  If the run fails with a 403, the org
+# has restricted GITHUB_TOKEN admin access; add a repo secret GH_ADMIN_TOKEN
+# (a PAT with the "repo" scope / admin:read+write access) and change
+# `github-token: ${{ secrets.GITHUB_TOKEN }}` to
+# `github-token: ${{ secrets.GH_ADMIN_TOKEN }}`.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  administration: write
+
+jobs:
+  protect-main:
+    name: Add required status checks (validate, test, typecheck) on main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure branch protection for main
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const branch = 'main';
+
+            // ── 1. Fetch existing rule (tolerate 404 = no rule yet) ─────────
+            let current = null;
+            try {
+              const { data } = await github.rest.repos.getBranchProtection({
+                owner, repo, branch,
+              });
+              current = data;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              core.info('No existing branch protection rule — creating from scratch.');
+            }
+
+            // ── 2. Required status checks ────────────────────────────────────
+            // The GitHub API has two representations of required checks:
+            //   • Legacy: required_status_checks.contexts  (flat string array)
+            //   • Current: required_status_checks.checks   (array of {context, app_id?})
+            // We normalise both to the current `checks` format so nothing is lost.
+            const REQUIRED_CHECKS = [
+              'Validate apps/cashclip/app.json',
+              'CashClip tests (game routing, metro, tsconfigs)',
+              'Typecheck (all packages)',
+            ];
+            const rsc = current?.required_status_checks ?? {};
+
+            // Collect legacy `contexts` entries (present on older rules).
+            const fromContexts = (rsc.contexts ?? []).map(c => ({ context: c }));
+            // Collect current `checks` entries.
+            const fromChecks   = (rsc.checks   ?? []).map(c => ({ context: c.context }));
+
+            // Merge, deduplicate on `context` string, then add any missing required checks.
+            const seen = new Set();
+            const mergedChecks = [...fromContexts, ...fromChecks]
+              .filter(c => { const dup = seen.has(c.context); seen.add(c.context); return !dup; });
+            for (const name of REQUIRED_CHECKS) {
+              if (!seen.has(name)) {
+                mergedChecks.push({ context: name });
+              }
+            }
+
+            const required_status_checks = {
+              strict: rsc.strict ?? false,
+              checks: mergedChecks,
+            };
+
+            // ── 3. PR review settings ────────────────────────────────────────
+            // GET returns nested user/team objects; PUT needs plain string arrays.
+            let required_pull_request_reviews = null;
+            const prr = current?.required_pull_request_reviews;
+            if (prr) {
+              const dr  = prr.dismissal_restrictions ?? {};
+              const bpa = prr.bypass_pull_request_allowances ?? {};
+              required_pull_request_reviews = {
+                dismiss_stale_reviews:           prr.dismiss_stale_reviews           ?? false,
+                require_code_owner_reviews:      prr.require_code_owner_reviews      ?? false,
+                required_approving_review_count: prr.required_approving_review_count ?? 1,
+                require_last_push_approval:      prr.require_last_push_approval      ?? false,
+                dismissal_restrictions: {
+                  users: dr.users?.map(u => u.login) ?? [],
+                  teams: dr.teams?.map(t => t.slug)  ?? [],
+                  apps:  dr.apps?.map(a => a.slug)   ?? [],
+                },
+                bypass_pull_request_allowances: {
+                  users: bpa.users?.map(u => u.login) ?? [],
+                  teams: bpa.teams?.map(t => t.slug)  ?? [],
+                  apps:  bpa.apps?.map(a => a.slug)   ?? [],
+                },
+              };
+            }
+
+            // ── 4. Push restrictions ─────────────────────────────────────────
+            let restrictions = null;
+            const r = current?.restrictions;
+            if (r) {
+              restrictions = {
+                users: r.users?.map(u => u.login) ?? [],
+                teams: r.teams?.map(t => t.slug)  ?? [],
+                apps:  r.apps?.map(a => a.slug)   ?? [],
+              };
+            }
+
+            // ── 5. Apply ─────────────────────────────────────────────────────
+            try {
+              await github.rest.repos.updateBranchProtection({
+                owner,
+                repo,
+                branch,
+                required_status_checks,
+                enforce_admins:    current?.enforce_admins?.enabled    ?? false,
+                required_pull_request_reviews,
+                restrictions,
+                required_linear_history:
+                  current?.required_linear_history?.enabled ?? false,
+                allow_force_pushes:
+                  current?.allow_force_pushes?.enabled ?? false,
+                allow_deletions:
+                  current?.allow_deletions?.enabled    ?? false,
+                block_creations:
+                  current?.block_creations?.enabled    ?? false,
+                required_conversation_resolution:
+                  current?.required_conversation_resolution?.enabled ?? false,
+                lock_branch:
+                  current?.lock_branch?.enabled        ?? false,
+                allow_fork_syncing:
+                  current?.allow_fork_syncing?.enabled ?? false,
+              });
+            } catch (e) {
+              if (e.status === 403) {
+                core.error(
+                  'Branch protection update failed with 403 Forbidden. ' +
+                  'GITHUB_TOKEN does not have administration:write access on this repository ' +
+                  '(common in org repos that restrict token permissions). ' +
+                  'Fix: create a Personal Access Token (PAT) with the "repo" scope and ' +
+                  'full repository administration access, add it as a repo secret named ' +
+                  'GH_ADMIN_TOKEN, then re-run this workflow. The workflow will ' +
+                  'automatically prefer GH_ADMIN_TOKEN over GITHUB_TOKEN when both are present.'
+                );
+                process.exit(1);
+              }
+              throw e;
+            }
+
+            // ── 6. Report ─────────────────────────────────────────────────────
+            core.info(
+              `✅  Branch protection updated on ${branch}.`
+            );
+            core.info(
+              `Required checks now: ${mergedChecks.map(c => c.context).join(', ')}`
+            );
+
+      - name: Smoke-test — verify required checks were actually applied
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const branch = 'main';
+
+            const REQUIRED_CHECKS = [
+              'Validate apps/cashclip/app.json',
+              'CashClip tests (game routing, metro, tsconfigs)',
+              'Typecheck (all packages)',
+            ];
+
+            const { data } = await github.rest.repos.getBranchProtection({
+              owner, repo, branch,
+            });
+
+            const rsc = data.required_status_checks ?? {};
+            const applied = new Set([
+              ...(rsc.contexts ?? []),
+              ...(rsc.checks ?? []).map(c => c.context),
+            ]);
+
+            core.info(`Checks confirmed in GitHub Settings: ${[...applied].join(', ')}`);
+
+            const missing = REQUIRED_CHECKS.filter(name => !applied.has(name));
+            if (missing.length > 0) {
+              core.error(
+                `Smoke-test FAILED — the following required checks are missing from ` +
+                `the branch protection rule for '${branch}' even though the update ` +
+                `reported success:\n` +
+                missing.map(n => `  • ${n}`).join('\n') + '\n\n' +
+                `To diagnose: open GitHub → Settings → Branches → ${branch} and inspect ` +
+                `"Require status checks to pass before merging". If none of the required ` +
+                `checks appear, the API call may have silently dropped them (e.g. the ` +
+                `token lacked administration:write, the checks array was malformed, or ` +
+                `a concurrent update overwrote the rule). Re-run the workflow or add the ` +
+                `checks manually.`
+              );
+              process.exit(1);
+            }
+
+            core.info('✅  Smoke-test passed — all required checks are confirmed in the branch protection rule.');
