@@ -42,7 +42,10 @@ jobs:
             const repo  = context.repo.repo;
             const branch = 'main';
 
-            // ── 1. Fetch existing rule (tolerate 404 = no rule yet) ─────────
+            // ── 1. Fetch existing rule (tolerate 404/403 = no rule yet) ────
+            // 404 = no protection rule exists yet.
+            // 403 = private repo on free plan; the GET is gated but the PUT
+            //       still works when called with a PAT that has admin scope.
             let current = null;
             try {
               const { data } = await github.rest.repos.getBranchProtection({
@@ -50,8 +53,13 @@ jobs:
               });
               current = data;
             } catch (e) {
-              if (e.status !== 404) throw e;
-              core.info('No existing branch protection rule — creating from scratch.');
+              if (e.status === 404) {
+                core.info('No existing branch protection rule — creating from scratch.');
+              } else if (e.status === 403) {
+                core.info('GET branch protection returned 403 (private repo / plan limit) — proceeding to upsert from scratch.');
+              } else {
+                throw e;
+              }
             }
 
             // ── 2. Required status checks ────────────────────────────────────
