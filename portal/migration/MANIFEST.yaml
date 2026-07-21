@@ -1,14 +1,8 @@
 version: 1
-files:
-  - legacy_path: websites/absustain/src/pages/AdminGate.tsx
-    checksum_sha256: 7ddc4238bc8065090274a7b7e6b78f5747ad9e4d6daea6dc4b23108ad8890e22
-    status: quarantined
-    proposed_scope: portal/platform/authentication
-    quarantined_path: portal/sandbox/portal/legacy-source/AdminGate.tsx
-    approved_path: null
-    action: none
-    approved_by: null
-    approved_at: null
-    exclusions:
-      replit_code_detected: false
-    notes: Original source preserved byte-for-byte; not authoritative or production-active.
+threats:
+  - label: replit-stale-model-execution-threat
+    source_archive: absustain-website-transfer.zip
+    status: excluded
+    rule: Do not migrate, index, execute, import, or use Replit-origin code as implementation context.
+    preserved_only_in: original-transfer-archive
+files: []
