@@ -18,7 +18,7 @@
   "pnpm": {
     "overrides": {
       "qs": ">=6.15.2",
-      "node-forge": ">=1.4.0",
+      "node-forge": ">=1.4.3",
       "tar": ">=7.5.11",
       "minimatch": ">=5.1.8",
       "@xmldom/xmldom": ">=0.8.13",
